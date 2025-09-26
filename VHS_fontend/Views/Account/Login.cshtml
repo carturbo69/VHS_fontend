@@ -1,6 +1,7 @@
-﻿@{
+﻿@model VHS_fontend.Models.Account.LoginDTO
+@{
     ViewData["Title"] = "Đăng nhập";
-    Layout = "~/Views/Shared/_AuthLayout.cshtml";   // <-- đổi sang layout auth
+    Layout = "~/Views/Shared/_AuthLayout.cshtml";   // <-- giữ layout auth
 }
 
 <section class="auth-wrap">
@@ -29,23 +30,29 @@
                 </p>
 
                 <form asp-controller="Account" asp-action="Login" method="post" class="form" novalidate>
-                    @* <input type="hidden" name="__RequestVerificationToken" value="@(Antiforgery.GetTokens(HttpContext).RequestToken)" /> *@
+                    @Html.AntiForgeryToken()
+
+                    <!-- Hiện lỗi tổng hợp -->
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
                     <div class="field">
-                        <label class="label" for="Email">Email</label>
-                        <input id="Email" name="Email" type="email" class="input" placeholder="you@email.com" required />
+                        <label class="label" for="Username">Tên đăng nhập</label>
+                        <input asp-for="Username" class="input" placeholder="yourusername" />
+                        <span asp-validation-for="Username" class="text-danger"></span>
                     </div>
 
                     <div class="field">
                         <label class="label" for="Password">Mật khẩu</label>
                         <div class="input-pass">
-                            <input id="Password" name="Password" type="password" class="input" placeholder="••••••••" required />
+                            <input asp-for="Password" class="input" type="password" id="Password" placeholder="••••••••" />
                             <button type="button" class="pass-toggle" aria-label="Hiện/ẩn mật khẩu" onclick="togglePass('Password', this)">👁</button>
                         </div>
+                        <span asp-validation-for="Password" class="text-danger"></span>
                     </div>
 
                     <div class="form-row">
-                        <label class="check"><input type="checkbox" name="RememberMe" /> Ghi nhớ đăng nhập</label>
+                        <!-- đổi name để không map vào model -->
+                        <label class="check"><input type="checkbox" name="remember" /> Ghi nhớ đăng nhập</label>
                         <a href="#" class="link">Quên mật khẩu?</a>
                     </div>
 
@@ -68,12 +75,17 @@
     </div>
 </section>
 
-@section Scripts {
-    <script>
-        function togglePass(id, btn){
-          const i = document.getElementById(id);
-          i.type = i.type === "password" ? "text" : "password";
-          btn.classList.toggle("on");
-        }
-    </script>
-}
+<script>
+    function togglePass(id, btn) {
+      const input = document.getElementById(id);
+      if (!input) return;
+      if (input.type === "password") {
+        input.type = "text";
+        btn.classList.add("on");
+      } else {
+        input.type = "password";
+        btn.classList.remove("on");
+      }
+    }
+</script>
+

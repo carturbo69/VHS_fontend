@@ -11,6 +11,10 @@ builder.Services.AddHttpClient<AuthService>();
 
 builder.Services.AddControllersWithViews();
 
+
+builder.Services.AddHttpContextAccessor();
+
+
 // Session
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>

@@ -10,5 +10,8 @@ namespace VHS_fontend.Models.Account
         public string Token { get; set; }
         public string Role { get; set; }
         public Guid AccountID { get; set; }
+
+        // Thêm:
+        public string? DisplayName { get; set; }
     }
 }

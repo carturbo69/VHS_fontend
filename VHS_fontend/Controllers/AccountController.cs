@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using VHS_frontend.Services;
+﻿// Controllers/AccountController.cs
+using Microsoft.AspNetCore.Mvc;
 using VHS_fontend.Models.Account;
+using VHS_frontend.Services;
 
 namespace VHS_frontend.Controllers
 {
@@ -16,7 +17,32 @@ namespace VHS_frontend.Controllers
         [HttpGet]
         public IActionResult Login() => View(new LoginDTO());
 
+        //[HttpPost]
+        //public async Task<IActionResult> Login(LoginDTO model)
+        //{
+        //    if (!ModelState.IsValid) return View(model);
+
+        //    var result = await _authService.LoginAsync(model);
+        //    if (result == null)
+        //    {
+        //        ModelState.AddModelError(string.Empty, "Sai tài khoản hoặc mật khẩu");
+        //        return View(model);
+        //    }
+
+        //    Console.WriteLine($"[DEBUG] Login success: Token={result.Token}, Role={result.Role}, AccountID={result.AccountID}");
+
+
+        //    // Lưu session
+        //    HttpContext.Session.SetString("JWToken", result.Token);
+        //    HttpContext.Session.SetString("Role", result.Role ?? string.Empty);
+        //    HttpContext.Session.SetString("AccountID", result.AccountID.ToString());
+
+        //    // Redirect theo Role
+        //    return RedirectByRole(result.Role);
+        //}
+
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginDTO model)
         {
             if (!ModelState.IsValid) return View(model);
@@ -30,32 +56,68 @@ namespace VHS_frontend.Controllers
 
             Console.WriteLine($"[DEBUG] Login success: Token={result.Token}, Role={result.Role}, AccountID={result.AccountID}");
 
-
-            // Lưu session
             HttpContext.Session.SetString("JWToken", result.Token);
             HttpContext.Session.SetString("Role", result.Role ?? string.Empty);
             HttpContext.Session.SetString("AccountID", result.AccountID.ToString());
+            // 🔥 Lưu thêm Username
+            HttpContext.Session.SetString("Username", model.Username);
 
-            // Redirect theo Role
+            TempData["ToastType"] = "success";
+            TempData["ToastMessage"] = $"Đăng nhập thành công! Xin chào {(result.DisplayName ?? model.Username)} 👋";
+
             return RedirectByRole(result.Role);
         }
+
 
         [HttpGet]
         public IActionResult Register() => View(new RegisterDTO());
 
+        //    [HttpPost]
+        //    [ValidateAntiForgeryToken]
+        //    public async Task<IActionResult> Register(RegisterDTO model)
+        //    {
+        //        if (!ModelState.IsValid) return View(model);
+
+        //        // Option: kiểm tra ConfirmPassword lần nữa (phòng khi tắt JS)
+        //        if (model.Password != model.ConfirmPassword)
+        //{
+        //            ModelState.AddModelError(nameof(model.ConfirmPassword), "Mật khẩu xác nhận không khớp");
+        //            return View(model);
+        //        }
+
+        //        var result = await _authService.RegisterAsync(model);
+        //        if (result == null)
+        //        {
+        //            ModelState.AddModelError(string.Empty, "Đăng ký thất bại");
+        //            return View(model);
+        //        }
+
+        //        return RedirectToAction("Login");
+        //    }
+
+
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterDTO model)
         {
             if (!ModelState.IsValid) return View(model);
 
-            var result = await _authService.RegisterAsync(model);
-            if (result == null)
+            // Double-check confirm password (phòng khi client-side validate bị tắt)
+            if (model.Password != model.ConfirmPassword)
             {
-                ModelState.AddModelError(string.Empty, "Đăng ký thất bại");
+                ModelState.AddModelError(nameof(model.ConfirmPassword), "Mật khẩu xác nhận không khớp");
                 return View(model);
             }
 
-            // Sau khi đăng ký → sang login
+            var result = await _authService.RegisterAsync(model);
+            if (result == null || !result.Success)
+            {
+                // Hiển thị message từ API nếu có
+                ModelState.AddModelError(string.Empty, result?.Message ?? "Đăng ký thất bại");
+                return View(model);
+            }
+
+            TempData["RegisterMessage"] = result.Message ?? "Đăng ký thành công";
             return RedirectToAction("Login");
         }
 

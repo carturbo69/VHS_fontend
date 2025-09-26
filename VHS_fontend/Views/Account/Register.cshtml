@@ -1,12 +1,12 @@
-﻿@{
+﻿@model VHS_fontend.Models.Account.RegisterDTO
+@{
     ViewData["Title"] = "Đăng ký";
-    Layout = "~/Views/Shared/_AuthLayout.cshtml";   // <-- đổi sang layout auth
+    Layout = "~/Views/Shared/_AuthLayout.cshtml";
 }
 
 <section class="auth-wrap">
     <div class="container-xl">
         <div class="auth-grid">
-            <!-- Cột trái -->
             <aside class="auth-side" aria-hidden="true">
                 <div class="auth-side-inner">
                     <img src="~/images/vhs-logo.png" alt="VHS" class="auth-logo" />
@@ -20,7 +20,6 @@
                 </div>
             </aside>
 
-            <!-- Cột phải: form -->
             <div class="auth-card" role="form">
                 <h1 class="auth-title">Đăng ký</h1>
                 <p class="auth-desc">
@@ -29,32 +28,38 @@
                 </p>
 
                 <form asp-controller="Account" asp-action="Register" method="post" class="form" novalidate>
-                    @* <input type="hidden" name="__RequestVerificationToken" value="@(Antiforgery.GetTokens(HttpContext).RequestToken)" /> *@
+                    @Html.AntiForgeryToken()
+
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
                     <div class="field">
-                        <label class="label" for="FullName">Họ và tên</label>
-                        <input id="FullName" name="FullName" type="text" class="input" placeholder="Nguyễn Văn A" required />
+                        <label class="label" for="Username">Tên đăng nhập</label>
+                        <input asp-for="Username" class="input" placeholder="yourusername" />
+                        <span asp-validation-for="Username" class="text-danger"></span>
                     </div>
 
                     <div class="field">
                         <label class="label" for="Email">Email</label>
-                        <input id="Email" name="Email" type="email" class="input" placeholder="you@email.com" required />
+                        <input asp-for="Email" class="input" placeholder="you@email.com" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
                     </div>
 
                     <div class="field">
                         <label class="label" for="Password">Mật khẩu</label>
                         <div class="input-pass">
-                            <input id="Password" name="Password" type="password" class="input" placeholder="Tối thiểu 6 ký tự" minlength="6" required />
+                            <input asp-for="Password" class="input" placeholder="Tối thiểu 6 ký tự" />
                             <button type="button" class="pass-toggle" aria-label="Hiện/ẩn mật khẩu" onclick="togglePass('Password', this)">👁</button>
                         </div>
+                        <span asp-validation-for="Password" class="text-danger"></span>
                     </div>
 
                     <div class="field">
                         <label class="label" for="ConfirmPassword">Xác nhận mật khẩu</label>
                         <div class="input-pass">
-                            <input id="ConfirmPassword" name="ConfirmPassword" type="password" class="input" placeholder="Nhập lại mật khẩu" minlength="6" required />
+                            <input asp-for="ConfirmPassword" class="input" placeholder="Nhập lại mật khẩu" />
                             <button type="button" class="pass-toggle" aria-label="Hiện/ẩn mật khẩu" onclick="togglePass('ConfirmPassword', this)">👁</button>
                         </div>
+                        <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
                     </div>
 
                     <div class="form-row">
@@ -83,9 +88,11 @@
 </section>
 
 @section Scripts {
+    <partial name="_ValidationScriptsPartial" />
     <script>
         function togglePass(id, btn){
           const i = document.getElementById(id);
+          if(!i) return;
           i.type = i.type === "password" ? "text" : "password";
           btn.classList.toggle("on");
         }
