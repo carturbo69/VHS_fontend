@@ -1,5 +1,4 @@
-﻿// Controllers/AccountController.cs
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using VHS_fontend.Models.Account;
 using VHS_frontend.Services;
 

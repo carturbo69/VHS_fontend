@@ -1,0 +1,74 @@
+﻿@model List<VHS_fontend.Controllers.ServiceViewModel>
+
+@{
+    ViewData["Title"] = "Dịch vụ";
+}
+
+<section class="services-section">
+    <div class="container-xl">
+        <h1 class="page-title">Danh sách dịch vụ</h1>
+        <p class="page-subtitle">Chọn dịch vụ phù hợp cho nhu cầu của bạn</p>
+
+        <div class="services-grid">
+            @foreach (var service in Model)
+            {
+                <div class="service-card">
+                    <img src="@service.ImageUrl" alt="@service.Name" class="service-img" />
+                    <div class="service-body">
+                        <h2 class="service-title">@service.Name</h2>
+                        <p class="service-desc">@service.Description</p>
+                        <p><strong>Thời gian:</strong> @service.Duration</p>
+                        <p><strong>Giá:</strong> @service.Price</p>
+                        <p class="stars">
+                            @for (int s = 0; s < service.Stars; s++)
+                            {
+                                <span>⭐</span>
+                            }
+                        </p>
+                        <div class="service-actions">
+                            <a href="#" class="btn btn-primary">Thêm vào giỏ hàng</a>
+                            <a asp-controller="Services" asp-action="Details" asp-route-id="@service.Id" class="btn btn-ghost">Chi tiết</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @{
+            int currentPage = ViewBag.CurrentPage ?? 1;
+            int totalPages = ViewBag.TotalPages ?? 1;
+
+            int startPage = Math.Max(1, currentPage - 2);
+            int endPage = Math.Min(totalPages, currentPage + 2);
+        }
+
+        <div class="pagination">
+            @if (currentPage > 1)
+            {
+                <a asp-action="Index" asp-route-page="1" class="page-link">«</a>
+                <a asp-action="Index" asp-route-page="@(currentPage - 1)" class="page-link">‹</a>
+            }
+
+            @for (int i = startPage; i <= endPage; i++)
+            {
+                if (i == currentPage)
+                {
+                    <span class="page-link active">@i</span>
+                }
+                else
+                {
+                    <a asp-action="Index" asp-route-page="@i" class="page-link">@i</a>
+                }
+            }
+
+            @if (currentPage < totalPages)
+            {
+                <a asp-action="Index" asp-route-page="@(currentPage + 1)" class="page-link">›</a>
+                <a asp-action="Index" asp-route-page="@totalPages" class="page-link">»</a>
+            }
+        </div>
+
+    </div>
+</section>
+
+<link rel="stylesheet" href="~/css/services.css" asp-append-version="true" />
