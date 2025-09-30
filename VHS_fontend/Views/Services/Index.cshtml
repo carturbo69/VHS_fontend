@@ -25,8 +25,8 @@
             <select name="category" class="input">
                 <option value="">-- Tất cả loại --</option>
                 <option value="Vệ sinh" selected="@(category == "Vệ sinh")">Vệ sinh</option>
-                <option value="Sửa chữa" selected="@(category == "Sửa chữa")">Sửa chữa</option>
-                <option value="Giúp việc" selected="@(category == "Giúp việc")">Giúp việc</option>
+                <option value="Nội trợ" selected="@(category == "Nội trợ")">Nội trợ</option>
+                <option value="Sự kiện nhỏ tại nhà" selected="@(category == "Sự kiện nhỏ tại nhà")">Sự kiện nhỏ tại nhà</option>
             </select>
 
             <select name="sort" class="input">
@@ -60,31 +60,32 @@
                             <p><strong>Thời gian:</strong> @service.Duration</p>
                             <p><strong>Giá:</strong> @service.PriceDisplay</p>
 
-                            <!-- Sao + tổng số đánh giá (làm tròn 0.5) -->
                             <div class="stars">
                                 @{
-                                    // Làm tròn về bội số 0.5
-                                    var avg = Math.Round(service.Stars * 2, MidpointRounding.AwayFromZero) / 2.0;
-                                    int fullStars = (int)Math.Floor(avg);      // số sao đầy
-                                    bool halfStar = (avg - fullStars) == 0.5;  // có nửa sao không
+                                    var avg = service.Stars; // giữ nguyên giá trị gốc, không làm tròn 0.5
                                 }
                                 @for (int s = 1; s <= 5; s++)
                                 {
-                                    if (s <= fullStars)
+                                    // mức “đổ” của ngôi sao thứ s: 0..1
+                                    var fill = Math.Max(0, Math.Min(1, avg - (s - 1)));
+                                    var pct = (int)Math.Round(fill * 100); // 0..100
+
+                                    if (pct >= 100)
                                     {
                                         <span class="star filled">★</span>
                                     }
-                                    else if (halfStar && s == fullStars + 1)
-                                    {
-                                        <span class="star half">★</span>
-                                    }
-                                    else
+                                    else if (pct <= 0)
                                     {
                                         <span class="star">★</span>
                                     }
+                                    else
+                                    {
+                                        <span class="star frac" style="--p:@pct%;">★</span>
+                                    }
                                 }
-                                <span class="rating-text">@avg / 5 (@service.TotalReviews đánh giá)</span>
+                                <span class="rating-text">@avg.ToString("0.#") / 5 (@service.TotalReviews đánh giá)</span>
                             </div>
+
 
                             <div class="service-actions">
                                 <a href="#" class="btn btn-primary">Thêm vào giỏ hàng</a>

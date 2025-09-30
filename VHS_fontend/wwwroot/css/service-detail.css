@@ -1,0 +1,1066 @@
+﻿/* ==========================================================================
+   SERVICE DETAIL PAGE
+   - Dùng biến màu từ site.css: --background, --foreground, --border,
+     --card, --muted, --muted-foreground, --primary, --primary-foreground
+   ========================================================================== */
+
+/* 0) Container tweak (tùy chọn) */
+/*.container-xl {
+    max-width: 1240px;
+    margin-inline: auto;
+}*/
+
+/* 1) Wrapper / Layout ----------------------------------------------------- */
+.service-detail {
+    background: var(--background);
+    color: var(--foreground);
+    min-height: 100vh;
+    padding: 40px 40px 64px;
+}
+
+/* 2) Breadcrumb ----------------------------------------------------------- */
+.breadcrumb {
+    display: flex;
+    gap: 8px;
+    font-size: .95rem;
+    color: var(--muted-foreground);
+    margin-bottom: 18px;
+}
+
+    .breadcrumb a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+        .breadcrumb a:hover {
+            color: var(--primary);
+        }
+
+    .breadcrumb .current {
+        color: var(--foreground);
+        font-weight: 700;
+    }
+
+/* 3) Grid: gallery (trái) + info (phải) ----------------------------------- */
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr; /* mobile: 1 cột */
+    row-gap: 28px;
+    margin-inline: 30px;
+}
+
+@media (min-width: 992px) {
+    .detail-grid {
+        grid-template-columns: minmax(500px, 0.8fr) minmax(520px, 1.2fr);
+        column-gap: 20px; /* khoảng giữa ảnh & info */
+        margin-inline: 200px;
+        align-items: start;
+    }
+}
+
+@media (min-width: 1400px) {
+    .detail-grid {
+        column-gap: 36px;
+        margin-inline: 100px;
+    }
+}
+
+/* 4) Gallery -------------------------------------------------------------- */
+.gallery {
+    display: grid;
+    gap: 14px;
+}
+
+.gallery-main {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    padding: 8px;
+}
+
+    .gallery-main img {
+        width: 100%;
+        height: 420px;
+        object-fit: cover;
+        border-radius: 8px;
+    }
+
+.thumbs {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.thumb {
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+    .thumb:hover {
+        transform: translateY(-2px);
+        border-color: var(--primary);
+        box-shadow: 0 6px 16px rgba(0,0,0,.08);
+    }
+
+    .thumb img {
+        width: 100%;
+        height: 70px;
+        object-fit: cover;
+        display: block;
+    }
+
+/* 5) Info block ----------------------------------------------------------- */
+.title {
+    font-size: clamp(22px, 3vw, 32px);
+    font-weight: 800;
+    margin: 4px 0 8px;
+}
+
+.rating-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+/* Stars (đổ màu liên tục) */
+.stars {
+    display: inline-flex;
+    gap: 2px;
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.star {
+    color: #d1d5db;
+}
+    /* nền xám chưa đổ */
+    .star.filled {
+        color: #f59e0b;
+    }
+    /* sao đầy */
+    .star.frac { /* sao đổ theo phần trăm 0..100 bằng --p */
+        background: linear-gradient(90deg, #f59e0b var(--p), #d1d5db var(--p));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+    }
+
+.rating-text {
+    font-size: .95rem;
+    color: var(--muted-foreground);
+}
+
+.price {
+    font-size: clamp(20px, 2.6vw, 28px);
+    font-weight: 800;
+    color: var(--primary);
+    margin: 6px 0 10px;
+}
+
+.brief {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 10px 0;
+    display: grid;
+    gap: 6px;
+}
+
+.desc {
+    color: var(--muted-foreground);
+    line-height: 1.7;
+    margin-bottom: 14px;
+}
+
+/* 6) Add-ons -------------------------------------------------------------- */
+.addons {
+    margin: 18px 0 10px;
+}
+
+.addons-title {
+    font-weight: 800;
+    font-size: 1.05rem;
+    margin-bottom: 10px;
+}
+
+.addons-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+@media (min-width: 768px) {
+    .addons-list {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Card add-on: 2 cột (Tên / Control), hàng 2 cho Giá */
+.addon-item {
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto; /* H1: name+control, H2: price */
+    align-items: center;
+    gap: 6px 12px;
+}
+
+.addon-name {
+    grid-column: 1/2;
+    grid-row: 1/2;
+    font-weight: 600;
+}
+
+.qty-control {
+    grid-column: 2/3;
+    grid-row: 1/2;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.addon-item.addon-check input[type="checkbox"] {
+    grid-column: 2/3;
+    grid-row: 1/2;
+    justify-self: end;
+}
+
+.qty-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--muted);
+    cursor: pointer;
+    font-weight: 800;
+}
+
+    .qty-btn:hover {
+        background: color-mix(in oklab, var(--muted) 70%, var(--foreground) 6%);
+    }
+
+.qty-input {
+    width: 48px;
+    height: 28px;
+    text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+}
+/* Giá add-on */
+.addon-price {
+    grid-column: 1 / -1; /* tràn 2 cột */
+    grid-row: 2/3;
+    justify-self: start;
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--primary) 10%, transparent);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: .95rem;
+}
+
+.addons-summary {
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+    display: grid;
+    gap: 6px;
+}
+
+    .addons-summary .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: .95rem;
+    }
+
+        .addons-summary .row.total {
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+
+@media (max-width: 420px) {
+    .addon-item {
+        padding: 12px;
+        gap: 8px 10px;
+    }
+
+    .addon-price {
+        font-size: .9rem;
+    }
+}
+
+/* 7) Actions --------------------------------------------------------------- */
+.actions {
+    display: flex;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+    .actions .btn {
+        flex: 0;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 700;
+        white-space: nowrap;
+        border: none;
+    }
+
+.btn-cart {
+    background: rgb(145 196 184);
+}
+
+    .btn-cart:hover {
+        background: #7fd1be;
+    }
+
+.btn-buy {
+    background: #1abc9c;
+    color: var(--primary-foreground);
+}
+
+    .btn-buy:hover {
+        background: #159d82;
+    }
+
+/* 8) Safety --------------------------------------------------------------- */
+.safety {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    font-size: .95rem;
+    color: var(--muted-foreground);
+    margin-top: 10px;
+}
+
+/* 9) Related -------------------------------------------------------------- */
+.related {
+    margin-top: 48px;
+}
+
+.related-title {
+    font-weight: 800;
+    font-size: clamp(18px, 2.4vw, 24px);
+    margin-bottom: 14px;
+}
+
+.related-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* mobile */
+    gap: 16px;
+}
+
+/* Desktop: 5 cột ngang */
+@media (min-width: 992px) {
+    .related-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    /* ảnh thấp hơn chút để cân khi thu hẹp card */
+    .rel-img-wrap img {
+        height: 120px;
+    }
+}
+
+.related-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    overflow: hidden;
+    transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+
+    .related-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px -18px rgba(0,0,0,.15);
+        border-color: color-mix(in oklab, var(--border) 70%, var(--primary) 30%);
+    }
+
+.rel-img-wrap img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    display: block;
+}
+
+.rel-body {
+    padding: 10px;
+    display: grid;
+    gap: 6px;
+}
+
+.rel-name {
+    font-weight: 700;
+    font-size: .98rem;
+    color: var(--foreground);
+    text-decoration: none;
+}
+
+    .rel-name:hover {
+        color: var(--primary);
+    }
+
+.rel-stars {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: .9rem;
+}
+
+.rel-rating-text {
+    font-size: .85rem;
+    color: var(--muted-foreground);
+}
+
+.rel-price {
+    font-weight: 800;
+    color: var(--primary);
+}
+
+/* 10) A11y & motion prefs ------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .thumb,
+    .related-card,
+    .service-detail * {
+        transition: none !important;
+    }
+}
+
+/* 11) Small helpers ------------------------------------------------------- */
+img {
+    max-width: 100%;
+}
+
+button {
+    cursor: pointer;
+}
+
+/* ===== Provider / Shop (style giống hình, tối ưu khoảng/ màu) ============ */
+/* ==========================================================================
+   PROVIDER / SHOP (dưới .detail-grid)
+   Layout: [LEFT 320px] | [divider] | [RIGHT 2 hàng × 3 cột]
+   Nút Chat/Xem shop ngang nhau, màu theo palette của bạn
+   ========================================================================== */
+
+.provider-section {
+    margin-top: 24px;
+}
+
+.provider-card.provider--split {
+    display: grid;
+    grid-template-columns: 320px 1px 1fr; /* trái | divider | phải */
+    gap: 18px;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.05);
+}
+
+.provider-divider {
+    width: 1px;
+    height: 72px;
+    background: var(--border);
+}
+
+@media (max-width: 992px) {
+    .provider-card.provider--split {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .provider-divider {
+        display: none;
+    }
+}
+
+/* LEFT: logo + name + status + 2 buttons (ngang nhau) */
+.provider-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.provider-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    object-fit: cover;
+    background: #fff;
+}
+
+.provider-meta {
+    display: grid;
+    gap: 8px;
+}
+
+.provider-name {
+    margin: 0;
+    font-weight: 800;
+    font-size: 1.06rem;
+    color: var(--foreground);
+}
+
+.provider-online {
+    font-size: .9rem;
+    color: var(--muted-foreground);
+}
+
+/* Buttons equal width/height */
+.provider-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 nút = nhau */
+    gap: 8px;
+    max-width: 320px;
+}
+
+    .provider-actions .btn {
+        height: 40px; /* cùng chiều cao */
+        padding: 0 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-weight: 700;
+        font-size: .9rem;
+        line-height: 1;
+        border-radius: 8px;
+        border-width: 1px;
+        text-decoration: none;
+        box-sizing: border-box;
+        white-space: nowrap;
+    }
+
+        .provider-actions .btn svg,
+        .provider-actions .btn img {
+            width: 16px;
+            height: 16px;
+            flex: 0 0 16px;
+        }
+
+/* Màu nút theo theme */
+.btn-outline {
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    background: transparent;
+}
+
+    .btn-outline:hover {
+        background: color-mix(in oklab, var(--primary) 10%, transparent);
+    }
+
+.btn-ghost {
+    border: 1px solid var(--border);
+    color: var(--foreground);
+    background: var(--card);
+}
+
+    .btn-ghost:hover {
+        background: var(--muted);
+    }
+
+/* RIGHT: 2 hàng × 3 cột thống kê */
+.provider-right {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px 32px;
+}
+
+@media (max-width: 720px) {
+    .provider-right {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px 20px;
+    }
+}
+
+@media (max-width: 420px) {
+    .provider-right {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Hàng thống kê: label xám, value nhấn màu, canh hai đầu */
+.stat-pair {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+    .stat-pair .label {
+        color: var(--muted-foreground);
+        font-size: .92rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .stat-pair .value {
+        color: var(--primary);
+        font-weight: 800;
+        font-size: 1rem;
+        white-space: nowrap;
+        line-height: 1.15;
+    }
+
+/* Optional: dark tweak */
+@media (prefers-color-scheme: dark) {
+    .btn-ghost {
+        border-color: color-mix(in oklab, var(--border) 70%, #000 30%);
+    }
+}
+
+/* ==========================================================================
+   REVIEWS (ĐÁNH GIÁ DỊCH VỤ) — FULL CSS
+   Dán ở cuối service-detail.css
+   ========================================================================== */
+
+/* 0) Layout chung + chừa trống bên phải ở desktop (review chiếm rộng hơn) */
+.reviews-section {
+    margin-top: 28px;
+}
+
+@media (min-width: 992px) {
+    /* Trái ~80%, phải ~20% để thoáng mắt */
+    .reviews-section {
+        display: grid;
+        grid-template-columns: minmax(640px, 0.65fr) 0.2fr;
+        column-gap: 20px;
+    }
+
+    .reviews-card {
+        grid-column: 1;
+    }
+}
+
+@media (min-width: 1400px) {
+    .reviews-section {
+        grid-template-columns: minmax(760px, 0.7fr) 0.15fr;
+        column-gap: 24px;
+    }
+}
+
+@media (min-width: 1680px) {
+    .reviews-section {
+        grid-template-columns: minmax(900px, 0.73fr) 0.12fr;
+    }
+}
+
+/* 1) Khung ngoài gọn, nhẹ mắt */
+.reviews-card {
+    background: var(--card);
+    border: 1px solid color-mix(in oklab, var(--border) 88%, var(--primary) 12%);
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 3px 10px rgba(0,0,0,.05);
+}
+
+@media (min-width: 992px) {
+    .reviews-card {
+        padding: 16px;
+    }
+}
+
+/* 2) Tiêu đề */
+.reviews-title {
+    margin: 2px 0 12px;
+    font-weight: 800;
+    font-size: clamp(18px, 2.4vw, 24px);
+}
+
+/* 3) Header: điểm trung bình + sao + chips */
+.reviews-header {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 12px;
+    background: color-mix(in oklab, var(--primary) 2.5%, var(--card) 97.5%);
+    border: 1px solid color-mix(in oklab, var(--border) 88%, var(--primary) 12%);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+    .reviews-header {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 3.1) Cột điểm tổng quan: căn giữa, gọn */
+.reviews-score {
+    display: grid;
+    grid-auto-flow: row;
+    row-gap: 6px;
+    place-content: center; /* căn giữa theo cả hai trục */
+    text-align: center;
+}
+
+.score-number {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    font-weight: 800;
+    color: var(--foreground);
+}
+
+    .score-number span {
+        font-size: 2rem;
+        line-height: 1;
+    }
+
+    .score-number small {
+        color: var(--muted-foreground);
+    }
+
+/* 3.2) Sao trong header (đổ màu liên tục 0–100%) */
+.reviews-section .stars {
+    font-size: 1.1rem;
+    display: inline-flex;
+    gap: 2px;
+    line-height: 1;
+}
+
+.reviews-section .star {
+    color: #d1d5db;
+}
+
+    .reviews-section .star.filled {
+        color: #f59e0b;
+    }
+
+    .reviews-section .star.frac {
+        background: linear-gradient(90deg, #f59e0b var(--p), #d1d5db var(--p));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+    }
+
+.score-count {
+    color: var(--muted-foreground);
+    font-size: .95rem;
+    margin-top: 2px;
+}
+
+/* 3.3) Chips lọc */
+.reviews-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-content: start;
+}
+
+.rv-chip {
+    height: 34px;
+    padding: 0 .65rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: .9rem;
+    line-height: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--foreground);
+    transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+
+    .rv-chip:hover {
+        background: var(--muted);
+        box-shadow: 0 1px 6px rgba(0,0,0,.06);
+    }
+
+    .rv-chip.active {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        border-color: var(--primary);
+    }
+
+/* 4) Danh sách review */
+.reviews-list {
+    margin-top: 2px;
+    display: grid;
+    gap: 10px;
+}
+
+.review-item {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 8px;
+    border: 1px solid color-mix(in oklab, var(--border) 92%, var(--primary) 8%);
+    border-radius: 10px;
+    background: var(--card);
+    padding: 10px;
+}
+
+.rv-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+}
+
+.rv-body {
+    display: grid;
+    gap: 6px;
+}
+
+.rv-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rv-user {
+    font-weight: 800;
+}
+
+/* 4.1) Sao trong từng review (đồng bộ cách tô) */
+.rv-stars .star {
+    color: #d1d5db;
+}
+
+    .rv-stars .star.filled {
+        color: #f59e0b;
+    }
+
+    .rv-stars .star.frac {
+        background: linear-gradient(90deg, #f59e0b var(--p), #d1d5db var(--p));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+    }
+
+/* 4.2) Meta / nội dung / ảnh / like */
+.rv-meta {
+    color: var(--muted-foreground);
+    font-size: .9rem;
+}
+
+.rv-content {
+    margin: 2px 0 4px;
+}
+
+/* Ảnh khách đăng: vừa đủ 5 cột, compact */
+.rv-photos {
+    display: grid;
+    grid-template-columns: repeat(5, 64px);
+    gap: 6px;
+}
+
+    .rv-photos img {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+    }
+
+@media (max-width: 520px) {
+    .rv-photos {
+        grid-template-columns: repeat(3, 64px);
+    }
+}
+
+.rv-actions {
+    color: var(--muted-foreground);
+    font-size: .9rem;
+}
+
+/* 5) Phân trang: nhỏ gọn, nổi nhẹ */
+.rv-pagination {
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+}
+
+.rv-page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--foreground);
+    font-weight: 700;
+    text-decoration: none;
+    transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+    box-shadow: 0 1px 6px rgba(0,0,0,.04);
+}
+
+    .rv-page:hover {
+        background: var(--muted);
+        box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+
+    .rv-page.active {
+        background: var(--primary);
+        color: var(--primary-foreground);
+        border-color: var(--primary);
+    }
+
+/* 6) A11y: giảm chuyển động khi user chọn */
+@media (prefers-reduced-motion: reduce) {
+    .reviews-section * {
+        transition: none !important;
+    }
+}
+
+/* Chips là <a> nên bỏ gạch chân & dùng pointer */
+.rv-chip {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Ảnh trong review: bo góc & border đã có; nếu muốn hover nhẹ: */
+.rv-photos img:hover {
+    transform: translateY(-1px);
+    transition: transform .12s;
+}
+
+
+/*============Phóng lớn ảnh lên ==================*/
+/* ==========================================================================
+   LIGHTBOX ẢNH REVIEW — FULL CSS
+   Phụ thuộc biến màu (nếu có): --card, --border, --foreground
+   ========================================================================== */
+
+/* Overlay */
+.rv-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,.68);
+    display: none; /* mở bằng .open */
+    align-items: center;
+    justify-content: center;
+    padding: 16px; /* chừa mép khi màn nhỏ */
+    opacity: 0;
+    transition: opacity .18s ease;
+}
+
+    .rv-lightbox.open {
+        display: flex;
+        opacity: 1;
+    }
+
+/* Khung ôm sát ảnh (để nút X bám đúng mép ảnh) */
+.rv-lb-inner {
+    position: relative;
+    display: inline-block;
+    overflow: visible; /* cho nút X nhô ra ngoài ảnh */
+    max-width: 98vw;
+    max-height: 98vh;
+}
+
+/* Ảnh (to hơn, vẫn giữ tỉ lệ) */
+.rv-lightbox img {
+    display: block;
+    width: clamp(720px, 50vw, 1280px); /* tối thiểu 720px, tối đa 1280px */
+    height: auto;
+    max-height: 88vh; /* không tràn màn */
+    object-fit: contain;
+    background: #000;
+    border-radius: 14px;
+    box-shadow: 0 16px 60px rgba(0,0,0,.55);
+    cursor: zoom-out;
+    transform: scale(.98);
+    transition: transform .18s ease;
+}
+
+.rv-lightbox.open img {
+    transform: scale(1);
+}
+
+/* Nút đóng (nhô ra góc phải-trên của ảnh) */
+.rv-lb-close {
+    position: absolute;
+    top: -14px; /* lệch lên để nhô ra ngoài */
+    left: calc(100% + 14px); /* lệch phải để nhô ra ngoài */
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.28);
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    font-size: 26px;
+    font-weight: 900;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+    outline: none;
+    transition: background .15s ease, transform .08s ease;
+}
+
+    .rv-lb-close:hover {
+        background: rgba(0,0,0,.7);
+    }
+
+    .rv-lb-close:active {
+        transform: scale(.96);
+    }
+
+    /* Focus ring (a11y) */
+    .rv-lb-close:focus-visible {
+        box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 0 0 4px rgba(0,0,0,.35);
+    }
+
+/* Thumbnail trong review (mở lightbox khi click) */
+.rv-photos img {
+    cursor: zoom-in;
+    border-radius: 10px;
+    border: 1px solid var(--border, #e5e7eb);
+    transition: transform .12s ease;
+}
+
+    .rv-photos img:hover {
+        transform: translateY(-1px);
+    }
+
+/* Mobile: đưa nút X vào trong ảnh để không tràn màn */
+@media (max-width: 640px) {
+    .rv-lightbox {
+        padding: 10px;
+    }
+
+        .rv-lightbox img {
+            width: 94vw;
+            max-height: 86vh;
+            border-radius: 12px;
+        }
+
+    .rv-lb-close {
+        top: 8px;
+        left: auto;
+        right: 8px; /* nằm trong góc phải-trên của ảnh */
+    }
+}
+
+/* Giảm chuyển động nếu user chọn */
+@media (prefers-reduced-motion: reduce) {
+    .rv-lightbox,
+    .rv-lightbox img,
+    .rv-lb-close {
+        transition: none !important;
+    }
+}
+
