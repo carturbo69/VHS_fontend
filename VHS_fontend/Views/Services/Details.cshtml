@@ -13,6 +13,15 @@
     string mainSrc = (Model.Images != null && Model.Images.FirstOrDefault() != null)
         ? Url.Content(Model.Images.First())
         : fallbackMain;
+
+    // ====== TOP RIGHT: chuẩn bị Top 4 dịch vụ nổi bật dùng chung cho 2 cột phải ======
+    var __relatedSrc = Model.Related ?? new List<VHS_fontend.Controllers.ServiceViewModel>();
+    var __rndTop = new Random(); // đổi thành new Random(42) nếu muốn cố định
+    var __topRight4 = __relatedSrc
+        .Where(x => x != null)
+        .OrderBy(_ => __rndTop.Next())
+        .Take(4)
+        .ToList();
 }
 
 <link rel="stylesheet" href="~/css/service-detail.css" asp-append-version="true" />
@@ -83,23 +92,19 @@
 
                             if (pct >= 100)
                             {
-                                <span class="star filled">★</span>
-                                ;
+                                <span class="star filled">★</span>;
                             }
                             else if (pct <= 0)
                             {
-                                <span class="star">★</span>
-                                ;
+                                <span class="star">★</span>;
                             }
                             else
                             {
-                                <span class="star frac" style="--p:@pct%;">★</span>
-                                ;
+                                <span class="star frac" style="--p:@pct%;">★</span>;
                             }
                         }
                     </span>
                     <span class="rating-text">@Model.Stars.ToString("0.#") / 5 (@Model.TotalReviews đánh giá)</span>
-
 
                     <div class="price">@Model.PriceDisplay</div>
 
@@ -223,7 +228,6 @@
                         <span class="value">@((ViewBag.VendorResponseTime as string) ?? "trong vài phút")</span>
                     </div>
 
-                    @* Followers: để trống hoặc set null để ẩn *@
                     @{
                         var followers = ViewBag.VendorFollowers as string; // null => không render
                     }
@@ -238,297 +242,364 @@
             </div>
         </section>
 
-        <!-- === SERVICE DESCRIPTION (block riêng) ======================== -->
-        <section class="desc-section" id="desc">
-            <article class="desc-card" id="descCard">
-                <div class="desc-header">Mô tả dịch vụ</div>
-                <div class="desc-content" id="descContent">
-                    @Html.Raw(Model.Description)
-                </div>
-                <button type="button" class="btn-toggle" id="descToggle" hidden>Xem thêm</button>
-            </article>
-            <div aria-hidden="true"></div> <!-- cột phải để tạo khoảng thoáng -->
-        </section>
+        @* ===== KHUNG BỐ CỤC HỢP NHẤT: Trái = DESC + REVIEWS (xếp dọc), Phải = Top 4 (sticky, render 1 lần) ===== *@
+        <section class="svc-detail-grid">
+            <!-- CỘT TRÁI: DESC + REVIEWS xếp dọc -->
+            <div class="svc-left-col">
 
-
-
-        <!-- ===== REVIEWS / ĐÁNH GIÁ DỊCH VỤ (filterable) ======================= -->
-        @{
-            var httpReq = ViewContext?.HttpContext?.Request;
-            string qPage = httpReq?.Query["rpage"];
-            string qStar = httpReq?.Query["rstar"];
-            string qMedia = httpReq?.Query["rmedia"];
-
-            int rpage = 1; int tmp;
-            if (int.TryParse(qPage, out tmp)) rpage = Math.Max(1, tmp);
-
-            int rstar = 0; // 0 = tất cả, 1..5 = lọc theo sao nguyên
-            int.TryParse(qStar, out rstar);
-            bool onlyMedia = !string.IsNullOrWhiteSpace(qMedia) &&
-            (qMedia == "1" || qMedia.Equals("true", StringComparison.OrdinalIgnoreCase));
-
-            const int rPageSize = 5;
-            var allReviews = Model.Reviews ?? new List<VHS_fontend.Controllers.ReviewItem>();
-
-            // ⭐ Chuẩn hoá sao về bucket 1..5 (để đếm & lọc khớp UI)
-            Func<double, int> Bucket = s =>
-            {
-                var i = (int)Math.Round(s, MidpointRounding.AwayFromZero);
-                if (i < 1) i = 1; else if (i > 5) i = 5;
-                return i;
-            };
-
-            // Đếm theo bucket
-            int n1 = allReviews.Count(x => Bucket(x.Stars) == 1);
-            int n2 = allReviews.Count(x => Bucket(x.Stars) == 2);
-            int n3 = allReviews.Count(x => Bucket(x.Stars) == 3);
-            int n4 = allReviews.Count(x => Bucket(x.Stars) == 4);
-            int n5 = allReviews.Count(x => Bucket(x.Stars) == 5);
-
-            // Đếm có media (loại chuỗi rỗng)
-            int nPic = allReviews.Count(x => x.Photos != null &&
-            x.Photos.Any(p => !string.IsNullOrWhiteSpace(p)));
-
-            // Lọc theo sao (nếu chọn chip)
-            IEnumerable<VHS_fontend.Controllers.ReviewItem> filtered = allReviews;
-            // Chỉ 1 chế độ: media OR stars
-            if (onlyMedia)
-            {
-                filtered = filtered.Where(x => x.Photos != null &&
-                x.Photos.Any(p => !string.IsNullOrWhiteSpace(p)));
-            }
-            else if (rstar >= 1 && rstar <= 5)
-            {
-                filtered = filtered.Where(x => Bucket(x.Stars) == rstar);
-            }
-
-            int rTotal = filtered.Count();
-            int rTotalPages = Math.Max(1, (int)Math.Ceiling(rTotal / (double)rPageSize));
-            if (rpage > rTotalPages) rpage = rTotalPages;
-
-            var pageReviews = filtered.Skip((rpage - 1) * rPageSize).Take(rPageSize).ToList();
-
-            // Format số: 1.2k
-            Func<int, string> K = n => n >= 1000 ? (n / 1000.0).ToString("0.#") + "k" : n.ToString();
-        }
-        <section class="reviews-section" id="reviews">
-            <div class="reviews-card">
-                <h3 class="reviews-title">Đánh giá dịch vụ</h3>
-
-                <!-- Summary + Filters -->
-                <div class="reviews-header">
-                    <div class="reviews-score">
-                        <div class="score-number">
-                            <span>@Model.Stars.ToString("0.#")</span>
-                            <small>trên 5</small>
+                <!-- === SERVICE DESCRIPTION (block riêng) ======================== -->
+                <section class="desc-section" id="desc">
+                    <article class="desc-card" id="descCard">
+                        <div class="desc-header">Mô tả dịch vụ</div>
+                        <div class="desc-content" id="descContent">
+                            @Html.Raw(Model.Description)
                         </div>
-                        <div class="score-stars">
-                            <span class="stars">
-                                @{
-                                    var avgScore = Model.Stars;
-                                    for (int i = 1; i <= 5; i++)
-                                    {
-                                        var fill = Math.Max(0, Math.Min(1, avgScore - (i - 1)));
-                                        var pct = (int)Math.Round(fill * 100);
-                                        if (pct >= 100)
-                                        {
-                                            <span class="star filled">★</span>
-                                            ;
-                                        }
-                                        else if (pct <= 0)
-                                        {
-                                            <span class="star">★</span>
-                                            ;
-                                        }
-                                        else
-                                        {
-                                            <span class="star frac" style="--p:@pct%;">★</span>
-                                            ;
-                                        }
-                                    }
-                                }
-                            </span>
-                            <div class="score-count">@rTotal đánh giá</div>
-                        </div>
-                    </div>
+                        <button type="button" class="btn-toggle" id="descToggle" hidden>Xem thêm</button>
+                    </article>
+                </section>
 
-                    <div class="reviews-filters">
-                        <!-- Tất cả -->
-                        <a class="rv-chip @(rstar==0 && !onlyMedia ? "active" : "")"
-                           asp-controller="Services" asp-action="Details"
-                           asp-route-id="@Model.Id"
-                           asp-fragment="reviews"
-                           aria-pressed="@(rstar==0 && !onlyMedia)">Tất cả</a>
+                <!-- ===== REVIEWS / ĐÁNH GIÁ DỊCH VỤ (filterable) ======================= -->
+                @{
+                    var httpReq = ViewContext?.HttpContext?.Request;
+                    string qPage = httpReq?.Query["rpage"];
+                    string qStar = httpReq?.Query["rstar"];
+                    string qMedia = httpReq?.Query["rmedia"];
 
-                        <!-- Các sao: KHÔNG mang theo rmedia => bấm là thoát media -->
-                        <a class="rv-chip @(rstar==5 && !onlyMedia ? "active" : "")"
-                           asp-controller="Services" asp-action="Details"
-                           asp-route-id="@Model.Id" asp-route-rstar="5"
-                           asp-fragment="reviews"
-                           aria-pressed="@(rstar==5 && !onlyMedia)">5 sao (@K(n5))</a>
+                    int rpage = 1; int tmp;
+                    if (int.TryParse(qPage, out tmp)) rpage = Math.Max(1, tmp);
 
-                        <a class="rv-chip @(rstar==4 && !onlyMedia ? "active" : "")"
-                           asp-controller="Services" asp-action="Details"
-                           asp-route-id="@Model.Id" asp-route-rstar="4"
-                           asp-fragment="reviews"
-                           aria-pressed="@(rstar==4 && !onlyMedia)">4 sao (@K(n4))</a>
+                    int rstar = 0; // 0 = tất cả, 1..5 = lọc theo sao nguyên
+                    int.TryParse(qStar, out rstar);
+                    bool onlyMedia = !string.IsNullOrWhiteSpace(qMedia) &&
+                    (qMedia == "1" || qMedia.Equals("true", StringComparison.OrdinalIgnoreCase));
 
-                        <a class="rv-chip @(rstar==3 && !onlyMedia ? "active" : "")"
-                           asp-controller="Services" asp-action="Details"
-                           asp-route-id="@Model.Id" asp-route-rstar="3"
-                           asp-fragment="reviews"
-                           aria-pressed="@(rstar==3 && !onlyMedia)">3 sao (@K(n3))</a>
+                    const int rPageSize = 5;
+                    var allReviews = Model.Reviews ?? new List<VHS_fontend.Controllers.ReviewItem>();
 
-                        <a class="rv-chip @(rstar==2 && !onlyMedia ? "active" : "")"
-                           asp-controller="Services" asp-action="Details"
-                           asp-route-id="@Model.Id" asp-route-rstar="2"
-                           asp-fragment="reviews"
-                           aria-pressed="@(rstar==2 && !onlyMedia)">2 sao (@K(n2))</a>
-
-                        <a class="rv-chip @(rstar==1 && !onlyMedia ? "active" : "")"
-                           asp-controller="Services" asp-action="Details"
-                           asp-route-id="@Model.Id" asp-route-rstar="1"
-                           asp-fragment="reviews"
-                           aria-pressed="@(rstar==1 && !onlyMedia)">1 sao (@K(n1))</a>
-
-                        <!-- Media: ĐỘC LẬP, chỉ set rmedia=1, KHÔNG truyền rstar -->
-                        <a class="rv-chip @(onlyMedia ? "active" : "")"
-                           asp-controller="Services" asp-action="Details"
-                           asp-route-id="@Model.Id"
-                           asp-route-rmedia="1"
-                           asp-fragment="reviews"
-                           aria-pressed="@(onlyMedia)">Có hình ảnh / video (@K(nPic))</a>
-                    </div>
-                </div>
-
-                <!-- List -->
-                <div class="reviews-list">
-                    @if (!pageReviews.Any())
+                    // ⭐ Chuẩn hoá sao về bucket 1..5 (để đếm & lọc khớp UI)
+                    Func<double, int> Bucket = s =>
                     {
-                        <div class="reviews-empty">Chưa có đánh giá.</div>
+                        var i = (int)Math.Round(s, MidpointRounding.AwayFromZero);
+                        if (i < 1) i = 1; else if (i > 5) i = 5;
+                        return i;
+                    };
+
+                    // Đếm theo bucket
+                    int n1 = allReviews.Count(x => Bucket(x.Stars) == 1);
+                    int n2 = allReviews.Count(x => Bucket(x.Stars) == 2);
+                    int n3 = allReviews.Count(x => Bucket(x.Stars) == 3);
+                    int n4 = allReviews.Count(x => Bucket(x.Stars) == 4);
+                    int n5 = allReviews.Count(x => Bucket(x.Stars) == 5);
+
+                    // Đếm có media (loại chuỗi rỗng)
+                    int nPic = allReviews.Count(x => x.Photos != null &&
+                    x.Photos.Any(p => !string.IsNullOrWhiteSpace(p)));
+
+                    // Lọc theo sao (nếu chọn chip)
+                    IEnumerable<VHS_fontend.Controllers.ReviewItem> filtered = allReviews;
+                    // Chỉ 1 chế độ: media OR stars
+                    if (onlyMedia)
+                    {
+                        filtered = filtered.Where(x => x.Photos != null &&
+                        x.Photos.Any(p => !string.IsNullOrWhiteSpace(p)));
                     }
-                    else
+                    else if (rstar >= 1 && rstar <= 5)
                     {
-                        foreach (var rv in pageReviews)
-                        {
-                            <article class="review-item">
-                                <img class="rv-avatar"
-                                     src="@Url.Content(rv.AvatarUrl ?? "~/images/VeSinh.jpg")"
-                                     alt="@rv.User" />
-                                <div class="rv-body">
-                                    <div class="rv-head">
-                                        <strong class="rv-user">@rv.User</strong>
-                                        <span class="rv-stars">
-                                            @{
-                                                // Sao review: integer 1..5 (không lẻ)
-                                                var fullStars = Math.Max(0, Math.Min(5,
-                                                (int)Math.Round(rv.Stars, MidpointRounding.AwayFromZero)));
-                                                for (int i = 1; i <= 5; i++)
+                        filtered = filtered.Where(x => Bucket(x.Stars) == rstar);
+                    }
+
+                    int rTotal = filtered.Count();
+                    int rTotalPages = Math.Max(1, (int)Math.Ceiling(rTotal / (double)rPageSize));
+                    if (rpage > rTotalPages) rpage = rTotalPages;
+
+                    var pageReviews = filtered.Skip((rpage - 1) * rPageSize).Take(rPageSize).ToList();
+
+                    // Format số: 1.2k
+                    Func<int, string> K = n => n >= 1000 ? (n / 1000.0).ToString("0.#") + "k" : n.ToString();
+                }
+                <section class="reviews-section" id="reviews">
+                    <div class="reviews-card">
+                        <h3 class="reviews-title">Đánh giá dịch vụ</h3>
+
+                        <!-- Summary + Filters -->
+                        <div class="reviews-header">
+                            <div class="reviews-score">
+                                <div class="score-number">
+                                    <span>@Model.Stars.ToString("0.#")</span>
+                                    <small>trên 5</small>
+                                </div>
+                                <div class="score-stars">
+                                    <span class="stars">
+                                        @{
+                                            var avgScore = Model.Stars;
+                                            for (int i = 1; i <= 5; i++)
+                                            {
+                                                var fill = Math.Max(0, Math.Min(1, avgScore - (i - 1)));
+                                                var pct = (int)Math.Round(fill * 100);
+                                                if (pct >= 100)
                                                 {
-                                                    if (i <= fullStars)
-                                                    {
-                                                        <span class="star filled">★</span>
-                                                        ;
-                                                    }
-                                                    else
-                                                    {
-                                                        <span class="star">★</span>
-                                                        ;
-                                                    }
+                                                    <span class="star filled">★</span>
+                                                    ;
+                                                }
+                                                else if (pct <= 0)
+                                                {
+                                                    <span class="star">★</span>
+                                                    ;
+                                                }
+                                                else
+                                                {
+                                                    <span class="star frac" style="--p:@pct%;">★</span>
+                                                    ;
                                                 }
                                             }
-                                        </span>
-                                    </div>
-
-                                    <div class="rv-meta">
-                                        @rv.CreatedAt.ToString("yyyy-MM-dd HH:mm")
-                                        @if (!string.IsNullOrWhiteSpace(rv.Variant))
-                                        {
-                                            <text> | Phân loại: @rv.Variant</text>
                                         }
-                                    </div>
-
-                                    @if (!string.IsNullOrWhiteSpace(rv.Content))
-                                    {
-                                        <p class="rv-content">@rv.Content</p>
-                                    }
-
-                                    @if (rv.Photos?.Any() == true)
-                                    {
-                                        <div class="rv-photos">
-                                            @foreach (var p in rv.Photos)
-                                            {
-                                                <img src="@Url.Content(p)" alt="Hình đánh giá" />
-                                            }
-                                        </div>
-                                    }
-
-                                    <!-- BỎ LIKE: xoá rv-actions -->
+                                    </span>
+                                    <div class="score-count">@rTotal đánh giá</div>
                                 </div>
-                            </article>
-                        }
-                    }
-                </div>
+                            </div>
 
-                <!-- Pagination (giữ filter hiện tại) -->
-                @if (rTotal > rPageSize)
-                {
-                    <div class="rv-pagination">
-                        @if (rpage > 1)
-                        {
-                            <a class="rv-page"
-                               asp-controller="Services" asp-action="Details"
-                               asp-route-id="@Model.Id"
-                               asp-route-rpage="@(rpage - 1)"
-                               asp-route-rstar="@(onlyMedia ? null : (rstar==0 ? null : rstar))"
-                               asp-route-rmedia="@(onlyMedia ? "1" : null)"
-                               asp-fragment="reviews">‹</a>
-                        }
-                        @for (int p = 1; p <= rTotalPages; p++)
-                        {
-                            if (p == rpage)
+                            <div class="reviews-filters">
+                                <!-- Tất cả -->
+                                <a class="rv-chip @(rstar==0 && !onlyMedia ? "active" : "")"
+                                   asp-controller="Services" asp-action="Details"
+                                   asp-route-id="@Model.Id"
+                                   asp-fragment="reviews"
+                                   aria-pressed="@(rstar==0 && !onlyMedia)">Tất cả</a>
+
+                                <!-- Các sao -->
+                                <a class="rv-chip @(rstar==5 && !onlyMedia ? "active" : "")"
+                                   asp-controller="Services" asp-action="Details"
+                                   asp-route-id="@Model.Id" asp-route-rstar="5"
+                                   asp-fragment="reviews"
+                                   aria-pressed="@(rstar==5 && !onlyMedia)">5 sao (@K(n5))</a>
+
+                                <a class="rv-chip @(rstar==4 && !onlyMedia ? "active" : "")"
+                                   asp-controller="Services" asp-action="Details"
+                                   asp-route-id="@Model.Id" asp-route-rstar="4"
+                                   asp-fragment="reviews"
+                                   aria-pressed="@(rstar==4 && !onlyMedia)">4 sao (@K(n4))</a>
+
+                                <a class="rv-chip @(rstar==3 && !onlyMedia ? "active" : "")"
+                                   asp-controller="Services" asp-action="Details"
+                                   asp-route-id="@Model.Id" asp-route-rstar="3"
+                                   asp-fragment="reviews"
+                                   aria-pressed="@(rstar==3 && !onlyMedia)">3 sao (@K(n3))</a>
+
+                                <a class="rv-chip @(rstar==2 && !onlyMedia ? "active" : "")"
+                                   asp-controller="Services" asp-action="Details"
+                                   asp-route-id="@Model.Id" asp-route-rstar="2"
+                                   asp-fragment="reviews"
+                                   aria-pressed="@(rstar==2 && !onlyMedia)">2 sao (@K(n2))</a>
+
+                                <a class="rv-chip @(rstar==1 && !onlyMedia ? "active" : "")"
+                                   asp-controller="Services" asp-action="Details"
+                                   asp-route-id="@Model.Id" asp-route-rstar="1"
+                                   asp-fragment="reviews"
+                                   aria-pressed="@(rstar==1 && !onlyMedia)">1 sao (@K(n1))</a>
+
+                                <!-- Media -->
+                                <a class="rv-chip @(onlyMedia ? "active" : "")"
+                                   asp-controller="Services" asp-action="Details"
+                                   asp-route-id="@Model.Id"
+                                   asp-route-rmedia="1"
+                                   asp-fragment="reviews"
+                                   aria-pressed="@(onlyMedia)">Có hình ảnh / video (@K(nPic))</a>
+                            </div>
+                        </div>
+
+                        <!-- List -->
+                        <div class="reviews-list">
+                            @if (!pageReviews.Any())
                             {
-                                <span class="rv-page active">@p</span>
+                                <div class="reviews-empty">Chưa có đánh giá.</div>
                             }
                             else
                             {
-                                <a class="rv-page"
-                                   asp-controller="Services" asp-action="Details"
-                                   asp-route-id="@Model.Id"
-                                   asp-route-rpage="@p"
-                                   asp-route-rstar="@(onlyMedia ? null : (rstar==0 ? null : rstar))"
-                                   asp-route-rmedia="@(onlyMedia ? "1" : null)"
-                                   asp-fragment="reviews">@p</a>
+                                foreach (var rv in pageReviews)
+                                {
+                                    <article class="review-item">
+                                        <img class="rv-avatar"
+                                             src="@Url.Content(rv.AvatarUrl ?? "~/images/VeSinh.jpg")"
+                                             alt="@rv.User" />
+                                        <div class="rv-body">
+                                            <div class="rv-head">
+                                                <strong class="rv-user">@rv.User</strong>
+                                                <span class="rv-stars">
+                                                    @{
+                                                        var fullStars = Math.Max(0, Math.Min(5,
+                                                        (int)Math.Round(rv.Stars, MidpointRounding.AwayFromZero)));
+                                                        for (int i = 1; i <= 5; i++)
+                                                        {
+                                                            if (i <= fullStars)
+                                                            {
+                                                                <span class="star filled">★</span>
+                                                                ;
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="star">★</span>
+                                                                ;
+                                                            }
+                                                        }
+                                                    }
+                                                </span>
+                                            </div>
+
+                                            <div class="rv-meta">
+                                                @rv.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                                                @if (!string.IsNullOrWhiteSpace(rv.Variant))
+                                                {
+                                                    <text> | Phân loại: @rv.Variant</text>
+                                                }
+                                            </div>
+
+                                            @if (!string.IsNullOrWhiteSpace(rv.Content))
+                                            {
+                                                <p class="rv-content">@rv.Content</p>
+                                            }
+
+                                            @if (rv.Photos?.Any() == true)
+                                            {
+                                                <div class="rv-photos">
+                                                    @foreach (var p in rv.Photos)
+                                                    {
+                                                        if (!string.IsNullOrWhiteSpace(p))
+                                                        {
+                                                            <img src="@Url.Content(p)" alt="Hình đánh giá" />
+                                                        }
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </article>
+                                }
                             }
-                        }
-                        @if (rpage < rTotalPages)
+                        </div>
+
+                        <!-- Pagination -->
+                        @if (rTotal > rPageSize)
                         {
-                            <a class="rv-page"
-                               asp-controller="Services" asp-action="Details"
-                               asp-route-id="@Model.Id"
-                               asp-route-rpage="@(rpage + 1)"
-                               asp-route-rstar="@(onlyMedia ? null : (rstar==0 ? null : rstar))"
-                               asp-route-rmedia="@(onlyMedia ? "1" : null)"
-                               asp-fragment="reviews">›</a>
+                            <div class="rv-pagination">
+                                @if (rpage > 1)
+                                {
+                                    <a class="rv-page"
+                                       asp-controller="Services" asp-action="Details"
+                                       asp-route-id="@Model.Id"
+                                       asp-route-rpage="@(rpage - 1)"
+                                       asp-route-rstar="@(onlyMedia ? null : (rstar==0 ? null : rstar))"
+                                       asp-route-rmedia="@(onlyMedia ? "1" : null)"
+                                       asp-fragment="reviews">‹</a>
+                                }
+                                @for (int p = 1; p <= rTotalPages; p++)
+                                {
+                                    if (p == rpage)
+                                    {
+                                        <span class="rv-page active">@p</span>
+                                    }
+                                    else
+                                    {
+                                        <a class="rv-page"
+                                           asp-controller="Services" asp-action="Details"
+                                           asp-route-id="@Model.Id"
+                                           asp-route-rpage="@p"
+                                           asp-route-rstar="@(onlyMedia ? null : (rstar==0 ? null : rstar))"
+                                           asp-route-rmedia="@(onlyMedia ? "1" : null)"
+                                           asp-fragment="reviews">@p</a>
+                                    }
+                                }
+                                @if (rpage < rTotalPages)
+                                {
+                                    <a class="rv-page"
+                                       asp-controller="Services" asp-action="Details"
+                                       asp-route-id="@Model.Id"
+                                       asp-route-rpage="@(rpage + 1)"
+                                       asp-route-rstar="@(onlyMedia ? null : (rstar==0 ? null : rstar))"
+                                       asp-route-rmedia="@(onlyMedia ? "1" : null)"
+                                       asp-fragment="reviews">›</a>
+                                }
+                            </div>
                         }
                     </div>
-                }
+
+                    <!-- Lightbox ảnh review -->
+                    <div id="rvLightbox" class="rv-lightbox" aria-hidden="true">
+                        <div class="rv-lb-inner">
+                            <img id="rvLightboxImg" alt="Xem ảnh đánh giá" draggable="false" />
+                            <button type="button" class="rv-lb-close" aria-label="Đóng">×</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- CỘT PHẢI: TOP 4 DỊCH VỤ NỔI BẬT (render 1 lần) -->
+            <div class="svc-right-col">
+                <div role="complementary" class="top-right" aria-label="Top dịch vụ nổi bật">
+                    <h4 class="top-title">Top dịch vụ nổi bật</h4>
+
+                    @{
+                        // An toàn null
+                        var topRight = __topRight4 as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+                    }
+                    @if (!topRight.Any())
+                    {
+                        <div class="top-empty">Chưa có dịch vụ nổi bật.</div>
+                    }
+                    else
+                    {
+                        <div class="top-list">
+                            @foreach (var s in topRight)
+                            {
+                                var imgRight = string.IsNullOrWhiteSpace((string)s.ImageUrl)
+                                ? ((string)s.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
+                                : (string)s.Category == "Sự kiện nhỏ tại nhà" ? Url.Content("~/images/SuKienNho.jpg")
+                                : Url.Content("~/images/VeSinh.jpg"))
+                                : Url.Content((string)s.ImageUrl);
+
+                                <article class="top-card">
+                                    <a asp-controller="Services" asp-action="Details" asp-route-id="@(s.Id)" class="top-thumb">
+                                        <img src="@imgRight" alt="@(s.Name)" loading="lazy" />
+                                    </a>
+                                    <div class="top-info">
+                                        <a asp-controller="Services" asp-action="Details" asp-route-id="@(s.Id)" class="top-name">
+                                            @s.Name
+                                        </a>
+                                        <div class="top-stars">
+                                            @{
+                                                double ratingRight = s.Stars;
+                                                for (int i = 1; i <= 5; i++)
+                                                {
+                                                    var fill = Math.Max(0, Math.Min(1, ratingRight - (i - 1)));
+                                                    var pct = (int)Math.Round(fill * 100);
+                                                    if (pct >= 100)
+                                                    {
+                                                        @:<span class="star filled">★</span>
+                                                    }
+                                                    else if (pct <= 0)
+                                                    {
+                                                        @:<span class="star">★</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        @:<span class="star frac" style="--p:@pct%;">★</span>
+                                                    }
+                                                }
+                                            }
+                                            <span class="top-rating-text">@Model.Stars.ToString("0.#") / 5 (@s.TotalReviews đánh giá)</span>
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace((string)s.PriceDisplay))
+                                        {
+                                            <div class="top-price">@s.PriceDisplay</div>
+                                        }
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                </div>
             </div>
         </section>
 
-        <!-- Lightbox ảnh review -->
-        <div id="rvLightbox" class="rv-lightbox" aria-hidden="true">
-            <div class="rv-lb-inner">
-                <img id="rvLightboxImg" alt="Xem ảnh đánh giá" draggable="false" />
-                <button type="button" class="rv-lb-close" aria-label="Đóng">×</button>
-            </div>
-        </div>
-     <!-- ===== /REVIEWS ======================================================== -->
-		
-     
 
-     
-     
      <!--  =========== RELATED SERVICES  ======================= -->
         @{
             var list = Model.Related ?? new List<VHS_fontend.Controllers.ServiceViewModel>();
@@ -577,7 +648,7 @@
                                             <span class="star frac" style="--p:@pct%;">★</span>
                                         }
                                     }
-                                    <span class="rel-rating-text">@ravg.ToString("0.#") / 5 (@s.TotalReviews đánh giá)</span>
+                                    <span class="rel-rating-text">@Model.Stars.ToString("0.#") / 5 (@s.TotalReviews đánh giá)</span>
                                 </div>
                                 <div class="rel-price">@s.PriceDisplay</div>
                             </div>
@@ -591,7 +662,7 @@
                             data-step="@step" aria-controls="relatedGrid">
                         Xem thêm
                     </button>
-                   <!-- <span class="more-count">Còn <b id="relatedRemain">@(Math.Max(0, list.Count - step))</b> dịch vụ</span> -->
+                    @* <span class="more-count">Còn <b id="relatedRemain">@(Math.Max(0, list.Count - step))</b> dịch vụ</span> *@
                 </div>
             </div>
         }
@@ -600,17 +671,7 @@
 
 @section Scripts {
     <script>
-        // Đổi ảnh lớn khi bấm thumbnail
-        // document.getElementById('thumbs')?.addEventListener('click', function(e){
-        //   const btn = e.target.closest('.thumb');
-        //   if(!btn) return;
-        //   const src = btn.getAttribute('data-src');
-        //   if(src){
-        //     const img = document.getElementById('mainImage');
-        //     if(img) img.setAttribute('src', src);
-        //   }
-        // });
-              // Đổi ảnh lớn + đánh dấu thumb đang chọn
+        // Đổi ảnh lớn + đánh dấu thumb đang chọn
         document.getElementById('thumbs')?.addEventListener('click', function (e) {
           const btn = e.target.closest('.thumb');
           if (!btn) return;
@@ -621,11 +682,31 @@
           this.querySelectorAll('.thumb.is-active').forEach(x => x.classList.remove('is-active'));
           btn.classList.add('is-active');
         });
-
         // Đánh dấu sẵn thumb đầu tiên
         document.querySelector('#thumbs .thumb')?.classList.add('is-active');
 
-        // Tính tiền add-on
+        // ===== Toggle MÔ TẢ: tự hiện nút nếu content dài =====
+        (function () {
+          const card = document.getElementById('descCard');
+          const content = document.getElementById('descContent');
+          const btn = document.getElementById('descToggle');
+          if (!card || !content || !btn) return;
+
+          const MAX_H = 380;
+          const check = () => {
+            btn.hidden = !(content.scrollHeight > MAX_H);
+            card.classList.toggle('is-collapsed', content.scrollHeight > MAX_H);
+            btn.textContent = card.classList.contains('is-collapsed') ? 'Xem thêm' : 'Thu gọn';
+          };
+          check();
+          btn.addEventListener('click', () => {
+            card.classList.toggle('is-collapsed');
+            btn.textContent = card.classList.contains('is-collapsed') ? 'Xem thêm' : 'Thu gọn';
+          });
+          content.querySelectorAll('img').forEach(img => img.addEventListener('load', check));
+        })();
+
+        // ===== Tính tiền add-on =====
         (function(){
           const money = n => n.toLocaleString('vi-VN') + 'đ';
           const baseEl = document.getElementById('basePrice');
@@ -678,8 +759,8 @@
           calc();
         })();
 
-		// Lightbox ảnh review
-                    (function () {
+        // ===== Lightbox ảnh review =====
+        (function () {
           const lb     = document.getElementById('rvLightbox');
           const lbImg  = document.getElementById('rvLightboxImg');
           const btnX   = document.querySelector('.rv-lb-close');
@@ -697,71 +778,45 @@
             if(lbImg) lbImg.src = '';
           }
 
-          /* Event delegation: bấm bất kỳ ảnh trong .rv-photos để mở */
+          // bấm ảnh để mở
           document.addEventListener('click', function(e){
             const img = e.target.closest('.rv-photos img');
             if(img){ e.preventDefault(); openLB(img.src); }
           });
 
-          /* Đóng khi bấm nền, nút ×, ảnh, hoặc ESC */
+          // đóng khi bấm nền, ×, ảnh, hoặc ESC
           lb?.addEventListener('click', (e)=>{ if(e.target === lb) closeLB(); });
           btnX?.addEventListener('click', closeLB);
-          lbImg?.addEventListener('click', closeLB);         // click ảnh để đóng
+          lbImg?.addEventListener('click', closeLB);
           window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeLB(); });
         })();
 
-        /* Relate */
-                (function(){
+        // ===== Related: nút "Xem thêm" =====
+        (function(){
           const grid = document.getElementById('relatedGrid');
           const moreWrap = document.getElementById('relatedMore');
           const btn = document.getElementById('btnRelatedMore');
           const remainEl = document.getElementById('relatedRemain');
           if(!grid || !btn) return;
 
-          const chunk = parseInt(btn.dataset.chunk || '20', 10);
+          const STEP = parseInt(btn.getAttribute('data-step') || btn.getAttribute('data-chunk') || '20', 10);
+
+          // Phòng khi item bị inline display:none ở phiên bản cũ
+          grid.querySelectorAll('.related-card.is-hidden').forEach(el => {
+            el.style.removeProperty('display');
+          });
 
           btn.addEventListener('click', function(){
-            const hidden = grid.querySelectorAll('.is-hidden');
-            const take = Math.min(chunk, hidden.length);
-            for(let i=0;i<take;i++){ hidden[i].classList.remove('is-hidden'); }
-            const remain = grid.querySelectorAll('.is-hidden').length;
+            const hidden = grid.querySelectorAll('.related-card.is-hidden');
+            const take = Math.min(STEP, hidden.length);
+            for(let i=0;i<take;i++){
+              hidden[i].classList.remove('is-hidden');
+              hidden[i].style.removeProperty('display');
+            }
+            const remain = grid.querySelectorAll('.related-card.is-hidden').length;
             if(remainEl) remainEl.textContent = remain;
             if(remain === 0 && moreWrap){ moreWrap.style.display = 'none'; }
           });
         })();
     </script>
-
-
-    <script> // Description
-        (() => {
-          const grid     = document.getElementById('relatedGrid');
-          const moreWrap = document.getElementById('relatedMore');
-          const btn      = document.getElementById('btnRelatedMore');
-          const remainEl = document.getElementById('relatedRemain');
-          if (!grid || !btn) return;
-
-          const STEP = parseInt(
-            btn.getAttribute('data-step') || btn.getAttribute('data-chunk') || '20',
-            10
-          );
-
-          // Phòng khi từng item bị đặt inline display:none ở phiên bản trước:
-          grid.querySelectorAll('.related-card.is-hidden').forEach(el => {
-            el.style.removeProperty('display');
-          });
-
-          btn.addEventListener('click', () => {
-            const hidden = grid.querySelectorAll('.related-card.is-hidden');
-            const take = Math.min(STEP, hidden.length);
-            for (let i = 0; i < take; i++) {
-              hidden[i].classList.remove('is-hidden');
-              hidden[i].style.removeProperty('display');
-            }
-            const remain = grid.querySelectorAll('.related-card.is-hidden').length;
-            if (remainEl) remainEl.textContent = remain;
-            if (remain === 0 && moreWrap) moreWrap.style.display = 'none';
-          });
-        })();
-    </script>
-
 }
