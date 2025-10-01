@@ -1,5 +1,4 @@
-﻿// Controllers/AccountController.cs
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using VHS_fontend.Models.Account;
 using VHS_frontend.Services;
 
@@ -17,29 +16,6 @@ namespace VHS_frontend.Controllers
         [HttpGet]
         public IActionResult Login() => View(new LoginDTO());
 
-        //[HttpPost]
-        //public async Task<IActionResult> Login(LoginDTO model)
-        //{
-        //    if (!ModelState.IsValid) return View(model);
-
-        //    var result = await _authService.LoginAsync(model);
-        //    if (result == null)
-        //    {
-        //        ModelState.AddModelError(string.Empty, "Sai tài khoản hoặc mật khẩu");
-        //        return View(model);
-        //    }
-
-        //    Console.WriteLine($"[DEBUG] Login success: Token={result.Token}, Role={result.Role}, AccountID={result.AccountID}");
-
-
-        //    // Lưu session
-        //    HttpContext.Session.SetString("JWToken", result.Token);
-        //    HttpContext.Session.SetString("Role", result.Role ?? string.Empty);
-        //    HttpContext.Session.SetString("AccountID", result.AccountID.ToString());
-
-        //    // Redirect theo Role
-        //    return RedirectByRole(result.Role);
-        //}
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -71,29 +47,6 @@ namespace VHS_frontend.Controllers
 
         [HttpGet]
         public IActionResult Register() => View(new RegisterDTO());
-
-        //    [HttpPost]
-        //    [ValidateAntiForgeryToken]
-        //    public async Task<IActionResult> Register(RegisterDTO model)
-        //    {
-        //        if (!ModelState.IsValid) return View(model);
-
-        //        // Option: kiểm tra ConfirmPassword lần nữa (phòng khi tắt JS)
-        //        if (model.Password != model.ConfirmPassword)
-        //{
-        //            ModelState.AddModelError(nameof(model.ConfirmPassword), "Mật khẩu xác nhận không khớp");
-        //            return View(model);
-        //        }
-
-        //        var result = await _authService.RegisterAsync(model);
-        //        if (result == null)
-        //        {
-        //            ModelState.AddModelError(string.Empty, "Đăng ký thất bại");
-        //            return View(model);
-        //        }
-
-        //        return RedirectToAction("Login");
-        //    }
 
 
         [HttpPost]
@@ -140,5 +93,18 @@ namespace VHS_frontend.Controllers
                 _ => RedirectToAction("Index", "Home")
             };
         }
+
+        public IActionResult Profile()
+        {
+            // TODO: lấy thông tin cá nhân từ API
+            return View();
+        }
+
+        public IActionResult History()
+        {
+            // TODO: lấy lịch sử dịch vụ từ API
+            return View();
+        }
+
     }
 }
