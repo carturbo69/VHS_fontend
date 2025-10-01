@@ -41,96 +41,184 @@
         font-weight: 700;
     }
 
-/* 3) Grid: gallery (trái) + info (phải) ----------------------------------- */
+/* =======================================================================
+   SERVICE DETAIL (FULL) – Gallery trái phẳng, ảnh chính có khung + hover,
+   ảnh phụ phẳng (không viền/nền), giữ các phần còn lại như cũ
+   ======================================================================= */
+
+/* --------- Card lớn bao toàn bộ gallery + info --------- */
 .detail-grid {
     display: grid;
     grid-template-columns: 1fr; /* mobile: 1 cột */
-    row-gap: 28px;
-    margin-inline: 30px;
+    row-gap: 24px; /* đều hơn */
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 10px 32px rgba(0,0,0,.06);
+    padding: 22px;
+    margin-inline: 8px;
 }
 
-@media (min-width: 992px) {
+@media (min-width:768px) {
     .detail-grid {
-        grid-template-columns: minmax(500px, 0.8fr) minmax(520px, 1.2fr);
-        column-gap: 20px; /* khoảng giữa ảnh & info */
-        margin-inline: 200px;
+        padding: 24px;
+        margin-inline: 16px;
+        row-gap: 26px;
+    }
+}
+
+/* ≥ 992px: cột ảnh nhỏ hơn, cột info rộng hơn */
+@media (min-width:992px) {
+    .detail-grid {
+        /* trước: minmax(480px,1fr) minmax(560px,1.05fr) */
+        grid-template-columns: minmax(420px, .85fr) minmax(620px, 1.15fr);
+        column-gap: 32px;
+        padding: 28px;
+        margin-inline: 28px;
         align-items: start;
     }
 }
 
-@media (min-width: 1400px) {
+/* ≥ 1400px: tiếp tục ưu tiên cột info */
+@media (min-width:1400px) {
     .detail-grid {
+        /* trước: minmax(520px,1fr) minmax(620px,1.05fr) */
+        grid-template-columns: minmax(430px, .8fr) minmax(700px, 1.2fr);
         column-gap: 36px;
-        margin-inline: 100px;
+        padding: 32px;
+        margin-inline: 40px;
     }
 }
 
-/* 4) Gallery -------------------------------------------------------------- */
+
+/* --------- XÓA KHUNG/NỀN của CỘT TRÁI (container của gallery) --------- */
+.detail-grid > div:first-child {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+/* -------------------- GALLERY -------------------- */
 .gallery {
     display: grid;
     gap: 14px;
+    align-content: start; /* dồn nội dung lên trên cho đều */
+    background: transparent;
 }
 
+/* ẢNH CHÍNH: có khung + hover zoom nhẹ */
 .gallery-main {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 12px;
+    padding: 10px; /* tăng nhẹ padding cho cân */
     overflow: hidden;
     display: grid;
     place-items: center;
-    padding: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.05);
 }
 
     .gallery-main img {
+        display: block;
         width: 100%;
-        height: 420px;
+        height: 400px;
         object-fit: cover;
         border-radius: 8px;
+        transform: scale(1);
+        transition: transform .25s ease;
     }
 
+    .gallery-main:hover img {
+        transform: scale(1.02);
+    }
+
+/* THUMBNAILS — phẳng, hover rõ ràng nhưng không viền thật */
 .thumbs {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0,1fr));
     gap: 10px;
 }
 
 .thumb {
-    border: 1px solid var(--border);
-    background: var(--card);
-    border-radius: 10px;
+    position: relative;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
     overflow: hidden;
     cursor: pointer;
-    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: none !important;
 }
 
-    .thumb:hover {
-        transform: translateY(-2px);
-        border-color: var(--primary);
-        box-shadow: 0 6px 16px rgba(0,0,0,.08);
+    .thumb:focus, .thumb:focus-visible, .thumb:active {
+        outline: none !important;
+        box-shadow: none !important;
     }
 
     .thumb img {
+        display: block;
         width: 100%;
         height: 70px;
         object-fit: cover;
-        display: block;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        transform: scale(1);
+        transition: transform .15s ease, filter .15s ease;
+    }
+    /* Hover: phóng nhẹ + sáng 1 chút */
+    .thumb:hover img,
+    .thumb:focus-visible img {
+        transform: scale(1.03);
+        filter: brightness(1.03);
+    }
+    /* Viền ảo để feedback khi hover/active */
+    .thumb::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        transition: border-color .15s ease;
+        pointer-events: none;
     }
 
-/* 5) Info block ----------------------------------------------------------- */
+    .thumb:hover::after,
+    .thumb:focus-visible::after {
+        border-color: color-mix(in oklab, var(--primary) 60%, transparent);
+    }
+
+    .thumb.is-active::after {
+        border-color: var(--primary);
+    }
+
+/* -------------------- INFO (giãn đều bằng grid gap) -------------------- */
+.info {
+    display: grid;
+    align-content: start;
+    gap: 12px; /* TẤT CẢ khoảng cách dồn về 1 chỗ */
+}
+
+    .info > * {
+        margin: 0;
+    }
+/* bỏ margin lẻ tẻ, dùng gap thay thế */
+
 .title {
-    font-size: clamp(22px, 3vw, 32px);
+    font-size: clamp(22px,3vw,32px);
     font-weight: 800;
-    margin: 4px 0 8px;
+    margin-bottom: 2px;
 }
 
 .rating-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 10px;
 }
 
-/* Stars (đổ màu liên tục) */
 .stars {
     display: inline-flex;
     gap: 2px;
@@ -141,12 +229,12 @@
 .star {
     color: #d1d5db;
 }
-    /* nền xám chưa đổ */
+
     .star.filled {
         color: #f59e0b;
     }
-    /* sao đầy */
-    .star.frac { /* sao đổ theo phần trăm 0..100 bằng --p */
+
+    .star.frac {
         background: linear-gradient(90deg, #f59e0b var(--p), #d1d5db var(--p));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -159,16 +247,15 @@
 }
 
 .price {
-    font-size: clamp(20px, 2.6vw, 28px);
+    font-size: clamp(20px,2.6vw,28px);
     font-weight: 800;
     color: var(--primary);
-    margin: 6px 0 10px;
+    margin-top: 4px;
 }
 
 .brief {
     list-style: none;
     padding: 0;
-    margin: 0 0 10px 0;
     display: grid;
     gap: 6px;
 }
@@ -176,34 +263,30 @@
 .desc {
     color: var(--muted-foreground);
     line-height: 1.7;
-    margin-bottom: 14px;
 }
 
-/* 6) Add-ons -------------------------------------------------------------- */
+/* -------------------- ADD-ONS -------------------- */
 .addons {
-    margin: 18px 0 10px;
+    margin-top: 6px;
 }
 
 .addons-title {
     font-weight: 800;
     font-size: 1.05rem;
-    margin-bottom: 10px;
 }
 
 .addons-list {
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
-    margin-bottom: 12px;
 }
 
-@media (min-width: 768px) {
+@media (min-width:768px) {
     .addons-list {
         grid-template-columns: 1fr 1fr;
     }
 }
 
-/* Card add-on: 2 cột (Tên / Control), hàng 2 cho Giá */
 .addon-item {
     border: 1px solid var(--border);
     background: var(--card);
@@ -211,7 +294,7 @@
     padding: 12px 14px;
     display: grid;
     grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto; /* H1: name+control, H2: price */
+    grid-template-rows: auto auto;
     align-items: center;
     gap: 6px 12px;
 }
@@ -258,9 +341,9 @@
     border-radius: 8px;
     background: var(--card);
 }
-/* Giá add-on */
+
 .addon-price {
-    grid-column: 1 / -1; /* tràn 2 cột */
+    grid-column: 1/-1;
     grid-row: 2/3;
     justify-self: start;
     display: inline-block;
@@ -287,26 +370,21 @@
     }
 
         .addons-summary .row.total {
-            font-size: 1.05rem;
+            font-size: 1.3rem;
             font-weight: 800;
         }
 
-@media (max-width: 420px) {
-    .addon-item {
-        padding: 12px;
-        gap: 8px 10px;
-    }
+            /* Màu đỏ cho "Tổng tạm tính" */
+            .addons-summary .row.total strong#grandTotal {
+                color: #e11d48; /* đỏ đậm */
+            }
 
-    .addon-price {
-        font-size: .9rem;
-    }
-}
 
-/* 7) Actions --------------------------------------------------------------- */
+/* -------------------- ACTIONS -------------------- */
 .actions {
     display: flex;
     gap: 12px;
-    margin: 16px 0;
+    margin: 8px 0 0;
 }
 
     .actions .btn {
@@ -335,116 +413,15 @@
         background: #159d82;
     }
 
-/* 8) Safety --------------------------------------------------------------- */
+/* -------------------- SAFETY -------------------- */
 .safety {
     display: flex;
     flex-wrap: wrap;
     gap: 10px 16px;
     font-size: .95rem;
     color: var(--muted-foreground);
-    margin-top: 10px;
 }
 
-/* 9) Related -------------------------------------------------------------- */
-.related {
-    margin-top: 48px;
-}
-
-.related-title {
-    font-weight: 800;
-    font-size: clamp(18px, 2.4vw, 24px);
-    margin-bottom: 14px;
-}
-
-.related-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr)); /* mobile */
-    gap: 16px;
-}
-
-/* Desktop: 5 cột ngang */
-@media (min-width: 992px) {
-    .related-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-    /* ảnh thấp hơn chút để cân khi thu hẹp card */
-    .rel-img-wrap img {
-        height: 120px;
-    }
-}
-
-.related-card {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--card);
-    overflow: hidden;
-    transition: transform .18s, box-shadow .18s, border-color .18s;
-}
-
-    .related-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 24px -18px rgba(0,0,0,.15);
-        border-color: color-mix(in oklab, var(--border) 70%, var(--primary) 30%);
-    }
-
-.rel-img-wrap img {
-    width: 100%;
-    height: 140px;
-    object-fit: cover;
-    display: block;
-}
-
-.rel-body {
-    padding: 10px;
-    display: grid;
-    gap: 6px;
-}
-
-.rel-name {
-    font-weight: 700;
-    font-size: .98rem;
-    color: var(--foreground);
-    text-decoration: none;
-}
-
-    .rel-name:hover {
-        color: var(--primary);
-    }
-
-.rel-stars {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: .9rem;
-}
-
-.rel-rating-text {
-    font-size: .85rem;
-    color: var(--muted-foreground);
-}
-
-.rel-price {
-    font-weight: 800;
-    color: var(--primary);
-}
-
-/* 10) A11y & motion prefs ------------------------------------------------- */
-@media (prefers-reduced-motion: reduce) {
-    .thumb,
-    .related-card,
-    .service-detail * {
-        transition: none !important;
-    }
-}
-
-/* 11) Small helpers ------------------------------------------------------- */
-img {
-    max-width: 100%;
-}
-
-button {
-    cursor: pointer;
-}
 
 /* ===== Provider / Shop (style giống hình, tối ưu khoảng/ màu) ============ */
 /* ==========================================================================
@@ -622,6 +599,128 @@ button {
         border-color: color-mix(in oklab, var(--border) 70%, #000 30%);
     }
 }
+
+/* ===== MÔ TẢ DỊCH VỤ (khung + lưới giống reviews-section) ===== */
+.desc-section {
+    margin-top: 28px;
+}
+
+/* Desktop: trái ~65%, phải ~20% (giống reviews-section) */
+@media (min-width: 992px) {
+    .desc-section {
+        display: grid;
+        grid-template-columns: minmax(640px, 0.65fr) 0.2fr;
+        column-gap: 20px;
+    }
+
+    .desc-card {
+        grid-column: 1;
+    }
+}
+
+/* ≥1400px: trái ~70%, phải ~15% */
+@media (min-width: 1400px) {
+    .desc-section {
+        grid-template-columns: minmax(760px, 0.7fr) 0.15fr;
+        column-gap: 24px;
+    }
+}
+
+/* ≥1680px: trái ~73%, phải ~12% */
+@media (min-width: 1680px) {
+    .desc-section {
+        grid-template-columns: minmax(900px, 0.73fr) 0.12fr;
+    }
+}
+
+/* Card mô tả: khung đồng bộ reviews-card */
+.desc-card {
+    background: var(--card);
+    border: 1px solid color-mix(in oklab, var(--border) 88%, var(--primary) 12%);
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 3px 10px rgba(0,0,0,.05);
+}
+
+@media (min-width:992px) {
+    .desc-card {
+        padding: 16px;
+    }
+}
+
+.desc-header {
+    margin: 2px 0 12px;
+    font-weight: 800;
+    font-size: clamp(18px, 2.4vw, 24px);
+}
+
+/* Thu gọn khi dài (giữ logic cũ) */
+.desc-card.is-collapsed .desc-content {
+    max-height: 380px;
+    overflow: hidden;
+    position: relative;
+}
+
+    .desc-card.is-collapsed .desc-content::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 56px;
+        background: linear-gradient(180deg, transparent, var(--card));
+        pointer-events: none;
+    }
+
+/* Nội dung rich text */
+.desc-content {
+    padding: 0;
+    color: var(--muted-foreground);
+    line-height: 1.7;
+}
+
+    .desc-content p {
+        margin: .6rem 0;
+    }
+
+    .desc-content ul, .desc-content ol {
+        margin: .6rem 1.2rem;
+    }
+
+    .desc-content h1, .desc-content h2, .desc-content h3 {
+        margin: .8rem 0 .4rem;
+        line-height: 1.3;
+        color: var(--foreground);
+    }
+
+    .desc-content img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 12px 0;
+        border-radius: 8px;
+    }
+
+/* Nút xem thêm */
+.btn-toggle {
+    margin: 8px 0 0;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--muted);
+    color: var(--foreground);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+    .btn-toggle:hover {
+        background: color-mix(in oklab, var(--muted) 85%, var(--foreground) 5%);
+    }
+
+    .btn-toggle[hidden] {
+        display: none !important;
+    }
+
 
 /* ==========================================================================
    REVIEWS (ĐÁNH GIÁ DỊCH VỤ) — FULL CSS
@@ -1064,3 +1163,136 @@ button {
     }
 }
 
+/* ========== Related (dịch vụ liên quan) ========== */
+.related {
+    margin-top: 48px;
+}
+
+.related-title {
+    font-weight: 800;
+    font-size: clamp(18px, 2.4vw, 24px);
+    margin-bottom: 14px;
+}
+
+/* Lưới: mobile 2 cột, desktop 5 cột */
+.related-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 16px;
+}
+
+@media (min-width: 992px) {
+    .related-grid {
+        grid-template-columns: repeat(5, minmax(0,1fr));
+    }
+}
+
+/* Card */
+.related-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    overflow: hidden;
+    transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+
+    .related-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px -18px rgba(0,0,0,.15);
+        border-color: color-mix(in oklab, var(--border) 70%, var(--primary) 30%);
+    }
+
+/* Ảnh */
+.rel-img-wrap img {
+    width: 100%;
+    height: 140px; /* mặc định */
+    object-fit: cover;
+    display: block;
+}
+
+@media (min-width: 992px) {
+    .rel-img-wrap img {
+        height: 120px;
+    }
+    /* cân card trên desktop */
+}
+
+/* Nội dung */
+.rel-body {
+    padding: 10px;
+    display: grid;
+    gap: 6px;
+}
+
+.rel-name {
+    font-weight: 700;
+    font-size: .98rem;
+    color: var(--foreground);
+    text-decoration: none;
+}
+
+    .rel-name:hover {
+        color: var(--primary);
+    }
+
+.rel-stars {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: .9rem;
+}
+
+.rel-rating-text {
+    font-size: .85rem;
+    color: var(--muted-foreground);
+}
+
+.rel-price {
+    font-weight: 800;
+    color: var(--primary);
+}
+
+/* Ẩn item khi chưa bung */
+.related-card.is-hidden {
+    display: none !important;
+}
+
+/* Nút “Xem thêm” */
+.related-more {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+    .related-more .btn-more {
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--foreground);
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-weight: 700;
+        transition: background .2s, border-color .2s, transform .08s;
+    }
+
+        .related-more .btn-more:hover {
+            background: var(--muted);
+            border-color: color-mix(in oklab, var(--border) 70%, var(--primary) 30%);
+        }
+
+        .related-more .btn-more:active {
+            transform: translateY(1px);
+        }
+
+    .related-more .more-count {
+        color: var(--muted-foreground);
+        font-size: .95rem;
+    }
+
+/* Giảm chuyển động nếu người dùng chọn */
+@media (prefers-reduced-motion: reduce) {
+    .related-card, .btn-more, .rel-img-wrap img {
+        transition: none !important;
+    }
+}

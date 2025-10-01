@@ -133,8 +133,8 @@ namespace VHS_fontend.Controllers
                 }
             };
 
-            // Related (7 mục)
-            var related = Enumerable.Range(1, 7).Select(i =>
+            // Related 
+            var related = Enumerable.Range(1, 40).Select(i =>
             {
                 var rid = (Math.Abs(id) + i) % 100 + 1;
                 var rcat = categories[rid % categories.Length];

@@ -28,151 +28,153 @@
 
         <div class="detail-grid">
             <!-- GALLERY -->
-            <div>
-                <div class="gallery">
-                    <div class="gallery-main">
-                        <img id="mainImage" src="@mainSrc" alt="@Model.Name" />
-                    </div>
+            <div class="detail-grid">
+                <div>
+                    <div class="gallery">
+                        <div class="gallery-main">
+                            <img id="mainImage" src="@mainSrc" alt="@Model.Name" />
+                        </div>
 
-                    <div class="thumbs" id="thumbs">
-                        @if (Model.Images != null && Model.Images.Any())
-                        {
-                            foreach (var img in Model.Images)
+                        <div class="thumbs" id="thumbs">
+                            @if (Model.Images != null && Model.Images.Any())
                             {
-                                var src = string.IsNullOrWhiteSpace(img)
-                                ? (Model.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
+                                foreach (var img in Model.Images)
+                                {
+                                    var src = string.IsNullOrWhiteSpace(img)
+                                    ? (Model.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
+                                    : Model.Category == "Sự kiện nhỏ tại nhà" ? Url.Content("~/images/SuKienNho.jpg")
+                                    : Url.Content("~/images/VeSinh.jpg"))
+                                    : Url.Content(img);
+
+                                    <button type="button" class="thumb" data-src="@src" title="Xem ảnh">
+                                        <img src="@src" alt="@Model.Name" />
+                                    </button>
+                                }
+                            }
+                            else
+                            {
+                                // Không có Images -> hiển thị 3 thumbnail fallback theo Category
+                                var thumb = Model.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
                                 : Model.Category == "Sự kiện nhỏ tại nhà" ? Url.Content("~/images/SuKienNho.jpg")
-                                : Url.Content("~/images/VeSinh.jpg"))
-                                : Url.Content(img);
-
-                                <button type="button" class="thumb" data-src="@src" title="Xem ảnh">
-                                    <img src="@src" alt="@Model.Name" />
-                                </button>
+                                : Url.Content("~/images/VeSinh.jpg");
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    <button type="button" class="thumb" data-src="@thumb" title="Xem ảnh">
+                                        <img src="@thumb" alt="@Model.Name" />
+                                    </button>
+                                }
                             }
-                        }
-                        else
-                        {
-                            // Không có Images -> hiển thị 3 thumbnail fallback theo Category
-                            var thumb = Model.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
-                            : Model.Category == "Sự kiện nhỏ tại nhà" ? Url.Content("~/images/SuKienNho.jpg")
-                            : Url.Content("~/images/VeSinh.jpg");
-                            for (int i = 0; i < 3; i++)
-                            {
-                                <button type="button" class="thumb" data-src="@thumb" title="Xem ảnh">
-                                    <img src="@thumb" alt="@Model.Name" />
-                                </button>
-                            }
-                        }
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- INFO -->
-            <div class="info">
-                <h1 class="title">@Model.Name</h1>
+                <!-- INFO -->
+                <div class="info">
+                    <h1 class="title">@Model.Name</h1>
 
-                <span class="stars">
-                    @{
-                        var avg = Model.Stars; // giữ số thực
-                    }
-                    @for (int s = 1; s <= 5; s++)
+                    <span class="stars">
+                        @{
+                            var avg = Model.Stars; // giữ số thực
+                        }
+                        @for (int s = 1; s <= 5; s++)
+                        {
+                            var fill = Math.Max(0, Math.Min(1, avg - (s - 1))); // 0..1
+                            var pct = (int)Math.Round(fill * 100);               // 0..100
+
+                            if (pct >= 100)
+                            {
+                                <span class="star filled">★</span>
+                                ;
+                            }
+                            else if (pct <= 0)
+                            {
+                                <span class="star">★</span>
+                                ;
+                            }
+                            else
+                            {
+                                <span class="star frac" style="--p:@pct%;">★</span>
+                                ;
+                            }
+                        }
+                    </span>
+                    <span class="rating-text">@Model.Stars.ToString("0.#") / 5 (@Model.TotalReviews đánh giá)</span>
+
+
+                    <div class="price">@Model.PriceDisplay</div>
+
+                    <ul class="brief">
+                        <li><strong>Loại:</strong> @Model.Category</li>
+                        <li><strong>Thời gian:</strong> @Model.Duration</li>
+                    </ul>
+
+                    @* <p class="desc">@Model.Description</p> *@
+
+                    <!-- ADD-ONS -->
+                    @if (Model.AddOns?.Any() == true)
                     {
-                        var fill = Math.Max(0, Math.Min(1, avg - (s - 1))); // 0..1
-                        var pct = (int)Math.Round(fill * 100);               // 0..100
+                        <div class="addons">
+                            <h3 class="addons-title">Tuỳ chọn thêm</h3>
 
-                        if (pct >= 100)
-                        {
-                            <span class="star filled">★</span>
-                            ;
-                        }
-                        else if (pct <= 0)
-                        {
-                            <span class="star">★</span>
-                            ;
-                        }
-                        else
-                        {
-                            <span class="star frac" style="--p:@pct%;">★</span>
-                            ;
-                        }
-                    }
-                </span>
-                <span class="rating-text">@Model.Stars.ToString("0.#") / 5 (@Model.TotalReviews đánh giá)</span>
-
-
-                <div class="price">@Model.PriceDisplay</div>
-
-                <ul class="brief">
-                    <li><strong>Loại:</strong> @Model.Category</li>
-                    <li><strong>Thời gian:</strong> @Model.Duration</li>
-                </ul>
-
-                <p class="desc">@Model.Description</p>
-
-                <!-- ADD-ONS -->
-                @if (Model.AddOns?.Any() == true)
-                {
-                    <div class="addons">
-                        <h3 class="addons-title">Tuỳ chọn thêm</h3>
-
-                        <div class="addons-list">
-                            @foreach (var a in Model.AddOns)
-                            {
-                                if (string.Equals(a.Type, "check", StringComparison.OrdinalIgnoreCase))
+                            <div class="addons-list">
+                                @foreach (var a in Model.AddOns)
                                 {
-                                    <label class="addon-item addon-check" data-price="@a.Price">
-                                        <input type="checkbox" class="addon-input" />
-                                        <span class="addon-name">@a.Name</span>
-                                        <span class="addon-price">+ @string.Format("{0:n0}", a.Price)đ</span>
-                                    </label>
-                                }
-                                else
-                                {
-                                    <div class="addon-item addon-qty" data-price="@a.Price" data-max="@a.MaxQty">
-                                        <div class="addon-name">@a.Name</div>
-                                        <div class="qty-control">
-                                            <button type="button" class="qty-btn" aria-label="Giảm">−</button>
-                                            <input type="text" class="qty-input" value="0" inputmode="numeric" />
-                                            <button type="button" class="qty-btn" aria-label="Tăng">+</button>
+                                    if (string.Equals(a.Type, "check", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <label class="addon-item addon-check" data-price="@a.Price">
+                                            <input type="checkbox" class="addon-input" />
+                                            <span class="addon-name">@a.Name</span>
+                                            <span class="addon-price">+ @string.Format("{0:n0}", a.Price)đ</span>
+                                        </label>
+                                    }
+                                    else
+                                    {
+                                        <div class="addon-item addon-qty" data-price="@a.Price" data-max="@a.MaxQty">
+                                            <div class="addon-name">@a.Name</div>
+                                            <div class="qty-control">
+                                                <button type="button" class="qty-btn" aria-label="Giảm">−</button>
+                                                <input type="text" class="qty-input" value="0" inputmode="numeric" />
+                                                <button type="button" class="qty-btn" aria-label="Tăng">+</button>
+                                            </div>
+                                            <div class="addon-price">+ @string.Format("{0:n0}", a.Price)đ</div>
                                         </div>
-                                        <div class="addon-price">+ @string.Format("{0:n0}", a.Price)đ</div>
-                                    </div>
+                                    }
                                 }
-                            }
-                        </div>
+                            </div>
 
-                        <div class="addons-summary">
-                            <div class="row">
-                                <span>Giá dịch vụ</span>
-                                <strong id="basePrice" data-base="@Model.PriceValue">@Model.PriceDisplay</strong>
-                            </div>
-                            <div class="row">
-                                <span>Phụ thu add-on</span>
-                                <strong id="addOnPrice">0đ</strong>
-                            </div>
-                            <div class="row total">
-                                <span>Tổng tạm tính</span>
-                                <strong id="grandTotal">@Model.PriceDisplay</strong>
+                            <div class="addons-summary">
+                                <div class="row">
+                                    <span>Giá dịch vụ</span>
+                                    <strong id="basePrice" data-base="@Model.PriceValue">@Model.PriceDisplay</strong>
+                                </div>
+                                <div class="row">
+                                    <span>Phụ thu add-on</span>
+                                    <strong id="addOnPrice">0đ</strong>
+                                </div>
+                                <div class="row total">
+                                    <span>Tổng tạm tính</span>
+                                    <strong id="grandTotal">@Model.PriceDisplay</strong>
+                                </div>
                             </div>
                         </div>
+                    }
+
+                    <!-- ACTIONS -->
+                    <div class="actions">
+                        <button type="button" class="btn btn-cart">
+                            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                                <path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 .001 3.999A2 2 0 0 0 17 18zM7.2 14h9.45a2 2 0 0 0 1.94-1.52l1.2-5.23A1 1 0 0 0 18.8 6H6.3l-.3-1.2A1 1 0 0 0 5 4H2v2h2.2l2.2 8.8z" />
+                            </svg>
+                            Thêm vào giỏ hàng
+                        </button>
+                        <button type="button" class="btn btn-buy">Mua ngay</button>
                     </div>
-                }
 
-                <!-- ACTIONS -->
-                <div class="actions">
-                    <button type="button" class="btn btn-cart">
-                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                            <path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 .001 3.999A2 2 0 0 0 17 18zM7.2 14h9.45a2 2 0 0 0 1.94-1.52l1.2-5.23A1 1 0 0 0 18.8 6H6.3l-.3-1.2A1 1 0 0 0 5 4H2v2h2.2l2.2 8.8z" />
-                        </svg>
-                        Thêm vào giỏ hàng
-                    </button>
-                    <button type="button" class="btn btn-buy">Mua ngay</button>
-                </div>
-
-                <div class="safety">
-                    <span>✓ Bảo hành theo chính sách</span>
-                    <span>✓ Lịch hẹn linh hoạt</span>
-                    <span>✓ Thanh toán an toàn</span>
+                    <div class="safety">
+                        <span>✓ Bảo hành theo chính sách</span>
+                        <span>✓ Lịch hẹn linh hoạt</span>
+                        <span>✓ Thanh toán an toàn</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -235,6 +237,20 @@
                 </div>
             </div>
         </section>
+
+        <!-- === SERVICE DESCRIPTION (block riêng) ======================== -->
+        <section class="desc-section" id="desc">
+            <article class="desc-card" id="descCard">
+                <div class="desc-header">Mô tả dịch vụ</div>
+                <div class="desc-content" id="descContent">
+                    @Html.Raw(Model.Description)
+                </div>
+                <button type="button" class="btn-toggle" id="descToggle" hidden>Xem thêm</button>
+            </article>
+            <div aria-hidden="true"></div> <!-- cột phải để tạo khoảng thoáng -->
+        </section>
+
+
 
         <!-- ===== REVIEWS / ĐÁNH GIÁ DỊCH VỤ (filterable) ======================= -->
         @{
@@ -507,26 +523,34 @@
                 <button type="button" class="rv-lb-close" aria-label="Đóng">×</button>
             </div>
         </div>
+     <!-- ===== /REVIEWS ======================================================== -->
+		
+     
 
-        <!-- ===== /REVIEWS ======================================================== -->
-
-
-        <!-- RELATED -->
-        @if (Model.Related?.Any() == true)
+     
+     
+     <!--  =========== RELATED SERVICES  ======================= -->
+        @{
+            var list = Model.Related ?? new List<VHS_fontend.Controllers.ServiceViewModel>();
+            const int step = 20;
+            var idx = 0;
+        }
+        @if (list.Count > 0)
         {
             <div class="related">
                 <h3 class="related-title">Dịch vụ liên quan</h3>
-                <div class="related-grid">
-                    @foreach (var s in Model.Related)
+
+                <div class="related-grid" id="relatedGrid">
+                    @foreach (var s in list)
                     {
-                        // Fallback ảnh theo Category nếu ImageUrl trống
                         var relImg = string.IsNullOrWhiteSpace(s.ImageUrl)
                         ? (s.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
                         : s.Category == "Sự kiện nhỏ tại nhà" ? Url.Content("~/images/SuKienNho.jpg")
                         : Url.Content("~/images/VeSinh.jpg"))
                         : Url.Content(s.ImageUrl);
 
-                        <article class="related-card">
+                        var hide = idx >= step;
+                        <article class="related-card@(hide ? " is-hidden" : "")" data-index="@idx">
                             <a asp-controller="Services" asp-action="Details" asp-route-id="@s.Id" class="rel-img-wrap">
                                 <img src="@relImg" alt="@s.Name" />
                             </a>
@@ -540,31 +564,34 @@
                                     {
                                         var fill = Math.Max(0, Math.Min(1, ravg - (i - 1)));
                                         var pct = (int)Math.Round(fill * 100);
-
                                         if (pct >= 100)
                                         {
                                             <span class="star filled">★</span>
-                                            ;
                                         }
                                         else if (pct <= 0)
                                         {
                                             <span class="star">★</span>
-                                            ;
                                         }
                                         else
                                         {
                                             <span class="star frac" style="--p:@pct%;">★</span>
-                                            ;
                                         }
                                     }
                                     <span class="rel-rating-text">@ravg.ToString("0.#") / 5 (@s.TotalReviews đánh giá)</span>
-
                                 </div>
-
                                 <div class="rel-price">@s.PriceDisplay</div>
                             </div>
                         </article>
+                        idx++;
                     }
+                </div>
+
+                <div class="related-more" id="relatedMore" style="@(list.Count > step ? "" : "display:none")">
+                    <button type="button" class="btn btn-more" id="btnRelatedMore"
+                            data-step="@step" aria-controls="relatedGrid">
+                        Xem thêm
+                    </button>
+                   <!-- <span class="more-count">Còn <b id="relatedRemain">@(Math.Max(0, list.Count - step))</b> dịch vụ</span> -->
                 </div>
             </div>
         }
@@ -574,15 +601,29 @@
 @section Scripts {
     <script>
         // Đổi ảnh lớn khi bấm thumbnail
-        document.getElementById('thumbs')?.addEventListener('click', function(e){
+        // document.getElementById('thumbs')?.addEventListener('click', function(e){
+        //   const btn = e.target.closest('.thumb');
+        //   if(!btn) return;
+        //   const src = btn.getAttribute('data-src');
+        //   if(src){
+        //     const img = document.getElementById('mainImage');
+        //     if(img) img.setAttribute('src', src);
+        //   }
+        // });
+              // Đổi ảnh lớn + đánh dấu thumb đang chọn
+        document.getElementById('thumbs')?.addEventListener('click', function (e) {
           const btn = e.target.closest('.thumb');
-          if(!btn) return;
+          if (!btn) return;
           const src = btn.getAttribute('data-src');
-          if(src){
-            const img = document.getElementById('mainImage');
-            if(img) img.setAttribute('src', src);
-          }
+          if (src) document.getElementById('mainImage')?.setAttribute('src', src);
+
+          // highlight thumbnail đang chọn
+          this.querySelectorAll('.thumb.is-active').forEach(x => x.classList.remove('is-active'));
+          btn.classList.add('is-active');
         });
+
+        // Đánh dấu sẵn thumb đầu tiên
+        document.querySelector('#thumbs .thumb')?.classList.add('is-active');
 
         // Tính tiền add-on
         (function(){
@@ -668,5 +709,59 @@
           lbImg?.addEventListener('click', closeLB);         // click ảnh để đóng
           window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeLB(); });
         })();
+
+        /* Relate */
+                (function(){
+          const grid = document.getElementById('relatedGrid');
+          const moreWrap = document.getElementById('relatedMore');
+          const btn = document.getElementById('btnRelatedMore');
+          const remainEl = document.getElementById('relatedRemain');
+          if(!grid || !btn) return;
+
+          const chunk = parseInt(btn.dataset.chunk || '20', 10);
+
+          btn.addEventListener('click', function(){
+            const hidden = grid.querySelectorAll('.is-hidden');
+            const take = Math.min(chunk, hidden.length);
+            for(let i=0;i<take;i++){ hidden[i].classList.remove('is-hidden'); }
+            const remain = grid.querySelectorAll('.is-hidden').length;
+            if(remainEl) remainEl.textContent = remain;
+            if(remain === 0 && moreWrap){ moreWrap.style.display = 'none'; }
+          });
+        })();
     </script>
+
+
+    <script> // Description
+        (() => {
+          const grid     = document.getElementById('relatedGrid');
+          const moreWrap = document.getElementById('relatedMore');
+          const btn      = document.getElementById('btnRelatedMore');
+          const remainEl = document.getElementById('relatedRemain');
+          if (!grid || !btn) return;
+
+          const STEP = parseInt(
+            btn.getAttribute('data-step') || btn.getAttribute('data-chunk') || '20',
+            10
+          );
+
+          // Phòng khi từng item bị đặt inline display:none ở phiên bản trước:
+          grid.querySelectorAll('.related-card.is-hidden').forEach(el => {
+            el.style.removeProperty('display');
+          });
+
+          btn.addEventListener('click', () => {
+            const hidden = grid.querySelectorAll('.related-card.is-hidden');
+            const take = Math.min(STEP, hidden.length);
+            for (let i = 0; i < take; i++) {
+              hidden[i].classList.remove('is-hidden');
+              hidden[i].style.removeProperty('display');
+            }
+            const remain = grid.querySelectorAll('.related-card.is-hidden').length;
+            if (remainEl) remainEl.textContent = remain;
+            if (remain === 0 && moreWrap) moreWrap.style.display = 'none';
+          });
+        })();
+    </script>
+
 }
