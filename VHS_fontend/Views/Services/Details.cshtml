@@ -38,147 +38,172 @@
         <div class="detail-grid">
             <!-- GALLERY -->
             <div class="detail-grid">
-                <div>
-                    <div class="gallery">
-                        <div class="gallery-main">
-                            <img id="mainImage" src="@mainSrc" alt="@Model.Name" />
-                        </div>
+                <!-- GALLERY -->
+                <div class="detail-grid">
+                    <div>
+                        <div class="gallery">
+                            <div class="gallery-main">
+                                <img id="mainImage" src="@mainSrc" alt="@Model.Name" />
+                            </div>
 
-                        <div class="thumbs" id="thumbs">
-                            @if (Model.Images != null && Model.Images.Any())
-                            {
-                                foreach (var img in Model.Images)
+                            <div class="thumbs" id="thumbs">
+                                @if (Model.Images != null && Model.Images.Any())
                                 {
-                                    var src = string.IsNullOrWhiteSpace(img)
-                                    ? (Model.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
+                                    foreach (var img in Model.Images)
+                                    {
+                                        var src = string.IsNullOrWhiteSpace(img)
+                                        ? (Model.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
+                                        : Model.Category == "Sự kiện nhỏ tại nhà" ? Url.Content("~/images/SuKienNho.jpg")
+                                        : Url.Content("~/images/VeSinh.jpg"))
+                                        : Url.Content(img);
+
+                                        <button type="button" class="thumb" data-src="@src" title="Xem ảnh">
+                                            <img src="@src" alt="@Model.Name" />
+                                        </button>
+                                    }
+                                }
+                                else
+                                {
+                                    // Không có Images -> hiển thị 3 thumbnail fallback theo Category
+                                    var thumb = Model.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
                                     : Model.Category == "Sự kiện nhỏ tại nhà" ? Url.Content("~/images/SuKienNho.jpg")
-                                    : Url.Content("~/images/VeSinh.jpg"))
-                                    : Url.Content(img);
-
-                                    <button type="button" class="thumb" data-src="@src" title="Xem ảnh">
-                                        <img src="@src" alt="@Model.Name" />
-                                    </button>
+                                    : Url.Content("~/images/VeSinh.jpg");
+                                    for (int i = 0; i < 3; i++)
+                                    {
+                                        <button type="button" class="thumb" data-src="@thumb" title="Xem ảnh">
+                                            <img src="@thumb" alt="@Model.Name" />
+                                        </button>
+                                    }
                                 }
-                            }
-                            else
-                            {
-                                // Không có Images -> hiển thị 3 thumbnail fallback theo Category
-                                var thumb = Model.Category == "Nội trợ" ? Url.Content("~/images/NoiTro.jpg")
-                                : Model.Category == "Sự kiện nhỏ tại nhà" ? Url.Content("~/images/SuKienNho.jpg")
-                                : Url.Content("~/images/VeSinh.jpg");
-                                for (int i = 0; i < 3; i++)
-                                {
-                                    <button type="button" class="thumb" data-src="@thumb" title="Xem ảnh">
-                                        <img src="@thumb" alt="@Model.Name" />
-                                    </button>
-                                }
-                            }
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- INFO -->
-                <div class="info">
-                    <h1 class="title">@Model.Name</h1>
+                    <!-- INFO -->
+                    <div class="info">
+                        <h1 class="title">@Model.Name</h1>
 
-                    <span class="stars">
-                        @{
-                            var avg = Model.Stars; // giữ số thực
-                        }
-                        @for (int s = 1; s <= 5; s++)
-                        {
-                            var fill = Math.Max(0, Math.Min(1, avg - (s - 1))); // 0..1
-                            var pct = (int)Math.Round(fill * 100);               // 0..100
-
-                            if (pct >= 100)
-                            {
-                                <span class="star filled">★</span>;
+                        <span class="stars">
+                            @{
+                                var avg = Model.Stars; // giữ số thực
                             }
-                            else if (pct <= 0)
+                            @for (int s = 1; s <= 5; s++)
                             {
-                                <span class="star">★</span>;
-                            }
-                            else
-                            {
-                                <span class="star frac" style="--p:@pct%;">★</span>;
-                            }
-                        }
-                    </span>
-                    <span class="rating-text">@Model.Stars.ToString("0.#") / 5 (@Model.TotalReviews đánh giá)</span>
+                                var fill = Math.Max(0, Math.Min(1, avg - (s - 1))); // 0..1
+                                var pct = (int)Math.Round(fill * 100);               // 0..100
 
-                    <div class="price">@Model.PriceDisplay</div>
-
-                    <ul class="brief">
-                        <li><strong>Loại:</strong> @Model.Category</li>
-                        <li><strong>Thời gian:</strong> @Model.Duration</li>
-                    </ul>
-
-                    @* <p class="desc">@Model.Description</p> *@
-
-                    <!-- ADD-ONS -->
-                    @if (Model.AddOns?.Any() == true)
-                    {
-                        <div class="addons">
-                            <h3 class="addons-title">Tuỳ chọn thêm</h3>
-
-                            <div class="addons-list">
-                                @foreach (var a in Model.AddOns)
+                                if (pct >= 100)
                                 {
-                                    if (string.Equals(a.Type, "check", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        <label class="addon-item addon-check" data-price="@a.Price">
-                                            <input type="checkbox" class="addon-input" />
-                                            <span class="addon-name">@a.Name</span>
-                                            <span class="addon-price">+ @string.Format("{0:n0}", a.Price)đ</span>
-                                        </label>
-                                    }
-                                    else
-                                    {
-                                        <div class="addon-item addon-qty" data-price="@a.Price" data-max="@a.MaxQty">
-                                            <div class="addon-name">@a.Name</div>
-                                            <div class="qty-control">
-                                                <button type="button" class="qty-btn" aria-label="Giảm">−</button>
-                                                <input type="text" class="qty-input" value="0" inputmode="numeric" />
-                                                <button type="button" class="qty-btn" aria-label="Tăng">+</button>
-                                            </div>
-                                            <div class="addon-price">+ @string.Format("{0:n0}", a.Price)đ</div>
+                                    <span class="star filled">★</span>
+                                    ;
+                                }
+                                else if (pct <= 0)
+                                {
+                                    <span class="star">★</span>
+                                    ;
+                                }
+                                else
+                                {
+                                    <span class="star frac" style="--p:@pct%;">★</span>
+                                    ;
+                                }
+                            }
+                        </span>
+                        <span class="rating-text">@Model.Stars.ToString("0.#") / 5 (@Model.TotalReviews đánh giá)</span>
+
+                        <div class="price">@Model.PriceDisplay</div>
+
+                        <ul class="brief">
+                            <li><strong>Loại:</strong> @Model.Category</li>
+                            <li><strong>Thời gian:</strong> @Model.Duration</li>
+                        </ul>
+
+                        @* <p class="desc">@Model.Description</p> *@
+
+                        <!-- FORM: Add to Cart -->
+                        <form asp-area="Customer" asp-controller="Cart" asp-action="AddToCart" method="post" id="cartForm">
+                            <!-- hidden chính -->
+                            <input type="hidden" name="id" value="@Model.Id" />
+                            <input type="hidden" name="name" value="@Model.Name" />
+                            <input type="hidden" name="priceValue" value="@Model.PriceValue" />
+                            <input type="hidden" name="imageUrl" value="@(Model.Images?.FirstOrDefault() ?? "")" />
+                            <input type="hidden" name="quantity" value="1" /> @* luôn 1 gói *@
+
+                            <!-- ADD-ONS -->
+                            @if (Model.AddOns?.Any() == true)
+                            {
+                                <div class="addons">
+                                    <h3 class="addons-title">Tuỳ chọn thêm</h3>
+
+                                    <div class="addons-list">
+                                        @* Mỗi add-on có đủ hidden và 1 input qty ẩn (JS đã đồng bộ) *@
+                                        @for (int i = 0; i < Model.AddOns.Count; i++)
+                                        {
+                                            var a = Model.AddOns[i];
+                                            <input type="hidden" name="addonId" value="@a.Id" />
+                                            <input type="hidden" name="addonName" value="@a.Name" />
+                                            <input type="hidden" name="addonPrice" value="@a.Price" />
+                                            <input type="hidden" name="addonType" value="@a.Type" />
+                                            <input type="hidden" class="addonQty-hidden" name="addonQty" value="0" />
+
+                                            if (string.Equals(a.Type, "check", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <label class="addon-item addon-check" data-price="@a.Price">
+                                                    <input type="checkbox" class="addon-input" />
+                                                    <span class="addon-name">@a.Name</span>
+                                                    <span class="addon-price">+ @string.Format("{0:n0}", a.Price)đ</span>
+                                                </label>
+                                            }
+                                            else
+                                            {
+                                                <div class="addon-item addon-qty" data-price="@a.Price" data-max="@a.MaxQty">
+                                                    <div class="addon-name">@a.Name</div>
+                                                    <div class="qty-control">
+                                                        <button type="button" class="qty-btn" aria-label="Giảm">−</button>
+                                                        <input type="text" class="qty-input" value="0" inputmode="numeric" />
+                                                        <button type="button" class="qty-btn" aria-label="Tăng">+</button>
+                                                    </div>
+                                                    <div class="addon-price">+ @string.Format("{0:n0}", a.Price)đ</div>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+
+                                    <!-- SUMMARY (giữ nguyên của bạn) -->
+                                    <div class="addons-summary">
+                                        <div class="row">
+                                            <span>Giá dịch vụ</span>
+                                            <strong id="basePrice" data-base="@Model.PriceValue">@Model.PriceDisplay</strong>
                                         </div>
-                                    }
-                                }
-                            </div>
+                                        <div class="row">
+                                            <span>Phụ thu add-on</span>
+                                            <strong id="addOnPrice">0đ</strong>
+                                        </div>
+                                        <div class="row total">
+                                            <span>Tổng tạm tính</span>
+                                            <strong id="grandTotal">@Model.PriceDisplay</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
 
-                            <div class="addons-summary">
-                                <div class="row">
-                                    <span>Giá dịch vụ</span>
-                                    <strong id="basePrice" data-base="@Model.PriceValue">@Model.PriceDisplay</strong>
-                                </div>
-                                <div class="row">
-                                    <span>Phụ thu add-on</span>
-                                    <strong id="addOnPrice">0đ</strong>
-                                </div>
-                                <div class="row total">
-                                    <span>Tổng tạm tính</span>
-                                    <strong id="grandTotal">@Model.PriceDisplay</strong>
-                                </div>
+                            <!-- ACTIONS -->
+                            <div class="actions">
+                                <button type="submit" class="btn btn-cart">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                                        <path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 .001 3.999A2 2 0 0 0 17 18zM7.2 14h9.45a2 2 0 0 0 1.94-1.52l1.2-5.23A1 1 0 0 0 18.8 6H6.3l-.3-1.2A1 1 0 0 0 5 4H2v2h2.2l2.2 8.8z" />
+                                    </svg>
+                                    Thêm vào giỏ hàng
+                                </button>
+                                <button type="submit" class="btn btn-buy">Mua ngay</button>
                             </div>
+                        </form>
+
+                        <div class="safety">
+                            <span>✓ Bảo hành theo chính sách</span>
+                            <span>✓ Lịch hẹn linh hoạt</span>
+                            <span>✓ Thanh toán an toàn</span>
                         </div>
-                    }
-
-                    <!-- ACTIONS -->
-                    <div class="actions">
-                        <button type="button" class="btn btn-cart">
-                            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                                <path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 .001 3.999A2 2 0 0 0 17 18zM7.2 14h9.45a2 2 0 0 0 1.94-1.52l1.2-5.23A1 1 0 0 0 18.8 6H6.3l-.3-1.2A1 1 0 0 0 5 4H2v2h2.2l2.2 8.8z" />
-                            </svg>
-                            Thêm vào giỏ hàng
-                        </button>
-                        <button type="button" class="btn btn-buy">Mua ngay</button>
-                    </div>
-
-                    <div class="safety">
-                        <span>✓ Bảo hành theo chính sách</span>
-                        <span>✓ Lịch hẹn linh hoạt</span>
-                        <span>✓ Thanh toán an toàn</span>
                     </div>
                 </div>
             </div>
@@ -706,7 +731,7 @@
           content.querySelectorAll('img').forEach(img => img.addEventListener('load', check));
         })();
 
-        // ===== Tính tiền add-on =====
+               // ===== Tính tiền add-on + đồng bộ hidden (giữ nguyên UI, thêm cập nhật qty ẩn) =====
         (function(){
           const money = n => n.toLocaleString('vi-VN') + 'đ';
           const baseEl = document.getElementById('basePrice');
@@ -719,43 +744,69 @@
           function calc(){
             let extra = 0;
 
+            // Checkbox add-on
             document.querySelectorAll('.addon-check').forEach(w => {
               const price = Number(w.getAttribute('data-price') || 0);
               const checked = w.querySelector('.addon-input')?.checked;
-              if (checked) extra += price;
+              const hiddenQty = w.previousElementSibling; // chính là input hidden addonQty ngay trước .addon-check
+              if (checked) {
+                extra += price;
+                if(hiddenQty && hiddenQty.classList.contains('addonQty-hidden')) hiddenQty.value = 1;
+              } else {
+                if(hiddenQty && hiddenQty.classList.contains('addonQty-hidden')) hiddenQty.value = 0;
+              }
             });
 
+            // Quantity add-on
             document.querySelectorAll('.addon-qty').forEach(w => {
               const price = Number(w.getAttribute('data-price') || 0);
-              const qty = Number((w.querySelector('.qty-input')?.value || '0').replace(/\D/g,''));
+              const qtyInput = w.querySelector('.qty-input');
+              const qty = Number((qtyInput?.value || '0').replace(/\D/g,''));
               extra += price * qty;
+
+              // hiddenQty của block qty nằm TRƯỚC .addon-qty (vì mình render các hidden trước wrapper)
+              const hiddenQty = w.previousElementSibling; // addonQty-hidden
+              if(hiddenQty && hiddenQty.classList.contains('addonQty-hidden')) hiddenQty.value = qty;
             });
 
             if(addOnEl) addOnEl.textContent = money(extra);
             if(totalEl) totalEl.textContent = money(base + extra);
           }
 
+          // Events cho qty
           document.querySelectorAll('.addon-qty').forEach(w => {
             const input = w.querySelector('.qty-input');
             if(!input) return;
             const max = Number(w.getAttribute('data-max') || 99);
-            const minus = w.querySelectorAll('.qty-btn')[0];
-            const plus  = w.querySelectorAll('.qty-btn')[1];
+            const btns = w.querySelectorAll('.qty-btn');
+            const minus = btns[0], plus = btns[1];
 
-            minus?.addEventListener('click', ()=>{ input.value = String(Math.max(0, Number(input.value || 0) - 1)); calc(); });
-            plus?.addEventListener('click',  ()=>{ input.value = String(Math.min(max, Number(input.value || 0) + 1)); calc(); });
+            minus?.addEventListener('click', ()=>{
+              const cur = Number((input.value||'0').replace(/\D/g,'')) || 0;
+              input.value = String(Math.max(0, cur - 1));
+              calc();
+            });
+            plus?.addEventListener('click', ()=>{
+              const cur = Number((input.value||'0').replace(/\D/g,'')) || 0;
+              input.value = String(Math.min(max, cur + 1));
+              calc();
+            });
 
             input.addEventListener('input', ()=>{
-              let v = input.value.replace(/\D/g,'');
-              if(v === '') v = '0';
+              let v = (input.value||'0').replace(/\D/g,'');
+              if (v === '') v = '0';
               v = String(Math.min(max, Number(v)));
-              input.value = v; calc();
+              input.value = v;
+              calc();
             });
           });
 
-          document.querySelectorAll('.addon-check .addon-input')
-            .forEach(chk => chk.addEventListener('change', calc));
+          // Events cho checkbox
+          document.querySelectorAll('.addon-check .addon-input').forEach(chk => {
+            chk.addEventListener('change', calc);
+          });
 
+          // Khởi tạo
           calc();
         })();
 
