@@ -106,5 +106,56 @@ namespace VHS_frontend.Controllers
             return View();
         }
 
+
+        // GET: /Account/ForgotPassword
+        [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        // POST: /Account/ForgotPassword
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ForgotPassword(ForgotPasswordDTO model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            // TODO: Gửi email reset password
+            // Giả sử bạn có service EmailSender -> gọi emailSender.SendResetLink(model.Email);
+
+            TempData["Success"] = "Liên kết đặt lại mật khẩu đã được gửi đến email của bạn.";
+            return RedirectToAction("Login", "Account");
+        }
+
+        // GET: /Account/ResetPassword
+        [HttpGet]
+        public IActionResult ResetPassword(string email, string token)
+        {
+            var model = new ResetPasswordDTO
+            {
+                Email = email,
+                Token = token
+            };
+            return View(model);
+        }
+
+        // POST: /Account/ResetPassword
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ResetPassword(ResetPasswordDTO model)
+        {
+            if (!ModelState.IsValid)
+                return View(model);
+
+            // TODO: xử lý logic reset password bằng token + email
+            // Ví dụ: gọi service.ResetPassword(model.Email, model.Token, model.Password);
+
+            TempData["Success"] = "Mật khẩu của bạn đã được đặt lại thành công!";
+            return RedirectToAction("Login", "Account");
+        }
     }
 }
