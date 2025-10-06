@@ -1,19 +1,37 @@
 ﻿using VHS_fontend.Models;
 using VHS_frontend.Services;
+using VHS_frontend.Services.Provider;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Bind ApiSettings
 builder.Services.Configure<ApiSettings>(builder.Configuration.GetSection("ApiSettings"));
 
-// HttpClient cho AuthService
-builder.Services.AddHttpClient<AuthService>();
+// Đăng ký HttpClient cho ProviderProfileService
+builder.Services.AddHttpClient<ProviderProfileService>(client =>
+{
+    var baseUrl = builder.Configuration["ApiSettings:BaseUrl"];
+    Console.WriteLine($">>> ProviderProfileService BaseUrl = {baseUrl}");
+    client.BaseAddress = new Uri(baseUrl ?? throw new InvalidOperationException("BaseUrl missing in config"));
+});
+
+// Đăng ký HttpClient cho AuthService
+builder.Services.AddHttpClient<AuthService>(client =>
+{
+    var baseUrl = builder.Configuration["ApiSettings:BaseUrl"];
+    Console.WriteLine($">>> AuthService BaseUrl = {baseUrl}");
+    client.BaseAddress = new Uri(baseUrl ?? throw new InvalidOperationException("BaseUrl missing in config"));
+});
+builder.Services.AddHttpClient<ProviderStaffService>(client =>
+{
+    var baseUrl = builder.Configuration["ApiSettings:BaseUrl"];
+    client.BaseAddress = new Uri(baseUrl!);
+});
+
 
 builder.Services.AddControllersWithViews();
 
-
 builder.Services.AddHttpContextAccessor();
-
 
 // Session
 builder.Services.AddDistributedMemoryCache();
@@ -45,7 +63,6 @@ app.MapControllerRoute(
     name: "areas",
     pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}"
 );
-
 // Route mặc định
 app.MapControllerRoute(
     name: "default",

@@ -89,7 +89,7 @@ namespace VHS_frontend.Controllers
             {
                 "admin" => RedirectToAction("Index", "Home", new { area = "Admin" }),
                 "customer" => RedirectToAction("Index", "Home", new { area = "Customer" }),
-                "provider" => RedirectToAction("Index", "Home", new { area = "Provider" }),
+                "provider" => RedirectToAction("Index", "HomePage", new { area = "Provider" }),
                 _ => RedirectToAction("Index", "Home")
             };
         }
