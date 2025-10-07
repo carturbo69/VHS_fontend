@@ -2,8 +2,9 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using VHS_fontend.Models;
-using VHS_fontend.Models.Account;
+using VHS_frontend.Models;
+using VHS_frontend.Models.Account;
+using VHS_frontend.Models.Account;
 
 namespace VHS_frontend.Services
 {

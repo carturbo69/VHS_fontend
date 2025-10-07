@@ -1,4 +1,4 @@
-﻿using VHS_fontend.Models;
+﻿using VHS_frontend.Models;
 using VHS_frontend.Services;
 
 var builder = WebApplication.CreateBuilder(args);

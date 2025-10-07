@@ -1,4 +1,4 @@
-﻿namespace VHS_fontend.Models
+﻿namespace VHS_frontend.Models
 {
     public class ApiSettings
     {

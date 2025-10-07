@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using VHS_fontend.Models;
+using VHS_frontend.Models;
 
-namespace VHS_fontend.Controllers
+namespace VHS_frontend.Controllers
 {
     public class HomeController : Controller
     {
