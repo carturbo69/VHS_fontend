@@ -1,0 +1,129 @@
+﻿@model List<VHS_frontend.Controllers.ServiceViewModel>
+
+@{
+    ViewData["Title"] = "Dịch vụ";
+
+    string search = ViewBag.Search as string ?? "";
+    string category = ViewBag.Category as string ?? "";
+    string sort = ViewBag.Sort as string ?? "";
+
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    int totalPages = ViewBag.TotalPages ?? 1;
+    int startPage = Math.Max(1, currentPage - 2);
+    int endPage = Math.Min(totalPages, currentPage + 2);
+}
+
+<section class="services-section">
+    <div class="container-xl">
+        <h1 class="page-title">Danh sách dịch vụ</h1>
+        <p class="page-subtitle">Chọn dịch vụ phù hợp cho nhu cầu của bạn</p>
+
+        <!-- Filter -->
+        <form method="get" asp-action="Index" class="filter-form">
+            <input type="text" name="search" value="@search" placeholder="🔍 Tìm dịch vụ..." class="input" />
+
+            <select name="category" class="input">
+                <option value="">-- Tất cả loại --</option>
+                <option value="Vệ sinh" selected="@(category == "Vệ sinh")">Vệ sinh</option>
+                <option value="Nội trợ" selected="@(category == "Nội trợ")">Nội trợ</option>
+                <option value="Sự kiện nhỏ tại nhà" selected="@(category == "Sự kiện nhỏ tại nhà")">Sự kiện nhỏ tại nhà</option>
+            </select>
+
+            <select name="sort" class="input">
+                <option value="">-- Khoảng giá / đánh giá --</option>
+                <option value="price-500" selected="@(sort == "price-500")">Dưới 500.000đ</option>
+                <option value="price-500-1000" selected="@(sort == "price-500-1000")">500.000đ - 1.000.000đ</option>
+                <option value="price-1000-5000" selected="@(sort == "price-1000-5000")">1.000.000đ - 5.000.000đ</option>
+                <option value="price-5000" selected="@(sort == "price-5000")">Trên 5.000.000đ</option>
+                <option value="stars" selected="@(sort == "stars")">Đánh giá cao</option>
+            </select>
+
+            <button type="submit" class="btn btn-primary">Lọc</button>
+        </form>
+
+        @if (Model == null || !Model.Any())
+        {
+            <div class="no-result">Không tìm thấy dịch vụ nào phù hợp.</div>
+        }
+        else
+        {
+            <div class="services-grid @(Model.Count == 1 ? "services-grid--single" : "")">
+                @foreach (var service in Model)
+                {
+                    <div class="service-card">
+                        <img src="@Url.Content(service.ImageUrl ?? "~/images/VeSinh.jpg")"
+                             alt="@service.Name"
+                             class="service-img" />
+                        <div class="service-body">
+                            <h2 class="service-title">@service.Name</h2>
+                            <p class="service-desc">@service.Description</p>
+                            <p><strong>Thời gian:</strong> @service.Duration</p>
+                            <p><strong>Giá:</strong> @service.PriceDisplay</p>
+
+                            <div class="stars">
+                                @{
+                                    var avg = service.Stars; // giữ nguyên giá trị gốc, không làm tròn 0.5
+                                }
+                                @for (int s = 1; s <= 5; s++)
+                                {
+                                    // mức “đổ” của ngôi sao thứ s: 0..1
+                                    var fill = Math.Max(0, Math.Min(1, avg - (s - 1)));
+                                    var pct = (int)Math.Round(fill * 100); // 0..100
+
+                                    if (pct >= 100)
+                                    {
+                                        <span class="star filled">★</span>
+                                    }
+                                    else if (pct <= 0)
+                                    {
+                                        <span class="star">★</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="star frac" style="--p:@pct%;">★</span>
+                                    }
+                                }
+                                <span class="rating-text">@avg.ToString("0.#") / 5 (@service.TotalReviews đánh giá)</span>
+                            </div>
+
+
+                            <div class="service-actions">
+                                <a asp-controller="Services" asp-action="Details" asp-route-id="@service.Id" class="btn btn-primary">Thêm vào giỏ hàng</a>
+                                <a asp-controller="Services" asp-action="Details" asp-route-id="@service.Id" class="btn btn-ghost">Chi tiết</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                @if (currentPage > 1)
+                {
+                    <a asp-action="Index" asp-route-page="1" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-link">«</a>
+                    <a asp-action="Index" asp-route-page="@(currentPage - 1)" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-link">‹</a>
+                }
+
+                @for (int i = startPage; i <= endPage; i++)
+                {
+                    if (i == currentPage)
+                    {
+                        <span class="page-link active">@i</span>
+                    }
+                    else
+                    {
+                        <a asp-action="Index" asp-route-page="@i" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-link">@i</a>
+                    }
+                }
+
+                @if (currentPage < totalPages)
+                {
+                    <a asp-action="Index" asp-route-page="@(currentPage + 1)" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-link">›</a>
+                    <a asp-action="Index" asp-route-page="@totalPages" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-link">»</a>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+<link rel="stylesheet" href="~/css/services.css" asp-append-version="true" />
