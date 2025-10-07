@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace VHS_fontend.Areas.Customer.Controllers
+namespace VHS_frontend.Areas.Customer.Controllers
 {
     [Area("Customer")]
     public class CartController : Controller

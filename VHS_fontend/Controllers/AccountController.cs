@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using VHS_fontend.Models.Account;
+using VHS_frontend.Models.Account;
 using VHS_frontend.Services;
 
 namespace VHS_frontend.Controllers
@@ -87,9 +87,9 @@ namespace VHS_frontend.Controllers
             var normalized = (role ?? "").Trim().ToLowerInvariant();
             return normalized switch
             {
-                "admin" => RedirectToAction("Index", "Home", new { area = "Admin" }),
+                "admin" => RedirectToAction("Index", "AdminDashboard", new { area = "Admin" }),
+                "provider" => RedirectToAction("Index", "HomePage", new { area = "Provider" }),
                 "customer" => RedirectToAction("Index", "Home", new { area = "Customer" }),
-                "provider" => RedirectToAction("Index", "Home", new { area = "Provider" }),
                 _ => RedirectToAction("Index", "Home")
             };
         }

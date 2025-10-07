@@ -3,7 +3,7 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 
-namespace VHS_fontend.Controllers
+namespace VHS_frontend.Controllers
 {
     public class ServicesController : Controller
     {

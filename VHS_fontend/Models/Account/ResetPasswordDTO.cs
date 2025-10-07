@@ -1,4 +1,4 @@
-﻿namespace VHS_fontend.Models.Account
+﻿namespace VHS_frontend.Models.Account
 {
     public class ResetPasswordDTO
     {

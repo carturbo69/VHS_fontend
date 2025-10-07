@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace VHS_fontend.Models.Account
+namespace VHS_frontend.Models.Account
 {
     public class RegisterDTO
     {
