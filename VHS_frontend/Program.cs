@@ -1,21 +1,19 @@
 ﻿using VHS_frontend.Models;
 using VHS_frontend.Services;
+using VHS_frontend.Services.Admin;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Bind ApiSettings
-builder.Services.Configure<ApiSettings>(builder.Configuration.GetSection("ApiSettings"));
 
 // DI HttpClient dùng đúng BaseAddress
 var backendBase = builder.Configuration["Apis:Backend"];
 if (string.IsNullOrWhiteSpace(backendBase))
     throw new InvalidOperationException("Missing configuration: Apis:Backend");
 
-builder.Services.AddHttpClient<VHS_frontend.Services.Admin.CategoryAdminService>(client =>
+builder.Services.AddHttpClient<CategoryAdminService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
-builder.Services.AddHttpClient<VHS_frontend.Services.Admin.TagAdminService>(client =>
+builder.Services.AddHttpClient<TagAdminService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
