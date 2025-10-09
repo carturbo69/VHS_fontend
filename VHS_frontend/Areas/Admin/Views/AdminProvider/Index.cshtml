@@ -1,8 +1,7 @@
-﻿@model List<VHS_frontend.Areas.Admin.Models.Customer.CustomerDTO>
+﻿@model List<VHS_frontend.Areas.Admin.Models.Provider.ProviderDTO>
 @{
-    ViewData["Title"] = "Quản lý tài khoản";
+    ViewData["Title"] = "Quản lý Provider";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
-
     var includeDeleted = (bool)(ViewData["IncludeDeleted"] ?? false);
     var total = Model?.Count ?? 0;
     var deleted = Model?.Count(x => x.Deleted == true) ?? 0;
@@ -10,19 +9,17 @@
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/customer.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/provider.css" asp-append-version="true" />
 }
-<!-- Center Notifications -->
-<div id="notif-root" aria-live="polite" aria-atomic="true"></div>
 
-<section class="cat-page container-fluid customer-ui">
-    <!-- Header / Metrics -->
+<section class="cat-page container-fluid provider-ui">
+    <!-- Header -->
     <div class="cat-head card-x glass">
         <div class="left">
-            <div class="ico"><i class="bi bi-person-badge"></i></div>
+            <div class="ico"><i class="bi bi-briefcase"></i></div>
             <div>
-                <h3>Tài khoản khách hàng</h3>
-                <div class="sub">Tạo, chỉnh sửa, ẩn/khôi phục tài khoản</div>
+                <h3>Tài khoản Provider</h3>
+                <div class="sub">Xem và ẩn/khôi phục tài khoản</div>
             </div>
         </div>
         <div class="right">
@@ -35,12 +32,8 @@
     <!-- Toolbar -->
     <div class="cat-toolbar">
         <div class="actions">
-            <button class="btn btn-primary soft" data-bs-toggle="modal" data-bs-target="#accModal">
-                <i class="bi bi-plus-circle"></i> Thêm tài khoản
-            </button>
-
             <a class="btn btn-ghost soft"
-               asp-area="Admin" asp-controller="AdminCustomer" asp-action="Index"
+               asp-area="Admin" asp-controller="AdminProvider" asp-action="Index"
                asp-route-includeDeleted="@( !includeDeleted )">
                 <i class="bi @(includeDeleted ? "bi-eye-slash" : "bi-eye")"></i>
                 @(includeDeleted ? "Ẩn đã xoá" : "Hiện cả đã xoá")
@@ -53,9 +46,9 @@
         </div>
     </div>
 
-    <!-- Table (KHÔNG đóng khung) -->
+    <!-- Table (không có cột mật khẩu) -->
     <div class="table-wrap">
-        <table class="table table-hover align-middle mb-0" id="tblAccs">
+        <table class="table table-hover align-middle mb-0" id="tblProviders">
             <thead>
                 <tr>
                     <th style="width:30%">Tài khoản</th>
@@ -71,7 +64,7 @@
                     var isDel = a.Deleted == true;
                     <tr class="cat-row @(isDel ? "open" : "")" data-id="@a.Id" data-name="@a.AccountName" data-email="@a.Email">
                         <td class="acc-cell">
-                            <span class="avatar"><i class="bi bi-person"></i></span>
+                            <span class="avatar"><i class="bi bi-person-gear"></i></span>
                             <div class="meta">
                                 <div class="name ellipsis fw-semibold">@a.AccountName</div>
                             </div>
@@ -90,8 +83,8 @@
                         </td>
                         <td class="text-end">
                             <div class="btn-group action-inline">
-                                <button class="btn btn-sm btn-outline-primary soft" onclick="openEdit('@a.Id')" @(isDel ? "disabled" : "")>
-                                    <i class="bi bi-pencil-square"></i><span>Sửa</span>
+                                <button class="btn btn-sm btn-outline-primary soft" onclick="openView('@a.Id')">
+                                    <i class="bi bi-eye"></i><span>Xem</span>
                                 </button>
                                 @if (isDel)
                                 {
@@ -117,53 +110,43 @@
             <div class="p-3 text-center text-muted">Chưa có tài khoản nào.</div>
         }
     </div>
+
+    <!-- Center Notifications -->
+    <div id="notif-root" aria-live="polite" aria-atomic="true"></div>
 </section>
 
-<!-- Modal: Create/Edit (1 cột) -->
-<div class="modal fade" id="accModal" tabindex="-1" aria-hidden="true">
+<!-- Modal: View (read-only) — bỏ dòng mật khẩu -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <form class="modal-content card-x" id="accForm" onsubmit="return false;">
+        <div class="modal-content card-x">
             <div class="modal-header">
-                <h5 class="modal-title" id="accModalTitle">Thêm tài khoản</h5>
+                <h5 class="modal-title">Chi tiết Provider</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="accId" />
-                <div class="mb-3">
-                    <label class="form-label">Account name</label>
-                    <input type="text" id="fName" class="form-control" maxlength="64" required />
-                    <div class="invalid-feedback">Vui lòng nhập Account name.</div>
+                <div class="stack">
+                    <div class="row-item"><span class="lbl">Account name</span><div class="val" id="vName">—</div></div>
+                    <div class="row-item"><span class="lbl">Email</span><div class="val" id="vEmail">—</div></div>
+                    <div class="row-item"><span class="lbl">Ngày tạo</span><div class="val" id="vCreated">—</div></div>
+                    <div class="row-item"><span class="lbl">Trạng thái</span><div class="val" id="vState">—</div></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Email</label>
-                    <input type="email" id="fEmail" class="form-control" maxlength="128" required />
-                    <div class="invalid-feedback">Vui lòng nhập Email hợp lệ.</div>
-                </div>
-                <div class="mb-1">
-                    <label class="form-label">Mật khẩu<span id="pwHint" class="text-muted"></span></label>
-                    <input type="password" id="fPass" class="form-control" minlength="6" maxlength="64" />
-                </div>
-                <div class="form-text" id="pwNote">Mật khẩu tối thiểu 6 ký tự.</div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
-                <button type="submit" class="btn btn-primary soft" id="btnSaveAcc">Lưu</button>
+                <button class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
 @section Scripts {
     <script>
         const routes = {
-          create  : '@Url.Action("Create", "AdminCustomer", new { area = "Admin" })',
-          update  : '@Url.Action("Update", "AdminCustomer", new { area = "Admin" })',
-          get     : '@Url.Action("Get", "AdminCustomer", new { area = "Admin" })',
-          del     : '@Url.Action("Delete", "AdminCustomer", new { area = "Admin" })',
-          restore : '@Url.Action("Restore", "AdminCustomer", new { area = "Admin" })'
+          get     : '@Url.Action("Get", "AdminProvider", new { area = "Admin" })',
+          del     : '@Url.Action("Delete", "AdminProvider", new { area = "Admin" })',
+          restore : '@Url.Action("Restore", "AdminProvider", new { area = "Admin" })'
         };
 
-        /* ======= CENTER TOAST (boxed + accent bar + fast) ======= */
+        // Toast giữa màn hình
         function showNotice(msg, type='info', duration=900){
           const root = document.getElementById('notif-root');
           const box  = document.createElement('div');
@@ -177,84 +160,35 @@
               <span class="msg">${msg}</span>
             </div>`;
           root.appendChild(box);
-
           requestAnimationFrame(()=> box.classList.add('show'));
-
-          setTimeout(()=> {
-            box.classList.remove('show');
-            setTimeout(()=> box.remove(), 180);
-          }, duration);
+          setTimeout(()=> { box.classList.remove('show'); setTimeout(()=> box.remove(), 180); }, duration);
         }
 
         // Search
         document.getElementById('txtSearch')?.addEventListener('input', function(){
           const q = this.value.toLowerCase().trim();
-          document.querySelectorAll('#tblAccs tbody tr').forEach(tr=>{
+          document.querySelectorAll('#tblProviders tbody tr').forEach(tr=>{
             const name  = tr.dataset.name?.toLowerCase()  ?? '';
             const email = tr.dataset.email?.toLowerCase() ?? '';
             tr.style.display = (name.includes(q) || email.includes(q)) ? '' : 'none';
           });
         });
 
-        // Modal & Form
-        const accModal = new bootstrap.Modal(document.getElementById('accModal'));
-        const accForm  = document.getElementById('accForm');
-        const accIdEl  = document.getElementById('accId');
-        const nameEl   = document.getElementById('fName');
-        const emailEl  = document.getElementById('fEmail');
-        const passEl   = document.getElementById('fPass');
-        const titleEl  = document.getElementById('accModalTitle');
-        const pwHint   = document.getElementById('pwHint');
-        const pwNote   = document.getElementById('pwNote');
-
-        document.querySelector('[data-bs-target="#accModal"]')?.addEventListener('click', ()=>{
-          titleEl.textContent = 'Thêm tài khoản';
-          accIdEl.value=''; nameEl.value=''; emailEl.value=''; passEl.value='';
-          pwHint.textContent=''; pwNote.style.visibility='visible';
-          nameEl.classList.remove('is-invalid'); emailEl.classList.remove('is-invalid'); passEl.classList.remove('is-invalid');
-        });
-
-        async function openEdit(id){
+        // Modal View
+        const viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
+        async function openView(id){
           const res = await fetch(routes.get + `?id=${id}`);
           if(!res.ok){ showNotice('Không đọc được dữ liệu.', 'error', 1200); return; }
           const x = await res.json();
-          titleEl.textContent = 'Sửa tài khoản';
-          accIdEl.value = x.id;
-          nameEl.value  = x.accountName ?? '';
-          emailEl.value = x.email ?? '';
-          passEl.value  = '';
-          pwHint.textContent = ' (để trống nếu không đổi)';
-          pwNote.style.visibility='hidden';
-          accModal.show();
+          document.getElementById('vName').textContent    = x.accountName ?? '—';
+          document.getElementById('vEmail').textContent   = x.email ?? '—';
+          document.getElementById('vCreated').textContent = (x.createdAt ? new Date(x.createdAt).toLocaleString() : '—');
+          document.getElementById('vState').textContent   = (x.deleted ? 'Đã xoá' : 'Hoạt động');
+          viewModal.show();
         }
-        window.openEdit = openEdit;
+        window.openView = openView;
 
-        accForm?.addEventListener('submit', async (e)=>{
-          e.preventDefault();
-          const id  = accIdEl.value.trim();
-          const dto = {
-            accountName: nameEl.value.trim(),
-            email:       emailEl.value.trim(),
-            password:    passEl.value ? passEl.value : null,
-            role:        'User'
-          };
-
-          if(!dto.accountName){ nameEl.classList.add('is-invalid'); showNotice('Vui lòng nhập Account name.', 'warn', 1100); return; }
-          if(!dto.email){ emailEl.classList.add('is-invalid'); showNotice('Vui lòng nhập Email hợp lệ.', 'warn', 1100); return; }
-          if(!id && !dto.password){ passEl.classList.add('is-invalid'); showNotice('Vui lòng nhập mật khẩu.', 'warn', 1100); return; }
-
-          let res;
-          if(!id){
-            res = await fetch(routes.create, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dto) });
-            if(res.ok){ showNotice('Đã tạo tài khoản.', 'success', 750); setTimeout(()=> location.reload(), 420); }
-            else      { showNotice((await res.text()) || 'Tạo thất bại.', 'error', 1400); }
-          }else{
-            res = await fetch(routes.update + `?id=${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dto) });
-            if(res.ok){ showNotice('Đã lưu thay đổi.', 'success', 750); setTimeout(()=> location.reload(), 420); }
-            else      { showNotice((await res.text()) || 'Cập nhật thất bại.', 'error', 1400); }
-          }
-        });
-
+        // Soft-delete / Restore
         async function doDelete(id){
           if(!confirm('Ẩn tài khoản này?')) return;
           const res = await fetch(routes.del + `?id=${id}`, { method:'DELETE' });
