@@ -1,6 +1,7 @@
 ﻿@{
     ViewData["Title"] = "Đăng ký Provider";
     Layout = "~/Views/Shared/_Layout.cshtml";
+    // ViewBag.Categories = new[] { new { Id="1", Name="Sửa chữa điện" }, ... }  // dữ liệu ảo nếu cần
     var categories = (IEnumerable<dynamic>)ViewBag.Categories;
 }
 
@@ -8,47 +9,54 @@
     <link rel="stylesheet" href="~/css/register-provider.css" asp-append-version="true" />
 }
 
-<main class="rp6">
-    <div class="rp6__container">
-        <header class="rp6__header">
+<main class="rp">
+    <div class="rp__container">
+        <header class="rp__header">
             <h1>Đăng ký Provider</h1>
             <p>Điền thông tin để bắt đầu hợp tác cùng chúng tôi</p>
         </header>
-
-        @if (TempData["Ok"] != null)
-        {
-            <div class="rp6__notice">@TempData["Ok"]</div>
-        }
 
         <form id="providerForm" method="post"
               asp-area="Customer" asp-controller="RegisterProvider" asp-action="RegisterFallback"
               enctype="multipart/form-data" novalidate>
             @Html.AntiForgeryToken()
 
-            <!-- Thông tin cơ bản -->
+            <!-- =========== THÔNG TIN =========== -->
             <section class="card">
-                <h2 class="card__title">Thông tin cơ bản</h2>
-                <div class="card__body">
+                <div class="card__head">
+                    <span class="ico"><i class="bi bi-person"></i></span>
+                    <div>
+                        <h2>Thông tin Provider</h2>
+                        <p>Vui lòng cung cấp thông tin chi tiết về dịch vụ của bạn</p>
+                    </div>
+                </div>
 
-                    <!-- Avatar: chỉ 1 tile icon khi chưa chọn; khi chọn -> ảnh + input file dưới ảnh -->
+                <div class="card__body">
+                    <!-- Avatar -->
                     <div class="field">
                         <label for="ProfileImage">Ảnh đại diện</label>
 
-                        <!-- Placeholder (only when no file) -->
+                        <!-- Placeholder khi chưa chọn -->
                         <button type="button" id="avatarPlaceholder" class="avatar-tile" aria-label="Chọn ảnh từ tệp">
                             <div class="tile-icon">📷</div>
                             <div class="tile-text">Chọn từ tệp</div>
                         </button>
 
-                        <!-- Preview (only when has file) -->
+                        <!-- Preview khi đã chọn -->
                         <div id="avatarPreviewWrap" class="avatar-wrap d-none">
-                            <img id="imgPreview" alt="Ảnh đại diện" class="avatar-img" src="~/images/placeholder-avatar.png" />
+                            <div class="avatar-img-wrap">
+                                <!-- size ảnh do CSS kiểm soát để overlay không tràn -->
+                                <img id="imgPreview" class="avatar-img" alt="Ảnh đại diện" src="~/images/placeholder-avatar.png" />
+                                <button type="button" id="avatarOverlay" class="avatar-overlay" title="Xóa ảnh">
+                                    <span class="overlay-x">×</span>
+                                </button>
+                            </div>
+
                             <div class="file-row">
                                 <input type="file" id="ProfileImage" name="ProfileImage" accept="image/*" class="file-input" />
                                 <div class="file-actions">
                                     <span id="fileName" class="file-name">Chưa chọn tệp</span>
                                     <label for="ProfileImage" class="btn ghost">Chọn tệp khác</label>
-                                    <button type="button" id="btnRemove" class="btn ghost danger">Xóa ảnh</button>
                                 </div>
                             </div>
                         </div>
@@ -68,15 +76,22 @@
 
                     <div class="field">
                         <label for="Description">Mô tả dịch vụ</label>
-                        <textarea id="Description" name="Description" class="input" rows="5"
+                        <textarea id="Description" name="Description" class="input autosize" rows="3"
                                   placeholder="Kinh nghiệm, phạm vi phục vụ, điểm mạnh..."></textarea>
                     </div>
                 </div>
             </section>
 
-            <!-- Chứng chỉ -->
+            <!-- =========== CHỨNG CHỈ =========== -->
             <section class="card">
-                <h2 class="card__title">Chứng chỉ & Danh mục</h2>
+                <div class="card__head">
+                    <span class="ico"><i class="bi bi-file-earmark-text"></i></span>
+                    <div>
+                        <h2>Chứng chỉ &amp; Danh mục</h2>
+                        <p>Thêm tối đa 2 chứng chỉ, mỗi chứng chỉ tương ứng với 1 danh mục dịch vụ</p>
+                    </div>
+                </div>
+
                 <div class="card__body" id="certList">
                     <!-- item 0 -->
                     <div class="cert" data-index="0">
@@ -104,7 +119,7 @@
 
                         <div class="field">
                             <label>Mô tả chứng chỉ</label>
-                            <textarea class="input" rows="3" name="Certificates[0].Description"
+                            <textarea class="input autosize" rows="3" name="Certificates[0].Description"
                                       placeholder="Mô tả ngắn, năm cấp, đơn vị cấp..."></textarea>
                         </div>
                     </div>
@@ -113,8 +128,8 @@
                 </div>
             </section>
 
-            <!-- Actions -->
-            <div class="actions">
+            <!-- =========== Actions (ở giữa) =========== -->
+            <div class="actions center">
                 <a href="javascript:history.back()" class="btn ghost">Hủy</a>
                 <button type="submit" class="btn primary" id="btnSubmit" disabled>Đăng ký Provider</button>
             </div>
@@ -125,40 +140,48 @@
 @section Scripts {
     <script>
         (function () {
-          const form = document.getElementById("providerForm");
-          const fileInput = document.getElementById("ProfileImage");
+          // ===== DOM
+          const fileInput   = document.getElementById("ProfileImage");
           const placeholder = document.getElementById("avatarPlaceholder");
           const previewWrap = document.getElementById("avatarPreviewWrap");
-          const img = document.getElementById("imgPreview");
-          const fileName = document.getElementById("fileName");
-          const btnRemove = document.getElementById("btnRemove");
+          const img         = document.getElementById("imgPreview");
+          const fileNameEl  = document.getElementById("fileName");
+          const overlayBtn  = document.getElementById("avatarOverlay");
 
-          const btnAdd = document.getElementById("btnAddCert");
-          const list = document.getElementById("certList");
-          const btnSubmit = document.getElementById("btnSubmit");
-          const nameInput = document.getElementById("ProviderName");
+          const btnAdd   = document.getElementById("btnAddCert");
+          const list     = document.getElementById("certList");
+          const btnSubmit= document.getElementById("btnSubmit");
+          const nameEl   = document.getElementById("ProviderName");
 
-          // ---- Avatar logic ----
+          // ===== Autosize textarea (mô tả dịch vụ & mô tả chứng chỉ)
+          function wireAutosize(scope){
+            scope.querySelectorAll("textarea.autosize, .cert textarea.input").forEach(t=>{
+              const resize = ()=>{ t.style.height="auto"; t.style.height=t.scrollHeight+"px"; };
+              t.removeEventListener("input", resize);
+              t.addEventListener("input", resize);
+              resize();
+            });
+          }
+          wireAutosize(document);
+
+          // ===== Avatar
           placeholder?.addEventListener("click", () => fileInput?.click());
-
           fileInput?.addEventListener("change", e => {
-            const f = e.target.files?.[0];
-            if (!f) return;
+            const f = e.target.files?.[0]; if (!f) return;
             img.src = URL.createObjectURL(f);
-            fileName.textContent = f.name;
+            if (fileNameEl) fileNameEl.textContent = f.name;
             placeholder.classList.add("d-none");
             previewWrap.classList.remove("d-none");
           });
-
-          btnRemove?.addEventListener("click", () => {
-            fileInput.value = "";
-            img.src = "~/images/placeholder-avatar.png";
+          // overlay X – xoá ảnh (overlay nằm gọn trong khung)
+          overlayBtn?.addEventListener("click", () => {
+            if (fileInput) fileInput.value = "";
             previewWrap.classList.add("d-none");
             placeholder.classList.remove("d-none");
-            fileName.textContent = "Chưa chọn tệp";
+            if (fileNameEl) fileNameEl.textContent = "Chưa chọn tệp";
           });
 
-          // ---- Cert logic (max 2) ----
+          // ===== Certificates (max 2, giống nhau hoàn toàn)
           function syncCertUI() {
             const items = list.querySelectorAll(".cert");
             list.querySelectorAll(".btn-remove-cert").forEach(b => b.classList.toggle("d-none", items.length <= 1));
@@ -172,23 +195,32 @@
             const items = list.querySelectorAll(".cert");
             if (items.length >= 2) return;
 
-            const clone = items[items.length - 1].cloneNode(true);
-            clone.querySelectorAll("input, textarea").forEach(el => el.value = "");
-            const sel = clone.querySelector("select"); if (sel) sel.selectedIndex = 0;
-            list.insertBefore(clone, btnAdd);
+            const tmpl  = items[items.length - 1];
+            const clone = tmpl.cloneNode(true);
 
+            // reset value & đảm bảo nhập được
+            clone.querySelectorAll("input, textarea, select").forEach(el=>{
+              el.value = ""; el.removeAttribute("disabled"); el.readOnly = false;
+            });
+
+            // chèn & re-index
+            list.insertBefore(clone, btnAdd);
             list.querySelectorAll(".cert").forEach((blk, i) => {
               blk.dataset.index = i;
               blk.querySelector(".pill").textContent = i + 1;
-              blk.querySelectorAll("input[name], textarea[name], select[name]").forEach(el => {
-                el.name = el.name.replace(/\Certificates\[\d+\]/, `Certificates[${i}]`);
+              const title = blk.querySelector(".cert__head strong");
+              if (title) title.textContent = `Chứng chỉ ${i + 1}`;
+              blk.querySelectorAll("[name]").forEach(el=>{
+                el.name = el.name.replace(/Certificates\[\d+\]/, `Certificates[${i}]`);
               });
             });
-            syncCertUI(); enableSubmit();
+
+            wireAutosize(clone); // autosize cho textareas mới
+            syncCertUI();
           });
 
           list.addEventListener("click", (e) => {
-            const btn = e.target.closest(".btn-remove-cert");
+            const btn = e.target.closest(".btn-remove-cert,.iconbtn.close");
             if (!btn) return;
             const items = list.querySelectorAll(".cert");
             if (items.length <= 1) return;
@@ -196,42 +228,31 @@
             list.querySelectorAll(".cert").forEach((blk, i) => {
               blk.dataset.index = i;
               blk.querySelector(".pill").textContent = i + 1;
-              blk.querySelectorAll("input[name], textarea[name], select[name]").forEach(el => {
-                el.name = el.name.replace(/\Certificates\[\d+\]/, `Certificates[${i}]`);
+              const title = blk.querySelector(".cert__head strong");
+              if (title) title.textContent = `Chứng chỉ ${i + 1}`;
+              blk.querySelectorAll("[name]").forEach(el=>{
+                el.name = el.name.replace(/Certificates\[\d+\]/, `Certificates[${i}]`);
               });
             });
-            syncCertUI(); enableSubmit();
+            syncCertUI();
           });
 
-          // ---- Submit state ----
-          function enableSubmit() {
+          // ===== Submit enable
+          function enableSubmit(){
             const firstCat = list.querySelector('select[name="Certificates[0].CategoryId"]');
-            btnSubmit.disabled = !(nameInput.value.trim() && (!firstCat || firstCat.value));
+            btnSubmit.disabled = !(nameEl.value.trim() && (!firstCat || firstCat.value));
           }
-          nameInput.addEventListener("input", enableSubmit);
-          list.addEventListener("change", (e)=>{ if (e.target.matches('select[name^="Certificates"]')) enableSubmit(); });
+          nameEl.addEventListener("input", enableSubmit);
+          list.addEventListener("change", e => { if (e.target.matches('select[name^="Certificates"]')) enableSubmit(); });
 
           syncCertUI(); enableSubmit();
 
-          // Fake submit
-          form?.addEventListener("submit", async (e) => {
+          // ===== Fake submit
+          document.getElementById("providerForm")?.addEventListener("submit", async (e) => {
             e.preventDefault();
             btnSubmit.disabled = true; btnSubmit.textContent = "Đang xử lý...";
-
-            const data = {
-              providerName: nameInput.value,
-              phoneNumber: document.getElementById("PhoneNumber").value,
-              description: document.getElementById("Description").value,
-              certificates: Array.from(list.querySelectorAll(".cert")).map((blk, i) => ({
-                categoryId: blk.querySelector(`select[name="Certificates[${i}].CategoryId"]`).value,
-                url: blk.querySelector(`input[name="Certificates[${i}].Url"]`).value,
-                description: blk.querySelector(`textarea[name="Certificates[${i}].Description"]`).value,
-              })),
-              hasImage: !!(fileInput?.files && fileInput.files.length > 0)
-            };
             await new Promise(r => setTimeout(r, 800));
-            console.log("FAKE SUBMIT PAYLOAD:", data);
-            alert("Đăng ký (giả lập) thành công! Kiểm tra Console để xem payload.");
+            alert("Đăng ký (giả lập) thành công!");
             btnSubmit.textContent = "Đăng ký Provider"; enableSubmit();
           });
         })();
