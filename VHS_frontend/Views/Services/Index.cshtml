@@ -1,16 +1,40 @@
-﻿@model List<VHS_frontend.Controllers.ServiceViewModel>
+﻿@model List<VHS_frontend.Models.ServiceDTOs.ListServiceHomePageDTOs>
 
 @{
     ViewData["Title"] = "Dịch vụ";
-
     string search = ViewBag.Search as string ?? "";
     string category = ViewBag.Category as string ?? "";
     string sort = ViewBag.Sort as string ?? "";
-
     int currentPage = ViewBag.CurrentPage ?? 1;
     int totalPages = ViewBag.TotalPages ?? 1;
     int startPage = Math.Max(1, currentPage - 2);
     int endPage = Math.Min(totalPages, currentPage + 2);
+
+    string PriceToDisplay(decimal p) => $"{p:n0}đ";
+    var fallbackImg = Url.Content("~/images/VeSinh.jpg"); // Ảnh cứng fallback
+}
+
+@functions {
+    // Lấy ảnh đầu tiên từ Images (JSON array, CSV, hoặc 1 URL)
+    string? FirstImageOrDefault(string? images)
+    {
+        if (string.IsNullOrWhiteSpace(images)) return null;
+
+        try
+        {
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+            if (arr != null && arr.Count > 0) return arr[0];
+        }
+        catch { /* ignore JSON parse error */ }
+
+        if (images.Contains(','))
+        {
+            var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
+        return images; // plain URL
+    }
 }
 
 <section class="services-section">
@@ -50,46 +74,59 @@
             <div class="services-grid @(Model.Count == 1 ? "services-grid--single" : "")">
                 @foreach (var service in Model)
                 {
+                    var img = FirstImageOrDefault(service.Images) ?? fallbackImg;
+                
+                    var priceDisplay = PriceToDisplay(service.Price);
+                    var avg = service.AverageRating;
+
                     <div class="service-card">
-                        <img src="@Url.Content(service.ImageUrl ?? "~/images/VeSinh.jpg")"
-                             alt="@service.Name"
-                             class="service-img" />
+                        <img src="@img"
+                             alt="@service.Title"
+                             class="service-img"
+                             loading="lazy"
+                             onerror="this.onerror=null;this.src='@fallbackImg';" />
                         <div class="service-body">
-                            <h2 class="service-title">@service.Name</h2>
-                            <p class="service-desc">@service.Description</p>
-                            <p><strong>Thời gian:</strong> @service.Duration</p>
-                            <p><strong>Giá:</strong> @service.PriceDisplay</p>
+                            <h2 class="service-title">@service.Title</h2>
+
+                            @if (!string.IsNullOrWhiteSpace(service.Description))
+                            {
+                                <p class="service-desc">@service.Description</p>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(service.UnitType))
+                            {
+                                <p><strong>Thời gian:</strong> @service.UnitType</p>
+                            }
+
+                            <p><strong>Giá:</strong> @priceDisplay</p>
 
                             <div class="stars">
                                 @{
-                                    var avg = service.Stars; // giữ nguyên giá trị gốc, không làm tròn 0.5
-                                }
-                                @for (int s = 1; s <= 5; s++)
-                                {
-                                    // mức “đổ” của ngôi sao thứ s: 0..1
-                                    var fill = Math.Max(0, Math.Min(1, avg - (s - 1)));
-                                    var pct = (int)Math.Round(fill * 100); // 0..100
+                                    for (int s = 1; s <= 5; s++)
+                                    {
+                                        var fill = Math.Max(0, Math.Min(1, avg - (s - 1)));
+                                        var pct = (int)Math.Round(fill * 100);
 
-                                    if (pct >= 100)
-                                    {
-                                        <span class="star filled">★</span>
-                                    }
-                                    else if (pct <= 0)
-                                    {
-                                        <span class="star">★</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="star frac" style="--p:@pct%;">★</span>
+                                        if (pct >= 100)
+                                        {
+                                            <span class="star filled">★</span>
+                                        }
+                                        else if (pct <= 0)
+                                        {
+                                            <span class="star">★</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="star frac" style="--p:@pct%;">★</span>
+                                        }
                                     }
                                 }
                                 <span class="rating-text">@avg.ToString("0.#") / 5 (@service.TotalReviews đánh giá)</span>
                             </div>
 
-
                             <div class="service-actions">
-                                <a asp-controller="Services" asp-action="Details" asp-route-id="@service.Id" class="btn btn-primary">Thêm vào giỏ hàng</a>
-                                <a asp-controller="Services" asp-action="Details" asp-route-id="@service.Id" class="btn btn-ghost">Chi tiết</a>
+                                <a asp-controller="Services" asp-action="Details" asp-route-id="@service.ServiceId" class="btn btn-primary">Thêm vào giỏ hàng</a>
+                                <a asp-controller="Services" asp-action="Details" asp-route-id="@service.ServiceId" class="btn btn-ghost">Chi tiết</a>
                             </div>
                         </div>
                     </div>
