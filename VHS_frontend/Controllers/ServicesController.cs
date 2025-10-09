@@ -1,82 +1,62 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
+using VHS_frontend.Services.Customer.Implementations;
+using VHS_frontend.Services.Customer.Interfaces;
 
 namespace VHS_frontend.Controllers
 {
     public class ServicesController : Controller
     {
+        private readonly IServiceCustomerService _serviceCustomerService;
+
+        public ServicesController(IServiceCustomerService serviceCustomerService)
+        {
+            _serviceCustomerService = serviceCustomerService;
+        }
+
         [HttpGet]
-        public IActionResult Index(
+        public async Task<IActionResult> Index(
             int page = 1,
             string? search = null,
             string? category = null,
-            string? sort = null
-        )
+            string? sort = null)
         {
             const int pageSize = 20;
-            const int totalServices = 100;
-            var rnd = new Random(42); // dùng cho TotalReviews
 
-            // Fake data
-            var all = Enumerable.Range(1, totalServices)
-                .Select(i =>
-                {
-                    var cat = (i % 3) switch
-                    {
-                        0 => "Vệ sinh",
-                        1 => "Nội trợ",
-                        _ => "Sự kiện nhỏ tại nhà"
-                    };
-                    var price = i * 75_000; // 75k..7.5tr
+            // 1) Lấy dữ liệu thật từ API (List<ListServiceHomePageDTOs>)
+            var dtos = await _serviceCustomerService.GetAllServiceHomePageAsync();
 
-                    // ⭐ Sao: seed theo id để List/Detail giống nhau, clamp 1..5
-                    var starRand = new Random(i * 99991 + 7);
-                    var starsRaw = starRand.NextDouble() * 4.0 + 1.0;   // 1.0..5.0
-                    var stars = Math.Round(Math.Min(5.0, Math.Max(1.0, starsRaw)), 2);
+            // 2) IQueryable để chain filter/sort
+            var all = dtos.AsQueryable();
 
-                    return new ServiceViewModel
-                    {
-                        Id = i,
-                        Name = $"{cat} #{i}",
-                        Description = "Mô tả ngắn gọn về dịch vụ này. Chuyên nghiệp – nhanh – gọn.",
-                        Duration = $"{1 + (i % 3)}–{2 + (i % 5)} giờ",
-                        PriceValue = price,
-                        PriceDisplay = $"{price:n0}đ",
-                        Stars = stars,
-                        TotalReviews = rnd.Next(10, 500),
-                        Category = cat,
-                        ImageUrl = Url.Content("~/images/VeSinh.jpg")
-                    };
-                })
-                .AsQueryable();
-
-            // Search
+            // 3) Search theo Title/Description
             if (!string.IsNullOrWhiteSpace(search))
             {
                 all = all.Where(s =>
-                    s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    s.Description.Contains(search, StringComparison.OrdinalIgnoreCase));
+                    (!string.IsNullOrEmpty(s.Title) && s.Title.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(s.Description) && s.Description.Contains(search, StringComparison.OrdinalIgnoreCase)));
             }
 
-            // Category
-            if (!string.IsNullOrWhiteSpace(category))
-            {
-                all = all.Where(s => s.Category == category);
-            }
+            //// 4) Category filter: map từ UnitType => 3 nhóm cố định
+            //if (!string.IsNullOrWhiteSpace(category))
+            //{
+            //    all = all.Where(s => MapCategory);
+            //}
 
-            // Sort / Price range filter / Rating
+            // 5) Sort / khoảng giá / rating
             all = sort switch
             {
-                "price-500" => all.Where(s => s.PriceValue < 500_000),
-                "price-500-1000" => all.Where(s => s.PriceValue >= 500_000 && s.PriceValue < 1_000_000),
-                "price-1000-5000" => all.Where(s => s.PriceValue >= 1_000_000 && s.PriceValue <= 5_000_000),
-                "price-5000" => all.Where(s => s.PriceValue > 5_000_000),
-                "stars" => all.OrderByDescending(s => s.Stars),
-                _ => all.OrderBy(s => s.Id)
+                "price-500" => all.Where(s => s.Price < 500_000),
+                "price-500-1000" => all.Where(s => s.Price >= 500_000 && s.Price < 1_000_000),
+                "price-1000-5000" => all.Where(s => s.Price >= 1_000_000 && s.Price <= 5_000_000),
+                "price-5000" => all.Where(s => s.Price > 5_000_000),
+                "stars" => all.OrderByDescending(s => s.AverageRating),
+                _ => all.OrderBy(s => s.Title) // hoặc CreatedAt tùy ý
             };
 
+            // 6) Paging
             var totalFiltered = all.Count();
             var totalPages = (int)Math.Ceiling(totalFiltered / (double)pageSize);
 
