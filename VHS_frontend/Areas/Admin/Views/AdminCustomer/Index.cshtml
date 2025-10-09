@@ -1,0 +1,272 @@
+﻿@model List<VHS_frontend.Areas.Admin.Models.Customer.CustomerDTO>
+@{
+    ViewData["Title"] = "Quản lý tài khoản";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+
+    var includeDeleted = (bool)(ViewData["IncludeDeleted"] ?? false);
+    var total = Model?.Count ?? 0;
+    var deleted = Model?.Count(x => x.Deleted == true) ?? 0;
+    var active = total - deleted;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/customer.css" asp-append-version="true" />
+}
+<!-- Center Notifications -->
+<div id="notif-root" aria-live="polite" aria-atomic="true"></div>
+
+<section class="cat-page container-fluid customer-ui">
+    <!-- Header / Metrics -->
+    <div class="cat-head card-x glass">
+        <div class="left">
+            <div class="ico"><i class="bi bi-person-badge"></i></div>
+            <div>
+                <h3>Tài khoản khách hàng</h3>
+                <div class="sub">Tạo, chỉnh sửa, ẩn/khôi phục tài khoản</div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="pill"><span class="lbl">Tổng</span><span class="val">@total</span></div>
+            <div class="pill good"><span class="lbl">Hoạt động</span><span class="val">@active</span></div>
+            <div class="pill mute"><span class="lbl">Đã xoá</span><span class="val">@deleted</span></div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="cat-toolbar">
+        <div class="actions">
+            <button class="btn btn-primary soft" data-bs-toggle="modal" data-bs-target="#accModal">
+                <i class="bi bi-plus-circle"></i> Thêm tài khoản
+            </button>
+
+            <a class="btn btn-ghost soft"
+               asp-area="Admin" asp-controller="AdminCustomer" asp-action="Index"
+               asp-route-includeDeleted="@( !includeDeleted )">
+                <i class="bi @(includeDeleted ? "bi-eye-slash" : "bi-eye")"></i>
+                @(includeDeleted ? "Ẩn đã xoá" : "Hiện cả đã xoá")
+            </a>
+        </div>
+
+        <div class="search">
+            <i class="bi bi-search"></i>
+            <input id="txtSearch" class="form-control" placeholder="Tìm theo AccountName / Email..." />
+        </div>
+    </div>
+
+    <!-- Table (KHÔNG đóng khung) -->
+    <div class="table-wrap">
+        <table class="table table-hover align-middle mb-0" id="tblAccs">
+            <thead>
+                <tr>
+                    <th style="width:30%">Tài khoản</th>
+                    <th style="width:30%">Email</th>
+                    <th style="width:20%">Ngày tạo</th>
+                    <th style="width:12%">Trạng thái</th>
+                    <th style="width:8%" class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody id="tbody">
+                @foreach (var a in Model)
+                {
+                    var isDel = a.Deleted == true;
+                    <tr class="cat-row @(isDel ? "open" : "")" data-id="@a.Id" data-name="@a.AccountName" data-email="@a.Email">
+                        <td class="acc-cell">
+                            <span class="avatar"><i class="bi bi-person"></i></span>
+                            <div class="meta">
+                                <div class="name ellipsis fw-semibold">@a.AccountName</div>
+                            </div>
+                        </td>
+                        <td class="ellipsis">@a.Email</td>
+                        <td>@(a.CreatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+                        <td>
+                            @if (!isDel)
+                            {
+                                <span class="state ok"><i class="bi bi-check-lg"></i> Hoạt động</span>
+                            }
+                            else
+                            {
+                                <span class="state del"><i class="bi bi-archive"></i> Đã xoá</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group action-inline">
+                                <button class="btn btn-sm btn-outline-primary soft" onclick="openEdit('@a.Id')" @(isDel ? "disabled" : "")>
+                                    <i class="bi bi-pencil-square"></i><span>Sửa</span>
+                                </button>
+                                @if (isDel)
+                                {
+                                    <button class="btn btn-sm btn-outline-warning soft" onclick="doRestore('@a.Id')">
+                                        <i class="bi bi-arrow-counterclockwise"></i><span>Khôi phục</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-danger soft" onclick="doDelete('@a.Id')">
+                                        <i class="bi bi-trash"></i><span>Xoá</span>
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (Model == null || Model.Count == 0)
+        {
+            <div class="p-3 text-center text-muted">Chưa có tài khoản nào.</div>
+        }
+    </div>
+</section>
+
+<!-- Modal: Create/Edit (1 cột) -->
+<div class="modal fade" id="accModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content card-x" id="accForm" onsubmit="return false;">
+            <div class="modal-header">
+                <h5 class="modal-title" id="accModalTitle">Thêm tài khoản</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="accId" />
+                <div class="mb-3">
+                    <label class="form-label">Account name</label>
+                    <input type="text" id="fName" class="form-control" maxlength="64" required />
+                    <div class="invalid-feedback">Vui lòng nhập Account name.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" id="fEmail" class="form-control" maxlength="128" required />
+                    <div class="invalid-feedback">Vui lòng nhập Email hợp lệ.</div>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label">Mật khẩu<span id="pwHint" class="text-muted"></span></label>
+                    <input type="password" id="fPass" class="form-control" minlength="6" maxlength="64" />
+                </div>
+                <div class="form-text" id="pwNote">Mật khẩu tối thiểu 6 ký tự.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-primary soft" id="btnSaveAcc">Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const routes = {
+          create  : '@Url.Action("Create", "AdminCustomer", new { area = "Admin" })',
+          update  : '@Url.Action("Update", "AdminCustomer", new { area = "Admin" })',
+          get     : '@Url.Action("Get", "AdminCustomer", new { area = "Admin" })',
+          del     : '@Url.Action("Delete", "AdminCustomer", new { area = "Admin" })',
+          restore : '@Url.Action("Restore", "AdminCustomer", new { area = "Admin" })'
+        };
+
+        /* ======= CENTER TOAST (boxed + accent bar + fast) ======= */
+        function showNotice(msg, type='info', duration=900){
+          const root = document.getElementById('notif-root');
+          const box  = document.createElement('div');
+          box.className = `center-toast ${type}`;
+          box.innerHTML = `
+            <div class="toast-box">
+              <div class="accent"></div>
+              <i class="bi ${type==='success'?'bi-check-circle':
+                           type==='error'  ?'bi-x-circle'   :
+                           type==='warn'   ?'bi-exclamation-triangle' : 'bi-info-circle'}"></i>
+              <span class="msg">${msg}</span>
+            </div>`;
+          root.appendChild(box);
+
+          requestAnimationFrame(()=> box.classList.add('show'));
+
+          setTimeout(()=> {
+            box.classList.remove('show');
+            setTimeout(()=> box.remove(), 180);
+          }, duration);
+        }
+
+        // Search
+        document.getElementById('txtSearch')?.addEventListener('input', function(){
+          const q = this.value.toLowerCase().trim();
+          document.querySelectorAll('#tblAccs tbody tr').forEach(tr=>{
+            const name  = tr.dataset.name?.toLowerCase()  ?? '';
+            const email = tr.dataset.email?.toLowerCase() ?? '';
+            tr.style.display = (name.includes(q) || email.includes(q)) ? '' : 'none';
+          });
+        });
+
+        // Modal & Form
+        const accModal = new bootstrap.Modal(document.getElementById('accModal'));
+        const accForm  = document.getElementById('accForm');
+        const accIdEl  = document.getElementById('accId');
+        const nameEl   = document.getElementById('fName');
+        const emailEl  = document.getElementById('fEmail');
+        const passEl   = document.getElementById('fPass');
+        const titleEl  = document.getElementById('accModalTitle');
+        const pwHint   = document.getElementById('pwHint');
+        const pwNote   = document.getElementById('pwNote');
+
+        document.querySelector('[data-bs-target="#accModal"]')?.addEventListener('click', ()=>{
+          titleEl.textContent = 'Thêm tài khoản';
+          accIdEl.value=''; nameEl.value=''; emailEl.value=''; passEl.value='';
+          pwHint.textContent=''; pwNote.style.visibility='visible';
+          nameEl.classList.remove('is-invalid'); emailEl.classList.remove('is-invalid'); passEl.classList.remove('is-invalid');
+        });
+
+        async function openEdit(id){
+          const res = await fetch(routes.get + `?id=${id}`);
+          if(!res.ok){ showNotice('Không đọc được dữ liệu.', 'error', 1200); return; }
+          const x = await res.json();
+          titleEl.textContent = 'Sửa tài khoản';
+          accIdEl.value = x.id;
+          nameEl.value  = x.accountName ?? '';
+          emailEl.value = x.email ?? '';
+          passEl.value  = '';
+          pwHint.textContent = ' (để trống nếu không đổi)';
+          pwNote.style.visibility='hidden';
+          accModal.show();
+        }
+        window.openEdit = openEdit;
+
+        accForm?.addEventListener('submit', async (e)=>{
+          e.preventDefault();
+          const id  = accIdEl.value.trim();
+          const dto = {
+            accountName: nameEl.value.trim(),
+            email:       emailEl.value.trim(),
+            password:    passEl.value ? passEl.value : null,
+            role:        'User'
+          };
+
+          if(!dto.accountName){ nameEl.classList.add('is-invalid'); showNotice('Vui lòng nhập Account name.', 'warn', 1100); return; }
+          if(!dto.email){ emailEl.classList.add('is-invalid'); showNotice('Vui lòng nhập Email hợp lệ.', 'warn', 1100); return; }
+          if(!id && !dto.password){ passEl.classList.add('is-invalid'); showNotice('Vui lòng nhập mật khẩu.', 'warn', 1100); return; }
+
+          let res;
+          if(!id){
+            res = await fetch(routes.create, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dto) });
+            if(res.ok){ showNotice('Đã tạo tài khoản.', 'success', 750); setTimeout(()=> location.reload(), 420); }
+            else      { showNotice((await res.text()) || 'Tạo thất bại.', 'error', 1400); }
+          }else{
+            res = await fetch(routes.update + `?id=${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dto) });
+            if(res.ok){ showNotice('Đã lưu thay đổi.', 'success', 750); setTimeout(()=> location.reload(), 420); }
+            else      { showNotice((await res.text()) || 'Cập nhật thất bại.', 'error', 1400); }
+          }
+        });
+
+        async function doDelete(id){
+          if(!confirm('Ẩn tài khoản này?')) return;
+          const res = await fetch(routes.del + `?id=${id}`, { method:'DELETE' });
+          if(res.ok){ showNotice('Đã ẩn tài khoản.', 'success', 650); setTimeout(()=> location.reload(), 400); }
+          else      { showNotice((await res.text()) || 'Ẩn thất bại.', 'error', 1400); }
+        }
+        async function doRestore(id){
+          const res = await fetch(routes.restore + `?id=${id}`, { method:'POST' });
+          if(res.ok){ showNotice('Đã khôi phục tài khoản.', 'success', 650); setTimeout(()=> location.reload(), 400); }
+          else      { showNotice((await res.text()) || 'Khôi phục thất bại.', 'error', 1400); }
+        }
+        window.doDelete = doDelete;
+        window.doRestore = doRestore;
+    </script>
+}

@@ -81,7 +81,7 @@ html, body {
 }
 
 .sidebar-nav {
-    padding: .5rem 0;
+/*    padding: .5rem 0;*/
     overflow: auto;
 }
 
@@ -346,3 +346,101 @@ body.sidebar-collapsed #sidebar .nav-link {
         animation: none !important;
     }
 }
+
+/* ===== Sidebar Nav Active State (no-jump) ===== */
+#sidebar .sidebar-nav .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    color: var(--muted-foreground);
+    /* KHÔNG đổi độ dày viền khi hover/active để tránh reflow */
+    border-left: 3px solid transparent;
+    border-radius: 10px;
+    /* Khóa layout: chiều cao/line-height cố định, không wrap chữ */
+    min-height: 40px; /* cố định chiều cao item */
+    line-height: 1.2; /* nhất quán dòng chữ */
+    white-space: nowrap; /* không xuống hàng khi sidebar co giãn */
+    overflow: hidden; /* tránh tràn chữ */
+    text-overflow: ellipsis; /* hiện … nếu hẹp */
+    /* Không đổi font-weight khi active (tránh rung layout) */
+    font-weight: 500;
+    /* Chỉ animate thuộc tính “rẻ” */
+    transition: background .18s ease, color .18s ease, border-color .18s ease, opacity .18s ease;
+    text-decoration: none;
+    will-change: background, color, border-color, opacity;
+}
+
+    /* Icon: khóa kích thước để không nhảy khung khi animate */
+    #sidebar .sidebar-nav .nav-link i {
+        width: 1.25rem; /* cố định bề ngang icon */
+        flex: 0 0 1.25rem;
+        font-size: 1rem;
+        opacity: .9;
+        transition: opacity .18s ease, transform .18s ease;
+    }
+
+    /* Nhãn: cho phép thu nhỏ khi sidebar hẹp, không bẻ layout */
+    #sidebar .sidebar-nav .nav-link span {
+        flex: 1 1 auto;
+        min-width: 0; /* cho phép ellipsis hoạt động */
+    }
+
+    /* Hover: không thay đổi kích thước, chỉ màu/nền */
+    #sidebar .sidebar-nav .nav-link:hover {
+        background: var(--muted);
+        color: var(--foreground);
+    }
+
+    /* Focus rõ ràng, không đổi layout */
+    #sidebar .sidebar-nav .nav-link:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
+    /* Active: KHÔNG đổi font-weight để tránh reflow */
+    #sidebar .sidebar-nav .nav-link.active,
+    #sidebar .sidebar-nav .nav-link[aria-current="page"] {
+        background: color-mix(in oklab, var(--accent) 12%, transparent);
+        color: var(--foreground);
+        border-left-color: var(--accent);
+        /* font-weight: 600;  <-- bỏ để tránh giật chữ */
+    }
+
+        /* Icon active: bỏ translateX để không xô chữ (tránh “nhảy”) */
+        #sidebar .sidebar-nav .nav-link.active i,
+        #sidebar .sidebar-nav .nav-link[aria-current="page"] i {
+            opacity: 1;
+            /* transform: translateX(1px); <-- bỏ để layout đứng yên */
+        }
+
+/* Dark mode tinh chỉnh */
+.dark #sidebar .sidebar-nav .nav-link:hover {
+    background: color-mix(in oklab, var(--accent) 10%, #0b1220);
+}
+
+.dark #sidebar .sidebar-nav .nav-link.active,
+.dark #sidebar .sidebar-nav .nav-link[aria-current="page"] {
+    background: color-mix(in oklab, var(--accent) 16%, #0b1220);
+}
+
+
+/* Nếu bạn đang thu gọn sidebar (sidebar-collapsed):
+   thay vì ẩn/hiện chữ làm đổi layout, hãy fade chữ bằng opacity */
+body.sidebar-collapsed #sidebar .sidebar-nav .nav-link span {
+    opacity: 0; /* mờ dần, không reflow */
+    pointer-events: none;
+    transition: opacity .18s ease;
+}
+
+body:not(.sidebar-collapsed) #sidebar .sidebar-nav .nav-link span {
+    opacity: 1;
+}
+
+
+/* Hover: không thay đổi kích thước, chỉ màu/nền */
+#sidebar .sidebar-nav .nav-link:hover {
+    background: var(--muted);
+    color: var(--foreground);
+}
+
