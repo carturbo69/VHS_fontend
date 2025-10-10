@@ -15,6 +15,13 @@
             <p>Điền thông tin để bắt đầu hợp tác cùng chúng tôi</p>
         </header>
 
+        @if (ViewBag.ApiError is string apiError && !string.IsNullOrWhiteSpace(apiError))
+        {
+            <div class="alert alert-danger" role="alert" style="max-width:1120px;margin:0 auto 16px;">
+                @apiError
+            </div>
+        }
+
         <form id="providerForm" method="post"
               asp-area="Customer" asp-controller="RegisterProvider" asp-action="RegisterFallback"
               enctype="multipart/form-data" novalidate>
@@ -220,16 +227,14 @@
           const nameEl   = document.getElementById("ProviderName");
 
           // Lưu trữ mảng File cho mỗi input (không thể sửa trực tiếp FileList)
-          const filesStore = new WeakMap(); // key: input[type=file].bl-input -> value: File[]
+          const filesStore = new WeakMap();
 
-          // Tạo FileList mới từ array bằng DataTransfer
           function setInputFiles(input, files){
             const dt = new DataTransfer();
             files.forEach(f => dt.items.add(f));
             input.files = dt.files;
           }
 
-          // Render thumbnails + nút xóa
           function renderBLPreview(input){
             const certEl = input.closest(".cert");
             const grid   = certEl.querySelector(".bl-previews");
@@ -249,7 +254,6 @@
             nameEl.textContent = arr.length ? `${arr.length} tệp đã chọn` : "Chưa chọn tệp";
           }
 
-          // Hợp nhất tệp mới chọn vào store (tránh trùng theo name-size-time)
           function mergeFiles(input, fileList){
             const cur = filesStore.get(input) || [];
             const map = new Set(cur.map(f => `${f.name}|${f.size}|${f.lastModified}`));
@@ -262,7 +266,6 @@
             renderBLPreview(input);
           }
 
-          // Gỡ 1 file theo index
           function removeFileAt(input, index){
             const cur = filesStore.get(input) || [];
             if (index < 0 || index >= cur.length) return;
@@ -272,28 +275,22 @@
             renderBLPreview(input);
           }
 
-          // Gắn behavior cho 1 chứng chỉ (bl-input)
           function wireBLInput(certEl){
             const input = certEl.querySelector('.bl-input');
             const labelFor = certEl.querySelector('label[for^="BL_"]');
             const idx  = certEl.dataset.index;
 
             if (!input) return;
-            // set id/for cho đúng index sau khi clone
             input.id = `BL_${idx}`;
             if (labelFor) labelFor.setAttribute("for", input.id);
 
-            // lần đầu khởi tạo store
             if (!filesStore.has(input)) filesStore.set(input, []);
 
-            // thêm dần ảnh khi người dùng chọn tiếp
             input.addEventListener("change", (e) => {
               mergeFiles(input, e.target.files);
-              // reset input.value để lần sau có thể chọn lại cùng 1 file nếu muốn
-              input.value = "";
+              input.value = ""; // để lần sau có thể chọn lại cùng file
             });
 
-            // lắng nghe click xóa từng ảnh
             const grid = certEl.querySelector(".bl-previews");
             grid.addEventListener("click", (e) => {
               const btn = e.target.closest(".thumb-del");
@@ -302,11 +299,9 @@
               removeFileAt(input, index);
             });
 
-            // lần đầu render (trống)
             renderBLPreview(input);
           }
 
-          // Khởi tạo cho cert đầu tiên
           document.querySelectorAll(".cert").forEach(wireBLInput);
 
           function syncCertUI() {
@@ -325,7 +320,6 @@
             const tmpl  = items[items.length - 1];
             const clone = tmpl.cloneNode(true);
 
-            // reset giá trị input + preview + tên file
             clone.querySelectorAll("input, textarea, select").forEach(el=>{
               if (el.type === "file") el.value = "";
               else el.value = "";
@@ -336,7 +330,6 @@
             if (blName) blName.textContent = "Chưa chọn tệp";
             if (blGrid) blGrid.innerHTML = "";
 
-            // chèn & re-index
             list.insertBefore(clone, btnAdd);
             list.querySelectorAll(".cert").forEach((blk, i) => {
               blk.dataset.index = i;
@@ -385,16 +378,14 @@
           list.addEventListener("change", e => { if (e.target.matches('select[name^="Certificates"]')) enableSubmit(); });
           syncCertUI(); enableSubmit();
 
-          // ====== Demo submit ======
-          document.getElementById("providerForm")?.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            btnSubmit.disabled = true; btnSubmit.textContent = "Đang xử lý...";
-            await new Promise(r => setTimeout(r, 800));
-            alert("Đăng ký (giả lập) thành công!");
-            btnSubmit.textContent = "Đăng ký Provider"; enableSubmit();
+          // ====== REAL submit: disable button tránh double submit
+          const form = document.getElementById("providerForm");
+          form?.addEventListener("submit", () => {
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = "Đang gửi...";
           });
-
         })();
     </script>
 }
+
 

@@ -1,6 +1,7 @@
 ﻿using VHS_frontend.Models;
 using VHS_frontend.Services;
 using VHS_frontend.Services.Admin;
+using VHS_frontend.Services.Customer;
 using VHS_frontend.Services.Customer.Implementations;
 using VHS_frontend.Services.Customer.Interfaces;
 
@@ -29,6 +30,10 @@ builder.Services.AddHttpClient<CustomerAdminService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 builder.Services.AddHttpClient<ProviderAdminService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+builder.Services.AddHttpClient<RegisterProviderService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
