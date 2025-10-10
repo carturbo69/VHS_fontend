@@ -20,5 +20,26 @@ namespace VHS_frontend.Services.Customer.Implementations
 
             return response ?? new List<ListServiceHomePageDTOs>();
         }
+
+        public async Task<IEnumerable<ListServiceHomePageDTOs>> GetTop05HighestRatedServicesAsync()
+        {
+            var response = await _httpClient.GetFromJsonAsync<IEnumerable<ListServiceHomePageDTOs>>(
+                "api/Services/services-top05"
+            );
+            return response ?? new List<ListServiceHomePageDTOs>();
+        }
+
+        public async Task<ServiceDetailDTOs?> GetServiceDetailAsync(Guid serviceId)
+        {
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<ServiceDetailDTOs>($"api/Services/{serviceId}");
+            }
+            catch (HttpRequestException)
+            {
+                return null;
+            }
+        }
+
     }
 }
