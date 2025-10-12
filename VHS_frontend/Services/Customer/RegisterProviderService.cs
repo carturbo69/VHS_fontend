@@ -10,8 +10,6 @@ namespace VHS_frontend.Services.Customer
     {
         private readonly HttpClient _http;
 
-        // Giữ nguyên key name (API đang trả UPPERCASE cho Register response),
-        // đồng thời case-insensitive để an toàn nếu backend đổi về PascalCase.
         private static readonly JsonSerializerOptions _json = new()
         {
             PropertyNamingPolicy = null,
@@ -20,12 +18,11 @@ namespace VHS_frontend.Services.Customer
 
         public RegisterProviderService(HttpClient http) => _http = http;
 
-        // Nếu API cần Bearer token:
+        // (Nếu chưa dùng AuthHeaderHandler) – gọi trước khi call API
         public void SetBearerToken(string token) =>
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // ===== CATEGORY =====
-        // Mặc định: chỉ lấy những Category còn hoạt động (includeDeleted=false)
         public Task<IReadOnlyList<CategoryDTO>> GetCategoriesAsync(CancellationToken ct = default)
             => GetCategoriesAsync(includeDeleted: false, ct);
 
@@ -34,26 +31,44 @@ namespace VHS_frontend.Services.Customer
             var url = $"/api/category?includeDeleted={includeDeleted.ToString().ToLower()}";
             var res = await _http.GetAsync(url, ct);
             res.EnsureSuccessStatusCode();
-
             await using var s = await res.Content.ReadAsStreamAsync(ct);
             var data = await JsonSerializer.DeserializeAsync<List<CategoryDTO>>(s, new JsonSerializerOptions(JsonSerializerDefaults.Web), ct);
             return data ?? new();
         }
 
-        // ===== REGISTER PROVIDER =====
-        // Forward nguyên form multipart sang API /api/register-provider
+        // ===== MY PROVIDER (lấy hồ sơ hiện tại của account) =====
+        // YÊU CẦU API có endpoint: GET /api/register-provider/me
+        public async Task<MyProviderDTO?> GetMyProviderAsync(CancellationToken ct = default)
+        {
+            var res = await _http.GetAsync("/api/register-provider/me", ct);
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound) return null; // chưa có hồ sơ
+            res.EnsureSuccessStatusCode();
+
+            await using var s = await res.Content.ReadAsStreamAsync(ct);
+            var dto = await JsonSerializer.DeserializeAsync<MyProviderDTO>(s, _json, ct);
+            return dto;
+        }
+
+        // ===== REGISTER / UPDATE (multipart forward) =====
         public async Task<RegisterResultVm> RegisterAsync(HttpRequest request, CancellationToken ct = default)
         {
             using var content = new MultipartFormDataContent();
-
             string Get(string key) => request.Form[key].FirstOrDefault() ?? string.Empty;
 
-            // Text fields (map đúng key UPPERCASE theo DTO backend)
+            // Nếu đang re-submit trên ID cũ (khi bị Rejected), form sẽ có hidden input "ProviderId"
+            var providerIdHidden = Get("ProviderId");
+            if (!string.IsNullOrWhiteSpace(providerIdHidden))
+            {
+                // Gửi lên API để xử lý update trên ID cũ
+                content.Add(new StringContent(providerIdHidden), "PROVIDERID");
+            }
+
+            // Text
             content.Add(new StringContent(Get("ProviderName")), "PROVIDERNAME");
             content.Add(new StringContent(Get("PhoneNumber")), "PHONENUMBER");
             content.Add(new StringContent(Get("Description")), "DESCRIPTION");
 
-            // TermsInsurance (gộp điều khoản & bảo hiểm)
+            // Terms & Insurance (gộp)
             content.Add(new StringContent(Get("TermsInsurance.Title")), "TERMSINSURANCE.TITLE");
             content.Add(new StringContent(Get("TermsInsurance.Description")), "TERMSINSURANCE.DESCRIPTION");
 
@@ -65,7 +80,7 @@ namespace VHS_frontend.Services.Customer
                 content.Add(fc, "PROFILEIMAGE", avatar.FileName);
             }
 
-            // Certificates (nhiều block; mỗi block nhiều ảnh BusinessLicenses)
+            // Certificates (nhiều block; mỗi block nhiều ảnh)
             var indexes = request.Form.Keys
                 .Where(k => k.StartsWith("Certificates[") && k.EndsWith("].CategoryId"))
                 .Select(k =>
@@ -102,7 +117,6 @@ namespace VHS_frontend.Services.Customer
 
             if (!res.IsSuccessStatusCode)
             {
-                // cố gắng bóc message chi tiết từ body
                 string msg = $"API {res.StatusCode}";
                 try
                 {
@@ -110,22 +124,17 @@ namespace VHS_frontend.Services.Customer
                     if (doc.RootElement.TryGetProperty("Message", out var m))
                         msg = m.GetString() ?? msg;
                 }
-                catch { /* ignore parse error */ }
+                catch { /* ignore */ }
 
                 return new RegisterResultVm { Success = false, Message = msg, Raw = payload };
             }
 
+            // LƯU Ý: dùng UPPERCASE đúng với Controller bạn đang xài
             var data = JsonSerializer.Deserialize<RegisterProviderResponseDTO>(payload, _json);
-            return new RegisterResultVm
-            {
-                Success = true,
-                Message = "Đăng ký thành công",
-                Response = data!,
-                Raw = payload
-            };
+            return new RegisterResultVm { Success = true, Message = "Đăng ký thành công", Response = data!, Raw = payload };
         }
 
-        // ===== VM cho FE =====
+        // ===== VM =====
         public sealed class RegisterResultVm
         {
             public bool Success { get; set; }
