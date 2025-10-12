@@ -1,0 +1,212 @@
+﻿@using System.Text.Json
+@using VHS_frontend.Areas.Admin.Models.RegisterProvider
+@model AdminProviderDetailDTO
+
+@{
+    ViewData["Title"] = "Chi tiết hồ sơ Provider";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+
+    // ===== Map trạng thái: class + text tiếng Việt
+    string MapStatusClass(string s) => s?.ToLower() switch
+    {
+        "pending" => "st-badge pending",
+        "approved" => "st-badge ok",
+        "rejected" => "st-badge rej",
+        _ => "st-badge"
+    };
+    string MapStatusText(string s) => s?.ToLower() switch
+    {
+        "pending" => "Đang chờ phê duyệt",
+        "approved" => "Đã phê duyệt",
+        "rejected" => "Bị từ chối",
+        _ => s
+    };
+
+    // ===== Cat map được truyền từ Controller
+    var catMap = ViewBag.CatMap as IDictionary<Guid, string> ?? new Dictionary<Guid, string>();
+    string CatName(Guid id) => catMap.TryGetValue(id, out var name) ? name : id.ToString();
+
+    // ===== Parse list ảnh GPKD
+    List<string> ToImages(string? json)
+    {
+        try { return string.IsNullOrWhiteSpace(json) ? new() : (JsonSerializer.Deserialize<List<string>>(json) ?? new()); }
+        catch { return new(); }
+    }
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-register-provider.css" asp-append-version="true" />
+}
+
+<section class="arp container-fluid">
+    <!-- Header -->
+    <div class="arp__head card-x glass">
+        <div class="left">
+            <div class="ico"><i class="bi bi-person-badge-fill"></i></div>
+            <div>
+                <h3>@Model.ProviderName</h3>
+                <div class="sub">Mã: <code>@Model.ProviderId</code></div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="pill">
+                <span class="lbl">Trạng thái</span>
+                <span class="val"><span class="@MapStatusClass(Model.Status)">@MapStatusText(Model.Status)</span></span>
+            </div>
+            <div class="pill"><span class="lbl">Tạo:</span><span class="val">@Model.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
+            <div class="pill"><span class="lbl">Duyệt:</span><span class="val">@Model.ApprovedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
+        </div>
+    </div>
+
+    <div class="arp__grid">
+        <!-- Pane: Thông tin -->
+        <div class="card-x pane">
+            <div class="pane__head">
+                <i class="bi bi-person"></i>
+                <h5>Thông tin</h5>
+            </div>
+            <div class="pane__body">
+                <dl class="kv">
+                    <dt>Tên Provider</dt>
+                    <dd>@Model.ProviderName</dd>
+
+                    <dt>Điện thoại</dt>
+                    <dd>@Model.PhoneNumber</dd>
+
+                    <dt>Mô tả</dt>
+                    <dd>@Model.Description</dd>
+                </dl>
+
+                <div class="avatar-sec">
+                    <div class="lbl">Ảnh đại diện</div>
+                    <div class="avatar">
+                        @if (!string.IsNullOrWhiteSpace(Model.Images))
+                        {
+                            <img src="@Model.Images" alt="Ảnh đại diện" />
+                        }
+                        else
+                        {
+                            <div class="noimg">Không có ảnh</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pane: Điều khoản & Bảo hiểm -->
+        <div class="card-x pane">
+            <div class="pane__head">
+                <i class="bi bi-shield-check"></i>
+                <h5>Điều khoản &amp; Bảo hiểm</h5>
+            </div>
+            <div class="pane__body">
+                <div class="terms">
+                    <div class="t-title">@Model.Terms?.Title</div>
+                    <div class="t-desc">@Model.Terms?.Description</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pane full: Chứng chỉ & Giấy phép kinh doanh -->
+        <div class="card-x pane pane--full">
+            <div class="pane__head">
+                <i class="bi bi-file-earmark-text"></i>
+                <h5>Chứng chỉ &amp; Giấy phép kinh doanh</h5>
+            </div>
+            <div class="pane__body">
+                @if (Model.Certificates?.Any() == true)
+                {
+                    <div class="certs">
+                        @for (int i = 0; i < Model.Certificates.Count; i++)
+                        {
+                            var c = Model.Certificates[i];
+                            var imgs = ToImages(c.Images);
+                            <div class="cert">
+                                <div class="cert__head">
+                                    <span class="pill">#@(i + 1)</span>
+                                    <div>
+                                        <div class="c-kv">
+                                            <span class="k">Danh mục:</span>
+                                            <span class="v">@CatName(c.CategoryId)</span>
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(c.Description))
+                                        {
+                                            <div class="c-kv"><span class="k">Mô tả:</span> <span class="v">@c.Description</span></div>
+                                        }
+                                    </div>
+                                </div>
+
+                                @if (imgs.Any())
+                                {
+                                    <div class="bl-grid">
+                                        @foreach (var url in imgs)
+                                        {
+                                            <figure class="thumb">
+                                                <img src="@url" alt="Giấy phép kinh doanh" />
+                                            </figure>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="note muted">Chưa có hình GPKD</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="note muted">Không có chứng chỉ</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions card-x">
+        @if (string.Equals(Model.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+        {
+            <form method="post"
+                  asp-area="Admin"
+                  asp-controller="AdminRegisterProvider"
+                  asp-action="Approve"
+                  asp-route-id="@Model.ProviderId"
+                  class="d-inline">
+                @Html.AntiForgeryToken()
+                <button class="btn btn-success soft"><i class="bi bi-check2-circle"></i> Duyệt</button>
+            </form>
+
+            <button class="btn btn-danger soft" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                <i class="bi bi-x-octagon"></i> Từ chối
+            </button>
+        }
+        <a class="btn btn-ghost soft" asp-area="Admin" asp-controller="AdminRegisterProvider" asp-action="Index">Quay lại</a>
+    </div>
+</section>
+
+<!-- Modal: Reject -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content card-x"
+              method="post"
+              asp-area="Admin"
+              asp-controller="AdminRegisterProvider"
+              asp-action="Reject"
+              asp-route-id="@Model.ProviderId">
+            @Html.AntiForgeryToken()
+            <div class="modal-header">
+                <h5 class="modal-title">Từ chối hồ sơ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Lý do (tuỳ chọn)</label>
+                <textarea class="form-control" name="reason" rows="3" placeholder="Nhập lý do từ chối (nếu cần)…"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-danger soft">Xác nhận từ chối</button>
+            </div>
+        </form>
+    </div>
+</div>
