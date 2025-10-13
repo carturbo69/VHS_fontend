@@ -2,43 +2,130 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VHS_frontend.Areas.Customer.Models.CartItemDTOs;
+using VHS_frontend.Services.Customer;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
     [Area("Customer")]
     public class CartController : Controller
     {
-        // ===== Models =====
-        public class CartAddon
+
+        private readonly CartServiceCustomer _cartService;
+
+        public CartController(CartServiceCustomer cartService)
         {
-            public int Id { get; set; }
-            public string Name { get; set; } = "";
-            public int Price { get; set; }                  // VND
-            public string Type { get; set; } = "check";     // "check" | "qty"
-            public int Qty { get; set; } = 0;               // check: 0/1; qty: >=0
-            public int Subtotal => Price * Qty;
+            _cartService = cartService;
         }
 
-        public class CartItem
-        {
-            public Guid Key { get; set; } = Guid.NewGuid();
-            public int ServiceId { get; set; }
-            public string Name { get; set; } = "";
-            public int PriceValue { get; set; }             // giá dịch vụ chính
-            public int Quantity { get; set; } = 1;          // luôn 1 gói
-            public string ImageUrl { get; set; } = "";
-            public List<CartAddon> AddOns { get; set; } = new();
-
-            public int AddOnTotal => AddOns.Sum(a => a.Subtotal);
-            public int LineTotal => PriceValue * Quantity + AddOnTotal;
-        }
-
-        // Tạm dùng static list
-        private static readonly List<CartItem> _cart = new();
-
-        // ===== View giỏ hàng =====
+        /// <summary>
+        /// Lấy tổng số dịch vụ trong giỏ hàng (CartItem Count)
+        /// </summary>
         [HttpGet]
-        public IActionResult Index() => View(_cart);
+        public async Task<IActionResult> GetCartTotalCount()
+        {
+            try
+            {
+                var accountIdString = HttpContext.Session.GetString("AccountID");
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+
+                if (string.IsNullOrEmpty(accountIdString) || !Guid.TryParse(accountIdString, out Guid accountId))
+                {
+                    return Json(new { total = 0 });
+                }
+
+                var totalDto = await _cartService.GetTotalCartItemAsync(accountId, jwtToken);
+
+                return Json(new { total = totalDto.TotalServices });
+            }
+            catch
+            {
+                return Json(new { total = 0 });
+            }
+        }
+
+
+        //public async Task<IActionResult> Index()
+        //{
+        //    // Lấy AccountID & Token từ Session (đã set sau khi Login)
+        //    var accountIdStr = HttpContext.Session.GetString("AccountID");
+        //    var jwt = HttpContext.Session.GetString("JWToken");
+
+        //    if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+        //    {
+        //        TempData["ToastType"] = "warning";
+        //        TempData["ToastMessage"] = "Vui lòng đăng nhập để xem giỏ hàng.";
+        //        return RedirectToAction("Login", "Account", new { area = "" });
+        //    }
+
+        //    try
+        //    {
+        //        var items = await _cartService.GetCartItemsByAccountIdAsync(accountId, jwt);
+        //        return View(items); // Model: List<ReadCartItemDTOs>
+        //    }
+        //    catch (UnauthorizedAccessException)
+        //    {
+        //        // Hết hạn token -> bắt đăng nhập lại
+        //        HttpContext.Session.Clear();
+        //        TempData["ToastType"] = "warning";
+        //        TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+        //        return RedirectToAction("Login", "Account", new { area = "" });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        // Lỗi khác
+        //        TempData["ToastType"] = "error";
+        //        TempData["ToastMessage"] = $"Không thể tải giỏ hàng: {ex.Message}";
+        //        return View(new System.Collections.Generic.List<ReadCartItemDTOs>());
+        //    }
+        //}
+
+        public async Task<IActionResult> Index()
+        {
+            var accountIdStr = HttpContext.Session.GetString("AccountID");
+            var jwt = HttpContext.Session.GetString("JWToken");
+
+            if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+            {
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Vui lòng đăng nhập để xem giỏ hàng.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            try
+            {
+                var items = await _cartService.GetCartItemsByAccountIdAsync(accountId, jwt);
+
+                // NEW: Lấy tất cả option của các service trong giỏ để làm "Gợi ý thêm"
+                var serviceIds = items.Select(i => i.ServiceId).Distinct().ToList();
+                var dictByService = new Dictionary<Guid, List<VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs.ReadServiceOptionDTOs>>();
+
+                foreach (var sid in serviceIds)
+                {
+                    var opts = await _cartService.GetAllOptionsByServiceIdAsync(sid)
+                               ?? new List<VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs.ReadServiceOptionDTOs>();
+                    dictByService[sid] = opts;
+                }
+
+                ViewBag.AvailableOptionsByServiceId = dictByService;
+
+                return View(items); // Model: List<ReadCartItemDTOs>
+            }
+            catch (UnauthorizedAccessException)
+            {
+                HttpContext.Session.Clear();
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastType"] = "error";
+                TempData["ToastMessage"] = $"Không thể tải giỏ hàng: {ex.Message}";
+                return View(new List<ReadCartItemDTOs>());
+            }
+        }
+
 
         // ===== Thêm vào giỏ (DUY NHẤT action này, POST) =====
         [HttpPost]
@@ -55,39 +142,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             int[]? addonQty
         )
         {
-            // chống null
-            addonId ??= Array.Empty<int>();
-            addonName ??= Array.Empty<string>();
-            addonType ??= Array.Empty<string>();
-            addonPrice ??= Array.Empty<int>();
-            addonQty ??= Array.Empty<int>();
-
-            var addons = new List<CartAddon>();
-            for (int i = 0; i < addonId.Length; i++)
-            {
-                var qty = i < addonQty.Length ? addonQty[i] : 0;
-                if (qty <= 0) continue;
-
-                addons.Add(new CartAddon
-                {
-                    Id = addonId[i],
-                    Name = i < addonName.Length ? addonName[i] : "",
-                    Price = i < addonPrice.Length ? addonPrice[i] : 0,
-                    Type = i < addonType.Length ? addonType[i] : "check",
-                    Qty = qty
-                });
-            }
-
-            _cart.Add(new CartItem
-            {
-                ServiceId = id,
-                Name = name,
-                PriceValue = priceValue,
-                Quantity = Math.Max(1, quantity),   // bạn đang gửi 1
-                ImageUrl = imageUrl ?? "",
-                AddOns = addons
-            });
-
+          
             return RedirectToAction(nameof(Index));
         }
 
@@ -95,24 +150,23 @@ namespace VHS_frontend.Areas.Customer.Controllers
         [HttpPost]
         public IActionResult UpdateQty(Guid key, int qty)
         {
-            var it = _cart.FirstOrDefault(x => x.Key == key);
-            if (it != null) it.Quantity = Math.Max(1, qty);
             return RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
         public IActionResult Remove(Guid key)
         {
-            var it = _cart.FirstOrDefault(x => x.Key == key);
-            if (it != null) _cart.Remove(it);
+          
             return RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
         public IActionResult Clear()
         {
-            _cart.Clear();
+            
             return RedirectToAction(nameof(Index));
         }
     }
 }
+
+

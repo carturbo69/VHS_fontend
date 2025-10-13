@@ -1,42 +1,76 @@
-﻿@model List<VHS_frontend.Areas.Customer.Controllers.CartController.CartItem>
+﻿@using VHS_frontend.Areas.Customer.Models.CartItemDTOs
+@using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs
+@model List<ReadCartItemDTOs>
 
 @{
     ViewData["Title"] = "Giỏ hàng";
     Layout = "~/Views/Shared/_Layout.cshtml";
 
-    var isEmpty = Model == null || !Model.Any();
+    var list = Model ?? new List<ReadCartItemDTOs>();
+    var isEmpty = !list.Any();
     var groups = isEmpty
-        ? new List<IGrouping<string, VHS_frontend.Areas.Customer.Controllers.CartController.CartItem>>()
-        : Model.GroupBy(i => GetProvider(i)).ToList();
+        ? new List<IGrouping<string, ReadCartItemDTOs>>()
+        : list.GroupBy(i => ProviderOf(i)).ToList();
+
+    var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+
+
 }
 
 @functions {
-    // Lấy tên Provider an toàn
-    string GetProvider(object it)
+    string ProviderOf(ReadCartItemDTOs it)
+        => string.IsNullOrWhiteSpace(it?.ProviderName) ? "Khác" : it.ProviderName;
+
+    string KeyOf(ReadCartItemDTOs it) => it?.CartItemId.ToString() ?? "";
+
+    string NameOf(ReadCartItemDTOs it)
+        => string.IsNullOrWhiteSpace(it?.ServiceName) ? "(Không có tên)" : it.ServiceName;
+
+    string ImageOf(ReadCartItemDTOs it) => it?.ServiceImage ?? "";
+
+    decimal PriceOf(ReadCartItemDTOs it) => it?.ServicePrice ?? 0m;
+
+    // 👉 TÍNH THÀNH TIỀN: Giá dịch vụ + tổng giá tuỳ chọn
+    decimal LineTotalOf(ReadCartItemDTOs it)
     {
-        var t = it.GetType();
-        var p = t.GetProperty("Provider") ?? t.GetProperty("ProviderName") ?? t.GetProperty("SellerName");
-        var val = p?.GetValue(it) as string;
-        return string.IsNullOrWhiteSpace(val) ? "Khác" : val;
+        var basePrice = it?.ServicePrice ?? 0m;
+        var optTotal = it?.Options?.Sum(o => o?.Price ?? 0m) ?? 0m;
+        return basePrice + optTotal;
     }
 
-    // Chuỗi tóm tắt add-on: "Tên, Tên ×2"
-    string AddonSummary(IEnumerable<dynamic> list)
+    // 👉 TÓM TẮT TUỲ CHỌN TỪ DTO
+    string AddonSummary(List<CartItemOptionReadDto>? options)
     {
-        if (list == null) return "Chọn tuỳ chọn";
-        var items = new List<string>();
-        foreach (var a in list)
+        if (options == null || options.Count == 0) return "Chọn tuỳ chọn";
+        var parts = options.Select(o =>
         {
-            try
-            {
-                string name = a.Name as string ?? "";
-                string type = a.Type as string ?? "toggle";
-                int qty = 0; try { qty = Convert.ToInt32(a.Qty); } catch { }
-                items.Add(type == "qty" && qty > 0 ? $"{name} ×{qty}" : name);
-            }
-            catch { }
-        }
-        return items.Count == 0 ? "Chọn tuỳ chọn" : string.Join(", ", items);
+            var name = o?.OptionName ?? "";
+            var unit = o?.UnitType;
+            return string.IsNullOrWhiteSpace(unit) ? name : $"{name} ({unit})";
+        })
+        .Where(s => !string.IsNullOrWhiteSpace(s))
+        .ToList();
+
+        return parts.Count == 0 ? "Chọn tuỳ chọn" : string.Join(", ", parts);
+    }
+
+    // ✅ GỢI Ý THÊM: TẤT CẢ OPTION CỦA SERVICE (trừ option đã chọn)
+    IEnumerable<ReadServiceOptionDTOs> SuggestOptions(ReadCartItemDTOs it)
+    {
+        // ViewBag từ Controller: Dictionary<Guid, List<ReadServiceOptionDTOs>>
+        var dictByService = ViewBag.AvailableOptionsByServiceId as
+            System.Collections.Generic.Dictionary<Guid, System.Collections.Generic.List<ReadServiceOptionDTOs>>;
+
+        var src = (dictByService != null && dictByService.TryGetValue(it.ServiceId, out var list))
+            ? list
+            : new System.Collections.Generic.List<ReadServiceOptionDTOs>();
+
+        // Loại bỏ những option đã chọn (theo OptionId trong cart)
+        var picked = new System.Collections.Generic.HashSet<Guid>(
+            it?.Options?.Select(o => o.OptionId)
+            ?? System.Linq.Enumerable.Empty<Guid>());
+
+        return src.Where(o => !picked.Contains(o.OptionId));
     }
 }
 
@@ -44,13 +78,14 @@
     <link rel="stylesheet" href="~/css/Cart.css" asp-append-version="true" />
 }
 
+
 <section class="cart-page">
     <div class="cart-card">
         <header class="cart-header">
             <h2 class="cart-title">Giỏ hàng của bạn</h2>
             @if (!isEmpty)
             {
-                <span class="cart-count">@Model.Count item(s)</span>
+                <span class="cart-count">@list.Count item(s)</span>
             }
         </header>
 
@@ -99,71 +134,96 @@
 
                             @foreach (var it in g)
                             {
-                                // Available add-ons (gợi ý)
-                                var available = (it.GetType().GetProperty("AvailableAddOns")?.GetValue(it) as IEnumerable<dynamic>) ?? null;
-                                var picked = it.AddOns.Select(a => (string)a.Name)
-                                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                                var suggestions = available?.Where(a => !picked.Contains((string)a.Name)).ToList();
+                                var key = KeyOf(it);
+                                var name = NameOf(it);
 
-                                <article class="cart-item" data-group="@gId" data-key="@it.Key">
+                                // Ảnh với fallback
+                                var rawImage = ImageOf(it);
+                                var image = string.IsNullOrWhiteSpace(rawImage)
+                                ? fallbackImg
+                                : (rawImage.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                                ? rawImage
+                                : Url.Content(rawImage));
+
+                                var unitPrice = PriceOf(it);
+                                var options = it?.Options ?? new List<CartItemOptionReadDto>();
+                                var lineTotal = LineTotalOf(it);
+                                var suggestions = SuggestOptions(it).ToList(); // 🔥 quan trọng
+
+                                var detailsUrl = Url.Action("Details", "Services", new { id = it.ServiceId, area = "" });
+
+                                <article class="cart-item" data-group="@gId" data-key="@key">
                                     <!-- Cột 1: Dịch vụ -->
                                     <div class="cell-left">
                                         <label class="chk">
                                             <input class="chk-item" type="checkbox"
-                                                   data-key="@it.Key" data-group="@gId" data-linetotal="@it.LineTotal" />
+                                                   data-key="@key" data-group="@gId" data-linetotal="@lineTotal" />
                                         </label>
 
-                                        <img class="cart-thumb" src="@it.ImageUrl" alt="@it.Name"
-                                             onerror="this.classList.add('fallback');this.src='/images/placeholder.png'">
+                                        <!-- Ảnh bọc trong link -->
+                                        <a href="@detailsUrl" class="svc-link-img" title="@name">
+                                            <img class="cart-thumb"
+                                                 src="@image"
+                                                 alt="@name"
+                                                 onerror="this.onerror=null;this.classList.add('fallback');this.src='@fallbackImg'">
+                                        </a>
 
                                         <div class="cart-info">
-                                            <strong class="cart-name" title="@it.Name">@it.Name</strong>
+                                            <!-- Tên bọc trong link -->
+                                            <a href="@detailsUrl" class="cart-name" title="@name">
+                                                @name
+                                            </a>
+                                            <!-- Có thể thêm sub-info tại đây nếu cần -->
                                         </div>
                                     </div>
 
                                     <!-- Cột 2: Đơn giá -->
-                                    <div class="cell-price">@it.PriceValue.ToString("n0")₫</div>
+                                    <div class="cell-price">@unitPrice.ToString("n0")₫</div>
 
                                     <!-- Cột 3: Tuỳ chọn -->
                                     <div class="cell-addons">
                                         <button type="button"
                                                 class="opt-btn"
-                                                data-opt="@it.Key"
+                                                data-opt="@key"
                                                 aria-haspopup="dialog"
-                                                aria-controls="@($"opt_{it.Key}")"
+                                                aria-controls="@($"opt_{key}")"
                                                 aria-expanded="false">
                                             <span class="opt-label">Tuỳ chọn:</span>
-                                            <span class="opt-value" title="@AddonSummary(it.AddOns)">@AddonSummary(it.AddOns)</span>
+                                            <span class="opt-value" title="@AddonSummary(options)">@AddonSummary(options)</span>
                                             <span class="opt-caret">▾</span>
                                         </button>
 
                                         <!-- Panel (sẽ được "bốc" ra portal khi mở) -->
-                                        <div class="opt-panel" id="@($"opt_{it.Key}")" role="dialog" aria-modal="false" hidden>
+                                        <div class="opt-panel" id="@($"opt_{key}")" role="dialog" aria-modal="false" hidden>
                                             <!-- Đã chọn -->
                                             <div class="opt-section">
                                                 <div class="opt-title">Đã chọn</div>
-                                                @if (it.AddOns.Any())
+
+                                                @if (options.Any())
                                                 {
                                                     var i = 0;
-                                                    foreach (var a in it.AddOns)
+                                                    foreach (var a in options)
                                                     {
                                                         <div class="opt-row">
-                                                            <div class="opt-name">@a.Name</div>
-                                                            <div class="opt-controls">
-                                                                @if (a.Type == "qty")
+                                                            <div class="opt-name">
+                                                                <div>@a.OptionName</div>
+                                                                @if (!string.IsNullOrWhiteSpace(a.UnitType))
                                                                 {
-                                                                    <form asp-action="UpdateAddonQty" method="post" class="opt-qty" onsubmit="lockBtn(this)">
-                                                                        <input type="hidden" name="key" value="@it.Key" />
-                                                                        <input type="hidden" name="addon" value="@a.Name" />
-                                                                        <button type="button" class="opt-btn2" onclick="chgAddon('@it.Key','@a.Name','-')">−</button>
-                                                                        <input class="opt-input" id="@($"addon_{it.Key}_{i}")" name="qty" type="number" min="0" value="@a.Qty" />
-                                                                        <button type="button" class="opt-btn2" onclick="chgAddon('@it.Key','@a.Name','+')">+</button>
-                                                                    </form>
+                                                                    <div class="muted text-sm">@a.UnitType</div>
                                                                 }
+                                                                @if (!string.IsNullOrWhiteSpace(a.Description))
+                                                                {
+                                                                    <div class="muted text-sm">@a.Description</div>
+                                                                }
+                                                            </div>
+
+                                                            <div class="opt-controls">
                                                                 <span class="opt-price">+ @a.Price.ToString("n0")₫</span>
+
+                                                                <!-- Bỏ tuỳ chọn: dùng CartItemOptionId từ DTO thật -->
                                                                 <form asp-action="RemoveAddon" method="post" onsubmit="lockBtn(this)">
-                                                                    <input type="hidden" name="key" value="@it.Key" />
-                                                                    <input type="hidden" name="addon" value="@a.Name" />
+                                                                    <input type="hidden" name="cartItemId" value="@it.CartItemId" />
+                                                                    <input type="hidden" name="cartItemOptionId" value="@a.CartItemOptionId" />
                                                                     <button class="opt-remove" type="submit">Bỏ</button>
                                                                 </form>
                                                             </div>
@@ -177,38 +237,36 @@
                                                 }
                                             </div>
 
-                                            <!-- Gợi ý thêm -->
+                                            <!-- Gợi ý thêm: tất cả option thuộc service, trừ cái đã chọn -->
                                             @if (suggestions != null && suggestions.Any())
                                             {
                                                 <form asp-action="AddAddon" method="post" class="opt-section" onsubmit="lockBtn(this)">
                                                     <div class="opt-title">Thêm tuỳ chọn</div>
-                                                    <input type="hidden" name="key" value="@it.Key" />
+                                                    <input type="hidden" name="cartItemId" value="@it.CartItemId" />
+
                                                     @foreach (var s in suggestions)
                                                     {
-                                                        string sType = s.Type as string ?? "toggle";
-                                                        decimal sPrice; try { sPrice = Convert.ToDecimal(s.Price); } catch { sPrice = 0m; }
-
                                                         <label class="opt-row pickable">
                                                             <div class="opt-name">
-                                                                <input type="checkbox" name="names" value="@s.Name" />
-                                                                <span>@s.Name</span>
+                                                                <input type="checkbox" name="optionIds" value="@s.OptionId" />
+                                                                <span>
+                                                                    <strong>@s.OptionName</strong>
+                                                                    @(string.IsNullOrWhiteSpace(s.UnitType) ? "" : $"({s.UnitType})")
+                                                                </span>
+                                                                @if (!string.IsNullOrWhiteSpace(s.Description))
+                                                                {
+                                                                    <div class="muted small">@s.Description</div>
+                                                                }
                                                             </div>
                                                             <div class="opt-controls">
-                                                                @if (sType == "qty")
-                                                                {
-                                                                    <input class="opt-input" type="number" name='qty[@s.Name]' min="1" value="1" />
-                                                                }
-                                                                else
-                                                                {
-                                                                    <span class="opt-input muted">—</span>
-                                                                }
-                                                                <span class="opt-price">+ @sPrice.ToString("n0")₫</span>
+                                                                <span class="opt-price">+ @s.Price.ToString("n0")₫</span>
                                                             </div>
                                                         </label>
                                                     }
+
                                                     <div class="opt-actions">
                                                         <button type="submit" class="btn-primary sm">Thêm</button>
-                                                        <button type="button" class="btn-ghost sm" data-close="#@($"opt_{it.Key}")">Đóng</button>
+                                                        <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
                                                     </div>
                                                 </form>
                                             }
@@ -218,29 +276,35 @@
                                                     <div class="opt-title">Thêm tuỳ chọn</div>
                                                     <div class="opt-empty muted">Không còn tuỳ chọn nào khác.</div>
                                                     <div class="opt-actions">
-                                                        <button type="button" class="btn-ghost sm" data-close="#@($"opt_{it.Key}")">Đóng</button>
+                                                        <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
                                                     </div>
                                                 </div>
                                             }
                                         </div>
                                     </div>
 
-                                    <!-- Cột 4: Thành tiền -->
-                                    <div class="cell-total">@it.LineTotal.ToString("n0")₫</div>
+
+                                    <!-- ================== HẾT PHẦN TUỲ CHỌN ================== -->
+
+                                    <!-- Cột 4: Thành tiền (đã gồm tuỳ chọn) -->
+                                    <div class="cell-total">@lineTotal.ToString("n0")₫</div>
 
                                     <!-- Cột 5: Thao tác -->
                                     <div class="cell-action">
                                         <form asp-action="Remove" method="post" onsubmit="lockBtn(this)">
-                                            <input type="hidden" name="key" value="@it.Key" />
+                                            <input type="hidden" name="key" value="@key" />
                                             <button class="btn-link-danger" type="submit">Xoá</button>
                                         </form>
                                     </div>
                                 </article>
                             }
+
+                          
                         </section>
                     }
                 </div>
             </form>
+  
 
             <!-- Voucher + thanh toán dính dưới -->
             <div class="checkout-dock">

@@ -1,6 +1,6 @@
 ﻿
-using VHS_frontend.Models.ReviewDTOs;
-using VHS_frontend.Models.ServiceOptionDTOs;
+using VHS_frontend.Areas.Customer.Models.ReviewDTOs;
+using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
 
 namespace VHS_frontend.Models.ServiceDTOs
 {
@@ -18,6 +18,8 @@ namespace VHS_frontend.Models.ServiceDTOs
         public string? Images { get; set; }
         public DateTime? CreatedAt { get; set; }
         public string? Status { get; set; }
+
+        public string CategoryName { get; set; } = null!;
 
         // Tổng quan review của chính service này
         public int TotalReviews { get; set; }
