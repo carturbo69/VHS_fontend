@@ -119,7 +119,7 @@
             <!-- Nhóm theo Provider -->
             <form id="cartForm" asp-action="Checkout" asp-controller="Checkout" method="get">
                 <input type="hidden" name="selectedKeysCsv" id="selectedKeysCsv" />
-
+                <input type="hidden" name="voucherId" id="voucherId" />
                 <div class="cart-groups">
                     @for (int gi = 0; gi < groups.Count; gi++)
                     {
@@ -304,7 +304,7 @@
                     }
                 </div>
             </form>
-  
+
 
             <!-- Voucher + thanh toán dính dưới -->
             <div class="checkout-dock">
@@ -313,8 +313,30 @@
                         <span class="voucher-badge">🏷️ Voucher</span>
                         <span class="muted">Chọn/nhập mã để áp dụng</span>
                     </div>
-                    <button class="btn-ghost" type="button" disabled>Đang cập nhật</button>
+                    <button class="btn-ghost opt-btn" type="button" data-opt="voucher" aria-expanded="false">
+                        Chọn voucher
+                    </button>
                 </div>
+                <!-- input ẩn để submit mã -->
+                <input type="hidden" name="voucherCode" id="voucherCode" />
+
+                <!-- Panel voucher, sẽ được bốc lên PORTAL khi mở -->
+                <div id="opt_voucher" class="opt-panel" hidden aria-label="Danh sách voucher">
+                    <div class="opt-head">
+                        <h3>Voucher của bạn</h3>
+                        <button class="btn-ghost" type="button" data-close="#opt_voucher">Đóng</button>
+                    </div>
+
+                    <div class="opt-body">
+                        <div class="voucher-toolbar">
+                            <input id="voucherInput" class="input" placeholder="Nhập mã voucher..." />
+                            <button id="btnApplyTyped" class="btn" type="button">Áp dụng</button>
+                        </div>
+                        <div id="voucherList" class="voucher-list"></div>
+                        <div class="tiny muted">* Chỉ voucher còn hiệu lực và còn lượt dùng mới có thể áp dụng.</div>
+                    </div>
+                </div>
+
 
                 <div class="checkout-bar" role="region" aria-label="Tóm tắt thanh toán">
                     <div class="co-left">
@@ -347,9 +369,31 @@
 
 @section Scripts {
     <script>
-        /* ======= Tổng & checkbox ======= */
-        const fmt = n => (n || 0).toLocaleString('vi-VN') + '₫';
+        /* ====== Helpers ====== */
+        const VND = n => (n||0).toLocaleString('vi-VN') + '₫';
+        const voucherCodeHid = document.getElementById('voucherCode');
+        const voucherListEl  = document.getElementById('voucherList');
+        const voucherInputEl = document.getElementById('voucherInput');
+        const btnApplyTyped  = document.getElementById('btnApplyTyped');
 
+        // Lấy field theo cả PascalCase lẫn camelCase
+        const pick = (o, pascal, camel) => o?.[pascal] ?? o?.[camel];
+
+        let CURRENT_VOUCHER = null; // sẽ giữ object chuẩn hoá PascalCase
+
+        // Tính giảm giá theo % và trần MaxAmount (đọc cả 2 kiểu tên)
+        function calcDiscount(subtotal, v){
+          if(!v) return 0;
+          const pct = Number(pick(v, 'DiscountPercent', 'discountPercent') || 0);
+          const max = Number(pick(v, 'DiscountMaxAmount', 'discountMaxAmount') || 0);
+          if(pct <= 0 || subtotal <= 0) return 0;
+          const raw = Math.floor(subtotal * pct / 100);
+          const capped = max > 0 ? Math.min(raw, max) : raw;
+          return Math.max(0, Math.min(capped, subtotal));
+        }
+
+        /* ======= Tổng & checkbox (BASE) ======= */
+        const fmt = n => (n || 0).toLocaleString('vi-VN') + '₫';
         const selCount      = document.getElementById('selCount');
         const selSubtotal   = document.getElementById('selSubtotal');
         const selTotal      = document.getElementById('selTotal');
@@ -357,7 +401,8 @@
         const chkAll        = document.getElementById('chkAll');
         const chkAll_bottom = document.getElementById('chkAll_bottom');
 
-        function recalc(){
+        // Base tính giỏ: KHÔNG đụng đến voucher ở đây
+        function cartRecalc(){
           const items = [...document.querySelectorAll('.chk-item')];
           const sel = items.filter(i => i.checked);
           const count = sel.length;
@@ -382,8 +427,225 @@
 
           const allOn = items.every(i=>i.checked);
           const someOn = items.some(i=>i.checked);
-          [chkAll, chkAll_bottom].forEach(c=>{ c.indeterminate = !allOn && someOn; c.checked = allOn; });
+          [chkAll, chkAll_bottom].forEach(c=>{
+            if(!c) return;
+            c.indeterminate = !allOn && someOn;
+            c.checked = allOn;
+          });
         }
+
+        /* ======= Wrapper cộng voucher (ENTRY POINT) ======= */
+        function recalc(){
+          cartRecalc();
+
+          const items = [...document.querySelectorAll('.chk-item')];
+          const sel = items.filter(i => i.checked);
+          const subtotal = sel.reduce((s,i)=> s + parseFloat(i.dataset.linetotal||'0'), 0);
+
+          // tạo breakdown nếu chưa có
+          let breakdown = document.getElementById('voucherBreakdown');
+          if(!breakdown){
+            const coTotal = document.querySelector('.co-total');
+            if(!coTotal) return; // chưa có chỗ gắn → bỏ qua lượt này
+            const wrap = document.createElement('div');
+            wrap.id = 'voucherBreakdown';
+            wrap.className = 'muted tiny';
+            wrap.hidden = true;
+            wrap.style.display = 'none';
+            wrap.innerHTML = `
+              <div class="vb-info" id="voucherAppliedInfo"></div>
+              <div class="vb-right">
+                <strong id="voucherDiscount">-0₫</strong>
+                <button id="btnRemoveVoucher" type="button" class="btn-ghost btn-xs">Bỏ voucher</button>
+              </div>`;
+            coTotal.appendChild(wrap);
+            // bind lần đầu
+            wrap.querySelector('#btnRemoveVoucher').addEventListener('click', removeVoucher);
+            breakdown = wrap;
+          }
+
+          const voucherDiscountEl = document.getElementById('voucherDiscount');
+          const voucherAppliedInfoEl = document.getElementById('voucherAppliedInfo');
+
+          const discount = calcDiscount(subtotal, CURRENT_VOUCHER);
+          if(CURRENT_VOUCHER && discount > 0){
+            selTotal.textContent = VND(Math.max(0, subtotal - discount));
+            voucherDiscountEl.textContent = '-' + VND(discount);
+
+            const code = pick(CURRENT_VOUCHER,'Code','code') || '';
+            const pct  = Number(pick(CURRENT_VOUCHER,'DiscountPercent','discountPercent')||0);
+            const maxA = pick(CURRENT_VOUCHER,'DiscountMaxAmount','discountMaxAmount');
+            const end  = pick(CURRENT_VOUCHER,'EndDate','endDate');
+
+            voucherAppliedInfoEl.textContent =
+              `Mã ${code} • Giảm ${pct}%` +
+              (maxA ? ` (tối đa ${VND(Number(maxA))})` : '') +
+              (end  ? ` • HSD: ${new Date(end).toLocaleDateString('vi-VN')}` : '');
+
+            breakdown.hidden = false;
+            breakdown.style.display = '';
+          }else{
+            // không có/không hợp lệ → tính tổng như bình thường & ẩn breakdown
+            selTotal.textContent = VND(subtotal);
+            voucherDiscountEl.textContent = '-0₫';
+            voucherAppliedInfoEl.textContent = '';
+            breakdown.hidden = true;
+            breakdown.style.display = 'none';
+          }
+        }
+
+        /* ===== Voucher utils ===== */
+        function normalizeVoucher(o){
+          if(!o) return null;
+          return {
+            Code: pick(o,'Code','code') ?? '',
+            Description: pick(o,'Description','description') ?? '',
+            DiscountPercent: Number(pick(o,'DiscountPercent','discountPercent') || 0),
+            DiscountMaxAmount: Number(pick(o,'DiscountMaxAmount','discountMaxAmount') || 0),
+            StartDate: pick(o,'StartDate','startDate') ?? null,
+            EndDate: pick(o,'EndDate','endDate') ?? null,
+            IsActive: !!pick(o,'IsActive','isActive'),
+            UsageLimit: pick(o,'UsageLimit','usageLimit'),
+            UsedCount: Number(pick(o,'UsedCount','usedCount') || 0),
+            RemainingUses: pick(o,'RemainingUses','remainingUses'),
+            IsUnlimited: !!pick(o,'IsUnlimited','isUnlimited'),
+            IsExpired: !!pick(o,'IsExpired','isExpired'),
+            IsUpcoming: !!pick(o,'IsUpcoming','isUpcoming'),
+            CanUseNow: !!pick(o,'CanUseNow','canUseNow'),
+          };
+        }
+
+        function setVoucher(v){
+          CURRENT_VOUCHER = normalizeVoucher(v);
+          if (voucherCodeHid) voucherCodeHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.Code || '') : '';
+
+          // reset input gõ tay nếu bỏ voucher
+          if(!CURRENT_VOUCHER && voucherInputEl) voucherInputEl.value = '';
+
+          // đánh dấu đang dùng trong list nếu panel còn mở
+          if (voucherListEl) {
+            voucherListEl.querySelectorAll('[data-code]').forEach(btn=>{
+              const c = btn.getAttribute('data-code') || '';
+              const isUsing = !!CURRENT_VOUCHER && (CURRENT_VOUCHER.Code === c);
+              btn.textContent = isUsing ? 'Đang dùng' : 'Sử dụng';
+              btn.classList.toggle('btn-primary', !isUsing);
+              btn.classList.toggle('btn-ghost', isUsing);
+              btn.disabled = isUsing ? false : btn.disabled; // vẫn cho đổi sang mã khác
+            });
+          }
+
+          recalc(); // tạm tính lại
+        }
+
+        function removeVoucher(){
+          setVoucher(null);
+          // dọn UI đề phòng CSS đè
+          const breakdownEl = document.getElementById('voucherBreakdown');
+          const voucherDiscountEl = document.getElementById('voucherDiscount');
+          const voucherAppliedInfoEl = document.getElementById('voucherAppliedInfo');
+          if (breakdownEl){
+            if (voucherDiscountEl) voucherDiscountEl.textContent = '-0₫';
+            if (voucherAppliedInfoEl) voucherAppliedInfoEl.textContent = '';
+            breakdownEl.hidden = true;
+            breakdownEl.style.display = 'none';
+          }
+        }
+
+        /* ===== Fetch + render danh sách voucher ===== */
+        async function loadVouchers(){
+          if (!voucherListEl) return;
+          voucherListEl.innerHTML = '<div class="muted">Đang tải voucher...</div>';
+          try{
+            const res = await fetch('@Url.Action("GetCartVouchers", "Cart", new { area = "Customer" })', { credentials:'same-origin' });
+            if(!res.ok) throw new Error('HTTP '+res.status);
+            const list = await res.json(); // []ReadVoucherByCustomerDTOs (camelCase từ server)
+            renderVouchers(list || []);
+          }catch(e){
+            voucherListEl.innerHTML = '<div class="error">Không thể tải voucher.</div>';
+          }
+        }
+
+        function renderVouchers(list){
+          if(!voucherListEl) return;
+          if(!list.length){ voucherListEl.innerHTML = '<div class="muted">Bạn chưa có voucher nào.</div>'; return; }
+
+          voucherListEl.innerHTML = list.map(v=>{
+            const code   = pick(v,'Code','code') || '';
+            const desc   = pick(v,'Description','description') ?? '';
+            const pct    = Number(pick(v,'DiscountPercent','discountPercent') || 0);
+            const maxAmt = Number(pick(v,'DiscountMaxAmount','discountMaxAmount') || 0);
+            const start  = pick(v,'StartDate','startDate');
+            const end    = pick(v,'EndDate','endDate');
+
+            const isExp  = !!pick(v,'IsExpired','isExpired');
+            const canUse = !!pick(v,'CanUseNow','canUseNow');
+            const isUnl  = !!pick(v,'IsUnlimited','isUnlimited');
+            const rem    = pick(v,'RemainingUses','remainingUses');
+            const used   = Number(pick(v,'UsedCount','usedCount') || 0);
+            const limit  = pick(v,'UsageLimit','usageLimit');
+
+            const usable = canUse && !isExp && (isUnl || (rem ?? 0) > 0);
+            const benefit = `${pct}%` + (maxAmt ? ` • tối đa ${VND(maxAmt)}` : '');
+            const limitTxt = isUnl ? 'Không giới hạn'
+              : `Còn ${rem ?? Math.max(0, (limit||0) - used)} lượt`;
+            const dateTxt = [
+              start ? `Từ ${new Date(start).toLocaleDateString('vi-VN')}` : '',
+              end   ? `đến ${new Date(end).toLocaleDateString('vi-VN')}`   : ''
+            ].filter(Boolean).join(' ');
+
+            const isUsing = !!CURRENT_VOUCHER && CURRENT_VOUCHER.Code === code;
+
+            return `
+              <div class="voucher-item">
+                <div class="row">
+                  <div class="col">
+                    <div class="code">Mã: <strong>${code}</strong></div>
+                    <div class="desc">${desc}</div>
+                    <div class="tiny muted">
+                      <span>${benefit}</span> • <span>${limitTxt}</span>${dateTxt? ` • <span>${dateTxt}</span>`:''}
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn ${isUsing?'btn-ghost':'btn-primary'}" type="button"
+                      data-code="${code}" ${usable?'':'disabled'}>${isUsing?'Đang dùng':'Sử dụng'}</button>
+                  </div>
+                </div>
+              </div>`;
+          }).join('');
+
+          // bind “Sử dụng”
+          voucherListEl.querySelectorAll('button[data-code]').forEach(btn=>{
+            btn.addEventListener('click', ()=>{
+              const code = btn.getAttribute('data-code');
+              const raw = list.find(x => pick(x,'Code','code') === code);
+              if(!raw) return;
+              setVoucher(raw); // lưu tạm + recalc
+              // đóng panel
+              const closer = document.querySelector('[data-close="#opt_voucher"]');
+              if(closer) closer.click();
+            });
+          });
+        }
+
+        /* ===== Nhập tay mã voucher ===== */
+        if(btnApplyTyped){
+          btnApplyTyped.addEventListener('click', ()=>{
+            const code = (voucherInputEl?.value || '').trim();
+            if(!code) return;
+            // set tạm để server validate khi submit
+            setVoucher({ code, discountPercent: 0, discountMaxAmount: 0 });
+            const closer = document.querySelector('[data-close="#opt_voucher"]');
+            if(closer) closer.click();
+          });
+        }
+
+        /* ===== Mở panel → load danh sách ===== */
+        document.addEventListener('click', (e)=>{
+          const btn = e.target.closest('.opt-btn[data-opt="voucher"]');
+          if(btn){ loadVouchers(); }
+        });
+
+        /* ======= Checkbox binding ======= */
         document.querySelectorAll('.chk-item').forEach(el => el.addEventListener('change', recalc));
         document.querySelectorAll('.chk-prov').forEach(ch=>{
           ch.addEventListener('change', ()=>{
@@ -393,10 +655,13 @@
           });
         });
         const bindAll = el=>{
+          if(!el) return;
           el.addEventListener('change', ()=>{
             document.querySelectorAll('.chk-item').forEach(i=> i.checked = el.checked);
             document.querySelectorAll('.chk-prov').forEach(i=>{ i.indeterminate=false; i.checked=el.checked; });
-            (el===chkAll? chkAll_bottom:chkAll).checked = el.checked;
+            if (chkAll && chkAll_bottom){
+              (el===chkAll? chkAll_bottom:chkAll).checked = el.checked;
+            }
             recalc();
           });
         };
@@ -425,7 +690,7 @@
           if(btn){ btn.disabled = true; btn.classList.add('is-loading'); }
         }
 
-        /* ========= Tuỳ chọn dùng PORTAL + MASK (anti-jitter, top-most) ========= */
+        /* ========= Tuỳ chọn dùng PORTAL + MASK ========= */
         let OPEN   = null;   // { btn, panel, parent, next }
         let PORTAL = null;   // div cố định trên body
         let MASK   = null;   // mask trong suốt
@@ -544,4 +809,5 @@
         // init
         recalc();
     </script>
+
 }

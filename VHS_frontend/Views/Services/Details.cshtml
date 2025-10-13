@@ -67,7 +67,6 @@
                                 }
                                 else
                                 {
-                                    // Không có ảnh -> render 3 thumbnail fallback theo UnitType
                                     var thumb = fallbackMain;
                                     for (int i = 0; i < 3; i++)
                                     {
@@ -86,10 +85,10 @@
 
                         <span class="stars">
                             @{
-                                var avg = Model.AverageRating; // 0..5 có phần lẻ
+                                var avg = Model.AverageRating;
                                 for (int s = 1; s <= 5; s++)
                                 {
-                                    var fill = Math.Max(0, Math.Min(1, avg - (s - 1))); // 0..1
+                                    var fill = Math.Max(0, Math.Min(1, avg - (s - 1)));
                                     var pct = (int)Math.Round(fill * 100);
                                     if (pct >= 100)
                                     {
@@ -113,15 +112,16 @@
                         </span>
                         <span class="rating-text">@Model.AverageRating.ToString("0.#") / 5 (@Model.TotalReviews đánh giá)</span>
 
-                        <div class="price">@string.Format("{0:#,0}đ", Model.Price) @if(!string.IsNullOrWhiteSpace(Model.UnitType)){
-                        <text>/ @Model.UnitType</text>
-                                                }
-                    </div>
+                        <div class="price">
+                            @string.Format("{0:#,0}đ", Model.Price)
+                            @if (!string.IsNullOrWhiteSpace(Model.UnitType))
+                            {
+                                <text>/ @Model.UnitType</text>
+                            }
+                        </div>
 
                         <ul class="brief">
-                            <li>
-                                <strong>Loại:</strong> @Model.CategoryName
-                            </li>
+                            <li><strong>Loại:</strong> @Model.CategoryName</li>
                             <li>
                                 <strong>Thời gian:</strong>
                                 @if (Model.BaseUnit.HasValue)
@@ -130,55 +130,61 @@
                                 }
                                 else
                                 {
+
                                     @Model.UnitType
                                 }
                             </li>
                         </ul>
 
-
-                        @if (Model.ServiceOptions?.Any() == true)
-                        {
-                            <section class="svc-options">
-                                <h3 class="addons-title">Tuỳ chọn thêm</h3>
-                                <div class="addons-list">
-                                    @foreach (var o in Model.ServiceOptions)
-                                    {
-                                        <div class="addon-item option-select-box" style="position: relative;">
-                                            <!-- Checkbox ở góc trên bên phải -->
-                                            <input type="checkbox"
-                                                   name="selectedOptions"
-                                                   value="@o.OptionId"
-                                                   class="option-checkbox"
-                                                   style="position: absolute; top: 8px; right: 8px; transform: scale(1.2);" />
-
-                                            <div class="option-body">
-                                                <div class="option-head">
-                                                    <div class="addon-name">@o.OptionName</div>
-                                                    <div class="addon-price">
-                                                        @string.Format("{0:#,0}đ / {1}", o.Price, o.UnitType)
-                                                    </div>
-                                                </div>
-
-                                                @if (!string.IsNullOrWhiteSpace(o.Description))
-                                                {
-                                                    <div class="addon-desc">@o.Description</div>
-                                                }
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
-                            </section>
-                        }
-
-                        <form asp-area="Customer" asp-controller="Cart" asp-action="AddToCart" method="post" id="cartForm">
+                        <!-- CHỈ CÒN 1 KHỐI TÙY CHỌN BÊN TRONG FORM -->
+                        <form asp-area="Customer"
+                              asp-controller="Cart"
+                              asp-action="AddToCart"
+                              method="post"
+                              id="cartForm">
+                            @Html.AntiForgeryToken()
                             <input type="hidden" name="serviceId" value="@Model.ServiceId" />
-                            <input type="hidden" name="name" value="@Model.Title" />
-                            <input type="hidden" name="priceValue" value="@Model.Price" />
-                            <input type="hidden" name="imageUrl" value="@(imgs.FirstOrDefault() ?? "")" />
-                            <input type="hidden" name="quantity" value="1" />
+
+                            @if (Model.ServiceOptions?.Any() == true)
+                            {
+                                <section class="svc-options">
+                                    <h3 class="addons-title">Tuỳ chọn thêm</h3>
+                                    <div class="addons-list">
+                                        @foreach (var o in Model.ServiceOptions)
+                                        {
+                                            <div class="addon-item option-select-box" style="position: relative;">
+                                                <!-- Đặt name=optionIds để binder map vào List<Guid>? optionIds -->
+                                                <input type="checkbox"
+                                                       name="optionIds"
+                                                       value="@o.OptionId"
+                                                       class="option-checkbox"
+                                                       style="position: absolute; top: 8px; right: 8px; transform: scale(1.2);" />
+
+                                                <div class="option-body">
+                                                    <div class="option-head">
+                                                        <div class="addon-name">@o.OptionName</div>
+                                                        <div class="addon-price">
+                                                            @string.Format("{0:#,0}đ / {1}", o.Price, o.UnitType)
+                                                        </div>
+                                                    </div>
+                                                    @if (!string.IsNullOrWhiteSpace(o.Description))
+                                                    {
+                                                        <div class="addon-desc">@o.Description</div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </section>
+                            }
+
                             <div class="actions">
                                 <button type="submit" class="btn btn-cart">Thêm vào giỏ hàng</button>
-                                <button type="submit" class="btn btn-buy">Mua ngay</button>
+                                <button type="submit"
+                                        class="btn btn-buy"
+                                        formaction="@(Url.Action("BuyNow","Checkout", new { area="Customer" }))">
+                                    Mua ngay
+                                </button>
                             </div>
                         </form>
 
@@ -190,6 +196,7 @@
                     </div>
                 </div>
             </div>
+
         </div>
 
 

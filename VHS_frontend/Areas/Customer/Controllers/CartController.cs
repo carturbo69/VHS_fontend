@@ -19,6 +19,30 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         /// <summary>
+        /// Gọi API lấy danh sách voucher trong giỏ hàng (dành cho khách hàng).
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetCartVouchers()
+        {
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+
+                var vouchers = await _cartService.GetCartVouchersAsync(jwtToken);
+
+                return Ok(vouchers);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Đã xảy ra lỗi khi lấy voucher", error = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Lấy tổng số dịch vụ trong giỏ hàng (CartItem Count)
         /// </summary>
         [HttpGet]
@@ -43,42 +67,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Json(new { total = 0 });
             }
         }
-
-
-        //public async Task<IActionResult> Index()
-        //{
-        //    // Lấy AccountID & Token từ Session (đã set sau khi Login)
-        //    var accountIdStr = HttpContext.Session.GetString("AccountID");
-        //    var jwt = HttpContext.Session.GetString("JWToken");
-
-        //    if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
-        //    {
-        //        TempData["ToastType"] = "warning";
-        //        TempData["ToastMessage"] = "Vui lòng đăng nhập để xem giỏ hàng.";
-        //        return RedirectToAction("Login", "Account", new { area = "" });
-        //    }
-
-        //    try
-        //    {
-        //        var items = await _cartService.GetCartItemsByAccountIdAsync(accountId, jwt);
-        //        return View(items); // Model: List<ReadCartItemDTOs>
-        //    }
-        //    catch (UnauthorizedAccessException)
-        //    {
-        //        // Hết hạn token -> bắt đăng nhập lại
-        //        HttpContext.Session.Clear();
-        //        TempData["ToastType"] = "warning";
-        //        TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
-        //        return RedirectToAction("Login", "Account", new { area = "" });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        // Lỗi khác
-        //        TempData["ToastType"] = "error";
-        //        TempData["ToastMessage"] = $"Không thể tải giỏ hàng: {ex.Message}";
-        //        return View(new System.Collections.Generic.List<ReadCartItemDTOs>());
-        //    }
-        //}
 
         public async Task<IActionResult> Index()
         {
@@ -127,23 +115,61 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
 
-        // ===== Thêm vào giỏ (DUY NHẤT action này, POST) =====
+        /// <summary>
+        /// Thêm service vào giỏ hàng (POST)
+        /// </summary>
         [HttpPost]
-        public IActionResult AddToCart(
-            int id,
-            string name,
-            int priceValue,
-            int quantity,
-            string? imageUrl,
-            int[]? addonId,
-            string[]? addonName,
-            string[]? addonType,   // "check" | "qty"
-            int[]? addonPrice,
-            int[]? addonQty
-        )
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddToCart(Guid serviceId, List<Guid>? optionIds)
         {
-          
-            return RedirectToAction(nameof(Index));
+            // Lấy accountId & token từ Session
+            var accountIdStr = HttpContext.Session.GetString("AccountID");
+            var jwtToken = HttpContext.Session.GetString("JWToken");
+
+            if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+            {
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Vui lòng đăng nhập để thêm vào giỏ.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            try
+            {
+                var req = new AddCartItemRequest
+                {
+                    ServiceId = serviceId,
+                    OptionIds = optionIds ?? new List<Guid>()
+                };
+
+                var ok = await _cartService.AddItemToCartAsync(accountId, req, jwtToken);
+
+                if (!ok)
+                {
+                    TempData["ToastType"] = "error";
+                    TempData["ToastMessage"] = "Thêm vào giỏ hàng thất bại.";
+                }
+                else
+                {
+                    TempData["ToastType"] = "success";
+                    TempData["ToastMessage"] = "Đã thêm vào giỏ hàng.";
+                }
+
+                // Điều hướng về trang giỏ (tuỳ ý bạn đổi nơi quay lại)
+                return RedirectToAction(nameof(Index));
+            }
+            catch (UnauthorizedAccessException)
+            {
+                HttpContext.Session.Clear();
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastType"] = "error";
+                TempData["ToastMessage"] = $"Không thể thêm vào giỏ: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
         }
 
         // ===== Cập nhật / Xoá =====
@@ -166,6 +192,28 @@ namespace VHS_frontend.Areas.Customer.Controllers
             
             return RedirectToAction(nameof(Index));
         }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ApplyVoucher([FromBody] dynamic dto)
+        {
+            string code = dto?.code;
+            if (string.IsNullOrWhiteSpace(code))
+                return BadRequest(new { ok = false, message = "Thiếu mã" });
+
+            // TODO: validate code qua service (thời hạn, lượt, …)
+            // HttpContext.Session.SetString("APPLIED_VOUCHER_CODE", code);
+            return Json(new { ok = true });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult RemoveVoucher()
+        {
+            // HttpContext.Session.Remove("APPLIED_VOUCHER_CODE");
+            return Json(new { ok = true });
+        }
+
     }
 }
 
