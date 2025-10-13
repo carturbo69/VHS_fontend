@@ -5,10 +5,8 @@
         public Guid CertificateId { get; set; }
         public Guid CategoryId { get; set; }
         public string? Description { get; set; }
-        /// <summary>
-        /// JSON string (array of urls) trả từ API.
-        /// FE có thể deserialize sang List&lt;string&gt; nếu cần.
-        /// </summary>
+
+        // JSON string: ["url1","url2",...]
         public string? Images { get; set; }
     }
 }

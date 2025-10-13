@@ -55,22 +55,21 @@ namespace VHS_frontend.Services.Customer
             using var content = new MultipartFormDataContent();
             string Get(string key) => request.Form[key].FirstOrDefault() ?? string.Empty;
 
-            // Nếu đang re-submit trên ID cũ (khi bị Rejected), form sẽ có hidden input "ProviderId"
-            var providerIdHidden = Get("ProviderId");
-            if (!string.IsNullOrWhiteSpace(providerIdHidden))
-            {
-                // Gửi lên API để xử lý update trên ID cũ
-                content.Add(new StringContent(providerIdHidden), "PROVIDERID");
-            }
+            // BE không còn yêu cầu PROVIDERID khi resubmit — tạo mới sau khi tự xóa hồ sơ Rejected gần nhất
 
-            // Text
-            content.Add(new StringContent(Get("ProviderName")), "PROVIDERNAME");
-            content.Add(new StringContent(Get("PhoneNumber")), "PHONENUMBER");
-            content.Add(new StringContent(Get("Description")), "DESCRIPTION");
+            // Text (trim + optional phone)
+            var providerName = Get("ProviderName").Trim();
+            var phoneNumber = Get("PhoneNumber").Trim();
+            var description = Get("Description");
+
+            content.Add(new StringContent(providerName), "PROVIDERNAME");
+            if (!string.IsNullOrWhiteSpace(phoneNumber))
+                content.Add(new StringContent(phoneNumber), "PHONENUMBER");
+            content.Add(new StringContent(description), "DESCRIPTION");
 
             // Terms & Insurance (gộp)
-            content.Add(new StringContent(Get("TermsInsurance.Title")), "TERMSINSURANCE.TITLE");
-            content.Add(new StringContent(Get("TermsInsurance.Description")), "TERMSINSURANCE.DESCRIPTION");
+            content.Add(new StringContent(Get("TermsInsurance.Title").Trim()), "TERMSINSURANCE.TITLE");
+            content.Add(new StringContent(Get("TermsInsurance.Description").Trim()), "TERMSINSURANCE.DESCRIPTION");
 
             // Avatar (1 ảnh)
             if (request.Form.Files["ProfileImage"] is IFormFile avatar && avatar.Length > 0)
@@ -115,23 +114,84 @@ namespace VHS_frontend.Services.Customer
             var res = await _http.PostAsync("/api/register-provider", content, ct);
             var payload = await res.Content.ReadAsStringAsync(ct);
 
+
+            var body = await res.Content.ReadAsStringAsync(ct);
+
             if (!res.IsSuccessStatusCode)
             {
                 string msg = $"API {res.StatusCode}";
+                List<ApiErrorItem>? errs = null;
                 try
                 {
-                    using var doc = JsonDocument.Parse(payload);
-                    if (doc.RootElement.TryGetProperty("Message", out var m))
-                        msg = m.GetString() ?? msg;
+                    using var doc = JsonDocument.Parse(body);
+                    if (doc.RootElement.TryGetProperty("message", out var p1)) msg = p1.GetString() ?? msg;
+                    else if (doc.RootElement.TryGetProperty("Message", out var p2)) msg = p2.GetString() ?? msg;
+                    if (doc.RootElement.TryGetProperty("Errors", out var arr) && arr.ValueKind == JsonValueKind.Array)
+                    {
+                        errs = new List<ApiErrorItem>();
+                        foreach (var it in arr.EnumerateArray())
+                        {
+                            errs.Add(new ApiErrorItem
+                            {
+                                Field = it.TryGetProperty("Field", out var f) ? f.GetString() : null,
+                                Code = it.TryGetProperty("Code", out var c) ? c.GetString() : null,
+                                Message = it.TryGetProperty("Message", out var mm) ? (mm.GetString() ?? string.Empty) : string.Empty
+                            });
+                        }
+                    }
                 }
-                catch { /* ignore */ }
+                catch { if (!string.IsNullOrWhiteSpace(body)) msg = body; }
 
-                return new RegisterResultVm { Success = false, Message = msg, Raw = payload };
+                return new RegisterResultVm { Success = false, Message = msg, Errors = errs, Raw = body, StatusCode = (int)res.StatusCode };
             }
 
-            // LƯU Ý: dùng UPPERCASE đúng với Controller bạn đang xài
-            var data = JsonSerializer.Deserialize<RegisterProviderResponseDTO>(payload, _json);
-            return new RegisterResultVm { Success = true, Message = "Đăng ký thành công", Response = data!, Raw = payload };
+            // ======= THÀNH CÔNG: bóc JSON case-insensitive + fallback =======
+            try
+            {
+                using var ok = JsonDocument.Parse(body);
+
+                // id (nhận cả PROVIDERID và ProviderId)
+                Guid id = Guid.Empty;
+                if (ok.RootElement.TryGetProperty("PROVIDERID", out var pId) && pId.ValueKind == JsonValueKind.String)
+                    id = pId.GetGuid();
+                else if (ok.RootElement.TryGetProperty("ProviderId", out var pId2) && pId2.ValueKind == JsonValueKind.String)
+                    id = pId2.GetGuid();
+
+                // status (nhận cả STATUS và Status; fallback "Pending")
+                string status = "Pending";
+                if (ok.RootElement.TryGetProperty("STATUS", out var pSt) && pSt.ValueKind == JsonValueKind.String)
+                    status = pSt.GetString() ?? "Pending";
+                else if (ok.RootElement.TryGetProperty("Status", out var pSt2) && pSt2.ValueKind == JsonValueKind.String)
+                    status = pSt2.GetString() ?? "Pending";
+
+                // Tự tạo DTO trả về cho controller để không bị undefined
+                var resp = new RegisterProviderResponseDTO
+                {
+                    // nếu DTO của bạn dùng property UPPERCASE thì gán vào đúng tên;
+                    // nếu DTO dùng camelCase thì đổi tên thuộc tính cho khớp
+                    PROVIDERID = id,
+                    STATUS = status
+                };
+
+                return new RegisterResultVm
+                {
+                    Success = true,
+                    Message = "Đăng ký thành công",
+                    Response = resp,
+                    Raw = body,
+                    StatusCode = 200
+                };
+            }
+            catch
+            {
+                // Fallback nữa: nếu parse lỗi, ít nhất trả Pending cho chắc
+                var resp = new RegisterProviderResponseDTO
+                {
+                    PROVIDERID = Guid.Empty, // controller vẫn redirect; nhưng bạn có thể log Raw để kiểm tra
+                    STATUS = "Pending"
+                };
+                return new RegisterResultVm { Success = true, Message = "Đăng ký thành công", Response = resp, Raw = body, StatusCode = 200 };
+            }
         }
 
         // ===== VM =====
@@ -140,7 +200,16 @@ namespace VHS_frontend.Services.Customer
             public bool Success { get; set; }
             public string Message { get; set; } = "";
             public RegisterProviderResponseDTO? Response { get; set; }
+            public List<ApiErrorItem>? Errors { get; set; }
             public string Raw { get; set; } = "";
+            public int StatusCode { get; set; }
+        }
+
+        public sealed class ApiErrorItem
+        {
+            public string? Field { get; set; }
+            public string? Code { get; set; }
+            public string Message { get; set; } = string.Empty;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Services.Admin;
 
 namespace VHS_frontend.Areas.Admin.Controllers
@@ -46,11 +47,52 @@ namespace VHS_frontend.Areas.Admin.Controllers
             if (dto == null)
                 return RedirectToAction(nameof(Index));
 
-            // Cách A: nạp map CategoryId -> Name cho View
+            // ===== helper build absolute URL từ Request
+            static string MakeAbs(HttpRequest req, string? u)
+            {
+                if (string.IsNullOrWhiteSpace(u)) return string.Empty;
+
+                // đã absolute thì giữ nguyên
+                if (Uri.TryCreate(u, UriKind.Absolute, out _)) return u;
+
+                // ghép scheme://host[:port][/pathbase]/relative
+                var scheme = req.Scheme;           // http/https
+                var host = req.Host.ToUriComponent();
+                var basePath = req.PathBase.HasValue ? req.PathBase.Value!.TrimEnd('/') : string.Empty;
+
+                var relative = u.TrimStart('/');
+                return $"{scheme}://{host}{basePath}/{relative}";
+            }
+
+            // 1) Avatar → absolute
+            dto.Images = MakeAbs(Request, dto.Images);
+
+            // 2) Certificate images (JSON string) → absolute rồi serialize lại
+            foreach (var c in dto.Certificates)
+            {
+                if (string.IsNullOrWhiteSpace(c.Images))
+                {
+                    c.Images = "[]";
+                    continue;
+                }
+
+                try
+                {
+                    var list = JsonSerializer.Deserialize<List<string>>(c.Images) ?? new();
+                    var abs = list.Select(x => MakeAbs(Request, x)).ToList();
+                    c.Images = JsonSerializer.Serialize(abs);
+                }
+                catch
+                {
+                    c.Images = "[]"; // JSON lỗi thì cho rỗng để view không vỡ
+                }
+            }
+
+            // Map CategoryId -> Name
             var cats = await _catSvc.GetAllAsync(includeDeleted: false, ct);
             ViewBag.CatMap = cats.ToDictionary(x => x.CategoryId, x => x.Name);
 
-            return View(dto);        // Views/AdminRegisterProvider/Detail.cshtml
+            return View(dto);
         }
 
         [HttpPost]

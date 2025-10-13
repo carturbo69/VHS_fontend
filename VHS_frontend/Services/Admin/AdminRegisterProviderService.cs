@@ -33,8 +33,51 @@ namespace VHS_frontend.Services.Admin
         {
             var res = await _http.GetAsync($"/api/admin/register-providers/{id}", ct);
             if (!res.IsSuccessStatusCode) return null;
-            return await res.Content.ReadFromJsonAsync<AdminProviderDetailDTO>(_json, ct);
+
+            var dto = await res.Content.ReadFromJsonAsync<AdminProviderDetailDTO>(_json, ct);
+            if (dto == null) return null;
+
+            // ===== helper: build absolute bằng API base (HttpClient.BaseAddress)
+            string MakeAbs(string? u)
+            {
+                if (string.IsNullOrWhiteSpace(u)) return string.Empty;
+                if (Uri.TryCreate(u, UriKind.Absolute, out _)) return u;        // đã absolute
+                var baseUri = _http.BaseAddress ?? new Uri("http://localhost:5154/");
+                // chuẩn hóa slash để tránh // hoặc \\
+                var rel = u.Replace('\\', '/').TrimStart('/');
+                return new Uri(baseUri, rel).ToString();
+            }
+
+            // 1) Avatar → absolute theo API base
+            if (!string.IsNullOrWhiteSpace(dto.Images))
+                dto.Images = MakeAbs(dto.Images);
+
+            // 2) Certificate images (JSON string) → absolute rồi serialize lại
+            foreach (var c in dto.Certificates)
+            {
+                if (string.IsNullOrWhiteSpace(c.Images))
+                {
+                    c.Images = "[]";
+                    continue;
+                }
+
+                try
+                {
+                    var list = JsonSerializer.Deserialize<List<string>>(c.Images) ?? new();
+                    // normalize & make absolute từng phần tử
+                    var abs = list.Select(MakeAbs).ToList();
+                    c.Images = JsonSerializer.Serialize(abs);
+                }
+                catch
+                {
+                    c.Images = "[]";
+                }
+            }
+
+            return dto;
         }
+
+
 
         public async Task<bool> ApproveAsync(Guid id, CancellationToken ct = default)
         {

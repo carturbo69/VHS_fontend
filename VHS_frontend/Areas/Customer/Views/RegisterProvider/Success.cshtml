@@ -1,13 +1,23 @@
 ﻿@{
     ViewData["Title"] = "Đăng ký Provider - Thành công";
     Layout = "~/Views/Shared/_Layout.cshtml";
+
     var providerId = (Guid)(ViewBag.ProviderId ?? Guid.Empty);
     var statusRaw = (string)(ViewBag.Status ?? "Pending");
 
-    // Map hiển thị: Pending -> Đang chờ phê duyệt
-    var statusDisplay = string.Equals(statusRaw, "Pending", StringComparison.OrdinalIgnoreCase)
-        ? "Đang chờ phê duyệt"
-        : statusRaw;
+    string statusDisplay = statusRaw?.ToLower() switch
+    {
+        "approved" => "Đã phê duyệt",
+        "rejected" => "Bị từ chối",
+        _ => "Đang chờ phê duyệt"
+    };
+
+    string badgeClass = statusRaw?.ToLower() switch
+    {
+        "approved" => "badge ok",
+        "rejected" => "badge rej",
+        _ => "badge pending"
+    };
 }
 @section Styles {
     <link rel="stylesheet" href="~/css/register-provider.css" asp-append-version="true" />
@@ -28,7 +38,7 @@
         <div class="su-kv">
             <div class="k">Trạng thái:</div>
             <div class="v">
-                <span class="badge pending">@statusDisplay</span>
+                <span class="@badgeClass">@statusDisplay</span>
             </div>
         </div>
 

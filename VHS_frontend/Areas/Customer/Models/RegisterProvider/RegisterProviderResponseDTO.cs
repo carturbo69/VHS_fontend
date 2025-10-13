@@ -3,6 +3,6 @@
     public class RegisterProviderResponseDTO
     {
         public Guid PROVIDERID { get; set; }
-        public string STATUS { get; set; } = "";
+        public string STATUS { get; set; } = "Pending";
     }
 }
