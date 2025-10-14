@@ -1,813 +1,892 @@
-﻿@using VHS_frontend.Areas.Customer.Models.CartItemDTOs
-@using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs
-@model List<ReadCartItemDTOs>
+﻿    @using VHS_frontend.Areas.Customer.Models.CartItemDTOs
+    @using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs
+    @model List<ReadCartItemDTOs>
 
-@{
-    ViewData["Title"] = "Giỏ hàng";
-    Layout = "~/Views/Shared/_Layout.cshtml";
+    @{
+        ViewData["Title"] = "Giỏ hàng";
+        Layout = "~/Views/Shared/_Layout.cshtml";
 
-    var list = Model ?? new List<ReadCartItemDTOs>();
-    var isEmpty = !list.Any();
-    var groups = isEmpty
-        ? new List<IGrouping<string, ReadCartItemDTOs>>()
-        : list.GroupBy(i => ProviderOf(i)).ToList();
+        var list = Model ?? new List<ReadCartItemDTOs>();
+        var isEmpty = !list.Any();
+        var groups = isEmpty
+            ? new List<IGrouping<string, ReadCartItemDTOs>>()
+            : list.GroupBy(i => ProviderOf(i)).ToList();
 
-    var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+        var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 
 
-}
-
-@functions {
-    string ProviderOf(ReadCartItemDTOs it)
-        => string.IsNullOrWhiteSpace(it?.ProviderName) ? "Khác" : it.ProviderName;
-
-    string KeyOf(ReadCartItemDTOs it) => it?.CartItemId.ToString() ?? "";
-
-    string NameOf(ReadCartItemDTOs it)
-        => string.IsNullOrWhiteSpace(it?.ServiceName) ? "(Không có tên)" : it.ServiceName;
-
-    string ImageOf(ReadCartItemDTOs it) => it?.ServiceImage ?? "";
-
-    decimal PriceOf(ReadCartItemDTOs it) => it?.ServicePrice ?? 0m;
-
-    // 👉 TÍNH THÀNH TIỀN: Giá dịch vụ + tổng giá tuỳ chọn
-    decimal LineTotalOf(ReadCartItemDTOs it)
-    {
-        var basePrice = it?.ServicePrice ?? 0m;
-        var optTotal = it?.Options?.Sum(o => o?.Price ?? 0m) ?? 0m;
-        return basePrice + optTotal;
     }
 
-    // 👉 TÓM TẮT TUỲ CHỌN TỪ DTO
-    string AddonSummary(List<CartItemOptionReadDto>? options)
-    {
-        if (options == null || options.Count == 0) return "Chọn tuỳ chọn";
-        var parts = options.Select(o =>
+    @functions {
+        string ProviderOf(ReadCartItemDTOs it)
+            => string.IsNullOrWhiteSpace(it?.ProviderName) ? "Khác" : it.ProviderName;
+
+        string KeyOf(ReadCartItemDTOs it) => it?.CartItemId.ToString() ?? "";
+
+        string NameOf(ReadCartItemDTOs it)
+            => string.IsNullOrWhiteSpace(it?.ServiceName) ? "(Không có tên)" : it.ServiceName;
+
+        string ImageOf(ReadCartItemDTOs it) => it?.ServiceImage ?? "";
+
+        decimal PriceOf(ReadCartItemDTOs it) => it?.ServicePrice ?? 0m;
+
+        // 👉 TÍNH THÀNH TIỀN: Giá dịch vụ + tổng giá tuỳ chọn
+        decimal LineTotalOf(ReadCartItemDTOs it)
         {
-            var name = o?.OptionName ?? "";
-            var unit = o?.UnitType;
-            return string.IsNullOrWhiteSpace(unit) ? name : $"{name} ({unit})";
-        })
-        .Where(s => !string.IsNullOrWhiteSpace(s))
-        .ToList();
-
-        return parts.Count == 0 ? "Chọn tuỳ chọn" : string.Join(", ", parts);
-    }
-
-    // ✅ GỢI Ý THÊM: TẤT CẢ OPTION CỦA SERVICE (trừ option đã chọn)
-    IEnumerable<ReadServiceOptionDTOs> SuggestOptions(ReadCartItemDTOs it)
-    {
-        // ViewBag từ Controller: Dictionary<Guid, List<ReadServiceOptionDTOs>>
-        var dictByService = ViewBag.AvailableOptionsByServiceId as
-            System.Collections.Generic.Dictionary<Guid, System.Collections.Generic.List<ReadServiceOptionDTOs>>;
-
-        var src = (dictByService != null && dictByService.TryGetValue(it.ServiceId, out var list))
-            ? list
-            : new System.Collections.Generic.List<ReadServiceOptionDTOs>();
-
-        // Loại bỏ những option đã chọn (theo OptionId trong cart)
-        var picked = new System.Collections.Generic.HashSet<Guid>(
-            it?.Options?.Select(o => o.OptionId)
-            ?? System.Linq.Enumerable.Empty<Guid>());
-
-        return src.Where(o => !picked.Contains(o.OptionId));
-    }
-}
-
-@section Styles {
-    <link rel="stylesheet" href="~/css/Cart.css" asp-append-version="true" />
-}
-
-
-<section class="cart-page">
-    <div class="cart-card">
-        <header class="cart-header">
-            <h2 class="cart-title">Giỏ hàng của bạn</h2>
-            @if (!isEmpty)
-            {
-                <span class="cart-count">@list.Count item(s)</span>
-            }
-        </header>
-
-        @if (isEmpty)
-        {
-            <div class="cart-empty">
-                <div class="cart-empty-illu"></div>
-                <div>
-                    <h3>Giỏ hàng trống</h3>
-                    <p>Hãy thêm vài dịch vụ để ngày hôm nay “đặc biệt” hơn nhé!</p>
-                    <a class="btn-primary" asp-area="" asp-controller="Services" asp-action="Index">Tiếp tục xem dịch vụ</a>
-                </div>
-            </div>
+            var basePrice = it?.ServicePrice ?? 0m;
+            var optTotal = it?.Options?.Sum(o => o?.Price ?? 0m) ?? 0m;
+            return basePrice + optTotal;
         }
-        else
+
+        // 👉 TÓM TẮT TUỲ CHỌN TỪ DTO
+        string AddonSummary(List<CartItemOptionReadDto>? options)
         {
-            <!-- Header cột -->
-            <div class="cart-table-head">
-                <div class="col col-svc">
-                    <label class="chk">
-                        <input id="chkAll" type="checkbox" />
-                        <span>Dịch vụ</span>
-                    </label>
+            if (options == null || options.Count == 0) return "Chọn tuỳ chọn";
+            var parts = options.Select(o =>
+            {
+                var name = o?.OptionName ?? "";
+                var unit = o?.UnitType;
+                return string.IsNullOrWhiteSpace(unit) ? name : $"{name} ({unit})";
+            })
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToList();
+
+            return parts.Count == 0 ? "Chọn tuỳ chọn" : string.Join(", ", parts);
+        }
+
+        // ✅ GỢI Ý THÊM: TẤT CẢ OPTION CỦA SERVICE (trừ option đã chọn)
+        IEnumerable<ReadServiceOptionDTOs> SuggestOptions(ReadCartItemDTOs it)
+        {
+            // ViewBag từ Controller: Dictionary<Guid, List<ReadServiceOptionDTOs>>
+            var dictByService = ViewBag.AvailableOptionsByServiceId as
+                System.Collections.Generic.Dictionary<Guid, System.Collections.Generic.List<ReadServiceOptionDTOs>>;
+
+            var src = (dictByService != null && dictByService.TryGetValue(it.ServiceId, out var list))
+                ? list
+                : new System.Collections.Generic.List<ReadServiceOptionDTOs>();
+
+            // Loại bỏ những option đã chọn (theo OptionId trong cart)
+            var picked = new System.Collections.Generic.HashSet<Guid>(
+                it?.Options?.Select(o => o.OptionId)
+                ?? System.Linq.Enumerable.Empty<Guid>());
+
+            return src.Where(o => !picked.Contains(o.OptionId));
+        }
+    }
+
+    @section Styles {
+        <link rel="stylesheet" href="~/css/Cart.css" asp-append-version="true" />
+    }
+
+
+    <section class="cart-page">
+        <div class="cart-card">
+            <header class="cart-header">
+                <h2 class="cart-title">Giỏ hàng của bạn</h2>
+                @if (!isEmpty)
+                {
+                    <span class="cart-count">@list.Count item(s)</span>
+                }
+            </header>
+
+            @if (isEmpty)
+            {
+                <div class="cart-empty">
+                    <div class="cart-empty-illu"></div>
+                    <div>
+                        <h3>Giỏ hàng trống</h3>
+                        <p>Hãy thêm vài dịch vụ để ngày hôm nay “đặc biệt” hơn nhé!</p>
+                        <a class="btn-primary" asp-area="" asp-controller="Services" asp-action="Index">Tiếp tục xem dịch vụ</a>
+                    </div>
                 </div>
-                <div class="col col-price">Đơn giá</div>
-                <div class="col col-addons">Tuỳ chọn</div>
-                <div class="col col-total">Số tiền</div>
-                <div class="col col-act">Thao tác</div>
-            </div>
+            }
+            else
+            {
+                <!-- Header cột -->
+                <div class="cart-table-head">
+                    <div class="col col-svc">
+                        <label class="chk">
+                            <input id="chkAll" type="checkbox" />
+                            <span>Dịch vụ</span>
+                        </label>
+                    </div>
+                    <div class="col col-price">Đơn giá</div>
+                    <div class="col col-addons">Tuỳ chọn</div>
+                    <div class="col col-total">Số tiền</div>
+                    <div class="col col-act">Thao tác</div>
+                </div>
 
-            <!-- Nhóm theo Provider -->
-            <form id="cartForm" asp-action="Checkout" asp-controller="Checkout" method="get">
-                <input type="hidden" name="selectedKeysCsv" id="selectedKeysCsv" />
-                <input type="hidden" name="voucherId" id="voucherId" />
-                <div class="cart-groups">
-                    @for (int gi = 0; gi < groups.Count; gi++)
-                    {
-                        var g = groups[gi]; var gId = $"g_{gi}";
-                        <section class="provider-block" data-group="@gId">
-                            <div class="provider-head">
-                                <label class="chk">
-                                    <input class="chk-prov" type="checkbox" data-group="@gId" />
-                                    <span class="prov-name">@g.Key</span>
-                                </label>
-                            </div>
+                <!-- Nhóm theo Provider -->
+                <!-- ĐỔI form id="cartForm" thành div để không lồng form -->
+                <div id="cartForm">
+                    @* <input type="hidden" name="selectedKeysCsv" id="selectedKeysCsv" />
+                    <input type="hidden" name="voucherId" id="voucherId" /> *@
+                    <div class="cart-groups">
+                        @for (int gi = 0; gi < groups.Count; gi++)
+                        {
+                            var g = groups[gi]; var gId = $"g_{gi}";
+                            <section class="provider-block" data-group="@gId">
+                                <div class="provider-head">
+                                    <label class="chk">
+                                        <input class="chk-prov" type="checkbox" data-group="@gId" />
+                                        <span class="prov-name">@g.Key</span>
+                                    </label>
+                                </div>
 
-                            @foreach (var it in g)
-                            {
-                                var key = KeyOf(it);
-                                var name = NameOf(it);
+                                @foreach (var it in g)
+                                {
+                                    var key = KeyOf(it);
+                                    var name = NameOf(it);
 
-                                // Ảnh với fallback
-                                var rawImage = ImageOf(it);
-                                var image = string.IsNullOrWhiteSpace(rawImage)
-                                ? fallbackImg
-                                : (rawImage.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-                                ? rawImage
-                                : Url.Content(rawImage));
+                                    var rawImage = ImageOf(it);
+                                    var image = string.IsNullOrWhiteSpace(rawImage)
+                                    ? fallbackImg
+                                    : (rawImage.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                                    ? rawImage
+                                    : Url.Content(rawImage));
 
-                                var unitPrice = PriceOf(it);
-                                var options = it?.Options ?? new List<CartItemOptionReadDto>();
-                                var lineTotal = LineTotalOf(it);
-                                var suggestions = SuggestOptions(it).ToList(); // 🔥 quan trọng
+                                    var unitPrice = PriceOf(it);
+                                    var options = it?.Options ?? new List<CartItemOptionReadDto>();
+                                    var lineTotal = LineTotalOf(it);
+                                    var suggestions = SuggestOptions(it).ToList();
 
-                                var detailsUrl = Url.Action("Details", "Services", new { id = it.ServiceId, area = "" });
+                                    var detailsUrl = Url.Action("Details", "Services", new { id = it.ServiceId, area = "" });
 
-                                <article class="cart-item" data-group="@gId" data-key="@key">
-                                    <!-- Cột 1: Dịch vụ -->
-                                    <div class="cell-left">
-                                        <label class="chk">
-                                            <input class="chk-item" type="checkbox"
-                                                   data-key="@key" data-group="@gId" data-linetotal="@lineTotal" />
-                                        </label>
+                                    <article class="cart-item" data-group="@gId" data-key="@key">
+                                        <!-- Cột 1: Dịch vụ -->
+                                        <div class="cell-left">
+                                            <label class="chk">
+                                                <input class="chk-item" type="checkbox"
+                                                       data-key="@key" data-group="@gId" data-linetotal="@lineTotal" />
+                                            </label>
 
-                                        <!-- Ảnh bọc trong link -->
-                                        <a href="@detailsUrl" class="svc-link-img" title="@name">
-                                            <img class="cart-thumb"
-                                                 src="@image"
-                                                 alt="@name"
-                                                 onerror="this.onerror=null;this.classList.add('fallback');this.src='@fallbackImg'">
-                                        </a>
-
-                                        <div class="cart-info">
-                                            <!-- Tên bọc trong link -->
-                                            <a href="@detailsUrl" class="cart-name" title="@name">
-                                                @name
+                                            <a href="@detailsUrl" class="svc-link-img" title="@name">
+                                                <img class="cart-thumb"
+                                                     src="@image"
+                                                     alt="@name"
+                                                     onerror="this.onerror=null;this.classList.add('fallback');this.src='@fallbackImg'">
                                             </a>
-                                            <!-- Có thể thêm sub-info tại đây nếu cần -->
+
+                                            <div class="cart-info">
+                                                <a href="@detailsUrl" class="cart-name" title="@name">@name</a>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <!-- Cột 2: Đơn giá -->
-                                    <div class="cell-price">@unitPrice.ToString("n0")₫</div>
+                                        <!-- Cột 2: Đơn giá -->
+                                        <div class="cell-price">@unitPrice.ToString("n0")₫</div>
 
-                                    <!-- Cột 3: Tuỳ chọn -->
-                                    <div class="cell-addons">
-                                        <button type="button"
-                                                class="opt-btn"
-                                                data-opt="@key"
-                                                aria-haspopup="dialog"
-                                                aria-controls="@($"opt_{key}")"
-                                                aria-expanded="false">
-                                            <span class="opt-label">Tuỳ chọn:</span>
-                                            <span class="opt-value" title="@AddonSummary(options)">@AddonSummary(options)</span>
-                                            <span class="opt-caret">▾</span>
-                                        </button>
+                                        <!-- Cột 3: Tuỳ chọn -->
+                                        <div class="cell-addons">
+                                            <button type="button"
+                                                    class="opt-btn"
+                                                    data-opt="@key"
+                                                    aria-haspopup="dialog"
+                                                    aria-controls="@($"opt_{key}")"
+                                                    aria-expanded="false">
+                                                <span class="opt-label">Tuỳ chọn:</span>
+                                                <span class="opt-value" title="@AddonSummary(options)">@AddonSummary(options)</span>
+                                                <span class="opt-caret">▾</span>
+                                            </button>
 
-                                        <!-- Panel (sẽ được "bốc" ra portal khi mở) -->
-                                        <div class="opt-panel" id="@($"opt_{key}")" role="dialog" aria-modal="false" hidden>
-                                            <!-- Đã chọn -->
-                                            <div class="opt-section">
-                                                <div class="opt-title">Đã chọn</div>
+                                            <div class="opt-panel" id="@($"opt_{key}")" role="dialog" aria-modal="false" hidden>
+                                                <div class="opt-section">
+                                                    <div class="opt-title">Đã chọn</div>
 
-                                                @if (options.Any())
-                                                {
-                                                    var i = 0;
-                                                    foreach (var a in options)
+                                                    @if (options.Any())
                                                     {
-                                                        <div class="opt-row">
-                                                            <div class="opt-name">
-                                                                <div>@a.OptionName</div>
-                                                                @if (!string.IsNullOrWhiteSpace(a.UnitType))
-                                                                {
-                                                                    <div class="muted text-sm">@a.UnitType</div>
-                                                                }
-                                                                @if (!string.IsNullOrWhiteSpace(a.Description))
-                                                                {
-                                                                    <div class="muted text-sm">@a.Description</div>
-                                                                }
-                                                            </div>
+                                                        foreach (var a in options)
+                                                        {
+                                                            <div class="opt-row">
+                                                                <div class="opt-name">
+                                                                    <div>@a.OptionName</div>
+                                                                    @if (!string.IsNullOrWhiteSpace(a.UnitType))
+                                                                    {
+                                                                        <div class="muted text-sm">@a.UnitType</div>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(a.Description))
+                                                                    {
+                                                                        <div class="muted text-sm">@a.Description</div>
+                                                                    }
+                                                                </div>
 
-                                                            <div class="opt-controls">
-                                                                <span class="opt-price">+ @a.Price.ToString("n0")₫</span>
+                                                                <div class="opt-controls">
+                                                                    <span class="opt-price">+ @a.Price.ToString("n0")₫</span>
 
-                                                                <!-- Bỏ tuỳ chọn: dùng CartItemOptionId từ DTO thật -->
-                                                                <form asp-action="RemoveAddon" method="post" onsubmit="lockBtn(this)">
-                                                                    <input type="hidden" name="cartItemId" value="@it.CartItemId" />
-                                                                    <input type="hidden" name="cartItemOptionId" value="@a.CartItemOptionId" />
-                                                                    <button class="opt-remove" type="submit">Bỏ</button>
-                                                                </form>
+                                                                    <!-- BỎ TUỲ CHỌN: thêm area + controller -->
+                                                                    <form asp-area="Customer"
+                                                                          asp-controller="Cart"
+                                                                          asp-action="RemoveAddon"
+                                                                          method="post"
+                                                                          onsubmit="lockBtn(this)">
+                                                                        @Html.AntiForgeryToken()
+                                                                        <input type="hidden" name="cartItemId" value="@it.CartItemId" />
+                                                                        <input type="hidden" name="optionId" value="@a.OptionId" />
+                                                                        <button class="opt-remove" type="submit">Bỏ</button>
+                                                                    </form>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                        i++;
+                                                        }
                                                     }
+                                                    else
+                                                    {
+                                                        <div class="opt-empty muted">Chưa chọn tuỳ chọn</div>
+                                                    }
+                                                </div>
+
+                                                @if (suggestions != null && suggestions.Any())
+                                                {
+                                                    <!-- THÊM TUỲ CHỌN: thêm area + controller -->
+                                                    <form asp-area="Customer"
+                                                          asp-controller="Cart"
+                                                          asp-action="AddAddon"
+                                                          method="post"
+                                                          class="opt-section"
+                                                          onsubmit="lockBtn(this)">
+                                                        @Html.AntiForgeryToken()
+                                                        <div class="opt-title">Thêm tuỳ chọn</div>
+                                                        <input type="hidden" name="cartItemId" value="@it.CartItemId" />
+
+                                                        @foreach (var s in suggestions)
+                                                        {
+                                                            <label class="opt-row pickable">
+                                                                <div class="opt-name">
+                                                                    <input type="checkbox" name="optionIds" value="@s.OptionId" />
+                                                                    <span>
+                                                                        <strong>@s.OptionName</strong>
+                                                                        @(string.IsNullOrWhiteSpace(s.UnitType) ? "" : $"({s.UnitType})")
+                                                                    </span>
+                                                                    @if (!string.IsNullOrWhiteSpace(s.Description))
+                                                                    {
+                                                                        <div class="muted small">@s.Description</div>
+                                                                    }
+                                                                </div>
+                                                                <div class="opt-controls">
+                                                                    <span class="opt-price">+ @s.Price.ToString("n0")₫</span>
+                                                                </div>
+                                                            </label>
+                                                        }
+
+                                                        <div class="opt-actions">
+                                                            <button type="submit" class="btn-primary sm">Thêm</button>
+                                                            <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
+                                                        </div>
+                                                    </form>
                                                 }
                                                 else
                                                 {
-                                                    <div class="opt-empty muted">Chưa chọn tuỳ chọn</div>
+                                                    <div class="opt-section">
+                                                        <div class="opt-title">Thêm tuỳ chọn</div>
+                                                        <div class="opt-empty muted">Không còn tuỳ chọn nào khác.</div>
+                                                        <div class="opt-actions">
+                                                            <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
+                                                        </div>
+                                                    </div>
                                                 }
                                             </div>
-
-                                            <!-- Gợi ý thêm: tất cả option thuộc service, trừ cái đã chọn -->
-                                            @if (suggestions != null && suggestions.Any())
-                                            {
-                                                <form asp-action="AddAddon" method="post" class="opt-section" onsubmit="lockBtn(this)">
-                                                    <div class="opt-title">Thêm tuỳ chọn</div>
-                                                    <input type="hidden" name="cartItemId" value="@it.CartItemId" />
-
-                                                    @foreach (var s in suggestions)
-                                                    {
-                                                        <label class="opt-row pickable">
-                                                            <div class="opt-name">
-                                                                <input type="checkbox" name="optionIds" value="@s.OptionId" />
-                                                                <span>
-                                                                    <strong>@s.OptionName</strong>
-                                                                    @(string.IsNullOrWhiteSpace(s.UnitType) ? "" : $"({s.UnitType})")
-                                                                </span>
-                                                                @if (!string.IsNullOrWhiteSpace(s.Description))
-                                                                {
-                                                                    <div class="muted small">@s.Description</div>
-                                                                }
-                                                            </div>
-                                                            <div class="opt-controls">
-                                                                <span class="opt-price">+ @s.Price.ToString("n0")₫</span>
-                                                            </div>
-                                                        </label>
-                                                    }
-
-                                                    <div class="opt-actions">
-                                                        <button type="submit" class="btn-primary sm">Thêm</button>
-                                                        <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
-                                                    </div>
-                                                </form>
-                                            }
-                                            else
-                                            {
-                                                <div class="opt-section">
-                                                    <div class="opt-title">Thêm tuỳ chọn</div>
-                                                    <div class="opt-empty muted">Không còn tuỳ chọn nào khác.</div>
-                                                    <div class="opt-actions">
-                                                        <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
-                                                    </div>
-                                                </div>
-                                            }
                                         </div>
-                                    </div>
 
 
-                                    <!-- ================== HẾT PHẦN TUỲ CHỌN ================== -->
+                                        <!-- Cột 4: Thành tiền -->
+                                        <div class="cell-total">@lineTotal.ToString("n0")₫</div>
 
-                                    <!-- Cột 4: Thành tiền (đã gồm tuỳ chọn) -->
-                                    <div class="cell-total">@lineTotal.ToString("n0")₫</div>
-
-                                    <!-- Cột 5: Thao tác -->
-                                    <div class="cell-action">
-                                        <form asp-action="Remove" method="post" onsubmit="lockBtn(this)">
-                                            <input type="hidden" name="key" value="@key" />
-                                            <button class="btn-link-danger" type="submit">Xoá</button>
-                                        </form>
-                                    </div>
-                                </article>
-                            }
-
-                          
-                        </section>
-                    }
-                </div>
-            </form>
-
-
-            <!-- Voucher + thanh toán dính dưới -->
-            <div class="checkout-dock">
-                <div class="voucher-row">
-                    <div class="left">
-                        <span class="voucher-badge">🏷️ Voucher</span>
-                        <span class="muted">Chọn/nhập mã để áp dụng</span>
+                                        <!-- Cột 5: Thao tác -->
+                                        <div class="cell-action">
+                                            <!-- Form xoá RIÊNG, có token + key -->
+                                            <form asp-area="Customer"
+                                                  asp-controller="Cart"
+                                                  asp-action="Remove"
+                                                  asp-route-key="@key"
+                                                  method="post"
+                                                  onsubmit="lockBtn(this)">
+                                                @Html.AntiForgeryToken()
+                                                <button class="btn-link-danger" type="submit">Xoá</button>
+                                            </form>
+                                        </div>
+                                    </article>
+                                }
+                            </section>
+                        }
                     </div>
-                    <button class="btn-ghost opt-btn" type="button" data-opt="voucher" aria-expanded="false">
-                        Chọn voucher
-                    </button>
                 </div>
-                <!-- input ẩn để submit mã -->
-                <input type="hidden" name="voucherCode" id="voucherCode" />
 
-                <!-- Panel voucher, sẽ được bốc lên PORTAL khi mở -->
-                <div id="opt_voucher" class="opt-panel" hidden aria-label="Danh sách voucher">
-                    <div class="opt-head">
-                        <h3>Voucher của bạn</h3>
-                        <button class="btn-ghost" type="button" data-close="#opt_voucher">Đóng</button>
-                    </div>
+                <!-- Form GET Checkout độc lập (ngoài danh sách item) -->
+                <form id="checkoutForm"
+                      asp-area=""
+                      asp-controller="Checkout"
+                      asp-action="Checkout"
+                      method="get">
+                    <input type="hidden" name="selectedKeysCsv" id="selectedKeysCsv" />
+                    <input type="hidden" name="voucherId" id="voucherId" />
+                </form>
 
-                    <div class="opt-body">
-                        <div class="voucher-toolbar">
-                            <input id="voucherInput" class="input" placeholder="Nhập mã voucher..." />
-                            <button id="btnApplyTyped" class="btn" type="button">Áp dụng</button>
+                <!-- Voucher + thanh toán dính dưới -->
+                <div class="checkout-dock">
+                    <div class="voucher-row">
+                        <div class="left">
+                            <span class="voucher-badge">🏷️ Voucher</span>
+                            <span class="muted">Chọn/nhập mã để áp dụng</span>
                         </div>
-                        <div id="voucherList" class="voucher-list"></div>
-                        <div class="tiny muted">* Chỉ voucher còn hiệu lực và còn lượt dùng mới có thể áp dụng.</div>
+                        <button class="btn-ghost opt-btn" type="button" data-opt="voucher" aria-expanded="false">
+                            Chọn voucher
+                        </button>
                     </div>
-                </div>
+                    <!-- input ẩn để submit mã -->
+                    <input type="hidden" name="voucherCode" id="voucherCode" />
 
-
-                <div class="checkout-bar" role="region" aria-label="Tóm tắt thanh toán">
-                    <div class="co-left">
-                        <label class="chk">
-                            <input id="chkAll_bottom" type="checkbox" />
-                            <span>Chọn tất cả</span>
-                        </label>
-                        <form asp-action="Clear" method="post" onsubmit="lockBtn(this)">
-                            <button class="btn-ghost" type="submit">Xoá giỏ hàng</button>
-                        </form>
-                    </div>
-
-                    <div class="co-mid">
-                        <div class="co-row"><span>Đã chọn</span><strong id="selCount">0</strong></div>
-                        <div class="co-row muted"><span>Tạm tính</span><strong id="selSubtotal">0₫</strong></div>
-                    </div>
-
-                    <div class="co-right">
-                        <div class="co-total">
-                            <span>Tổng cộng</span>
-                            <strong id="selTotal">0₫</strong>
+                    <!-- Panel voucher, sẽ được bốc lên PORTAL khi mở -->
+                    <div id="opt_voucher" class="opt-panel" hidden aria-label="Danh sách voucher">
+                        <div class="opt-head">
+                            <h3>Voucher của bạn</h3>
+                            <button class="btn-ghost" type="button" data-close="#opt_voucher">Đóng</button>
                         </div>
-                        <button id="btnCheckout" class="btn-primary co-btn" disabled onclick="submitSelected()">Thanh toán</button>
+
+                        <div class="opt-body">
+                            <div class="voucher-toolbar">
+                                <input id="voucherInput" class="input" placeholder="Nhập mã voucher..." />
+                                <button id="btnApplyTyped" class="btn" type="button">Áp dụng</button>
+                            </div>
+                            <div id="voucherList" class="voucher-list"></div>
+                            <div class="tiny muted">* Chỉ voucher còn hiệu lực và còn lượt dùng mới có thể áp dụng.</div>
+                        </div>
+                    </div>
+
+
+                    <div class="checkout-bar" role="region" aria-label="Tóm tắt thanh toán">
+                        <div class="co-left">
+                            <label class="chk">
+                                <input id="chkAll_bottom" type="checkbox" />
+                                <span>Chọn tất cả</span>
+                            </label>
+
+                            <!-- Nút XÓA MỤC ĐÃ CHỌN (post tới RemoveSelected) -->
+                            <button class="btn-ghost" type="button" onclick="removeSelected()">Xoá mục đã chọn</button>
+
+                            <!-- Form ẨN để submit danh sách selectedIds -->
+                            <form id="bulkRemoveForm"
+                                  asp-area="Customer"
+                                  asp-controller="Cart"
+                                  asp-action="RemoveSelected"
+                                  method="post"
+                                  onsubmit="lockBtn(this)">
+                                @Html.AntiForgeryToken()
+                                <!-- JS sẽ bơm các <input name="selectedIds" value="..."> vào đây -->
+                            </form>
+
+                            <!-- Nút XÓA TẤT CẢ (post tới Clear) -->
+                            <form asp-area="Customer"
+                                  asp-controller="Cart"
+                                  asp-action="Clear"
+                                  method="post"
+                                  onsubmit="lockBtn(this)">
+                                @Html.AntiForgeryToken()
+                                <button class="btn-link-danger" type="submit">Xoá tất cả</button>
+                            </form>
+                        </div>
+
+
+                        <div class="co-mid">
+                            <div class="co-row"><span>Đã chọn</span><strong id="selCount">0</strong></div>
+                            <div class="co-row muted"><span>Tạm tính</span><strong id="selSubtotal">0₫</strong></div>
+                        </div>
+
+                        <div class="co-right">
+                            <div class="co-total">
+                                <span>Tổng cộng</span>
+                                <strong id="selTotal">0₫</strong>
+                            </div>
+                            <button id="btnCheckout" class="btn-primary co-btn" disabled onclick="submitSelected()">Thanh toán</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        }
-    </div>
-</section>
-
-@section Scripts {
-    <script>
-        /* ====== Helpers ====== */
-        const VND = n => (n||0).toLocaleString('vi-VN') + '₫';
-        const voucherCodeHid = document.getElementById('voucherCode');
-        const voucherListEl  = document.getElementById('voucherList');
-        const voucherInputEl = document.getElementById('voucherInput');
-        const btnApplyTyped  = document.getElementById('btnApplyTyped');
-
-        // Lấy field theo cả PascalCase lẫn camelCase
-        const pick = (o, pascal, camel) => o?.[pascal] ?? o?.[camel];
-
-        let CURRENT_VOUCHER = null; // sẽ giữ object chuẩn hoá PascalCase
-
-        // Tính giảm giá theo % và trần MaxAmount (đọc cả 2 kiểu tên)
-        function calcDiscount(subtotal, v){
-          if(!v) return 0;
-          const pct = Number(pick(v, 'DiscountPercent', 'discountPercent') || 0);
-          const max = Number(pick(v, 'DiscountMaxAmount', 'discountMaxAmount') || 0);
-          if(pct <= 0 || subtotal <= 0) return 0;
-          const raw = Math.floor(subtotal * pct / 100);
-          const capped = max > 0 ? Math.min(raw, max) : raw;
-          return Math.max(0, Math.min(capped, subtotal));
-        }
-
-        /* ======= Tổng & checkbox (BASE) ======= */
-        const fmt = n => (n || 0).toLocaleString('vi-VN') + '₫';
-        const selCount      = document.getElementById('selCount');
-        const selSubtotal   = document.getElementById('selSubtotal');
-        const selTotal      = document.getElementById('selTotal');
-        const btnCheckout   = document.getElementById('btnCheckout');
-        const chkAll        = document.getElementById('chkAll');
-        const chkAll_bottom = document.getElementById('chkAll_bottom');
-
-        // Base tính giỏ: KHÔNG đụng đến voucher ở đây
-        function cartRecalc(){
-          const items = [...document.querySelectorAll('.chk-item')];
-          const sel = items.filter(i => i.checked);
-          const count = sel.length;
-          const subtotal = sel.reduce((s,i)=> s + parseFloat(i.dataset.linetotal||'0'), 0);
-
-          selCount.textContent = count;
-          selSubtotal.textContent = fmt(subtotal);
-          selTotal.textContent = fmt(subtotal);
-          btnCheckout.disabled = count === 0;
-
-          const groups = new Set(items.map(i=>i.dataset.group));
-          groups.forEach(g=>{
-            const gItems = items.filter(i=>i.dataset.group===g);
-            const gChk = document.querySelector(`.chk-prov[data-group="${g}"]`);
-            if(gChk){
-              gChk.indeterminate = false;
-              if(gItems.every(i=>i.checked)) gChk.checked = true;
-              else if(gItems.some(i=>i.checked)) { gChk.checked=false; gChk.indeterminate=true; }
-              else gChk.checked=false;
             }
-          });
+        </div>
+    </section>
 
-          const allOn = items.every(i=>i.checked);
-          const someOn = items.some(i=>i.checked);
-          [chkAll, chkAll_bottom].forEach(c=>{
-            if(!c) return;
-            c.indeterminate = !allOn && someOn;
-            c.checked = allOn;
-          });
-        }
+    @section Scripts {
+        <script>
 
-        /* ======= Wrapper cộng voucher (ENTRY POINT) ======= */
-        function recalc(){
-          cartRecalc();
 
-          const items = [...document.querySelectorAll('.chk-item')];
-          const sel = items.filter(i => i.checked);
-          const subtotal = sel.reduce((s,i)=> s + parseFloat(i.dataset.linetotal||'0'), 0);
+            /* ====== Helpers ====== */
+            const VND = n => (n||0).toLocaleString('vi-VN') + '₫';
+            const voucherCodeHid = document.getElementById('voucherCode');
+            const voucherListEl  = document.getElementById('voucherList');
+            const voucherInputEl = document.getElementById('voucherInput');
+            const btnApplyTyped  = document.getElementById('btnApplyTyped');
 
-          // tạo breakdown nếu chưa có
-          let breakdown = document.getElementById('voucherBreakdown');
-          if(!breakdown){
-            const coTotal = document.querySelector('.co-total');
-            if(!coTotal) return; // chưa có chỗ gắn → bỏ qua lượt này
-            const wrap = document.createElement('div');
-            wrap.id = 'voucherBreakdown';
-            wrap.className = 'muted tiny';
-            wrap.hidden = true;
-            wrap.style.display = 'none';
-            wrap.innerHTML = `
-              <div class="vb-info" id="voucherAppliedInfo"></div>
-              <div class="vb-right">
-                <strong id="voucherDiscount">-0₫</strong>
-                <button id="btnRemoveVoucher" type="button" class="btn-ghost btn-xs">Bỏ voucher</button>
-              </div>`;
-            coTotal.appendChild(wrap);
-            // bind lần đầu
-            wrap.querySelector('#btnRemoveVoucher').addEventListener('click', removeVoucher);
-            breakdown = wrap;
-          }
+            // Lấy field theo cả PascalCase lẫn camelCase
+            const pick = (o, pascal, camel) => o?.[pascal] ?? o?.[camel];
 
-          const voucherDiscountEl = document.getElementById('voucherDiscount');
-          const voucherAppliedInfoEl = document.getElementById('voucherAppliedInfo');
+            let CURRENT_VOUCHER = null; // sẽ giữ object chuẩn hoá PascalCase
 
-          const discount = calcDiscount(subtotal, CURRENT_VOUCHER);
-          if(CURRENT_VOUCHER && discount > 0){
-            selTotal.textContent = VND(Math.max(0, subtotal - discount));
-            voucherDiscountEl.textContent = '-' + VND(discount);
+            // Tính giảm giá theo % và trần MaxAmount (đọc cả 2 kiểu tên)
+            function calcDiscount(subtotal, v){
+              if(!v) return 0;
+              const pct = Number(pick(v, 'DiscountPercent', 'discountPercent') || 0);
+              const max = Number(pick(v, 'DiscountMaxAmount', 'discountMaxAmount') || 0);
+              if(pct <= 0 || subtotal <= 0) return 0;
+              const raw = Math.floor(subtotal * pct / 100);
+              const capped = max > 0 ? Math.min(raw, max) : raw;
+              return Math.max(0, Math.min(capped, subtotal));
+            }
 
-            const code = pick(CURRENT_VOUCHER,'Code','code') || '';
-            const pct  = Number(pick(CURRENT_VOUCHER,'DiscountPercent','discountPercent')||0);
-            const maxA = pick(CURRENT_VOUCHER,'DiscountMaxAmount','discountMaxAmount');
-            const end  = pick(CURRENT_VOUCHER,'EndDate','endDate');
+            /* ======= Tổng & checkbox (BASE) ======= */
+            const fmt = n => (n || 0).toLocaleString('vi-VN') + '₫';
+            const selCount      = document.getElementById('selCount');
+            const selSubtotal   = document.getElementById('selSubtotal');
+            const selTotal      = document.getElementById('selTotal');
+            const btnCheckout   = document.getElementById('btnCheckout');
+            const chkAll        = document.getElementById('chkAll');
+            const chkAll_bottom = document.getElementById('chkAll_bottom');
 
-            voucherAppliedInfoEl.textContent =
-              `Mã ${code} • Giảm ${pct}%` +
-              (maxA ? ` (tối đa ${VND(Number(maxA))})` : '') +
-              (end  ? ` • HSD: ${new Date(end).toLocaleDateString('vi-VN')}` : '');
+            // Base tính giỏ: KHÔNG đụng đến voucher ở đây
+            function cartRecalc(){
+              const items = [...document.querySelectorAll('.chk-item')];
+              const sel = items.filter(i => i.checked);
+              const count = sel.length;
+              const subtotal = sel.reduce((s,i)=> s + parseFloat(i.dataset.linetotal||'0'), 0);
 
-            breakdown.hidden = false;
-            breakdown.style.display = '';
-          }else{
-            // không có/không hợp lệ → tính tổng như bình thường & ẩn breakdown
-            selTotal.textContent = VND(subtotal);
-            voucherDiscountEl.textContent = '-0₫';
-            voucherAppliedInfoEl.textContent = '';
-            breakdown.hidden = true;
-            breakdown.style.display = 'none';
-          }
-        }
+              selCount.textContent = count;
+              selSubtotal.textContent = fmt(subtotal);
+              selTotal.textContent = fmt(subtotal);
+              btnCheckout.disabled = count === 0;
 
-        /* ===== Voucher utils ===== */
-        function normalizeVoucher(o){
-          if(!o) return null;
-          return {
-            Code: pick(o,'Code','code') ?? '',
-            Description: pick(o,'Description','description') ?? '',
-            DiscountPercent: Number(pick(o,'DiscountPercent','discountPercent') || 0),
-            DiscountMaxAmount: Number(pick(o,'DiscountMaxAmount','discountMaxAmount') || 0),
-            StartDate: pick(o,'StartDate','startDate') ?? null,
-            EndDate: pick(o,'EndDate','endDate') ?? null,
-            IsActive: !!pick(o,'IsActive','isActive'),
-            UsageLimit: pick(o,'UsageLimit','usageLimit'),
-            UsedCount: Number(pick(o,'UsedCount','usedCount') || 0),
-            RemainingUses: pick(o,'RemainingUses','remainingUses'),
-            IsUnlimited: !!pick(o,'IsUnlimited','isUnlimited'),
-            IsExpired: !!pick(o,'IsExpired','isExpired'),
-            IsUpcoming: !!pick(o,'IsUpcoming','isUpcoming'),
-            CanUseNow: !!pick(o,'CanUseNow','canUseNow'),
-          };
-        }
+              const groups = new Set(items.map(i=>i.dataset.group));
+              groups.forEach(g=>{
+                const gItems = items.filter(i=>i.dataset.group===g);
+                const gChk = document.querySelector(`.chk-prov[data-group="${g}"]`);
+                if(gChk){
+                  gChk.indeterminate = false;
+                  if(gItems.every(i=>i.checked)) gChk.checked = true;
+                  else if(gItems.some(i=>i.checked)) { gChk.checked=false; gChk.indeterminate=true; }
+                  else gChk.checked=false;
+                }
+              });
 
-        function setVoucher(v){
-          CURRENT_VOUCHER = normalizeVoucher(v);
-          if (voucherCodeHid) voucherCodeHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.Code || '') : '';
+              const allOn = items.every(i=>i.checked);
+              const someOn = items.some(i=>i.checked);
+              [chkAll, chkAll_bottom].forEach(c=>{
+                if(!c) return;
+                c.indeterminate = !allOn && someOn;
+                c.checked = allOn;
+              });
+            }
 
-          // reset input gõ tay nếu bỏ voucher
-          if(!CURRENT_VOUCHER && voucherInputEl) voucherInputEl.value = '';
+            /* ======= Wrapper cộng voucher (ENTRY POINT) ======= */
+            function recalc(){
+              cartRecalc();
 
-          // đánh dấu đang dùng trong list nếu panel còn mở
-          if (voucherListEl) {
-            voucherListEl.querySelectorAll('[data-code]').forEach(btn=>{
-              const c = btn.getAttribute('data-code') || '';
-              const isUsing = !!CURRENT_VOUCHER && (CURRENT_VOUCHER.Code === c);
-              btn.textContent = isUsing ? 'Đang dùng' : 'Sử dụng';
-              btn.classList.toggle('btn-primary', !isUsing);
-              btn.classList.toggle('btn-ghost', isUsing);
-              btn.disabled = isUsing ? false : btn.disabled; // vẫn cho đổi sang mã khác
-            });
-          }
+              const items = [...document.querySelectorAll('.chk-item')];
+              const sel = items.filter(i => i.checked);
+              const subtotal = sel.reduce((s,i)=> s + parseFloat(i.dataset.linetotal||'0'), 0);
 
-          recalc(); // tạm tính lại
-        }
+              // tạo breakdown nếu chưa có
+              let breakdown = document.getElementById('voucherBreakdown');
+              if(!breakdown){
+                const coTotal = document.querySelector('.co-total');
+                if(!coTotal) return; // chưa có chỗ gắn → bỏ qua lượt này
+                const wrap = document.createElement('div');
+                wrap.id = 'voucherBreakdown';
+                wrap.className = 'muted tiny';
+                wrap.hidden = true;
+                wrap.style.display = 'none';
+                wrap.innerHTML = `
+                  <div class="vb-info" id="voucherAppliedInfo"></div>
+                  <div class="vb-right">
+                    <strong id="voucherDiscount">-0₫</strong>
+                    <button id="btnRemoveVoucher" type="button" class="btn-ghost btn-xs">Bỏ voucher</button>
+                  </div>`;
+                coTotal.appendChild(wrap);
+                // bind lần đầu
+                wrap.querySelector('#btnRemoveVoucher').addEventListener('click', removeVoucher);
+                breakdown = wrap;
+              }
 
-        function removeVoucher(){
-          setVoucher(null);
-          // dọn UI đề phòng CSS đè
-          const breakdownEl = document.getElementById('voucherBreakdown');
-          const voucherDiscountEl = document.getElementById('voucherDiscount');
-          const voucherAppliedInfoEl = document.getElementById('voucherAppliedInfo');
-          if (breakdownEl){
-            if (voucherDiscountEl) voucherDiscountEl.textContent = '-0₫';
-            if (voucherAppliedInfoEl) voucherAppliedInfoEl.textContent = '';
-            breakdownEl.hidden = true;
-            breakdownEl.style.display = 'none';
-          }
-        }
+              const voucherDiscountEl = document.getElementById('voucherDiscount');
+              const voucherAppliedInfoEl = document.getElementById('voucherAppliedInfo');
 
-        /* ===== Fetch + render danh sách voucher ===== */
-        async function loadVouchers(){
-          if (!voucherListEl) return;
-          voucherListEl.innerHTML = '<div class="muted">Đang tải voucher...</div>';
-          try{
-            const res = await fetch('@Url.Action("GetCartVouchers", "Cart", new { area = "Customer" })', { credentials:'same-origin' });
-            if(!res.ok) throw new Error('HTTP '+res.status);
-            const list = await res.json(); // []ReadVoucherByCustomerDTOs (camelCase từ server)
-            renderVouchers(list || []);
-          }catch(e){
-            voucherListEl.innerHTML = '<div class="error">Không thể tải voucher.</div>';
-          }
-        }
+              const discount = calcDiscount(subtotal, CURRENT_VOUCHER);
+              if(CURRENT_VOUCHER && discount > 0){
+                selTotal.textContent = VND(Math.max(0, subtotal - discount));
+                voucherDiscountEl.textContent = '-' + VND(discount);
 
-        function renderVouchers(list){
-          if(!voucherListEl) return;
-          if(!list.length){ voucherListEl.innerHTML = '<div class="muted">Bạn chưa có voucher nào.</div>'; return; }
+                const code = pick(CURRENT_VOUCHER,'Code','code') || '';
+                const pct  = Number(pick(CURRENT_VOUCHER,'DiscountPercent','discountPercent')||0);
+                const maxA = pick(CURRENT_VOUCHER,'DiscountMaxAmount','discountMaxAmount');
+                const end  = pick(CURRENT_VOUCHER,'EndDate','endDate');
 
-          voucherListEl.innerHTML = list.map(v=>{
-            const code   = pick(v,'Code','code') || '';
-            const desc   = pick(v,'Description','description') ?? '';
-            const pct    = Number(pick(v,'DiscountPercent','discountPercent') || 0);
-            const maxAmt = Number(pick(v,'DiscountMaxAmount','discountMaxAmount') || 0);
-            const start  = pick(v,'StartDate','startDate');
-            const end    = pick(v,'EndDate','endDate');
+                voucherAppliedInfoEl.textContent =
+                  `Mã ${code} • Giảm ${pct}%` +
+                  (maxA ? ` (tối đa ${VND(Number(maxA))})` : '') +
+                  (end  ? ` • HSD: ${new Date(end).toLocaleDateString('vi-VN')}` : '');
 
-            const isExp  = !!pick(v,'IsExpired','isExpired');
-            const canUse = !!pick(v,'CanUseNow','canUseNow');
-            const isUnl  = !!pick(v,'IsUnlimited','isUnlimited');
-            const rem    = pick(v,'RemainingUses','remainingUses');
-            const used   = Number(pick(v,'UsedCount','usedCount') || 0);
-            const limit  = pick(v,'UsageLimit','usageLimit');
+                breakdown.hidden = false;
+                breakdown.style.display = '';
+              }else{
+                // không có/không hợp lệ → tính tổng như bình thường & ẩn breakdown
+                selTotal.textContent = VND(subtotal);
+                voucherDiscountEl.textContent = '-0₫';
+                voucherAppliedInfoEl.textContent = '';
+                breakdown.hidden = true;
+                breakdown.style.display = 'none';
+              }
+            }
 
-            const usable = canUse && !isExp && (isUnl || (rem ?? 0) > 0);
-            const benefit = `${pct}%` + (maxAmt ? ` • tối đa ${VND(maxAmt)}` : '');
-            const limitTxt = isUnl ? 'Không giới hạn'
-              : `Còn ${rem ?? Math.max(0, (limit||0) - used)} lượt`;
-            const dateTxt = [
-              start ? `Từ ${new Date(start).toLocaleDateString('vi-VN')}` : '',
-              end   ? `đến ${new Date(end).toLocaleDateString('vi-VN')}`   : ''
-            ].filter(Boolean).join(' ');
+            /* ===== Voucher utils ===== */
+            function normalizeVoucher(o){
+              if(!o) return null;
+              return {
+                Code: pick(o,'Code','code') ?? '',
+                Description: pick(o,'Description','description') ?? '',
+                DiscountPercent: Number(pick(o,'DiscountPercent','discountPercent') || 0),
+                DiscountMaxAmount: Number(pick(o,'DiscountMaxAmount','discountMaxAmount') || 0),
+                StartDate: pick(o,'StartDate','startDate') ?? null,
+                EndDate: pick(o,'EndDate','endDate') ?? null,
+                IsActive: !!pick(o,'IsActive','isActive'),
+                UsageLimit: pick(o,'UsageLimit','usageLimit'),
+                UsedCount: Number(pick(o,'UsedCount','usedCount') || 0),
+                RemainingUses: pick(o,'RemainingUses','remainingUses'),
+                IsUnlimited: !!pick(o,'IsUnlimited','isUnlimited'),
+                IsExpired: !!pick(o,'IsExpired','isExpired'),
+                IsUpcoming: !!pick(o,'IsUpcoming','isUpcoming'),
+                CanUseNow: !!pick(o,'CanUseNow','canUseNow'),
+              };
+            }
 
-            const isUsing = !!CURRENT_VOUCHER && CURRENT_VOUCHER.Code === code;
+            function setVoucher(v){
+              CURRENT_VOUCHER = normalizeVoucher(v);
+              if (voucherCodeHid) voucherCodeHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.Code || '') : '';
 
-            return `
-              <div class="voucher-item">
-                <div class="row">
-                  <div class="col">
-                    <div class="code">Mã: <strong>${code}</strong></div>
-                    <div class="desc">${desc}</div>
-                    <div class="tiny muted">
-                      <span>${benefit}</span> • <span>${limitTxt}</span>${dateTxt? ` • <span>${dateTxt}</span>`:''}
+              // reset input gõ tay nếu bỏ voucher
+              if(!CURRENT_VOUCHER && voucherInputEl) voucherInputEl.value = '';
+
+              // đánh dấu đang dùng trong list nếu panel còn mở
+              if (voucherListEl) {
+                voucherListEl.querySelectorAll('[data-code]').forEach(btn=>{
+                  const c = btn.getAttribute('data-code') || '';
+                  const isUsing = !!CURRENT_VOUCHER && (CURRENT_VOUCHER.Code === c);
+                  btn.textContent = isUsing ? 'Đang dùng' : 'Sử dụng';
+                  btn.classList.toggle('btn-primary', !isUsing);
+                  btn.classList.toggle('btn-ghost', isUsing);
+                  btn.disabled = isUsing ? false : btn.disabled; // vẫn cho đổi sang mã khác
+                });
+              }
+
+              recalc(); // tạm tính lại
+            }
+
+            function removeVoucher(){
+              setVoucher(null);
+              // dọn UI đề phòng CSS đè
+              const breakdownEl = document.getElementById('voucherBreakdown');
+              const voucherDiscountEl = document.getElementById('voucherDiscount');
+              const voucherAppliedInfoEl = document.getElementById('voucherAppliedInfo');
+              if (breakdownEl){
+                if (voucherDiscountEl) voucherDiscountEl.textContent = '-0₫';
+                if (voucherAppliedInfoEl) voucherAppliedInfoEl.textContent = '';
+                breakdownEl.hidden = true;
+                breakdownEl.style.display = 'none';
+              }
+            }
+
+            /* ===== Fetch + render danh sách voucher ===== */
+            async function loadVouchers(){
+              if (!voucherListEl) return;
+              voucherListEl.innerHTML = '<div class="muted">Đang tải voucher...</div>';
+              try{
+                const res = await fetch('@Url.Action("GetCartVouchers", "Cart", new { area = "Customer" })', { credentials:'same-origin' });
+                if(!res.ok) throw new Error('HTTP '+res.status);
+                const list = await res.json(); // []ReadVoucherByCustomerDTOs (camelCase từ server)
+                renderVouchers(list || []);
+              }catch(e){
+                voucherListEl.innerHTML = '<div class="error">Không thể tải voucher.</div>';
+              }
+            }
+
+            function renderVouchers(list){
+              if(!voucherListEl) return;
+              if(!list.length){ voucherListEl.innerHTML = '<div class="muted">Bạn chưa có voucher nào.</div>'; return; }
+
+              voucherListEl.innerHTML = list.map(v=>{
+                const code   = pick(v,'Code','code') || '';
+                const desc   = pick(v,'Description','description') ?? '';
+                const pct    = Number(pick(v,'DiscountPercent','discountPercent') || 0);
+                const maxAmt = Number(pick(v,'DiscountMaxAmount','discountMaxAmount') || 0);
+                const start  = pick(v,'StartDate','startDate');
+                const end    = pick(v,'EndDate','endDate');
+
+                const isExp  = !!pick(v,'IsExpired','isExpired');
+                const canUse = !!pick(v,'CanUseNow','canUseNow');
+                const isUnl  = !!pick(v,'IsUnlimited','isUnlimited');
+                const rem    = pick(v,'RemainingUses','remainingUses');
+                const used   = Number(pick(v,'UsedCount','usedCount') || 0);
+                const limit  = pick(v,'UsageLimit','usageLimit');
+
+                const usable = canUse && !isExp && (isUnl || (rem ?? 0) > 0);
+                const benefit = `${pct}%` + (maxAmt ? ` • tối đa ${VND(maxAmt)}` : '');
+                const limitTxt = isUnl ? 'Không giới hạn'
+                  : `Còn ${rem ?? Math.max(0, (limit||0) - used)} lượt`;
+                const dateTxt = [
+                  start ? `Từ ${new Date(start).toLocaleDateString('vi-VN')}` : '',
+                  end   ? `đến ${new Date(end).toLocaleDateString('vi-VN')}`   : ''
+                ].filter(Boolean).join(' ');
+
+                const isUsing = !!CURRENT_VOUCHER && CURRENT_VOUCHER.Code === code;
+
+                return `
+                  <div class="voucher-item">
+                    <div class="row">
+                      <div class="col">
+                        <div class="code">Mã: <strong>${code}</strong></div>
+                        <div class="desc">${desc}</div>
+                        <div class="tiny muted">
+                          <span>${benefit}</span> • <span>${limitTxt}</span>${dateTxt? ` • <span>${dateTxt}</span>`:''}
+                        </div>
+                      </div>
+                      <div class="actions">
+                        <button class="btn ${isUsing?'btn-ghost':'btn-primary'}" type="button"
+                          data-code="${code}" ${usable?'':'disabled'}>${isUsing?'Đang dùng':'Sử dụng'}</button>
+                      </div>
                     </div>
-                  </div>
-                  <div class="actions">
-                    <button class="btn ${isUsing?'btn-ghost':'btn-primary'}" type="button"
-                      data-code="${code}" ${usable?'':'disabled'}>${isUsing?'Đang dùng':'Sử dụng'}</button>
-                  </div>
-                </div>
-              </div>`;
-          }).join('');
+                  </div>`;
+              }).join('');
 
-          // bind “Sử dụng”
-          voucherListEl.querySelectorAll('button[data-code]').forEach(btn=>{
-            btn.addEventListener('click', ()=>{
-              const code = btn.getAttribute('data-code');
-              const raw = list.find(x => pick(x,'Code','code') === code);
-              if(!raw) return;
-              setVoucher(raw); // lưu tạm + recalc
-              // đóng panel
-              const closer = document.querySelector('[data-close="#opt_voucher"]');
-              if(closer) closer.click();
-            });
-          });
-        }
-
-        /* ===== Nhập tay mã voucher ===== */
-        if(btnApplyTyped){
-          btnApplyTyped.addEventListener('click', ()=>{
-            const code = (voucherInputEl?.value || '').trim();
-            if(!code) return;
-            // set tạm để server validate khi submit
-            setVoucher({ code, discountPercent: 0, discountMaxAmount: 0 });
-            const closer = document.querySelector('[data-close="#opt_voucher"]');
-            if(closer) closer.click();
-          });
-        }
-
-        /* ===== Mở panel → load danh sách ===== */
-        document.addEventListener('click', (e)=>{
-          const btn = e.target.closest('.opt-btn[data-opt="voucher"]');
-          if(btn){ loadVouchers(); }
-        });
-
-        /* ======= Checkbox binding ======= */
-        document.querySelectorAll('.chk-item').forEach(el => el.addEventListener('change', recalc));
-        document.querySelectorAll('.chk-prov').forEach(ch=>{
-          ch.addEventListener('change', ()=>{
-            const g = ch.dataset.group;
-            document.querySelectorAll(`.chk-item[data-group="${g}"]`).forEach(i=> i.checked = ch.checked);
-            recalc();
-          });
-        });
-        const bindAll = el=>{
-          if(!el) return;
-          el.addEventListener('change', ()=>{
-            document.querySelectorAll('.chk-item').forEach(i=> i.checked = el.checked);
-            document.querySelectorAll('.chk-prov').forEach(i=>{ i.indeterminate=false; i.checked=el.checked; });
-            if (chkAll && chkAll_bottom){
-              (el===chkAll? chkAll_bottom:chkAll).checked = el.checked;
+              // bind “Sử dụng”
+              voucherListEl.querySelectorAll('button[data-code]').forEach(btn=>{
+                btn.addEventListener('click', ()=>{
+                  const code = btn.getAttribute('data-code');
+                  const raw = list.find(x => pick(x,'Code','code') === code);
+                  if(!raw) return;
+                  setVoucher(raw); // lưu tạm + recalc
+                  // đóng panel
+                  const closer = document.querySelector('[data-close="#opt_voucher"]');
+                  if(closer) closer.click();
+                });
+              });
             }
+
+            /* ===== Nhập tay mã voucher ===== */
+            if(btnApplyTyped){
+              btnApplyTyped.addEventListener('click', ()=>{
+                const code = (voucherInputEl?.value || '').trim();
+                if(!code) return;
+                // set tạm để server validate khi submit
+                setVoucher({ code, discountPercent: 0, discountMaxAmount: 0 });
+                const closer = document.querySelector('[data-close="#opt_voucher"]');
+                if(closer) closer.click();
+              });
+            }
+
+            /* ===== Mở panel → load danh sách ===== */
+            document.addEventListener('click', (e)=>{
+              const btn = e.target.closest('.opt-btn[data-opt="voucher"]');
+              if(btn){ loadVouchers(); }
+            });
+
+            /* ======= Checkbox binding ======= */
+            document.querySelectorAll('.chk-item').forEach(el => el.addEventListener('change', recalc));
+            document.querySelectorAll('.chk-prov').forEach(ch=>{
+              ch.addEventListener('change', ()=>{
+                const g = ch.dataset.group;
+                document.querySelectorAll(`.chk-item[data-group="${g}"]`).forEach(i=> i.checked = ch.checked);
+                recalc();
+              });
+            });
+            const bindAll = el=>{
+              if(!el) return;
+              el.addEventListener('change', ()=>{
+                document.querySelectorAll('.chk-item').forEach(i=> i.checked = el.checked);
+                document.querySelectorAll('.chk-prov').forEach(i=>{ i.indeterminate=false; i.checked=el.checked; });
+                if (chkAll && chkAll_bottom){
+                  (el===chkAll? chkAll_bottom:chkAll).checked = el.checked;
+                }
+                recalc();
+              });
+            };
+            bindAll(chkAll); bindAll(chkAll_bottom);
+
+                    function removeSelected(){
+              const ids = [...document.querySelectorAll('.chk-item:checked')].map(i=>i.dataset.key);
+              if(ids.length === 0){
+                alert('Bạn chưa chọn dịch vụ nào để xoá.');
+                return;
+              }
+
+              const form = document.getElementById('bulkRemoveForm');
+              if(!form) return;
+
+              // Dọn input cũ
+              form.querySelectorAll('input[name="selectedIds"]').forEach(e => e.remove());
+
+              // Bơm các selectedIds vào form
+              ids.forEach(id => {
+                const inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = 'selectedIds';
+                inp.value = id;
+                form.appendChild(inp);
+              });
+
+              lockBtn(form);
+              form.submit();
+            }
+
+
+            // function submitSelected(){
+            //   const keys = [...document.querySelectorAll('.chk-item:checked')].map(i=>i.dataset.key);
+            //   if(keys.length===0) return;
+            //   document.getElementById('selectedKeysCsv').value = keys.join(',');
+            //   document.getElementById('cartForm').submit();
+            // }
+
+                    function submitSelected(){
+              const keys = [...document.querySelectorAll('.chk-item:checked')].map(i=>i.dataset.key);
+              if(keys.length===0) return;
+
+              // Gán vào input của form Checkout
+              document.getElementById('selectedKeysCsv').value = keys.join(',');
+
+              // Nếu bạn muốn gửi kèm mã voucher (đang lưu ở #voucherCode), có thể map sang voucherId hoặc thêm 1 input khác:
+              // document.getElementById('voucherId').value = document.getElementById('voucherCode')?.value || '';
+
+              // Submit form Checkout (không phải #cartForm)
+              document.getElementById('checkoutForm').submit();
+            }
+
+
+            /* ======= Add-on qty +/- ======= */
+            function chgAddon(key, addon, sign){
+              const forms = [...document.querySelectorAll(`form.opt-qty input[name="key"][value="${key}"]`)].map(i=>i.closest('form'));
+              const target = forms.find(f => f.querySelector(`input[name="addon"][value="${addon}"]`));
+              if(!target) return;
+              const input = target.querySelector('.opt-input');
+              let v = parseInt(input.value||"0"); if(isNaN(v)) v=0;
+              v += (sign==='+'?1:-1); if(v<0) v=0;
+              input.value = v;
+              target.requestSubmit();
+            }
+            function lockBtn(form){
+              const btn = form.querySelector('button[type="submit"]');
+              if(btn){ btn.disabled = true; btn.classList.add('is-loading'); }
+            }
+
+            /* ========= Tuỳ chọn dùng PORTAL + MASK ========= */
+            let OPEN   = null;   // { btn, panel, parent, next }
+            let PORTAL = null;   // div cố định trên body
+            let MASK   = null;   // mask trong suốt
+            let rafId  = 0;
+
+            const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+            function ensurePortal(){
+              if (PORTAL) return PORTAL;
+              PORTAL = document.createElement('div');
+              PORTAL.id = 'optPortal';
+              document.body.appendChild(PORTAL);
+              return PORTAL;
+            }
+            function ensureMask(){
+              if (MASK) return MASK;
+              MASK = document.createElement('div');
+              MASK.id = 'optMask';
+              MASK.className = 'opt-mask';
+              MASK.hidden = true;
+              MASK.addEventListener('click', closePanel, {passive:true});
+              document.body.appendChild(MASK);
+              return MASK;
+            }
+
+            function placePanel(btn, panel){
+              const MARGIN = 12, GAP = 8;
+              const PANEL_W = Math.min(460, window.innerWidth - MARGIN*2);
+              const MAXH    = Math.floor(window.innerHeight - MARGIN*2);
+
+              panel.removeAttribute('hidden');
+              panel.classList.add('floating');
+              panel.style.width     = PANEL_W + 'px';
+              panel.style.maxHeight = MAXH + 'px';
+              panel.style.setProperty('--panel-w', PANEL_W + 'px');
+
+              const r  = btn.getBoundingClientRect();
+              const cx = r.left + r.width/2;
+
+              let left = Math.round(cx - PANEL_W/2);
+              left = clamp(left, MARGIN, window.innerWidth - MARGIN - PANEL_W);
+
+              const spaceDown = window.innerHeight - r.bottom - MARGIN;
+              const spaceUp   = r.top - MARGIN;
+              const dropUp    = spaceUp > spaceDown && spaceUp >= 120;
+
+              let topRef = dropUp ? (r.top - GAP) : (r.bottom + GAP);
+              topRef = clamp(topRef, MARGIN, window.innerHeight - MARGIN);
+
+              panel.style.left = left + 'px';
+              panel.style.top  = Math.round(topRef) + 'px';
+              panel.classList.toggle('drop-up', dropUp);
+
+              const arrowLeft = Math.round(cx - left);
+              panel.style.setProperty('--arrow-left', clamp(arrowLeft, 14, PANEL_W-14) + 'px');
+            }
+
+            function openPanel(btn){
+              const panel = document.getElementById('opt_' + btn.dataset.opt);
+              if(!panel) return;
+              if(OPEN && OPEN.panel === panel){ closePanel(); return; }
+
+              closePanel();
+              ensurePortal(); ensureMask();
+              MASK.hidden = false;
+              document.body.classList.add('opt-open'); // khoá scroll nền
+
+              // nhớ vị trí cũ & bốc panel lên portal
+              OPEN = { btn, panel, parent: panel.parentNode, next: panel.nextSibling };
+              PORTAL.appendChild(panel);
+
+              placePanel(btn, panel);
+              btn.setAttribute('aria-expanded','true');
+            }
+
+            function closePanel(){
+              if (MASK) MASK.hidden = true;
+              document.body.classList.remove('opt-open');
+
+              if(!OPEN) return;
+              const {panel, parent, next, btn} = OPEN;
+
+              if(parent) parent.insertBefore(panel, next);
+              panel.setAttribute('hidden','');
+              panel.classList.remove('floating','drop-up');
+              panel.style.left = panel.style.top = panel.style.width = panel.style.maxHeight = '';
+              panel.style.removeProperty('--panel-w');
+              panel.style.removeProperty('--arrow-left');
+
+              if(btn) btn.setAttribute('aria-expanded','false');
+              OPEN = null;
+            }
+
+            // Toggle
+            document.addEventListener('click', (e)=>{
+              const btn = e.target.closest('.opt-btn');
+              if(btn){ openPanel(btn); return; }
+
+              const closer = e.target.closest('[data-close]');
+              if(closer && OPEN){
+                const sel = closer.getAttribute('data-close');
+                const el  = document.querySelector(sel);
+                if(el && el === OPEN.panel) closePanel();
+              }
+            });
+
+            // Reposition khi resize (body đã khoá scroll nên không cần lắng nghe scroll)
+            function scheduleReposition(){
+              if(!OPEN) return;
+              if(rafId) return;
+              rafId = requestAnimationFrame(()=>{ rafId=0; placePanel(OPEN.btn, OPEN.panel); });
+            }
+            window.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
+            window.addEventListener('resize', scheduleReposition);
+
+            // init
             recalc();
-          });
-        };
-        bindAll(chkAll); bindAll(chkAll_bottom);
+        </script>
 
-        function submitSelected(){
-          const keys = [...document.querySelectorAll('.chk-item:checked')].map(i=>i.dataset.key);
-          if(keys.length===0) return;
-          document.getElementById('selectedKeysCsv').value = keys.join(',');
-          document.getElementById('cartForm').submit();
-        }
-
-        /* ======= Add-on qty +/- ======= */
-        function chgAddon(key, addon, sign){
-          const forms = [...document.querySelectorAll(`form.opt-qty input[name="key"][value="${key}"]`)].map(i=>i.closest('form'));
-          const target = forms.find(f => f.querySelector(`input[name="addon"][value="${addon}"]`));
-          if(!target) return;
-          const input = target.querySelector('.opt-input');
-          let v = parseInt(input.value||"0"); if(isNaN(v)) v=0;
-          v += (sign==='+'?1:-1); if(v<0) v=0;
-          input.value = v;
-          target.requestSubmit();
-        }
-        function lockBtn(form){
-          const btn = form.querySelector('button[type="submit"]');
-          if(btn){ btn.disabled = true; btn.classList.add('is-loading'); }
-        }
-
-        /* ========= Tuỳ chọn dùng PORTAL + MASK ========= */
-        let OPEN   = null;   // { btn, panel, parent, next }
-        let PORTAL = null;   // div cố định trên body
-        let MASK   = null;   // mask trong suốt
-        let rafId  = 0;
-
-        const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-
-        function ensurePortal(){
-          if (PORTAL) return PORTAL;
-          PORTAL = document.createElement('div');
-          PORTAL.id = 'optPortal';
-          document.body.appendChild(PORTAL);
-          return PORTAL;
-        }
-        function ensureMask(){
-          if (MASK) return MASK;
-          MASK = document.createElement('div');
-          MASK.id = 'optMask';
-          MASK.className = 'opt-mask';
-          MASK.hidden = true;
-          MASK.addEventListener('click', closePanel, {passive:true});
-          document.body.appendChild(MASK);
-          return MASK;
-        }
-
-        function placePanel(btn, panel){
-          const MARGIN = 12, GAP = 8;
-          const PANEL_W = Math.min(460, window.innerWidth - MARGIN*2);
-          const MAXH    = Math.floor(window.innerHeight - MARGIN*2);
-
-          panel.removeAttribute('hidden');
-          panel.classList.add('floating');
-          panel.style.width     = PANEL_W + 'px';
-          panel.style.maxHeight = MAXH + 'px';
-          panel.style.setProperty('--panel-w', PANEL_W + 'px');
-
-          const r  = btn.getBoundingClientRect();
-          const cx = r.left + r.width/2;
-
-          let left = Math.round(cx - PANEL_W/2);
-          left = clamp(left, MARGIN, window.innerWidth - MARGIN - PANEL_W);
-
-          const spaceDown = window.innerHeight - r.bottom - MARGIN;
-          const spaceUp   = r.top - MARGIN;
-          const dropUp    = spaceUp > spaceDown && spaceUp >= 120;
-
-          let topRef = dropUp ? (r.top - GAP) : (r.bottom + GAP);
-          topRef = clamp(topRef, MARGIN, window.innerHeight - MARGIN);
-
-          panel.style.left = left + 'px';
-          panel.style.top  = Math.round(topRef) + 'px';
-          panel.classList.toggle('drop-up', dropUp);
-
-          const arrowLeft = Math.round(cx - left);
-          panel.style.setProperty('--arrow-left', clamp(arrowLeft, 14, PANEL_W-14) + 'px');
-        }
-
-        function openPanel(btn){
-          const panel = document.getElementById('opt_' + btn.dataset.opt);
-          if(!panel) return;
-          if(OPEN && OPEN.panel === panel){ closePanel(); return; }
-
-          closePanel();
-          ensurePortal(); ensureMask();
-          MASK.hidden = false;
-          document.body.classList.add('opt-open'); // khoá scroll nền
-
-          // nhớ vị trí cũ & bốc panel lên portal
-          OPEN = { btn, panel, parent: panel.parentNode, next: panel.nextSibling };
-          PORTAL.appendChild(panel);
-
-          placePanel(btn, panel);
-          btn.setAttribute('aria-expanded','true');
-        }
-
-        function closePanel(){
-          if (MASK) MASK.hidden = true;
-          document.body.classList.remove('opt-open');
-
-          if(!OPEN) return;
-          const {panel, parent, next, btn} = OPEN;
-
-          if(parent) parent.insertBefore(panel, next);
-          panel.setAttribute('hidden','');
-          panel.classList.remove('floating','drop-up');
-          panel.style.left = panel.style.top = panel.style.width = panel.style.maxHeight = '';
-          panel.style.removeProperty('--panel-w');
-          panel.style.removeProperty('--arrow-left');
-
-          if(btn) btn.setAttribute('aria-expanded','false');
-          OPEN = null;
-        }
-
-        // Toggle
-        document.addEventListener('click', (e)=>{
-          const btn = e.target.closest('.opt-btn');
-          if(btn){ openPanel(btn); return; }
-
-          const closer = e.target.closest('[data-close]');
-          if(closer && OPEN){
-            const sel = closer.getAttribute('data-close');
-            const el  = document.querySelector(sel);
-            if(el && el === OPEN.panel) closePanel();
-          }
-        });
-
-        // Reposition khi resize (body đã khoá scroll nên không cần lắng nghe scroll)
-        function scheduleReposition(){
-          if(!OPEN) return;
-          if(rafId) return;
-          rafId = requestAnimationFrame(()=>{ rafId=0; placePanel(OPEN.btn, OPEN.panel); });
-        }
-        window.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
-        window.addEventListener('resize', scheduleReposition);
-
-        // init
-        recalc();
-    </script>
-
-}
+    }

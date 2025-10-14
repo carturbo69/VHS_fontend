@@ -114,7 +114,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
         }
 
-
         /// <summary>
         /// Thêm service vào giỏ hàng (POST)
         /// </summary>
@@ -172,26 +171,239 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
         }
 
-        // ===== Cập nhật / Xoá =====
+        // ===== XÓA 1 ITEM =====
         [HttpPost]
-        public IActionResult UpdateQty(Guid key, int qty)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Remove(Guid key)
         {
+            // key = CartItemId
+            var accountIdStr = HttpContext.Session.GetString("AccountID");
+            var jwt = HttpContext.Session.GetString("JWToken");
+
+            if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+            {
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Vui lòng đăng nhập để xóa sản phẩm.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            try
+            {
+                var ok = await _cartService.RemoveCartItemAsync(accountId, key, jwt);
+                TempData["ToastType"] = ok ? "success" : "error";
+                TempData["ToastMessage"] = ok ? "Đã xóa sản phẩm khỏi giỏ." : "Không thể xóa sản phẩm.";
+            }
+            catch (UnauthorizedAccessException)
+            {
+                HttpContext.Session.Clear();
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastType"] = "error";
+                TempData["ToastMessage"] = $"Lỗi khi xóa sản phẩm: {ex.Message}";
+            }
+
             return RedirectToAction(nameof(Index));
         }
 
+        // ===== XÓA NHIỀU ITEM (BULK) =====
         [HttpPost]
-        public IActionResult Remove(Guid key)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveSelected([FromForm] List<Guid> selectedIds)
         {
-          
+            var accountIdStr = HttpContext.Session.GetString("AccountID");
+            var jwt = HttpContext.Session.GetString("JWToken");
+
+            if (selectedIds == null || selectedIds.Count == 0)
+            {
+                TempData["ToastType"] = "info";
+                TempData["ToastMessage"] = "Bạn chưa chọn sản phẩm nào để xóa.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+            {
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Vui lòng đăng nhập để xóa sản phẩm.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            try
+            {
+                var ok = await _cartService.RemoveCartItemsAsync(accountId, selectedIds, jwt);
+                TempData["ToastType"] = ok ? "success" : "error";
+                TempData["ToastMessage"] = ok ? "Đã xóa các sản phẩm đã chọn." : "Không thể xóa các sản phẩm đã chọn.";
+            }
+            catch (UnauthorizedAccessException)
+            {
+                HttpContext.Session.Clear();
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastType"] = "error";
+                TempData["ToastMessage"] = $"Lỗi khi xóa nhiều sản phẩm: {ex.Message}";
+            }
+
             return RedirectToAction(nameof(Index));
         }
 
+        // ===== XÓA TOÀN BỘ GIỎ =====
         [HttpPost]
-        public IActionResult Clear()
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Clear()
         {
-            
+            var accountIdStr = HttpContext.Session.GetString("AccountID");
+            var jwt = HttpContext.Session.GetString("JWToken");
+
+            if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+            {
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Vui lòng đăng nhập để xóa giỏ hàng.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            try
+            {
+                var ok = await _cartService.ClearCartAsync(accountId, jwt);
+                TempData["ToastType"] = ok ? "success" : "error";
+                TempData["ToastMessage"] = ok ? "Đã xóa toàn bộ giỏ hàng." : "Không thể xóa giỏ hàng.";
+            }
+            catch (UnauthorizedAccessException)
+            {
+                HttpContext.Session.Clear();
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastType"] = "error";
+                TempData["ToastMessage"] = $"Lỗi khi xóa giỏ hàng: {ex.Message}";
+            }
+
             return RedirectToAction(nameof(Index));
         }
+
+        // ===== THÊM TUỲ CHỌN VÀO CART ITEM =====
+        // Form ở View gửi: cartItemId + optionIds[]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddAddon(Guid cartItemId, List<Guid>? optionIds)
+        {
+            var accountIdStr = HttpContext.Session.GetString("AccountID");
+            var jwt = HttpContext.Session.GetString("JWToken");
+
+            if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+            {
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Vui lòng đăng nhập để thêm tuỳ chọn.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            if (cartItemId == Guid.Empty || optionIds == null || optionIds.Count == 0)
+            {
+                TempData["ToastType"] = "info";
+                TempData["ToastMessage"] = "Chưa chọn tuỳ chọn để thêm.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            try
+            {
+                var ok = await _cartService.AddOptionsToCartItemAsync(accountId, cartItemId, optionIds, jwt);
+                TempData["ToastType"] = ok ? "success" : "error";
+                TempData["ToastMessage"] = ok ? "Đã thêm tuỳ chọn." : "Không thể thêm tuỳ chọn.";
+            }
+            catch (UnauthorizedAccessException)
+            {
+                HttpContext.Session.Clear();
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastType"] = "error";
+                TempData["ToastMessage"] = $"Lỗi khi thêm tuỳ chọn: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+
+        // ===== BỎ 1 TUỲ CHỌN KHỎI CART ITEM =====
+        // View có thể gửi optionId trực tiếp (khuyến nghị).
+        // Nếu View hiện tại chỉ có cartItemOptionId thì mình map sang optionId bằng cách load lại cart items.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveAddon(Guid cartItemId, Guid? optionId, Guid? cartItemOptionId)
+        {
+            var accountIdStr = HttpContext.Session.GetString("AccountID");
+            var jwt = HttpContext.Session.GetString("JWToken");
+
+            if (string.IsNullOrWhiteSpace(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+            {
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Vui lòng đăng nhập để bỏ tuỳ chọn.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            if (cartItemId == Guid.Empty)
+            {
+                TempData["ToastType"] = "error";
+                TempData["ToastMessage"] = "Thiếu CartItemId.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            try
+            {
+                Guid oid = optionId ?? Guid.Empty;
+
+                // Nếu chưa có optionId mà chỉ có cartItemOptionId -> map sang optionId
+                if (oid == Guid.Empty && cartItemOptionId.HasValue && cartItemOptionId.Value != Guid.Empty)
+                {
+                    var items = await _cartService.GetCartItemsByAccountIdAsync(accountId, jwt);
+                    var hit = items
+                        .FirstOrDefault(ci => ci.CartItemId == cartItemId)?
+                        .Options?
+                        .FirstOrDefault(o => o.CartItemOptionId == cartItemOptionId.Value);
+
+                    if (hit != null)
+                        oid = hit.OptionId;
+                }
+
+                if (oid == Guid.Empty)
+                {
+                    TempData["ToastType"] = "error";
+                    TempData["ToastMessage"] = "Không xác định được tuỳ chọn cần xoá.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                var ok = await _cartService.RemoveOptionFromCartItemAsync(accountId, cartItemId, oid, jwt);
+                TempData["ToastType"] = ok ? "success" : "error";
+                TempData["ToastMessage"] = ok ? "Đã bỏ tuỳ chọn." : "Không thể bỏ tuỳ chọn.";
+            }
+            catch (UnauthorizedAccessException)
+            {
+                HttpContext.Session.Clear();
+                TempData["ToastType"] = "warning";
+                TempData["ToastMessage"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastType"] = "error";
+                TempData["ToastMessage"] = $"Lỗi khi bỏ tuỳ chọn: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
 
         [HttpPost]
         [ValidateAntiForgeryToken]
