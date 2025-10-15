@@ -1,4 +1,4 @@
-﻿namespace VHS_frontend.Models.ReviewDTOs
+﻿namespace VHS_frontend.Areas.Customer.Models.ReviewDTOs
 {
     public class ReadReviewDTOs
     {

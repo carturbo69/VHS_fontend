@@ -1,6 +1,7 @@
 ﻿using VHS_frontend.Models;
 using VHS_frontend.Services;
 using VHS_frontend.Services.Admin;
+using VHS_frontend.Services.Customer;
 using VHS_frontend.Services.Customer.Implementations;
 using VHS_frontend.Services.Customer.Interfaces;
 
@@ -12,6 +13,11 @@ if (string.IsNullOrWhiteSpace(backendBase))
     throw new InvalidOperationException("Missing configuration: Apis:Backend");
 
 builder.Services.AddHttpClient<IServiceCustomerService, ServiceCustomerService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+builder.Services.AddHttpClient<CartServiceCustomer>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });

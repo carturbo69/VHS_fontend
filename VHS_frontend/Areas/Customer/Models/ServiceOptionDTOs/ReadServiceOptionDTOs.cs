@@ -1,4 +1,4 @@
-﻿namespace VHS_frontend.Models.ServiceOptionDTOs
+﻿namespace VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs
 {
     public class ReadServiceOptionDTOs
     {
