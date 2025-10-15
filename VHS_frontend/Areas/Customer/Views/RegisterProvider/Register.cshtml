@@ -393,6 +393,7 @@
           const tiDescEl  = document.getElementById("TI_Description");
 
           // === CORE: mỗi input file có "kho" riêng bằng WeakMap ===
+          // QUAN TRỌNG: fileStore gắn với từng input element cụ thể, không bị mất khi renumber
           const fileStore = new WeakMap();       // input[type=file] -> File[]
           function ensureStore(input){ if(!fileStore.has(input)) fileStore.set(input, []); return fileStore.get(input); }
 
@@ -402,6 +403,10 @@
             const grid  = cert.querySelector(".bl-previews");
             const name  = cert.querySelector(".bl-name");
             const files = ensureStore(input);
+            
+            // Debug: log để kiểm tra
+            console.log(`Render for input ${input.id}:`, files.length, 'files');
+            
             grid.innerHTML = "";
             files.forEach((f, i) => {
               const url = URL.createObjectURL(f);
@@ -416,27 +421,50 @@
           // Đồng bộ files vào chính input để submit đúng
           function syncInputFiles(input){
             const files = ensureStore(input);
+            console.log(`Syncing ${files.length} files to input ${input.id}`);
+            
             const dt = new DataTransfer();
-            files.forEach(f => dt.items.add(f));
+            files.forEach(f => {
+              dt.items.add(f);
+              console.log(`Added file to DataTransfer: ${f.name}`);
+            });
             input.files = dt.files;
+            
+            console.log(`After sync - input.files.length: ${input.files.length}`);
           }
 
           // Lắng nghe CHANGE trên từng input file (không dùng listener cũ bị clone)
           function bindFileInput(input){
-            input.addEventListener("change", e => {
+            // Xóa listener cũ nếu có để tránh duplicate
+            if (input._changeHandler) {
+              input.removeEventListener("change", input._changeHandler);
+            }
+            
+            // Tạo handler mới
+            input._changeHandler = (e) => {
+              console.log(`File change detected for input ${input.id}`);
               const cur = ensureStore(input);
               const sig = new Set(cur.map(f => `${f.name}|${f.size}|${f.lastModified}`));
               Array.from(input.files || []).forEach(f=>{
                 // validate type
-                if (!f.type.startsWith("image/")) return;
+                if (!f.type.startsWith("image/")) {
+                  console.log(`Invalid file type: ${f.type}`);
+                  return;
+                }
                 const k = `${f.name}|${f.size}|${f.lastModified}`;
-                if(!sig.has(k)){ cur.push(f); sig.add(k); }
+                if(!sig.has(k)){ 
+                  cur.push(f); 
+                  sig.add(k);
+                  console.log(`Added file: ${f.name}`);
+                }
               });
               fileStore.set(input, cur);
               syncInputFiles(input);
               renderFor(input);
               input.value = ""; // cho phép chọn lại cùng tệp
-            });
+            };
+            
+            input.addEventListener("change", input._changeHandler);
           }
 
           // Xóa ảnh ở đúng khung
@@ -469,7 +497,15 @@
           }
           list.addEventListener("change", (e)=>{
             if (e.target.matches('.cert select[name$=".CategoryId"]')) {
-              syncCategorySelects(); enableSubmit();
+              syncCategorySelects(); 
+              enableSubmit();
+              
+              // Đảm bảo ảnh vẫn hiển thị sau khi thay đổi category
+              const cert = e.target.closest(".cert");
+              const input = cert.querySelector(".bl-input");
+              if (input) {
+                renderFor(input);
+              }
             }
           });
 
@@ -481,10 +517,17 @@
             const tmpl  = items[items.length - 1];
             const clone = tmpl.cloneNode(true);
 
-            // reset giá trị
+            // reset giá trị - CHỈ reset form fields, KHÔNG động vào fileStore
             clone.querySelectorAll("input, textarea, select").forEach(el=>{
-              if (el.type === "file") el.value = ""; else el.value = "";
+              if (el.type === "file") {
+                el.value = ""; // reset input value
+                // KHÔNG xóa fileStore - để giữ ảnh đã chọn
+              } else {
+                el.value = "";
+              }
             });
+            
+            // Reset UI elements cho certificate mới
             const blName = clone.querySelector(".bl-name");
             const blGrid = clone.querySelector(".bl-previews");
             if (blName) blName.textContent = "Chưa chọn tệp";
@@ -497,10 +540,24 @@
             syncCertUI();
             enableSubmit();
 
-            // bind input file của khung mới
+            // bind input file của khung mới - tạo kho mới riêng
             const newInput = clone.querySelector(".bl-input");
-            ensureStore(newInput);   // kho rỗng riêng
+            ensureStore(newInput);   // kho rỗng riêng cho certificate mới
             bindFileInput(newInput); // gắn change cho khung mới
+            
+            // QUAN TRỌNG: Bind lại TẤT CẢ input files sau khi renumber
+            // Vì renumber có thể làm mất event listeners
+            list.querySelectorAll(".cert .bl-input").forEach(input => {
+              bindFileInput(input); // Bind lại tất cả để đảm bảo hoạt động
+            });
+            
+            // Force render lại tất cả certificates để đảm bảo ảnh hiển thị đúng
+            list.querySelectorAll(".cert").forEach(cert => {
+              const input = cert.querySelector(".bl-input");
+              if (input) {
+                renderFor(input);
+              }
+            });
           });
 
           // Xóa khung chứng chỉ
@@ -511,44 +568,51 @@
             if (items.length <= 1) return;
             const cert = btn.closest(".cert");
             const input = cert.querySelector(".bl-input");
-            fileStore.delete(input);             // xóa kho của khung này
+            // Xóa kho của khung bị xóa để giải phóng memory
+            fileStore.delete(input);             
             cert.remove();
             renumberCerts();
             syncCertUI();
             enableSubmit();
           });
 
-          // Đánh lại index (name/id/for) — KHÔNG động vào fileStore nên ảnh không “nhảy”
-                  function renumberCerts(){
-          list.querySelectorAll(".cert").forEach((blk, i) => {
-            blk.dataset.index = i;
-            blk.querySelector(".pill").textContent = i + 1;
-            const title = blk.querySelector(".cert__head strong");
-            if (title) title.textContent = `Chứng chỉ ${i + 1}`;
+          // Đánh lại index (name/id/for) — KHÔNG động vào fileStore nên ảnh không "nhảy"
+          function renumberCerts(){
+            list.querySelectorAll(".cert").forEach((blk, i) => {
+              blk.dataset.index = i;
+              blk.querySelector(".pill").textContent = i + 1;
+              const title = blk.querySelector(".cert__head strong");
+              if (title) title.textContent = `Chứng chỉ ${i + 1}`;
 
-            // 1) Cập nhật name để .NET bind đúng
-            blk.querySelectorAll("[name]").forEach(el=>{
-              el.name = el.name.replace(/Certificates\[\d+\]/g, `Certificates[${i}]`);
+              // 1) Cập nhật name để .NET bind đúng
+              blk.querySelectorAll("[name]").forEach(el=>{
+                el.name = el.name.replace(/Certificates\[\d+\]/g, `Certificates[${i}]`);
+              });
+
+              // 2) Cập nhật ID của input file
+              const input = blk.querySelector(".bl-input");
+              if (input) input.id = `BL_${i}`;
+
+              // 3) Cập nhật TẤT CẢ label trỏ tới input file (cả nhãn tiêu đề và nút "Chọn ảnh")
+              blk.querySelectorAll('label[for^="BL_"]').forEach(lab=>{
+                lab.setAttribute("for", `BL_${i}`);
+              });
+
+              // 4) Đồng bộ lại files vào input + render đúng khung
+              // QUAN TRỌNG: Chỉ render lại UI, KHÔNG làm mất fileStore
+              if (input) {
+                // Đảm bảo fileStore vẫn tồn tại trước khi sync
+                const files = ensureStore(input);
+                syncInputFiles(input);
+                renderFor(input);
+                
+                // Bind lại event listener cho input này
+                bindFileInput(input);
+              }
             });
 
-            // 2) Cập nhật ID của input file
-            const input = blk.querySelector(".bl-input");
-            if (input) input.id = `BL_${i}`;
-
-            // 3) Cập nhật TẤT CẢ label trỏ tới input file (cả nhãn tiêu đề và nút "Chọn ảnh")
-            blk.querySelectorAll('label[for^="BL_"]').forEach(lab=>{
-              lab.setAttribute("for", `BL_${i}`);
-            });
-
-            // 4) Đồng bộ lại files vào input + render đúng khung
-            if (input) {
-              syncInputFiles(input);
-              renderFor(input);
-            }
-          });
-
-          syncCategorySelects();
-        }
+            syncCategorySelects();
+          }
 
 
           function syncCertUI(){
@@ -570,14 +634,23 @@
           nameEl?.addEventListener("input", enableSubmit);
 
           // ===== init =====
-          // bind khung 1
-          const firstInput = document.querySelector('.cert .bl-input');
-          ensureStore(firstInput);
-          bindFileInput(firstInput);
+          // bind TẤT CẢ input files từ đầu
+          list.querySelectorAll(".cert .bl-input").forEach(input => {
+            ensureStore(input);
+            bindFileInput(input);
+          });
 
           renumberCerts();
           syncCertUI();
           enableSubmit();
+          
+          // Force render tất cả certificates khi trang load
+          list.querySelectorAll(".cert").forEach(cert => {
+            const input = cert.querySelector(".bl-input");
+            if (input) {
+              renderFor(input);
+            }
+          });
 
           // Submit AJAX JSON — loại bỏ redirect/banner
           const form = document.getElementById("providerForm");
@@ -639,11 +712,23 @@
             let totalBytes = 0;
             const allFiles = [];
             if (fileInput?.files?.[0]) allFiles.push(fileInput.files[0]);
-            certBlocks.forEach(blk => {
+            
+            // Debug: log tất cả files trước khi submit
+            console.log('=== SUBMIT DEBUG ===');
+            certBlocks.forEach((blk, idx) => {
               const input = blk.querySelector('.bl-input');
               const files = ensureStore(input) || [];
+              console.log(`Certificate ${idx + 1}:`, files.length, 'files in store');
+              console.log(`Certificate ${idx + 1} input.files:`, input.files.length);
+              
+              // Đảm bảo sync files vào input trước khi submit
+              syncInputFiles(input);
+              console.log(`After sync - Certificate ${idx + 1} input.files:`, input.files.length);
+              
               files.forEach(f => allFiles.push(f));
             });
+            console.log('Total files to submit:', allFiles.length);
+            
             allFiles.forEach(f => {
               if (!f.type.startsWith('image/')) errors.push({ msg: 'Tệp không hợp lệ (không phải ảnh).', el: null });
               totalBytes += f.size;
@@ -664,6 +749,15 @@
             if (nameEl) nameEl.value = providerName;
             if (phoneEl) phoneEl.value = phoneTrim;
 
+            // QUAN TRỌNG: Sync tất cả files vào input trước khi submit
+            certBlocks.forEach(blk => {
+              const input = blk.querySelector('.bl-input');
+              if (input) {
+                syncInputFiles(input);
+                console.log(`Final sync - Certificate input.files:`, input.files.length);
+              }
+            });
+
             ev.preventDefault();
             btnSubmit.disabled = true;
             const oldText = btnSubmit.textContent;
@@ -671,6 +765,17 @@
 
             try {
               const fd = new FormData(form);
+              
+              // Debug: log FormData contents
+              console.log('=== FORMDATA DEBUG ===');
+              for (let [key, value] of fd.entries()) {
+                if (value instanceof File) {
+                  console.log(`${key}: File(${value.name}, ${value.size} bytes)`);
+                } else {
+                  console.log(`${key}: ${value}`);
+                }
+              }
+              
               // gửi giữ nguyên keys theo yêu cầu; không set Content-Type
               const res = await fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd });
 
