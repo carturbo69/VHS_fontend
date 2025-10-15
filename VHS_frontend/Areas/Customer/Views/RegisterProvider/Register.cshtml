@@ -675,19 +675,27 @@
               const res = await fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd });
 
               if (res.status === 200) {
-                const ok = await res.json(); // { PROVIDERID, STATUS }
-                // điều hướng trang Success theo flow cũ
-                window.location.href = `${form.getAttribute('data-success') || '/Customer/RegisterProvider/Success'}?id=${encodeURIComponent(ok.PROVIDERID)}&stat=${encodeURIComponent(ok.STATUS)}`;
+                const ok = await res.json(); // { ok: true, providerId, status, refresh } OR { ok:false,... }
+                if (!ok || ok.ok !== true) {
+                  alert(ok?.message || 'Đăng ký thất bại.');
+                } else if (ok.refresh) {
+                  localStorage.removeItem('myProvider');
+                  window.location.reload();
+                } else {
+                  window.location.href = `${form.getAttribute('data-success') || '/Customer/RegisterProvider/Success'}?id=${encodeURIComponent(ok.providerId)}&stat=${encodeURIComponent(ok.status)}`;
+                }
                 return;
               }
 
               // lỗi 409 hoặc 400
               let err; try { err = await res.json(); } catch { err = { Message: 'Đăng ký thất bại.' }; }
-              const msg = err?.Message || 'Đăng ký thất bại.';
-              alert(msg);
+              const msg = err?.Message || err?.message || 'Đăng ký thất bại.';
+              const detail = err?.Detail || err?.detail;
+              alert(detail ? `${msg}\n\nChi tiết: ${detail}` : msg);
 
               // map Errors[].Field
-              if (Array.isArray(err?.Errors)) {
+              if (Array.isArray(err?.Errors) || Array.isArray(err?.errors)) {
+                const list = err.Errors || err.errors;
                 const m = (field) => {
                   if (!field) return null;
                   if (field === 'PROVIDERNAME') return nameEl;
@@ -708,8 +716,8 @@
                   }
                   return null;
                 };
-                const first = err.Errors.find(e => !!e.Field);
-                const el = first ? m(first.Field) : null;
+                const first = list.find(e => !!(e.Field || e.field));
+                const el = first ? m(first.Field || first.field) : null;
                 if (el && el.classList) el.classList.add('is-invalid');
                 if (el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth',block:'center'});
                 if (el && el.focus) el.focus();

@@ -40,13 +40,22 @@ namespace VHS_frontend.Services.Customer
         // YÊU CẦU API có endpoint: GET /api/register-provider/me
         public async Task<MyProviderDTO?> GetMyProviderAsync(CancellationToken ct = default)
         {
-            var res = await _http.GetAsync("/api/register-provider/me", ct);
+            // Cache busting để đảm bảo lấy dữ liệu mới nhất
+            var url = $"/api/register-provider/me?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+            var res = await _http.GetAsync(url, ct);
             if (res.StatusCode == System.Net.HttpStatusCode.NotFound) return null; // chưa có hồ sơ
             res.EnsureSuccessStatusCode();
 
             await using var s = await res.Content.ReadAsStreamAsync(ct);
             var dto = await JsonSerializer.DeserializeAsync<MyProviderDTO>(s, _json, ct);
             return dto;
+        }
+
+        // Clear cache method (nếu cần)
+        public void ClearCache()
+        {
+            // Clear any cached provider data
+            // Có thể mở rộng để clear localStorage nếu dùng JS
         }
 
         // ===== REGISTER / UPDATE (multipart forward) =====
@@ -114,18 +123,22 @@ namespace VHS_frontend.Services.Customer
             var res = await _http.PostAsync("/api/register-provider", content, ct);
             var payload = await res.Content.ReadAsStringAsync(ct);
 
-
-            var body = await res.Content.ReadAsStringAsync(ct);
+            // Log chi tiết để debug
+            Console.WriteLine($"API Response Status: {res.StatusCode}");
+            Console.WriteLine($"API Response Body: {payload}");
 
             if (!res.IsSuccessStatusCode)
             {
                 string msg = $"API {res.StatusCode}";
                 List<ApiErrorItem>? errs = null;
+                string? detail = null;
                 try
                 {
-                    using var doc = JsonDocument.Parse(body);
+                    using var doc = JsonDocument.Parse(payload);
                     if (doc.RootElement.TryGetProperty("message", out var p1)) msg = p1.GetString() ?? msg;
                     else if (doc.RootElement.TryGetProperty("Message", out var p2)) msg = p2.GetString() ?? msg;
+                    if (doc.RootElement.TryGetProperty("detail", out var d1)) detail = d1.GetString();
+                    else if (doc.RootElement.TryGetProperty("Detail", out var d2)) detail = d2.GetString();
                     if (doc.RootElement.TryGetProperty("Errors", out var arr) && arr.ValueKind == JsonValueKind.Array)
                     {
                         errs = new List<ApiErrorItem>();
@@ -140,15 +153,15 @@ namespace VHS_frontend.Services.Customer
                         }
                     }
                 }
-                catch { if (!string.IsNullOrWhiteSpace(body)) msg = body; }
+                catch { if (!string.IsNullOrWhiteSpace(payload)) msg = payload; }
 
-                return new RegisterResultVm { Success = false, Message = msg, Errors = errs, Raw = body, StatusCode = (int)res.StatusCode };
+                return new RegisterResultVm { Success = false, Message = msg, Detail = detail, Errors = errs, Raw = payload, StatusCode = (int)res.StatusCode };
             }
 
             // ======= THÀNH CÔNG: bóc JSON case-insensitive + fallback =======
             try
             {
-                using var ok = JsonDocument.Parse(body);
+                using var ok = JsonDocument.Parse(payload);
 
                 // id (nhận cả PROVIDERID và ProviderId)
                 Guid id = Guid.Empty;
@@ -178,7 +191,7 @@ namespace VHS_frontend.Services.Customer
                     Success = true,
                     Message = "Đăng ký thành công",
                     Response = resp,
-                    Raw = body,
+                    Raw = payload,
                     StatusCode = 200
                 };
             }
@@ -190,7 +203,7 @@ namespace VHS_frontend.Services.Customer
                     PROVIDERID = Guid.Empty, // controller vẫn redirect; nhưng bạn có thể log Raw để kiểm tra
                     STATUS = "Pending"
                 };
-                return new RegisterResultVm { Success = true, Message = "Đăng ký thành công", Response = resp, Raw = body, StatusCode = 200 };
+                return new RegisterResultVm { Success = true, Message = "Đăng ký thành công", Response = resp, Raw = payload, StatusCode = 200 };
             }
         }
 
@@ -199,6 +212,7 @@ namespace VHS_frontend.Services.Customer
         {
             public bool Success { get; set; }
             public string Message { get; set; } = "";
+            public string? Detail { get; set; }
             public RegisterProviderResponseDTO? Response { get; set; }
             public List<ApiErrorItem>? Errors { get; set; }
             public string Raw { get; set; } = "";

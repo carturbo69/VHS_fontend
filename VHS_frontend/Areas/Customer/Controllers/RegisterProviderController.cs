@@ -62,7 +62,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             if (string.IsNullOrEmpty(token))
             {
-                if (isAjax) return Ok(new { ok = false, message = "Bạn chưa đăng nhập." });
+                if (isAjax) return StatusCode(401, new { ok = false, message = "Bạn chưa đăng nhập." });
                 return RedirectToAction("Login", "Account", new { area = "" });
             }
             _svc.SetBearerToken(token);
@@ -77,26 +77,52 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         ? "Đăng ký thất bại. Vui lòng kiểm tra dữ liệu và thử lại."
                         : result.Message;
 
-                    // AJAX: luôn trả 200 + payload rõ ràng
-                    if (isAjax) return Ok(new { ok = false, message = msg, errors = result.Errors });
+                    // Log chi tiết để debug
+                    Console.WriteLine($"Register failed - StatusCode: {result.StatusCode}, Message: {msg}");
+                    Console.WriteLine($"Raw API Response: {result.Raw}");
 
-                    // Non-AJAX: quay lại form với banner lỗi
+                    // Phân loại lỗi BE để hiển thị thông báo phù hợp
+                    if (result.Raw.Contains("CancellationToken") || result.Raw.Contains("store type mapping"))
+                    {
+                        Console.WriteLine("Detected CancellationToken mapping error - BE needs to fix entity model");
+                        msg = "Lỗi hệ thống: BE cần kiểm tra Entity Framework model (không được có CancellationToken trong entity).";
+                    }
+                    else if (result.Raw.Contains("Invalid object name") || result.Raw.Contains("Providers"))
+                    {
+                        Console.WriteLine("Detected table name error - BE using wrong table name");
+                        msg = "Lỗi hệ thống: BE đang dùng tên bảng sai (Providers thay vì Provider).";
+                    }
+                    else if (result.Raw.Contains("REFERENCE constraint") || result.Raw.Contains("FK__"))
+                    {
+                        Console.WriteLine("Detected foreign key constraint error - BE should create new Provider instead of deleting");
+                        msg = "Lỗi hệ thống: BE nên tạo Provider mới thay vì xóa Provider cũ (tránh foreign key constraint).";
+                    }
+                    else if (result.Raw.Contains("duplicate key") || result.Raw.Contains("UQ__Provider"))
+                    {
+                        Console.WriteLine("Detected duplicate key error - BE should generate new ProviderId");
+                        msg = "Lỗi hệ thống: BE nên tạo ProviderId mới (NEWID()) thay vì dùng lại ID cũ.";
+                    }
+
+                    if (isAjax) return StatusCode(result.StatusCode == 0 ? 400 : result.StatusCode, new { ok = false, message = msg, detail = result.Detail, errors = result.Errors, raw = result.Raw });
+
                     TempData["ApiError"] = msg;
                     return RedirectToAction(nameof(Register));
                 }
 
-                // Thành công: chuẩn hóa STAT để không bao giờ undefined
                 var id = result.Response?.PROVIDERID ?? Guid.Empty;
                 var stat = string.IsNullOrWhiteSpace(result.Response?.STATUS) ? "Pending" : result.Response!.STATUS;
 
-                if (isAjax) return Ok(new { ok = true, providerId = id, status = stat });
+                // Clear cache để đảm bảo dữ liệu mới nhất
+                _svc.ClearCache();
+
+                if (isAjax) return Ok(new { ok = true, providerId = id, status = stat, refresh = true });
 
                 return RedirectToAction(nameof(Success), new { id, stat });
             }
             catch (Exception ex)
             {
                 var msg = $"Đăng ký thất bại: {ex.Message}";
-                if (isAjax) return Ok(new { ok = false, message = msg });
+                if (isAjax) return StatusCode(500, new { ok = false, message = msg });
 
                 TempData["ApiError"] = msg;
                 return RedirectToAction(nameof(Register));
