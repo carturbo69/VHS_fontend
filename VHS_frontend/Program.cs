@@ -41,6 +41,10 @@ builder.Services.AddHttpClient<AdminRegisterProviderService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+builder.Services.AddHttpClient<AdminVoucherService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 
 // HttpClient cho AuthService
 builder.Services.AddHttpClient<AuthService>();

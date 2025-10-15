@@ -1,0 +1,453 @@
+﻿@using VHS_frontend.Areas.Admin.Models.Voucher
+@model List<AdminVoucherItemDTO>
+
+@{
+    ViewData["Title"] = "Quản lý Voucher";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+
+    var total = (int)(ViewBag.Total ?? Model.Count);
+    var active = (int)(ViewBag.Active ?? Model.Count(x => x.IsActive == true));
+    var inactive = (int)(ViewBag.Inactive ?? Model.Count(x => x.IsActive != true));
+    var expired = (int)(ViewBag.Expired ?? Model.Count(x => x.IsExpired));
+    var keyword = (string)(ViewBag.Keyword ?? "");
+    bool? onlyActive = (bool?)ViewBag.OnlyActive;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/voucher.css" asp-append-version="true" />
+}
+
+<section class="v-page container-fluid">
+    <!-- Header / Metrics -->
+    <div class="v-head card-x glass">
+        <div class="left">
+            <div class="ico"><i class="bi bi-ticket-perforated"></i></div>
+            <div>
+                <h3>Voucher</h3>
+                <div class="sub">Quản lý mã giảm giá (Percent &amp; Max Amount)</div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="pill"><span class="lbl">Tổng</span><span class="val">@total</span></div>
+            <div class="pill good"><span class="lbl">Hoạt động</span><span class="val">@active</span></div>
+            <div class="pill mute"><span class="lbl">Ngưng</span><span class="val">@inactive</span></div>
+            <div class="pill warn"><span class="lbl">Hết hạn</span><span class="val">@expired</span></div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="v-toolbar">
+        <div class="actions">
+            <button class="btn btn-primary soft" id="btnCreate">
+                <i class="bi bi-plus-circle"></i> Thêm voucher
+            </button>
+
+            <a class="btn btn-ghost soft"
+               asp-area="Admin" asp-controller="AdminVoucher" asp-action="Index"
+               asp-route-onlyActive="@( onlyActive.HasValue ? (!onlyActive.Value) : true )"
+               asp-route-keyword="@keyword">
+                <i class="bi @(onlyActive==true ? "bi-eye-slash" : "bi-eye")"></i>
+                @(onlyActive == true ? "Hiện tất cả" : "Chỉ hiển thị Hoạt động")
+            </a>
+
+            <form class="search" method="get" asp-area="Admin" asp-controller="AdminVoucher" asp-action="Index">
+                <i class="bi bi-search"></i>
+                <input name="keyword" value="@keyword" class="form-control" placeholder="Tìm theo Code/Description…" />
+                @if (onlyActive == true)
+                {
+                    <input type="hidden" name="onlyActive" value="true" />
+                }
+            </form>
+        </div>
+
+        <!-- FILTER CARD: % + Ngày + Trạng thái thời gian -->
+        <div class="filter-card card-x">
+            <div class="filter-grid">
+                <div class="filter-block">
+                    <div class="fb-label">% Giảm</div>
+                    <div class="fb-row">
+                        <input id="pfMin" type="number" class="form-control" placeholder="Từ" min="0" max="100" />
+                        <span class="dash">–</span>
+                        <input id="pfMax" type="number" class="form-control" placeholder="Đến" min="0" max="100" />
+                    </div>
+                </div>
+
+                <div class="filter-block">
+                    <div class="fb-label">Thời gian áp dụng</div>
+                    <div class="fb-row">
+                        <input id="dMin" type="date" class="form-control" />
+                        <span class="dash">→</span>
+                        <input id="dMax" type="date" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="filter-block">
+                    <div class="fb-label">Trạng thái thời gian</div>
+                    <div class="fb-row">
+                        <select id="timeState" class="form-select">
+                            <option value="all" selected>Tất cả</option>
+                            <option value="upcoming">Chưa bắt đầu</option>
+                            <option value="started">Đang diễn ra</option>
+                            <option value="expired">Đã hết hạn</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button class="btn btn-ghost soft" id="btnApply" type="button">Lọc</button>
+                    <button class="btn btn-ghost soft" id="btnClear" type="button" title="Xoá lọc">Xoá</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap card-x">
+        <div class="table-scroll">
+            <table class="table table-hover align-middle mb-0" id="tblVouchers">
+                <thead>
+                    <tr>
+                        <th class="w-code">Mã</th>
+                        <th>Mô tả</th>
+                        <th class="w-number">% giảm</th>
+                        <th class="w-number">Giảm tối đa</th>
+                        <th class="w-time">Thời gian</th>
+                        <th class="w-number">Sử dụng</th>
+                        <th class="w-state">Trạng thái</th>
+                        <th class="text-end w-actions">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var v in Model)
+                    {
+                        var sStr = v.StartDate?.ToString("yyyy-MM-dd") ?? "";
+                        var eStr = v.EndDate?.ToString("yyyy-MM-dd") ?? "";
+                        var sShow = v.StartDate?.ToString("dd/MM/yyyy") ?? "—";
+                        var eShow = v.EndDate?.ToString("dd/MM/yyyy") ?? "—";
+                        var tState = v.IsUpcoming ? "upcoming" : (v.IsExpired ? "expired" : "started");
+                        <tr data-id="@v.VoucherId"
+                            data-start="@sStr"
+                            data-end="@eStr"
+                            data-tstate="@tState">
+                            <td class="fw-semibold mono">@v.Code</td>
+                            <td class="text-truncate" style="max-width:360px;">@v.Description</td>
+                            <td>@(v.DiscountPercent?.ToString("0.##") ?? "—")</td>
+                            <td>@(v.DiscountMaxAmount?.ToString("N0") ?? "—")</td>
+                            <td class="time-cell">
+                                <div class="date-line">@sShow → @eShow</div>
+                                <div class="substate">
+                                    @if (v.IsUpcoming)
+                                    {
+                                        <span class="badge upcoming">Chưa bắt đầu</span>
+                                    }
+                                    else if (v.IsExpired)
+                                    {
+                                        <span class="badge expired">Hết hạn</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge started">Đang diễn ra</span>
+                                    }
+                                </div>
+                            </td>
+                            <td>@(v.UsedCount ?? 0) / @(v.UsageLimit?.ToString() ?? "∞")</td>
+                            <td>
+                                @if (v.IsActive == true)
+                                {
+                                    <span class="state ok">Hoạt động</span>
+                                }
+                                else
+                                {
+                                    <span class="state off">Tạm dừng</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-edit soft btn-edit-v">
+                                        <i class="bi bi-pencil-square"></i> Sửa
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger soft btn-del-v">
+                                        <i class="bi bi-trash"></i> Xoá
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- Modal: Voucher -->
+<div class="modal fade" id="vModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content card-x" id="vForm">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vModalTitle">Thêm voucher</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="vId" />
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Mã (Code)</label>
+                        <input type="text" id="vCode" class="form-control mono" maxlength="64" required />
+                        <div class="invalid-feedback">Vui lòng nhập mã hợp lệ.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Trạng thái</label>
+                        <select id="vActive" class="form-select">
+                            <option value="true">Hoạt động</option>
+                            <option value="false">Tạm dừng</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Mô tả</label>
+                        <textarea id="vDesc" class="form-control" rows="2" maxlength="512"></textarea>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Giảm (%)</label>
+                        <input type="number" id="vPercent" step="0.01" min="0" max="100" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Giảm tối đa</label>
+                        <input type="number" id="vMax" step="0.01" min="0" class="form-control" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Bắt đầu</label>
+                        <input type="date" id="vStart" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Kết thúc</label>
+                        <input type="date" id="vEnd" class="form-control" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Giới hạn dùng</label>
+                        <input type="number" id="vLimit" class="form-control" min="0" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Đã dùng</label>
+                        <input type="number" id="vUsed" class="form-control" min="0" disabled value="0" />
+                    </div>
+                </div>
+
+                <div id="vError" class="text-danger small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-primary soft" id="btnSaveV">Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const routes = {
+          vGet   : '@Url.Action("Get", "AdminVoucher", new { area = "Admin" })',
+          vCreate: '@Url.Action("Create", "AdminVoucher", new { area = "Admin" })',
+          vUpdate: '@Url.Action("Update", "AdminVoucher", new { area = "Admin" })',
+          vDelete: '@Url.Action("Delete", "AdminVoucher", new { area = "Admin" })'
+        };
+
+        // ===== Modal + fields =====
+        const vModal = new bootstrap.Modal(document.getElementById('vModal'));
+        const vId    = document.getElementById('vId');
+        const vCode  = document.getElementById('vCode');
+        const vDesc  = document.getElementById('vDesc');
+        const vPercent = document.getElementById('vPercent');
+        const vMax     = document.getElementById('vMax');
+        const vStart   = document.getElementById('vStart');
+        const vEnd     = document.getElementById('vEnd');
+        const vLimit   = document.getElementById('vLimit');
+        const vUsed    = document.getElementById('vUsed');
+        const vActive  = document.getElementById('vActive');
+        const vError   = document.getElementById('vError');
+
+        document.getElementById('btnCreate').addEventListener('click', () => {
+          document.getElementById('vModalTitle').textContent = 'Thêm voucher';
+          vId.value=''; vCode.value=''; vDesc.value='';
+          vPercent.value=''; vMax.value='';
+          vStart.value=''; vEnd.value='';
+          vLimit.value=''; vUsed.value='0';
+          vActive.value='true';
+          vError.textContent=''; vCode.classList.remove('is-invalid');
+          vModal.show();
+        });
+
+        vCode.addEventListener('input', ()=> { if (vCode.value.trim()) vCode.classList.remove('is-invalid'); });
+
+        // ===== Bảng: edit/delete =====
+        document.getElementById('tblVouchers').addEventListener('click', async (e)=>{
+          const btn = e.target.closest('button'); if(!btn) return;
+          const tr = btn.closest('tr'); const id = tr?.dataset?.id; if(!id) return;
+
+          // Edit
+          if (btn.classList.contains('btn-edit-v')) {
+            const res = await fetch(routes.vGet + `?id=${id}`);
+            if(!res.ok) { alert('Không đọc được voucher'); return; }
+            const v = await res.json();
+
+            document.getElementById('vModalTitle').textContent = 'Sửa voucher';
+            vId.value = v.voucherId;
+            vCode.value = v.code;
+            vDesc.value = v.description ?? '';
+            vPercent.value = v.discountPercent ?? '';
+            vMax.value = v.discountMaxAmount ?? '';
+            vStart.value = v.startDate ? v.startDate.substring(0,10) : '';
+            vEnd.value = v.endDate ? v.endDate.substring(0,10) : '';
+            vLimit.value = v.usageLimit ?? '';
+            vUsed.value = v.usedCount ?? 0;
+            vActive.value = (v.isActive === true) ? 'true' : 'false';
+            vError.textContent='';
+            vModal.show();
+            return;
+          }
+
+          // Delete
+          if (btn.classList.contains('btn-del-v')) {
+            if (!confirm('Xoá voucher này?')) return;
+            const res = await fetch(routes.vDelete + `?id=${id}`, { method:'DELETE' });
+            if (res.status === 204) location.reload();
+            else alert(await res.text());
+            return;
+          }
+        });
+
+        // ===== FILTERS: % + date + time-state (client-side) =====
+        const pfMin = document.getElementById('pfMin');
+        const pfMax = document.getElementById('pfMax');
+        const dMin  = document.getElementById('dMin');
+        const dMax  = document.getElementById('dMax');
+        const timeState = document.getElementById('timeState');
+
+        document.getElementById('btnApply').addEventListener('click', applyAllFilters);
+        document.getElementById('btnClear').addEventListener('click', () => {
+          pfMin.value=''; pfMax.value='';
+          dMin.value=''; dMax.value='';
+          timeState.value='all';
+          applyAllFilters();
+        });
+
+        // apply on enter in any input
+        [pfMin,pfMax,dMin,dMax,timeState].forEach(el=>{
+          el.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); applyAllFilters(); }});
+          el.addEventListener('change', ()=>{ /* optional live */ });
+        });
+
+        function parseYMD(s){
+          // expects "yyyy-MM-dd"
+          if(!s) return null;
+          const [y,m,d] = s.split('-').map(Number);
+          if(!y || !m || !d) return null;
+          return new Date(y, m-1, d, 0,0,0,0);
+        }
+
+        function applyAllFilters(){
+          // validate %
+          const min = pfMin.value === '' ? null : Number(pfMin.value);
+          const max = pfMax.value === '' ? null : Number(pfMax.value);
+          if (min != null && (isNaN(min) || min<0 || min>100)) { alert('Phần trăm tối thiểu phải trong khoảng 0–100.'); return; }
+          if (max != null && (isNaN(max) || max<0 || max>100)) { alert('Phần trăm tối đa phải trong khoảng 0–100.'); return; }
+          if (min != null && max != null && min > max) { alert('Giá trị Từ phải ≤ Đến.'); return; }
+
+          // dates
+          const dmin = parseYMD(dMin.value);
+          const dmax = parseYMD(dMax.value);
+          if (dmin && dmax && dmin.getTime() > dmax.getTime()) { alert('Ngày bắt đầu phải trước ngày kết thúc.'); return; }
+
+          const want = timeState.value; // 'all' | 'upcoming' | 'started' | 'expired'
+
+          document.querySelectorAll('#tblVouchers tbody tr').forEach(tr=>{
+            // percent
+            const pctCell = tr.querySelectorAll('td')[2];
+            const percentText = pctCell ? pctCell.textContent.trim() : '';
+            const pctVal = (percentText==='—' || percentText==='') ? null : Number(percentText.replace(',', '.'));
+
+            let show = true;
+            if (min != null && (pctVal == null || pctVal < min)) show = false;
+            if (max != null && (pctVal == null || pctVal > max)) show = false;
+
+            // time-state
+            const tstate = tr.dataset.tstate; // upcoming|started|expired
+            if (want !== 'all' && tstate !== want) show = false;
+
+            // date range overlap check: voucher [start,end] intersects [dmin,dmax]
+            if (dmin || dmax){
+              const sStr = tr.dataset.start || '';
+              const eStr = tr.dataset.end || '';
+              const vs = parseYMD(sStr); // may be null
+              const ve = parseYMD(eStr); // may be null
+
+              // interpret nulls: if start null => -infinity, if end null => +infinity
+              const startMs = vs ? vs.getTime() : -8640000000000000; // min date
+              const endMs   = ve ? ve.getTime() :  8640000000000000; // max date
+
+              const rangeStart = dmin ? dmin.getTime() : -8640000000000000;
+              const rangeEnd   = dmax ? dmax.getTime() :  8640000000000000;
+
+              // overlap if (start <= rangeEnd) && (end >= rangeStart)
+              if (!(startMs <= rangeEnd && endMs >= rangeStart)) show = false;
+            }
+
+            tr.style.display = show ? '' : 'none';
+          });
+        }
+
+        // ===== Validate form (giới hạn / % / ngày) =====
+        function showError(msg){
+          vError.textContent = msg || 'Có lỗi xảy ra.';
+          vError.classList.add('shake');
+          setTimeout(()=>vError.classList.remove('shake'), 250);
+        }
+
+        document.getElementById('vForm').addEventListener('submit', async (e)=>{
+          e.preventDefault();
+
+          const code = vCode.value.trim();
+          if (!code){ vCode.classList.add('is-invalid'); return; }
+
+          if (vPercent.value !== '') {
+            const p = Number(vPercent.value);
+            if (isNaN(p) || p < 0 || p > 100) { showError('Phần trăm giảm phải trong khoảng 0–100.'); return; }
+          }
+
+          if (vStart.value && vEnd.value && vStart.value > vEnd.value) {
+            showError('Ngày bắt đầu phải trước ngày kết thúc.'); return;
+          }
+
+          if (vLimit.value !== '') {
+            const lim = Number(vLimit.value);
+            if (isNaN(lim) || lim < 0) { showError('Giới hạn sử dụng phải ≥ 0.'); return; }
+            const used = vUsed.value === '' ? 0 : Number(vUsed.value);
+            if (used > lim) { showError('Đã dùng vượt quá giới hạn sử dụng.'); return; }
+          }
+
+          const body = JSON.stringify({
+            code,
+            description: vDesc.value || null,
+            discountPercent: vPercent.value ? Number(vPercent.value) : null,
+            discountMaxAmount: vMax.value ? Number(vMax.value) : null,
+            startDate: vStart.value || null,
+            endDate: vEnd.value || null,
+            usageLimit: vLimit.value ? Number(vLimit.value) : null,
+            isActive: vActive.value === 'true'
+          });
+
+          let res;
+          if (!vId.value) {
+            res = await fetch(routes.vCreate, { method:'POST', headers:{'Content-Type':'application/json'}, body });
+            if (res.status === 201 || res.status === 200) { location.reload(); return; }
+          } else {
+            res = await fetch(routes.vUpdate + `?id=${vId.value}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body });
+            if (res.status === 200) { location.reload(); return; }
+          }
+          showError((await res.text()) || 'Có lỗi xảy ra.');
+        });
+    </script>
+}
