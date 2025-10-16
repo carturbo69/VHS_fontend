@@ -269,6 +269,32 @@
         const vActive  = document.getElementById('vActive');
         const vError   = document.getElementById('vError');
 
+        // ===== Helpers =====
+        function clearError(){
+          if (!vError) return;
+          vError.textContent = '';
+          vError.hidden = true;
+        }
+        function showError(msg){
+          if (!vError) { alert(msg); return; }
+          vError.textContent = msg || 'Có lỗi xảy ra.';
+          vError.hidden = false;
+          vError.classList.remove('shake');
+          void vError.offsetWidth; // reflow to retrigger animation
+          vError.classList.add('shake');
+        }
+        async function readJsonMessage(res){
+          let msg = '';
+          try {
+            const j = await res.clone().json();
+            if (j && typeof j.message === 'string') msg = j.message;
+          } catch(_) {
+            try { msg = await res.text(); } catch(_) { msg = ''; }
+          }
+          return msg || 'Có lỗi xảy ra.';
+        }
+
+        // ===== Create button =====
         document.getElementById('btnCreate').addEventListener('click', () => {
           document.getElementById('vModalTitle').textContent = 'Thêm voucher';
           vId.value=''; vCode.value=''; vDesc.value='';
@@ -276,10 +302,10 @@
           vStart.value=''; vEnd.value='';
           vLimit.value=''; vUsed.value='0';
           vActive.value='true';
-          vError.textContent=''; vCode.classList.remove('is-invalid');
+          vCode.classList.remove('is-invalid');
+          clearError();
           vModal.show();
         });
-
         vCode.addEventListener('input', ()=> { if (vCode.value.trim()) vCode.classList.remove('is-invalid'); });
 
         // ===== Bảng: edit/delete =====
@@ -289,32 +315,42 @@
 
           // Edit
           if (btn.classList.contains('btn-edit-v')) {
-            const res = await fetch(routes.vGet + `?id=${id}`);
-            if(!res.ok) { alert('Không đọc được voucher'); return; }
-            const v = await res.json();
+            try{
+              const res = await fetch(routes.vGet + `?id=${encodeURIComponent(id)}`);
+              if(!res.ok){ showError('Không đọc được voucher.'); return; }
+              const v = await res.json();
 
-            document.getElementById('vModalTitle').textContent = 'Sửa voucher';
-            vId.value = v.voucherId;
-            vCode.value = v.code;
-            vDesc.value = v.description ?? '';
-            vPercent.value = v.discountPercent ?? '';
-            vMax.value = v.discountMaxAmount ?? '';
-            vStart.value = v.startDate ? v.startDate.substring(0,10) : '';
-            vEnd.value = v.endDate ? v.endDate.substring(0,10) : '';
-            vLimit.value = v.usageLimit ?? '';
-            vUsed.value = v.usedCount ?? 0;
-            vActive.value = (v.isActive === true) ? 'true' : 'false';
-            vError.textContent='';
-            vModal.show();
+              document.getElementById('vModalTitle').textContent = 'Sửa voucher';
+              vId.value = v.voucherId;
+              vCode.value = v.code ?? '';
+              vDesc.value = v.description ?? '';
+              vPercent.value = v.discountPercent ?? '';
+              vMax.value = v.discountMaxAmount ?? '';
+              vStart.value = v.startDate ? v.startDate.substring(0,10) : '';
+              vEnd.value = v.endDate ? v.endDate.substring(0,10) : '';
+              vLimit.value = v.usageLimit ?? '';
+              vUsed.value = v.usedCount ?? 0;
+              vActive.value = (v.isActive === true) ? 'true' : 'false';
+              vCode.classList.remove('is-invalid');
+              clearError();
+              vModal.show();
+            }catch(_){
+              showError('Không thể tải voucher để sửa.');
+            }
             return;
           }
 
           // Delete
           if (btn.classList.contains('btn-del-v')) {
             if (!confirm('Xoá voucher này?')) return;
-            const res = await fetch(routes.vDelete + `?id=${id}`, { method:'DELETE' });
-            if (res.status === 204) location.reload();
-            else alert(await res.text());
+            try{
+              const res = await fetch(routes.vDelete + `?id=${encodeURIComponent(id)}`, { method:'DELETE' });
+              if (res.status === 204) { location.reload(); return; }
+              const msg = await readJsonMessage(res);
+              showError(msg);
+            }catch(_){
+              showError('Không xoá được voucher.');
+            }
             return;
           }
         });
@@ -334,29 +370,23 @@
           applyAllFilters();
         });
 
-        // apply on enter in any input
         [pfMin,pfMax,dMin,dMax,timeState].forEach(el=>{
           el.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); applyAllFilters(); }});
-          el.addEventListener('change', ()=>{ /* optional live */ });
         });
 
         function parseYMD(s){
-          // expects "yyyy-MM-dd"
           if(!s) return null;
           const [y,m,d] = s.split('-').map(Number);
           if(!y || !m || !d) return null;
-          return new Date(y, m-1, d, 0,0,0,0);
+          return new Date(y, m-1, d);
         }
-
         function applyAllFilters(){
-          // validate %
           const min = pfMin.value === '' ? null : Number(pfMin.value);
           const max = pfMax.value === '' ? null : Number(pfMax.value);
           if (min != null && (isNaN(min) || min<0 || min>100)) { alert('Phần trăm tối thiểu phải trong khoảng 0–100.'); return; }
           if (max != null && (isNaN(max) || max<0 || max>100)) { alert('Phần trăm tối đa phải trong khoảng 0–100.'); return; }
           if (min != null && max != null && min > max) { alert('Giá trị Từ phải ≤ Đến.'); return; }
 
-          // dates
           const dmin = parseYMD(dMin.value);
           const dmax = parseYMD(dMax.value);
           if (dmin && dmax && dmin.getTime() > dmax.getTime()) { alert('Ngày bắt đầu phải trước ngày kết thúc.'); return; }
@@ -364,7 +394,6 @@
           const want = timeState.value; // 'all' | 'upcoming' | 'started' | 'expired'
 
           document.querySelectorAll('#tblVouchers tbody tr').forEach(tr=>{
-            // percent
             const pctCell = tr.querySelectorAll('td')[2];
             const percentText = pctCell ? pctCell.textContent.trim() : '';
             const pctVal = (percentText==='—' || percentText==='') ? null : Number(percentText.replace(',', '.'));
@@ -373,41 +402,28 @@
             if (min != null && (pctVal == null || pctVal < min)) show = false;
             if (max != null && (pctVal == null || pctVal > max)) show = false;
 
-            // time-state
             const tstate = tr.dataset.tstate; // upcoming|started|expired
             if (want !== 'all' && tstate !== want) show = false;
 
-            // date range overlap check: voucher [start,end] intersects [dmin,dmax]
             if (dmin || dmax){
               const sStr = tr.dataset.start || '';
               const eStr = tr.dataset.end || '';
-              const vs = parseYMD(sStr); // may be null
-              const ve = parseYMD(eStr); // may be null
-
-              // interpret nulls: if start null => -infinity, if end null => +infinity
-              const startMs = vs ? vs.getTime() : -8640000000000000; // min date
-              const endMs   = ve ? ve.getTime() :  8640000000000000; // max date
-
+              const vs = parseYMD(sStr);
+              const ve = parseYMD(eStr);
+              const startMs = vs ? vs.getTime() : -8640000000000000;
+              const endMs   = ve ? ve.getTime() :  8640000000000000;
               const rangeStart = dmin ? dmin.getTime() : -8640000000000000;
               const rangeEnd   = dmax ? dmax.getTime() :  8640000000000000;
-
-              // overlap if (start <= rangeEnd) && (end >= rangeStart)
               if (!(startMs <= rangeEnd && endMs >= rangeStart)) show = false;
             }
-
             tr.style.display = show ? '' : 'none';
           });
         }
 
-        // ===== Validate form (giới hạn / % / ngày) =====
-        function showError(msg){
-          vError.textContent = msg || 'Có lỗi xảy ra.';
-          vError.classList.add('shake');
-          setTimeout(()=>vError.classList.remove('shake'), 250);
-        }
-
+        // ===== Validate & Submit (Create/Update) =====
         document.getElementById('vForm').addEventListener('submit', async (e)=>{
           e.preventDefault();
+          clearError();
 
           const code = vCode.value.trim();
           if (!code){ vCode.classList.add('is-invalid'); return; }
@@ -416,11 +432,9 @@
             const p = Number(vPercent.value);
             if (isNaN(p) || p < 0 || p > 100) { showError('Phần trăm giảm phải trong khoảng 0–100.'); return; }
           }
-
           if (vStart.value && vEnd.value && vStart.value > vEnd.value) {
             showError('Ngày bắt đầu phải trước ngày kết thúc.'); return;
           }
-
           if (vLimit.value !== '') {
             const lim = Number(vLimit.value);
             if (isNaN(lim) || lim < 0) { showError('Giới hạn sử dụng phải ≥ 0.'); return; }
@@ -428,7 +442,15 @@
             if (used > lim) { showError('Đã dùng vượt quá giới hạn sử dụng.'); return; }
           }
 
-          const body = JSON.stringify({
+          // Ít nhất 1 trong 2: % hoặc MaxAmount > 0
+          const dp = vPercent.value ? Number(vPercent.value) : 0;
+          const dm = vMax.value ? Number(vMax.value) : 0;
+          if ((isNaN(dp) ? 0 : dp) <= 0 && (isNaN(dm) ? 0 : dm) <= 0) {
+            showError('Cần nhập Giảm % hoặc Số tiền tối đa (> 0).');
+            return;
+          }
+
+          const payload = {
             code,
             description: vDesc.value || null,
             discountPercent: vPercent.value ? Number(vPercent.value) : null,
@@ -437,17 +459,41 @@
             endDate: vEnd.value || null,
             usageLimit: vLimit.value ? Number(vLimit.value) : null,
             isActive: vActive.value === 'true'
-          });
+          };
 
-          let res;
-          if (!vId.value) {
-            res = await fetch(routes.vCreate, { method:'POST', headers:{'Content-Type':'application/json'}, body });
-            if (res.status === 201 || res.status === 200) { location.reload(); return; }
-          } else {
-            res = await fetch(routes.vUpdate + `?id=${vId.value}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body });
-            if (res.status === 200) { location.reload(); return; }
+          try {
+            let res;
+            const isCreate = !vId.value;
+            if (isCreate) {
+              res = await fetch(routes.vCreate, {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+              });
+              if (res.status === 201 || res.status === 200) {
+                vModal.hide(); location.reload(); return;
+              }
+            } else {
+              res = await fetch(routes.vUpdate + `?id=${encodeURIComponent(vId.value)}`, {
+                method:'PUT',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+              });
+              if (res.status === 200) {
+                vModal.hide(); location.reload(); return;
+              }
+            }
+
+            // Lỗi → phân loại 409 / 400 / khác
+            const msg = await readJsonMessage(res);
+            if (res.status === 409)      showError(msg || 'Mã voucher đã tồn tại, vui lòng nhập mã khác.');
+            else if (res.status === 400) showError(msg || 'Dữ liệu không hợp lệ.');
+            else                         showError(msg);
+
+          } catch (err) {
+            showError('Không thể gửi yêu cầu. Vui lòng thử lại.');
           }
-          showError((await res.text()) || 'Có lỗi xảy ra.');
         });
     </script>
 }
+

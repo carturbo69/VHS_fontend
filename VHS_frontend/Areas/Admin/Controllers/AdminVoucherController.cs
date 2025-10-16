@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿// Areas/Admin/Controllers/AdminVoucherController.cs
+using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Admin.Models.Voucher;
 using VHS_frontend.Services.Admin;
 
@@ -42,23 +43,51 @@ namespace VHS_frontend.Areas.Admin.Controllers
         {
             AttachBearerIfAny();
             var dto = await _svc.GetAsync(id, ct);
-            return dto == null ? NotFound("Không tìm thấy voucher.") : Ok(dto);
+            return dto == null ? NotFound(new { message = "Không tìm thấy voucher." }) : Ok(dto);
         }
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] AdminVoucherEditDTO dto, CancellationToken ct = default)
         {
             AttachBearerIfAny();
-            var created = await _svc.CreateAsync(dto, ct);
-            return Created(nameof(Get), created);
+            if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+            try
+            {
+                var created = await _svc.CreateAsync(dto, ct);
+                return Created(nameof(Get), created);
+            }
+            catch (DuplicateCodeException dup)
+            {
+                return Conflict(new { message = dup.Message });
+            }
+            catch (ApiBadRequestException br)
+            {
+                return BadRequest(new { message = br.Message });
+            }
         }
 
         [HttpPut]
         public async Task<IActionResult> Update(Guid id, [FromBody] AdminVoucherEditDTO dto, CancellationToken ct = default)
         {
             AttachBearerIfAny();
-            var updated = await _svc.UpdateAsync(id, dto, ct);
-            return updated == null ? NotFound("Không tìm thấy voucher.") : Ok(updated);
+            if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+            try
+            {
+                var updated = await _svc.UpdateAsync(id, dto, ct);
+                return updated == null
+                    ? NotFound(new { message = "Không tìm thấy voucher." })
+                    : Ok(updated);
+            }
+            catch (DuplicateCodeException dup)
+            {
+                return Conflict(new { message = dup.Message });
+            }
+            catch (ApiBadRequestException br)
+            {
+                return BadRequest(new { message = br.Message });
+            }
         }
 
         [HttpDelete]
@@ -66,7 +95,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         {
             AttachBearerIfAny();
             var ok = await _svc.DeleteAsync(id, ct);
-            return ok ? NoContent() : NotFound("Không tìm thấy voucher.");
+            return ok ? NoContent() : NotFound(new { message = "Không tìm thấy voucher." });
         }
     }
 }
