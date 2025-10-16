@@ -16,27 +16,54 @@ namespace VHS_frontend.Controllers
         [HttpGet]
         public IActionResult Login() => View(new LoginDTO());
 
-
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginDTO model)
         {
-            if (!ModelState.IsValid) return View(model);
+            if (!ModelState.IsValid)
+                return View(model);
 
             var result = await _authService.LoginAsync(model);
             if (result == null)
             {
-                ModelState.AddModelError(string.Empty, "Sai tài khoản hoặc mật khẩu");
+                ModelState.AddModelError(string.Empty, "Sai tài khoản hoặc mật khẩu hoặc máy chủ không phản hồi.");
                 return View(model);
             }
 
             Console.WriteLine($"[DEBUG] Login success: Token={result.Token}, Role={result.Role}, AccountID={result.AccountID}");
 
+            // ✅ Lưu session cơ bản
             HttpContext.Session.SetString("JWToken", result.Token);
             HttpContext.Session.SetString("Role", result.Role ?? string.Empty);
             HttpContext.Session.SetString("AccountID", result.AccountID.ToString());
-            // 🔥 Lưu thêm Username
             HttpContext.Session.SetString("Username", model.Username);
+
+            // 🟢 Nếu user là Provider → lấy ProviderID
+            if (result.Role?.ToLower() == "provider")
+            {
+                try
+                {
+                    var provider = await _authService.GetProviderProfileByAccountIdAsync(result.AccountID);
+                    if (provider != null)
+                    {
+                        HttpContext.Session.SetString("ProviderID", provider.ProviderId.ToString());
+                        Console.WriteLine($"[SESSION SAVED] ProviderID = {provider.ProviderId}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("[WARN] Không tìm thấy Provider profile cho tài khoản này!");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ERROR] Khi lấy Provider profile: {ex.Message}");
+                }
+            }
+
+            // 🧩 Log xác nhận session
+            Console.WriteLine($"[SESSION] AccountID={HttpContext.Session.GetString("AccountID")}");
+            Console.WriteLine($"[SESSION] ProviderID={HttpContext.Session.GetString("ProviderID")}");
+            Console.WriteLine($"[SESSION] Role={HttpContext.Session.GetString("Role")}");
 
             TempData["ToastType"] = "success";
             TempData["ToastMessage"] = $"Đăng nhập thành công! Xin chào {(result.DisplayName ?? model.Username)} 👋";
@@ -44,18 +71,16 @@ namespace VHS_frontend.Controllers
             return RedirectByRole(result.Role);
         }
 
-
         [HttpGet]
         public IActionResult Register() => View(new RegisterDTO());
-
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterDTO model)
         {
-            if (!ModelState.IsValid) return View(model);
+            if (!ModelState.IsValid)
+                return View(model);
 
-            // Double-check confirm password (phòng khi client-side validate bị tắt)
             if (model.Password != model.ConfirmPassword)
             {
                 ModelState.AddModelError(nameof(model.ConfirmPassword), "Mật khẩu xác nhận không khớp");
@@ -63,9 +88,9 @@ namespace VHS_frontend.Controllers
             }
 
             var result = await _authService.RegisterAsync(model);
+
             if (result == null || !result.Success)
             {
-                // Hiển thị message từ API nếu có
                 ModelState.AddModelError(string.Empty, result?.Message ?? "Đăng ký thất bại");
                 return View(model);
             }
@@ -81,10 +106,11 @@ namespace VHS_frontend.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // Helper redirect theo Role
         private IActionResult RedirectByRole(string? role)
         {
             var normalized = (role ?? "").Trim().ToLowerInvariant();
+            Console.WriteLine($"[REDIRECT] Role={normalized}");
+
             return normalized switch
             {
                 "admin" => RedirectToAction("Index", "Home", new { area = "Admin" }),
@@ -94,17 +120,7 @@ namespace VHS_frontend.Controllers
             };
         }
 
-        public IActionResult Profile()
-        {
-            // TODO: lấy thông tin cá nhân từ API
-            return View();
-        }
-
-        public IActionResult History()
-        {
-            // TODO: lấy lịch sử dịch vụ từ API
-            return View();
-        }
-
+        public IActionResult Profile() => View();
+        public IActionResult History() => View();
     }
 }

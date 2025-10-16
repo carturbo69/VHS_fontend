@@ -14,6 +14,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             _staffService = staffService;
         }
 
+        // Danh sách nhân viên (chưa bị khóa)
         public async Task<IActionResult> Index()
         {
             var providerId = HttpContext.Session.GetString("ProviderID");
@@ -42,8 +43,23 @@ namespace VHS_frontend.Areas.Provider.Controllers
             return View(model);
         }
 
+        // GET Edit: nạp dữ liệu cũ
         [HttpGet]
-        public IActionResult Edit(Guid id) => View(new StaffUpdateViewModel { StaffId = id });
+        public async Task<IActionResult> Edit(Guid id)
+        {
+            var staff = await _staffService.GetByIdAsync(id);
+            if (staff == null) return NotFound();
+
+            var model = new StaffUpdateViewModel
+            {
+                StaffId = staff.StaffId,
+                StaffName = staff.StaffName,
+                CitizenID = staff.CitizenID,
+                FaceImage = staff.FaceImage?.FirstOrDefault(),
+                CitizenIDImage = staff.CitizenIDImage?.FirstOrDefault()
+            };
+            return View(model);
+        }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -58,11 +74,32 @@ namespace VHS_frontend.Areas.Provider.Controllers
             return View(model);
         }
 
+        // Khóa nhân viên
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(Guid id)
         {
             await _staffService.DeleteAsync(id);
             return RedirectToAction("Index");
+        }
+
+        // Danh sách bị khóa
+        public async Task<IActionResult> Locked()
+        {
+            var providerId = HttpContext.Session.GetString("ProviderID");
+            if (string.IsNullOrEmpty(providerId)) return RedirectToAction("Login", "Account", new { area = "" });
+
+            var lockedList = await _staffService.GetLockedByProviderAsync(Guid.Parse(providerId));
+            return View(lockedList ?? new List<StaffReadViewModel>());
+        }
+
+        // Mở khóa
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Unlock(Guid id)
+        {
+            await _staffService.UnlockAsync(id);
+            return RedirectToAction("Locked");
         }
     }
 }

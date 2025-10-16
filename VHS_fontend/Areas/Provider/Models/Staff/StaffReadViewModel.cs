@@ -5,7 +5,9 @@
         public Guid StaffId { get; set; }
         public string StaffName { get; set; } = string.Empty;
         public string? CitizenID { get; set; }
-        public string? FaceImage { get; set; }
-        public DateTime CreatedAt { get; set; }
+        public List<string>? FaceImage { get; set; }
+        public List<string>? CitizenIDImage { get; set; }
+        public DateTime CreatedAt { get; set; }           
+        public bool IsDeleted { get; set; }              
     }
 }

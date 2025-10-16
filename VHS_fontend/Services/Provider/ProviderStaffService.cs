@@ -1,7 +1,4 @@
 ﻿using System.Net.Http;
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
 using VHS_frontend.Areas.Provider.Models.Staff;
 
 namespace VHS_frontend.Services.Provider
@@ -13,40 +10,89 @@ namespace VHS_frontend.Services.Provider
         public ProviderStaffService(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri("http://localhost:5154/api/");
         }
 
-        // GET: Lấy danh sách staff theo ProviderId
+        // 🟢 CREATE STAFF (multipart/form-data)
+        public async Task<bool> CreateAsync(Guid providerId, StaffCreateViewModel model)
+        {
+            using var form = new MultipartFormDataContent();
+
+            form.Add(new StringContent(model.StaffName ?? ""), "StaffName");
+            form.Add(new StringContent(model.Password ?? ""), "Password");
+            form.Add(new StringContent(model.CitizenID ?? ""), "CitizenID");
+
+            if (model.FaceImages != null)
+            {
+                foreach (var file in model.FaceImages)
+                    form.Add(new StreamContent(file.OpenReadStream()), "FaceImages", file.FileName);
+            }
+
+            if (model.CitizenIDImages != null)
+            {
+                foreach (var file in model.CitizenIDImages)
+                    form.Add(new StreamContent(file.OpenReadStream()), "CitizenIDImages", file.FileName);
+            }
+
+            var response = await _httpClient.PostAsync($"api/Staff/provider/{providerId}", form);
+            return response.IsSuccessStatusCode;
+        }
+
+        // 🟡 UPDATE STAFF (multipart/form-data)
+        public async Task<bool> UpdateAsync(Guid id, StaffUpdateViewModel model)
+        {
+            using var form = new MultipartFormDataContent();
+
+            form.Add(new StringContent(model.StaffName ?? ""), "StaffName");
+            form.Add(new StringContent(model.CitizenID ?? ""), "CitizenID");
+
+            if (model.FaceImages != null)
+            {
+                foreach (var file in model.FaceImages)
+                    form.Add(new StreamContent(file.OpenReadStream()), "FaceImages", file.FileName);
+            }
+
+            if (model.CitizenIDImages != null)
+            {
+                foreach (var file in model.CitizenIDImages)
+                    form.Add(new StreamContent(file.OpenReadStream()), "CitizenIDImages", file.FileName);
+            }
+
+            var response = await _httpClient.PutAsync($"api/Staff/{id}", form);
+            return response.IsSuccessStatusCode;
+        }
+
+        // 🟢 Các hàm còn lại giữ nguyên
         public async Task<IEnumerable<StaffReadViewModel>?> GetAllByProviderAsync(Guid providerId)
         {
-            var response = await _httpClient.GetAsync($"Staff/provider/{providerId}");
+            var response = await _httpClient.GetAsync($"api/Staff/provider/{providerId}");
             if (!response.IsSuccessStatusCode) return null;
             return await response.Content.ReadFromJsonAsync<IEnumerable<StaffReadViewModel>>();
         }
 
-        // POST: Tạo staff mới
-        public async Task<bool> CreateAsync(Guid providerId, StaffCreateViewModel model)
+        public async Task<StaffReadViewModel?> GetByIdAsync(Guid id)
         {
-            var json = JsonSerializer.Serialize(model);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync($"Staff/provider/{providerId}", content);
-            return response.IsSuccessStatusCode;
+            var response = await _httpClient.GetAsync($"api/Staff/{id}");
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<StaffReadViewModel>();
         }
 
-        // PUT: Cập nhật staff
-        public async Task<bool> UpdateAsync(Guid id, StaffUpdateViewModel model)
-        {
-            var json = JsonSerializer.Serialize(model);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PutAsync($"Staff/{id}", content);
-            return response.IsSuccessStatusCode;
-        }
-
-        // DELETE: Xóa staff
         public async Task<bool> DeleteAsync(Guid id)
         {
-            var response = await _httpClient.DeleteAsync($"Staff/{id}");
+            var response = await _httpClient.DeleteAsync($"api/Staff/{id}");
             return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> UnlockAsync(Guid id)
+        {
+            var response = await _httpClient.PutAsync($"api/Staff/unlock/{id}", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<IEnumerable<StaffReadViewModel>?> GetLockedByProviderAsync(Guid providerId)
+        {
+            var response = await _httpClient.GetAsync($"api/Staff/provider/{providerId}/locked");
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<IEnumerable<StaffReadViewModel>>();
         }
     }
 }

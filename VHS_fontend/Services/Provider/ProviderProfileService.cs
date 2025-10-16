@@ -20,16 +20,15 @@ namespace VHS_frontend.Services.Provider
         }
 
         // PUT: cập nhật hồ sơ Provider
-        public async Task<bool> UpdateProfileAsync(Guid accountId, ProviderProfileUpdateViewModel dto)
+        public async Task<bool> UpdateProfileWithFileAsync(Guid accountId, MultipartFormDataContent formData)
         {
-            var res = await _http.PutAsJsonAsync($"api/Provider/profile/{accountId}", dto);
+            var res = await _http.PutAsync($"api/Provider/profile/{accountId}", formData);
             if (!res.IsSuccessStatusCode)
             {
                 var error = await res.Content.ReadAsStringAsync();
-                Console.WriteLine($"[UpdateProfileAsync] Error: {res.StatusCode} - {error}");
+                Console.WriteLine($"[UpdateProfileWithFileAsync] Error: {res.StatusCode} - {error}");
             }
             return res.IsSuccessStatusCode;
         }
-
     }
 }
