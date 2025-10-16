@@ -4,6 +4,7 @@
     {
         public Guid ProviderId { get; set; }
         public Guid AccountId { get; set; }
+        public string AccountName { get; set; } = "";
         public string ProviderName { get; set; } = "";
         public string? PhoneNumber { get; set; }
         public string? Description { get; set; }
