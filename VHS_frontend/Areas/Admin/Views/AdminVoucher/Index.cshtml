@@ -37,65 +37,85 @@
 
     <!-- Toolbar -->
     <div class="v-toolbar">
-        <div class="actions">
-            <button class="btn btn-primary soft" id="btnCreate">
-                <i class="bi bi-plus-circle"></i> Thêm voucher
-            </button>
-
-            <a class="btn btn-ghost soft"
-               asp-area="Admin" asp-controller="AdminVoucher" asp-action="Index"
-               asp-route-onlyActive="@( onlyActive.HasValue ? (!onlyActive.Value) : true )"
-               asp-route-keyword="@keyword">
-                <i class="bi @(onlyActive==true ? "bi-eye-slash" : "bi-eye")"></i>
-                @(onlyActive == true ? "Hiện tất cả" : "Chỉ hiển thị Hoạt động")
-            </a>
-
-            <form class="search" method="get" asp-area="Admin" asp-controller="AdminVoucher" asp-action="Index">
-                <i class="bi bi-search"></i>
-                <input name="keyword" value="@keyword" class="form-control" placeholder="Tìm theo Code/Description…" />
-                @if (onlyActive == true)
-                {
-                    <input type="hidden" name="onlyActive" value="true" />
-                }
-            </form>
-        </div>
-
-        <!-- FILTER CARD: % + Ngày + Trạng thái thời gian -->
-        <div class="filter-card card-x">
-            <div class="filter-grid">
-                <div class="filter-block">
-                    <div class="fb-label">% Giảm</div>
-                    <div class="fb-row">
-                        <input id="pfMin" type="number" class="form-control" placeholder="Từ" min="0" max="100" />
-                        <span class="dash">–</span>
-                        <input id="pfMax" type="number" class="form-control" placeholder="Đến" min="0" max="100" />
+        <div class="row g-3">
+            <!-- Bên trái: Nút thêm + Chỉ hiện hoạt động + Tìm kiếm (4 cột) -->
+            <div class="col-md-4">
+                <div class="search-card card-x">
+                    <div class="row g-3">
+                        <!-- Hàng trên: Nút thêm + Chỉ hiện hoạt động -->
+                        <div class="col-12">
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-primary soft" id="btnCreate">
+                                    <i class="bi bi-plus-circle"></i> Thêm voucher
+                                </button>
+                                <a class="btn btn-ghost soft"
+                                   asp-area="Admin" asp-controller="AdminVoucher" asp-action="Index"
+                                   asp-route-onlyActive="@( onlyActive.HasValue ? (!onlyActive.Value) : true )"
+                                   asp-route-keyword="@keyword">
+                                    <i class="bi @(onlyActive==true ? "bi-eye-slash" : "bi-eye")"></i>
+                                    @(onlyActive == true ? "Hiện tất cả" : "Chỉ hiện Hoạt động")
+                                </a>
+                            </div>
+                        </div>
+                        <!-- Hàng dưới: Tìm kiếm -->
+                        <div class="col-12">
+                            <form class="search" method="get" asp-area="Admin" asp-controller="AdminVoucher" asp-action="Index">
+                                <div class="input-group">
+                                    <input name="keyword" value="@keyword" class="form-control" placeholder="Tìm theo mã / mô tả…" />
+                                    <button class="btn btn-outline-secondary" type="submit">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                    @if (onlyActive == true)
+                                    {
+                                        <input type="hidden" name="onlyActive" value="true" />
+                                    }
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="filter-block">
-                    <div class="fb-label">Thời gian áp dụng</div>
-                    <div class="fb-row">
-                        <input id="dMin" type="date" class="form-control" />
-                        <span class="dash">→</span>
-                        <input id="dMax" type="date" class="form-control" />
+            <!-- Bên phải: Filter (6 cột) -->
+            <div class="col-md-8">
+                <div class="filter-card card-x">
+                    <div class="row g-3">
+                        <!-- Hàng 1: % Giảm và Trạng thái thời gian ngang nhau -->
+                        <div class="col-md-6">
+                            <div class="fb-label">% Giảm</div>
+                            <div class="fb-row">
+                                <input id="pfMin" type="number" class="form-control" placeholder="Từ" min="0" max="100" />
+                                <span class="dash">–</span>
+                                <input id="pfMax" type="number" class="form-control" placeholder="Đến" min="0" max="100" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="fb-label">Trạng thái thời gian</div>
+                            <select id="timeState" class="form-select">
+                                <option value="all" selected>Tất cả</option>
+                                <option value="upcoming">Chưa bắt đầu</option>
+                                <option value="started">Đang diễn ra</option>
+                                <option value="expired">Đã hết hạn</option>
+                            </select>
+                        </div>
+                        <!-- Hàng 2: Thời gian áp dụng + Nút Lọc/Xóa -->
+                        <div class="col-12">
+                            <div class="d-flex gap-2 align-items-end">
+                                <div class="flex-grow-1">
+                                    <div class="fb-label">Thời gian áp dụng</div>
+                                    <div class="fb-row">
+                                        <input id="dMin" type="date" class="form-control" />
+                                        <span class="dash">→</span>
+                                        <input id="dMax" type="date" class="form-control" />
+                                    </div>
+                                </div>
+                                <div class="filter-actions">
+                                    <button class="btn btn-primary soft" id="btnApply" type="button">Lọc</button>
+                                    <button class="btn btn-ghost soft" id="btnClear" type="button" title="Xoá lọc">Xoá</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-
-                <div class="filter-block">
-                    <div class="fb-label">Trạng thái thời gian</div>
-                    <div class="fb-row">
-                        <select id="timeState" class="form-select">
-                            <option value="all" selected>Tất cả</option>
-                            <option value="upcoming">Chưa bắt đầu</option>
-                            <option value="started">Đang diễn ra</option>
-                            <option value="expired">Đã hết hạn</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="filter-actions">
-                    <button class="btn btn-ghost soft" id="btnApply" type="button">Lọc</button>
-                    <button class="btn btn-ghost soft" id="btnClear" type="button" title="Xoá lọc">Xoá</button>
                 </div>
             </div>
         </div>
