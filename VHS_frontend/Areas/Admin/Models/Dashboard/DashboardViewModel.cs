@@ -22,6 +22,8 @@ namespace VHS_frontend.Areas.Admin.Models.Dashboard
         public double ProvidersChange { get; set; }
         public double ProvidersProgress { get; set; }
         
+        public int ActiveVouchers { get; set; }
+        
         public double ConversionRate { get; set; }
         public double ConversionChange { get; set; }
         

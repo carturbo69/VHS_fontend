@@ -10,15 +10,18 @@ namespace VHS_frontend.Areas.Admin.Controllers
         private readonly CustomerAdminService _customerService;
         private readonly ProviderAdminService _providerService;
         private readonly AdminRegisterProviderService _registerProviderService;
+        private readonly AdminVoucherService _voucherService;
 
         public AdminDashboardController(
             CustomerAdminService customerService,
             ProviderAdminService providerService,
-            AdminRegisterProviderService registerProviderService)
+            AdminRegisterProviderService registerProviderService,
+            AdminVoucherService voucherService)
         {
             _customerService = customerService;
             _providerService = providerService;
             _registerProviderService = registerProviderService;
+            _voucherService = voucherService;
         }
 
         public async Task<IActionResult> Index()
@@ -44,6 +47,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
             var customers = new List<VHS_frontend.Areas.Admin.Models.Customer.CustomerDTO>();
             var providers = new List<VHS_frontend.Areas.Admin.Models.Provider.ProviderDTO>();
             var registerProviders = new List<VHS_frontend.Areas.Admin.Models.RegisterProvider.AdminProviderItemDTO>();
+            var vouchers = new List<VHS_frontend.Areas.Admin.Models.Voucher.AdminVoucherItemDTO>();
             
             try
             {
@@ -73,10 +77,27 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 registerProviders = new List<VHS_frontend.Areas.Admin.Models.RegisterProvider.AdminProviderItemDTO>();
             }
             
+            try
+            {
+                var voucherQuery = new VHS_frontend.Areas.Admin.Models.Voucher.AdminVoucherQuery
+                {
+                    Page = 1,
+                    PageSize = 1000, // Lấy tất cả voucher
+                    OnlyActive = true
+                };
+                var voucherResult = await _voucherService.GetListAsync(voucherQuery);
+                vouchers = voucherResult.Items;
+            }
+            catch (Exception ex)
+            {
+                vouchers = new List<VHS_frontend.Areas.Admin.Models.Voucher.AdminVoucherItemDTO>();
+            }
+            
             // Tính toán dữ liệu thật
             var activeCustomers = customers.Count;
             var activeProviders = providers.Count;
             var pendingRegistrations = registerProviders.Count(r => r.Status == "Pending");
+            var activeVouchers = vouchers.Count;
             
             // Tạo Model với dữ liệu thật
             var model = new DashboardViewModel
@@ -97,6 +118,8 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 ActiveProviders = activeProviders, // Dữ liệu thật
                 ProvidersChange = CalculateProvidersChange(activeProviders), // Tính toán % tăng trưởng thật
                 ProvidersProgress = CalculateProvidersProgress(activeProviders), // Progress dựa trên mục tiêu
+                
+                ActiveVouchers = activeVouchers, // Dữ liệu thật
                 
                 ConversionRate = activeCustomers > 0 ? Math.Min((double)activeProviders / activeCustomers * 100, 100) : 0, // Tính toán thật
                 ConversionChange = 0,
