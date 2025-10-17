@@ -1,0 +1,351 @@
+@model List<VHS_frontend.Areas.Admin.Models.Feedback.FeedbackDTO>
+@{
+    ViewData["Title"] = "Quản lý Feedback";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-feedback.css" asp-append-version="true" />
+}
+
+<div class="admin-feedback-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <div class="title-with-icon">
+                    <div class="title-icon">
+                        <i class="bi bi-chat-dots-fill"></i>
+                    </div>
+                    <div class="title-content">
+                        <h1>Quản lý Feedback</h1>
+                        <p>Quản lý và theo dõi phản hồi từ khách hàng</p>
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-refresh" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    Làm mới
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-chat-dots-fill"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">@Model.Count</span>
+                <span class="stat-label">Tổng feedback</span>
+            </div>
+            <div class="stat-decoration">
+                <i class="bi bi-chat-square-heart"></i>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-eye-fill"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">@Model.Count(f => f.IsVisible && !f.IsDeleted)</span>
+                <span class="stat-label">Đang hiển thị</span>
+            </div>
+            <div class="stat-decoration">
+                <i class="bi bi-eye-check"></i>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-eye-slash-fill"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">@Model.Count(f => !f.IsVisible && !f.IsDeleted)</span>
+                <span class="stat-label">Đã ẩn</span>
+            </div>
+            <div class="stat-decoration">
+                <i class="bi bi-eye-slash"></i>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-star-fill"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">@(Model.Count > 0 ? Math.Round(Model.Average(f => f.Rating), 1) : 0)</span>
+                <span class="stat-label">Đánh giá TB</span>
+            </div>
+            <div class="stat-decoration">
+                <i class="bi bi-star-heart"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback List -->
+    <div class="feedback-list-container">
+        <div class="list-header">
+            <h2>Danh sách Feedback</h2>
+            <div class="filter-controls">
+                <select class="filter-select" onchange="filterFeedbacks(this.value)">
+                    <option value="all">Tất cả</option>
+                    <option value="visible">Đang hiển thị</option>
+                    <option value="hidden">Đã ẩn</option>
+                    <option value="deleted">Đã xóa</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="feedback-list">
+            @if (Model.Any())
+            {
+                @foreach (var feedback in Model)
+                {
+                    <div class="feedback-item @(feedback.IsDeleted ? "deleted" : !feedback.IsVisible ? "hidden" : "")" data-status="@(feedback.IsDeleted ? "deleted" : !feedback.IsVisible ? "hidden" : "visible")">
+                        <div class="feedback-header">
+                            <div class="customer-info">
+                                <div class="customer-avatar">
+                                    @if (!string.IsNullOrEmpty(feedback.CustomerEmail))
+                                    {
+                                        <img src="https://ui-avatars.com/api/?name=@Uri.EscapeDataString(feedback.CustomerName)&background=1abc9c&color=fff&size=60&bold=true" 
+                                             alt="@feedback.CustomerName" 
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                        <i class="bi bi-person-circle" style="display: none;"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-person-circle"></i>
+                                    }
+                                </div>
+                                <div class="customer-details">
+                                    <h4>@feedback.CustomerName</h4>
+                                    <p>@feedback.CustomerEmail</p>
+                                </div>
+                            </div>
+                            <div class="feedback-meta">
+                                <span class="rating">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        <i class="bi bi-star@(i <= feedback.Rating ? "-fill" : "")"></i>
+                                    }
+                                </span>
+                                <span class="date">@feedback.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                <span class="status status-@(feedback.IsDeleted ? "deleted" : !feedback.IsVisible ? "hidden" : "visible")">
+                                    @feedback.Status
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="feedback-content">
+                            <div class="service-info">
+                                @if (!string.IsNullOrEmpty(feedback.ServiceName))
+                                {
+                                    <p><strong>Dịch vụ:</strong> @feedback.ServiceName</p>
+                                }
+                                @if (!string.IsNullOrEmpty(feedback.ProviderName))
+                                {
+                                    <p><strong>Nhà cung cấp:</strong> @feedback.ProviderName</p>
+                                }
+                            </div>
+                            <div class="comment">
+                                <p>@feedback.Comment</p>
+                            </div>
+                            
+                            @if (feedback.Images != null && feedback.Images.Any())
+                            {
+                                <div class="feedback-images">
+                                    <h5><i class="bi bi-image"></i> Hình ảnh đính kèm</h5>
+                                    <div class="images-grid">
+                                        @foreach (var image in feedback.Images)
+                                        {
+                                            <div class="image-item" onclick="openLightbox('@image', @feedback.Images.IndexOf(image), this)">
+                                                <img src="@image" alt="Feedback image" />
+                                                <div class="image-overlay">
+                                                    <i class="bi bi-zoom-in"></i>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="feedback-actions">
+                            @if (!feedback.IsDeleted)
+                            {
+                                @if (feedback.IsVisible)
+                                {
+                                    <form asp-action="Hide" method="post" style="display: inline;">
+                                        <input type="hidden" name="id" value="@feedback.Id" />
+                                        <button type="submit" class="btn-action btn-hide" onclick="return confirm('Bạn có chắc muốn ẩn feedback này?')">
+                                            <i class="bi bi-eye-slash"></i>
+                                            Ẩn
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="Show" method="post" style="display: inline;">
+                                        <input type="hidden" name="id" value="@feedback.Id" />
+                                        <button type="submit" class="btn-action btn-show">
+                                            <i class="bi bi-eye"></i>
+                                            Hiện
+                                        </button>
+                                    </form>
+                                }
+                                <form asp-action="Delete" method="post" style="display: inline;">
+                                    <input type="hidden" name="id" value="@feedback.Id" />
+                                    <button type="submit" class="btn-action btn-delete" onclick="return confirm('Bạn có chắc muốn xóa feedback này? Hành động này không thể hoàn tác!')">
+                                        <i class="bi bi-trash"></i>
+                                        Xóa
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="bi bi-chat-dots"></i>
+                    </div>
+                    <h3>Chưa có feedback nào</h3>
+                    <p>Khách hàng chưa để lại phản hồi nào trong hệ thống.</p>
+                    <div class="empty-decoration">
+                        <i class="bi bi-heart"></i>
+                        <i class="bi bi-star"></i>
+                        <i class="bi bi-chat-square"></i>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox Modal -->
+<div id="lightbox" class="lightbox" onclick="closeLightbox()">
+    <div class="lightbox-content" onclick="event.stopPropagation();">
+        <span class="lightbox-close" onclick="event.stopPropagation(); closeLightbox();">&times;</span>
+        <img id="lightbox-image" src="" alt="Feedback image" />
+        <div class="lightbox-nav">
+            <button class="lightbox-prev" onclick="event.stopPropagation(); previousImage();">❮</button>
+            <button class="lightbox-next" onclick="event.stopPropagation(); nextImage();">❯</button>
+        </div>
+        <div class="lightbox-counter" id="lightbox-counter"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function filterFeedbacks(status) {
+            const items = document.querySelectorAll('.feedback-item');
+            items.forEach(item => {
+                if (status === 'all' || item.dataset.status === status) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        // Auto refresh every 30 seconds
+        setInterval(() => {
+            location.reload();
+        }, 30000);
+
+        // Simple Lightbox functions
+        let currentImageIndex = 0;
+        let currentImages = [];
+
+        function openLightbox(imageSrc, imageIndex, element) {
+            const lightbox = document.getElementById('lightbox');
+            const lightboxImg = document.getElementById('lightbox-image');
+            const counter = document.getElementById('lightbox-counter');
+            
+            // Get all images from current feedback
+            const currentFeedback = element.closest('.feedback-item');
+            const imageItems = currentFeedback.querySelectorAll('.image-item');
+            currentImages = [];
+            
+            imageItems.forEach(item => {
+                const img = item.querySelector('img');
+                if (img && img.src) {
+                    currentImages.push(img.src);
+                }
+            });
+            
+            currentImageIndex = parseInt(imageIndex);
+            lightboxImg.src = imageSrc;
+            lightbox.style.display = 'flex';
+            
+            console.log('Images found:', currentImages.length);
+            console.log('Current index:', currentImageIndex);
+            console.log('All images:', currentImages);
+            
+            // Show/hide navigation buttons and counter
+            const prevBtn = document.querySelector('.lightbox-prev');
+            const nextBtn = document.querySelector('.lightbox-next');
+            
+            if (currentImages.length > 1) {
+                prevBtn.style.display = 'flex';
+                nextBtn.style.display = 'flex';
+                counter.style.display = 'block';
+                counter.textContent = `${currentImageIndex + 1} / ${currentImages.length}`;
+            } else {
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+                counter.style.display = 'none';
+            }
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').style.display = 'none';
+        }
+
+        function previousImage() {
+            console.log('Previous clicked - currentImages:', currentImages.length, 'currentIndex:', currentImageIndex);
+            if (currentImages.length > 1) {
+                currentImageIndex = (currentImageIndex - 1 + currentImages.length) % currentImages.length;
+                console.log('New index:', currentImageIndex, 'New src:', currentImages[currentImageIndex]);
+                document.getElementById('lightbox-image').src = currentImages[currentImageIndex];
+                updateCounter();
+            }
+        }
+
+        function nextImage() {
+            console.log('Next clicked - currentImages:', currentImages.length, 'currentIndex:', currentImageIndex);
+            if (currentImages.length > 1) {
+                currentImageIndex = (currentImageIndex + 1) % currentImages.length;
+                console.log('New index:', currentImageIndex, 'New src:', currentImages[currentImageIndex]);
+                document.getElementById('lightbox-image').src = currentImages[currentImageIndex];
+                updateCounter();
+            }
+        }
+
+        function updateCounter() {
+            const counter = document.getElementById('lightbox-counter');
+            if (currentImages.length > 1) {
+                counter.textContent = `${currentImageIndex + 1} / ${currentImages.length}`;
+            }
+        }
+
+        // Close lightbox with Escape key and navigation
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeLightbox();
+            }
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                previousImage();
+            }
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                nextImage();
+            }
+        });
+    </script>
+}
