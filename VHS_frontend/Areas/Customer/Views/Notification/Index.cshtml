@@ -1,0 +1,175 @@
+@model VHS_frontend.Areas.Customer.Models.Notification.NotificationListResponse
+@{
+    ViewData["Title"] = "Thông báo";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="notification-page">
+    <div class="container">
+        <div class="notification-header">
+            <div class="header-content">
+                <h1 class="page-title">
+                    <i class="icon-bell"></i>
+                    Thông báo của tôi
+                </h1>
+                <div class="notification-stats">
+                    <span class="stat-item">
+                        <span class="stat-number">@Model.TotalCount</span>
+                        <span class="stat-label">Tổng cộng</span>
+                    </span>
+                    <span class="stat-item unread">
+                        <span class="stat-number">@Model.UnreadCount</span>
+                        <span class="stat-label">Chưa đọc</span>
+                    </span>
+                </div>
+            </div>
+            
+            @if (Model.Data.Any())
+            {
+                <div class="header-actions">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="markAllReadBtn">
+                        <i class="icon-check"></i>
+                        Đánh dấu tất cả đã đọc
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="clearAllBtn">
+                        <i class="icon-trash"></i>
+                        Xóa tất cả
+                    </button>
+                </div>
+            }
+        </div>
+
+        <div class="notification-filters">
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all">
+                    Tất cả <span class="count">@Model.TotalCount</span>
+                </button>
+                <button class="filter-tab" data-filter="unread">
+                    Chưa đọc <span class="count">@Model.UnreadCount</span>
+                </button>
+                <button class="filter-tab" data-filter="booking">
+                    Đặt lịch <span class="count">@Model.Data.Count(n => n.NotificationType == "Booking")</span>
+                </button>
+                <button class="filter-tab" data-filter="payment">
+                    Thanh toán <span class="count">@Model.Data.Count(n => n.NotificationType == "Payment")</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="notification-list">
+            @if (Model.Data.Any())
+            {
+                @foreach (var notification in Model.Data)
+                {
+                    <div class="notification-item @(notification.IsRead ? "read" : "unread")" 
+                         data-type="@notification.NotificationType.ToLower()"
+                         data-notification-id="@notification.NotificationId">
+                        
+                        <div class="notification-icon">
+                            @switch (notification.NotificationType.ToLower())
+                            {
+                                case "booking":
+                                    <i class="icon-calendar"></i>
+                                    break;
+                                case "payment":
+                                    <i class="icon-credit-card"></i>
+                                    break;
+                                case "system":
+                                    <i class="icon-settings"></i>
+                                    break;
+                                default:
+                                    <i class="icon-bell"></i>
+                                    break;
+                            }
+                        </div>
+                        
+                        <div class="notification-content">
+                            <div class="content-text">@notification.Content</div>
+                            <div class="notification-meta">
+                                <span class="time">@notification.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                <span class="type-badge type-@notification.NotificationType.ToLower()">
+                                    @notification.NotificationType
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="notification-actions">
+                            @if (!notification.IsRead)
+                            {
+                                <button class="action-btn mark-read" 
+                                        data-notification-id="@notification.NotificationId"
+                                        title="Đánh dấu đã đọc">
+                                    <i class="icon-check"></i>
+                                </button>
+                            }
+                            <button class="action-btn delete" 
+                                    data-notification-id="@notification.NotificationId"
+                                    title="Xóa">
+                                <i class="icon-trash"></i>
+                            </button>
+                        </div>
+                        
+                        @if (!notification.IsRead)
+                        {
+                            <div class="unread-indicator"></div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="icon-bell-off"></i>
+                    </div>
+                    <h3>Chưa có thông báo nào</h3>
+                    <p>Bạn sẽ nhận được thông báo khi có hoạt động mới.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/notification.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Setup event listeners cho trang notification
+            const markAllReadBtn = document.getElementById('markAllReadBtn');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            
+            if (markAllReadBtn) {
+                markAllReadBtn.addEventListener('click', function() {
+                    if (window.notificationManager) {
+                        window.notificationManager.markAllAsRead();
+                    }
+                });
+            }
+            
+            if (clearAllBtn) {
+                clearAllBtn.addEventListener('click', function() {
+                    if (window.notificationManager) {
+                        window.notificationManager.clearAllNotifications();
+                    }
+                });
+            }
+            
+            // Setup individual notification actions
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.mark-read')) {
+                    const notificationId = e.target.closest('.mark-read').dataset.notificationId;
+                    if (window.notificationManager && notificationId) {
+                        window.notificationManager.markAsRead(notificationId);
+                    }
+                }
+                
+                if (e.target.closest('.delete')) {
+                    const notificationId = e.target.closest('.delete').dataset.notificationId;
+                    if (window.notificationManager && notificationId) {
+                        window.notificationManager.deleteNotification(notificationId);
+                    }
+                }
+            });
+        });
+    </script>
+}
