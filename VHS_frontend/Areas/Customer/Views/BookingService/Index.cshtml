@@ -1,0 +1,826 @@
+﻿@using VHS_frontend.Areas.Customer.Models.Booking
+@using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
+@model BookingViewModel
+@{
+    ViewData["Title"] = "Thanh toán";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    string Money(decimal v) => string.Format(System.Globalization.CultureInfo.GetCultureInfo("vi-VN"), "{0:n0}₫", v);
+
+    // CHỈNH: đặt sẵn id cho form chính để các input ở chỗ khác có thể "gửi chung"
+    var placeOrderFormId = "placeOrderForm";
+}
+
+@functions {
+    string AddonSummary(IEnumerable<BookItemOption> opts)
+    {
+        if (opts == null) return "Chưa chọn";
+        var list = opts.ToList();
+        if (!list.Any()) return "Chưa chọn";
+        return $"{list.Count} tuỳ chọn";
+    }
+
+    string AddonFullTitle(IEnumerable<BookItemOption> opts)
+        => (opts != null && opts.Any())
+            ? string.Join(", ", opts.Select(o => o.Name))
+            : "Chưa chọn";
+}
+
+<link rel="stylesheet" href="~/css/booking-service.css" asp-append-version="true" />
+
+<style>
+    .opt-panel {
+        max-height: 80vh;
+        overflow: auto;
+        padding-right: 6px;
+    }
+
+    .opt-name > div {
+        white-space: normal;
+        word-break: break-word;
+    }
+
+    .opt-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .opt-value {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 220px;
+    }
+
+    .opt-badge {
+        min-width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        background: #f3f4f6;
+        color: #111;
+        padding: 0 6px;
+    }
+
+    /* Thêm nhẹ cho hàng điều khoản */
+    .tos-accept {
+        padding: 10px 16px;
+        border-top: 1px dashed #eee;
+        border-bottom: 1px dashed #eee;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fafafa;
+    }
+
+        .tos-accept a {
+            text-decoration: underline;
+        }
+
+    .modal#tosModal .modal-card {
+        max-width: 760px;
+    }
+</style>
+
+<section class="checkout-page">
+    <!-- Địa chỉ nhận hàng -->
+    <div class="address-card">
+        <div class="addr-title">
+            <span>📍 Địa Chỉ Nhận Hàng</span>
+            <button type="button" class="btn" onclick="openAddressModal()">Thay đổi</button>
+        </div>
+        <div class="addr-body">
+            <div><strong>@Model.RecipientFullName</strong> (@Model.RecipientPhone)</div>
+            <div>@Model.Address.ToDisplayString()</div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div>
+            @{
+                // CHỈNH: tạo biến đếm index cho mảng Items[i]
+                var i = 0;
+            }
+            @foreach (var shop in Model.Items.GroupBy(it => it.Provider))
+            {
+                <div class="shop-block">
+                    <div class="shop-head">@shop.Key</div>
+
+                    @foreach (var it in shop)
+                    {
+                        var key = it.CartItemId;
+                        var options = it.Options ?? new List<BookItemOption>();
+
+                        <div class="item-row">
+                            <!-- Cột 1: Ảnh -->
+                            <img class="thumb" src="@it.Image" alt="@it.ServiceName" />
+
+                            <!-- Cột 2: Tên dịch vụ -->
+                            <div>
+                                <div><strong>@it.ServiceName</strong></div>
+                            </div>
+
+                            <!-- Cột 3: Tuỳ chọn hiển thị sẵn -->
+                            <div class="cell-addons">
+                                <div class="opt-section">
+                                    @if (options.Any())
+                                    {
+                                        foreach (var a in options)
+                                        {
+                                            <div class="opt-row">
+                                                <div class="opt-name">
+                                                    <div>@a.Name</div>
+                                                    @if (!string.IsNullOrWhiteSpace(a.Unit))
+                                                    {
+                                                        <div class="muted text-sm">@a.Unit</div>
+                                                    }
+                                                </div>
+
+                                                <div class="opt-controls">
+                                                    <span class="opt-price">+ @Money(a.Price)</span>
+                                                    <form asp-area="Customer"
+                                                          asp-controller="Cart"
+                                                          asp-action="RemoveAddon"
+                                                          method="post"
+                                                          onsubmit="lockBtn(this)">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="cartItemId" value="@key" />
+                                                        <input type="hidden" name="optionId" value="@a.OptionId" />
+                                                        <button class="opt-remove" type="submit">Bỏ</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <div class="opt-empty muted">Chưa chọn tuỳ chọn</div>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Cột 4: Đơn giá -->
+                            <div class="price">@Money(it.UnitPrice)</div>
+
+                            <!-- Cột 6: Thành tiền -->
+                            <div class="line-total">@Money(it.LineTotal)</div>
+                        </div>
+
+                        <!-- CHỈNH: các input post theo mảng Items[i].* và "gắn" vào form chính bằng thuộc tính form -->
+                        <input type="hidden" form="@placeOrderFormId" name="Items[@i].CartItemId" value="@it.CartItemId" />
+                        <input type="hidden" form="@placeOrderFormId" name="Items[@i].ServiceId" value="@it.ServiceId" />
+
+                        <!-- Giờ đặt -->
+                        <div class="booking-time">
+                            <label for="booking-time-@i" class="booking-label">
+                                Chọn giờ thực hiện dịch vụ
+                                <span class="hint">(dự kiến bắt đầu sau 30–45 phút kể từ thời điểm đặt)</span>
+                            </label>
+                            <input type="datetime-local"
+                                   id="booking-time-@i"
+                                   form="@placeOrderFormId"
+                                   name="Items[@i].BookingTime"
+                                   value="@it.BookingTime.ToString("yyyy-MM-ddTHH:mm")"
+                                   class="booking-input" />
+                        </div>
+
+
+                        i++;
+                    }
+
+                    @* ====== CHÈN Ô TÍCH + LINK MỞ ĐIỀU KHOẢN THEO PROVIDER ====== *@
+                    @{
+                        var firstItem = shop.FirstOrDefault();
+                        // YÊU CẦU: BookItem có ProviderId. Nếu chưa có thì thêm vào model.
+                        var providerId = firstItem?.ProviderId ?? Guid.Empty;
+                    }
+                    <div class="tos-accept">
+                        <input type="checkbox"
+                               class="tos-check"
+                               data-provider-id="@providerId"
+                               onchange="syncTosHidden(this)" />
+                        <div>
+                            Tôi đã đọc và đồng ý
+                            <a href="#"
+                               class="tos-link"
+                               data-provider-id="@providerId"
+                               onclick="openTosModal('@providerId'); return false;">
+                                Điều khoản dịch vụ
+                            </a>
+                            của nhà cung cấp này.
+                        </div>
+
+                        <!-- Hidden để post về server: TosAccepted[providerId] -->
+                        <input type="hidden"
+                               name="TosAccepted[@providerId]"
+                               value="false"
+                               form="@placeOrderFormId" />
+                    </div>
+                    @* ====== HẾT PHẦN Ô TÍCH ====== *@
+                </div>
+            }
+
+            <!-- Voucher + thanh toán dính dưới -->
+            <div class="shop-block">
+                <div class="voucher-row">
+                    <div class="left">
+                        <span class="voucher-badge">🏷️ Voucher</span>
+                        <span class="muted" id="voucherHint">Chọn/nhập mã để áp dụng</span>
+                    </div>
+                    <button class="btn-ghost opt-btn" type="button" id="btnOpenVoucher" aria-expanded="false" aria-controls="opt_voucher">
+                        Chọn voucher
+                    </button>
+                </div>
+
+                <!-- CHỈNH: gắn vào form chính -->
+                <input type="hidden" form="@placeOrderFormId" name="VoucherCode" id="voucherCode" value="@Model.VoucherCode" />
+            </div>
+
+            <!-- Panel voucher (PORTAL) -->
+            <div id="opt_voucher" class="opt-panel" hidden aria-label="Danh sách voucher" role="dialog" aria-modal="true">
+                <div class="opt-card">
+                    <div class="opt-head">
+                        <h3>Voucher của bạn</h3>
+                        <button class="btn-ghost" type="button" id="btnCloseVoucher" aria-label="Đóng">Đóng</button>
+                    </div>
+
+                    <div class="opt-body">
+                        <div class="voucher-toolbar">
+                            <input id="voucherInput" class="input" placeholder="Nhập mã voucher..." />
+                            <button id="btnApplyTyped" class="btn" type="button">Áp dụng</button>
+                        </div>
+
+                        <div id="voucherList" class="voucher-list"></div>
+                        <div class="tiny muted">* Chỉ voucher còn hiệu lực và còn lượt dùng mới có thể áp dụng.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phương thức thanh toán -->
+            <div class="shop-block">
+                <div class="shop-head">Phương thức thanh toán</div>
+                <div style="padding:12px 16px">
+                    <div class="pm-list">
+                        @for (int j = 0; j < Model.PaymentMethods.Count; j++)
+                        {
+                            var pm = Model.PaymentMethods[j];
+                            var active = pm.Code == Model.SelectedPaymentCode ? "active" : "";
+                            <label class="pm @active">
+                                <!-- CHỈNH: gắn radio vào form chính -->
+                                <input type="radio"
+                                       form="@placeOrderFormId"
+                                       name="SelectedPaymentCode"
+                                       value="@pm.Code"
+                                       @(pm.Code == Model.SelectedPaymentCode ? "checked" : "")
+                                       style="display:none" />
+                                @pm.DisplayName
+                            </label>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tóm tắt -->
+        <div>
+            <div class="summary-box">
+                <!-- CHỈNH: thêm id cho form chính -->
+                <form id="@placeOrderFormId" asp-area="Customer" asp-controller="Booking" asp-action="PlaceOrder" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="SelectedAddressId" value="@Model.Address.AddressId" />
+
+                    <div class="row">
+                        <span class="muted">Tổng tiền hàng</span>
+                        <strong data-subtotal data-raw="@Model.Subtotal">@Money(Model.Subtotal)</strong>
+                    </div>
+                    <div class="row">
+                        <span class="muted">Tổng tiền phí vận chuyển</span>
+                        <strong data-shipping data-raw="@Model.ShippingFee">@Money(Model.ShippingFee)</strong>
+                    </div>
+                    <div class="row">
+                        <span class="muted">Tổng cộng Voucher giảm giá</span>
+                        <strong data-discount data-raw="@Model.VoucherDiscount">-@Money(Model.VoucherDiscount)</strong>
+                    </div>
+                    <hr />
+                    <div class="row" style="font-size:20px">
+                        <span>Tổng thanh toán</span>
+                        <strong style="color:#ee4d2d" data-total data-raw="@Model.Total">@Money(Model.Total)</strong>
+                    </div>
+
+                    <div id="voucherBreakdown" class="muted tiny" style="margin-top:6px" hidden>
+                        <div id="voucherAppliedInfo"></div>
+                    </div>
+
+                    <div style="margin-top:12px">
+                        <button class="btn-place" type="submit">Đặt hàng</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Modal chọn địa chỉ -->
+<div class="modal" id="addressModal">
+    <div class="modal-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3 style="margin:0">Chọn địa chỉ nhận hàng</h3>
+            <button class="btn" type="button" onclick="closeAddressModal()">✕</button>
+        </div>
+
+        <!-- Form CHỌN địa chỉ -->
+        <form asp-area="Customer" asp-controller="Booking" asp-action="ChangeAddress" method="post" style="margin-top:8px">
+            @Html.AntiForgeryToken()
+
+            <div class="addr-list">
+                @if (Model.Addresses?.Any() == true)
+                {
+                    foreach (var addr in Model.Addresses)
+                    {
+                        var isChecked = addr.AddressId == Model.Address.AddressId ? "checked" : "";
+                        <div class="addr-item"
+                             data-id="@addr.AddressId"
+                             data-province="@addr.ProvinceName"
+                             data-district="@addr.DistrictName"
+                             data-ward="@addr.WardName"
+                             data-street="@addr.StreetAddress">
+                            <input type="radio" name="SelectedAddressId" value="@addr.AddressId" @isChecked style="margin-top:3px" />
+                            <div style="flex:1">
+                                <div><strong>@Model.RecipientFullName</strong> (@Model.RecipientPhone)</div>
+                                <div class="muted">@addr.ToDisplayString()</div>
+                            </div>
+
+                            <div style="display:flex;flex-direction:column;gap:4px">
+                                <button type="button" class="btn small" onclick="openEditAddressForm(this)">📝</button>
+                                <button type="submit"
+                                        class="btn small"
+                                        style="color:#d00"
+                                        form="del-@addr.AddressId"
+                                        onclick="return confirm('Xóa địa chỉ này?')">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div style="padding:16px" class="muted">Bạn chưa có địa chỉ nào.</div>
+                }
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+                <button type="button" class="btn" onclick="closeAddressModal()">Hủy</button>
+                <div style="display:flex;gap:8px">
+                    <button type="button" class="btn" onclick="openCreateAddressForm()">➕ Thêm địa chỉ</button>
+                    <button type="submit" class="btn primary">Xác nhận</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@foreach (var addr in Model.Addresses ?? new List<UserAddressDto>())
+{
+    <form id="del-@addr.AddressId" asp-area="Customer" asp-controller="Address" asp-action="Delete" asp-route-id="@addr.AddressId" method="post">
+        @Html.AntiForgeryToken()
+    </form>
+}
+
+<!-- Modal Upsert địa chỉ -->
+<div class="modal" id="addressUpsertModal">
+    <div class="modal-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3 id="upsertTitle" style="margin:0">Thêm địa chỉ</h3>
+            <button class="btn" type="button" onclick="closeUpsertModal()">✕</button>
+        </div>
+
+        <form id="addressUpsertForm" asp-area="Customer" asp-controller="Address" asp-action="Upsert" method="post" style="margin-top:12px">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="AddressId" id="AddressId" />
+
+            <div class="form-row">
+                <label for="StreetAddress">Địa chỉ</label>
+                <input type="text" id="StreetAddress" name="StreetAddress" required />
+            </div>
+
+            <div class="form-grid-3">
+                <div class="form-row">
+                    <label for="WardName">Phường/Xã</label>
+                    <input type="text" id="WardName" name="WardName" required />
+                </div>
+                <div class="form-row">
+                    <label for="DistrictName">Quận/Huyện</label>
+                    <input type="text" id="DistrictName" name="DistrictName" required />
+                </div>
+                <div class="form-row">
+                    <label for="ProvinceName">Tỉnh/Thành</label>
+                    <input type="text" id="ProvinceName" name="ProvinceName" required />
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+                <button type="button" class="btn" onclick="closeUpsertModal()">Hủy</button>
+                <button type="submit" class="btn primary">Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Điều khoản dịch vụ -->
+<div class="modal" id="tosModal">
+    <div class="modal-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3 style="margin:0">Điều khoản dịch vụ</h3>
+            <button class="btn" type="button" onclick="closeTosModal()">✕</button>
+        </div>
+        <div id="tosModalBody" style="margin-top:12px; max-height:65vh; overflow:auto">
+            <!-- Nội dung nạp qua AJAX -->
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button type="button" class="btn" onclick="closeTosModal()">Đã hiểu</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        /* ========= Modal chọn địa chỉ ========= */
+        function openAddressModal(){ document.getElementById('addressModal').classList.add('open'); }
+        function closeAddressModal(){ document.getElementById('addressModal').classList.remove('open'); }
+
+        /* ========= Modal Upsert Address ========= */
+        function openCreateAddressForm(){
+          document.getElementById('upsertTitle').innerText = 'Thêm địa chỉ';
+          document.getElementById('AddressId').value = '';
+          document.getElementById('StreetAddress').value = '';
+          document.getElementById('WardName').value = '';
+          document.getElementById('DistrictName').value = '';
+          document.getElementById('ProvinceName').value = '';
+          document.getElementById('addressUpsertModal').classList.add('open');
+        }
+        function openEditAddressForm(btn){
+          const row = btn.closest('.addr-item');
+          document.getElementById('upsertTitle').innerText = 'Sửa địa chỉ';
+          document.getElementById('AddressId').value = row.dataset.id;
+          document.getElementById('StreetAddress').value = row.dataset.street;
+          document.getElementById('WardName').value = row.dataset.ward;
+          document.getElementById('DistrictName').value = row.dataset.district;
+          document.getElementById('ProvinceName').value = row.dataset.province;
+          document.getElementById('addressUpsertModal').classList.add('open');
+        }
+        function closeUpsertModal(){ document.getElementById('addressUpsertModal').classList.remove('open'); }
+
+        /* ========= Lock submit button nhỏ ========= */
+        function lockBtn(form){
+          const btn = form.querySelector('button[type="submit"]');
+          if(btn){ btn.disabled = true; btn.classList.add('is-loading'); }
+          return true;
+        }
+
+        /* ========= Toggle panel GENERIC ========= */
+        (function(){
+          function closeAll(exceptId){
+            document.querySelectorAll('.opt-panel').forEach(p=>{
+              if(!exceptId || p.id !== exceptId){
+                p.hidden = true;
+                const b = document.querySelector('.opt-btn[aria-controls="'+p.id+'"]');
+                if(b) b.setAttribute('aria-expanded','false');
+              }
+            });
+          }
+          document.addEventListener('click', function(e){
+            const btn = e.target.closest('.opt-btn');
+            const isVoucherBtn = btn && btn.id === 'btnOpenVoucher';
+
+            if(btn && !isVoucherBtn){
+              const id = btn.getAttribute('aria-controls');
+              const el = document.getElementById(id);
+              const expanded = btn.getAttribute('aria-expanded') === 'true';
+              if(expanded){ el.hidden = true; btn.setAttribute('aria-expanded','false'); }
+              else { closeAll(id); el.hidden = false; btn.setAttribute('aria-expanded','true'); }
+              return;
+            }
+
+            const panel = e.target.closest('.opt-panel');
+            if(!panel && !isVoucherBtn) closeAll();
+          });
+        })();
+
+        /* ========= Voucher MODULE + TẠM TÍNH CLIENT ========= */
+        (function(){
+          const panel   = document.getElementById('opt_voucher');
+          const btnOpen = document.getElementById('btnOpenVoucher');
+          const btnClose= document.getElementById('btnCloseVoucher');
+          const listEl  = document.getElementById('voucherList');
+          const inputEl = document.getElementById('voucherInput');
+          const applyTypedBtn = document.getElementById('btnApplyTyped');
+          const voucherCodeInput = document.getElementById('voucherCode');
+          const voucherHint = document.getElementById('voucherHint');
+
+          let VOUCHERS = null;
+          let CURRENT_VOUCHER = null;
+
+          const VND = n => (new Intl.NumberFormat('vi-VN')).format(Math.max(0, Math.round(n))) + '₫';
+          const pick = (o, ...keys) => { for (const k of keys) if (o && k in o && o[k] != null) return o[k]; };
+
+          function normalizeVoucher(o){
+            if(!o) return null;
+            return {
+              Code: pick(o,'Code','code') ?? '',
+              Description: pick(o,'Description','description') ?? '',
+              DiscountPercent: Number(pick(o,'DiscountPercent','discountPercent') || 0),
+              DiscountMaxAmount: Number(pick(o,'DiscountMaxAmount','discountMaxAmount') || 0),
+              StartDate: pick(o,'StartDate','startDate') ?? null,
+              EndDate: pick(o,'EndDate','endDate') ?? null,
+              IsActive: !!pick(o,'IsActive','isActive'),
+              UsageLimit: pick(o,'UsageLimit','usageLimit'),
+              UsedCount: Number(pick(o,'UsedCount','usedCount') || 0),
+              RemainingUses: pick(o,'RemainingUses','remainingUses'),
+              IsUnlimited: !!pick(o,'IsUnlimited','isUnlimited'),
+              IsExpired: !!pick(o,'IsExpired','isExpired'),
+              IsUpcoming: !!pick(o,'IsUpcoming','isUpcoming'),
+              CanUseNow: !!pick(o,'CanUseNow','canUseNow'),
+            };
+          }
+          function inDateRange(v) {
+            const now = new Date();
+            const s = v.StartDate ? new Date(v.StartDate) : null;
+            const e = v.EndDate ? new Date(v.EndDate) : null;
+            const okStart = !s || now >= s;
+            const okEnd   = !e || now <= e;
+            return okStart && okEnd;
+          }
+          function canUse(v) {
+            const active = !!v.IsActive;
+            const unlimited = !!v.IsUnlimited;
+            const remaining = Number(v.RemainingUses ?? ((v.UsageLimit ?? null) && isFinite(v.UsageLimit) ? (v.UsageLimit - (v.UsedCount||0)) : NaN));
+            const usesOk = unlimited || (isFinite(remaining) ? remaining > 0 : true);
+            const daterangeOk = inDateRange(v) && !v.IsExpired && !v.IsUpcoming;
+            return (active && usesOk && daterangeOk) || v.CanUseNow;
+          }
+
+          function updateVoucherUI() {
+            const code = voucherCodeInput.value?.trim();
+            if (code) {
+              voucherHint.textContent = `Đã áp dụng: ${code}`;
+              btnOpen.textContent = 'Đổi voucher';
+            } else {
+              voucherHint.textContent = 'Chọn/nhập mã để áp dụng';
+              btnOpen.textContent = 'Chọn voucher';
+            }
+            ensureBreakdown();
+          }
+
+          function ensureBreakdown(){
+            const totalRow = document.querySelector('.summary-box .row:last-of-type');
+            if(!totalRow) return;
+            const bd = document.getElementById('voucherBreakdown');
+            const info = document.getElementById('voucherAppliedInfo');
+            const code = voucherCodeInput.value?.trim();
+            if(code && CURRENT_VOUCHER){
+              const pct  = CURRENT_VOUCHER.DiscountPercent || 0;
+              const maxA = CURRENT_VOUCHER.DiscountMaxAmount;
+              const end  = CURRENT_VOUCHER.EndDate;
+              info.textContent =
+                `Áp dụng mã ${code} • Giảm ${pct}%` +
+                (maxA ? ` (tối đa ${VND(Number(maxA))})` : '') +
+                (end  ? ` • HSD: ${new Date(end).toLocaleDateString('vi-VN')}` : '');
+              bd.hidden = false;
+            } else {
+              info.textContent = '';
+              bd.hidden = true;
+            }
+          }
+
+          function renderList(vouchers){
+            listEl.innerHTML = '';
+            if(!vouchers || vouchers.length === 0){
+              listEl.innerHTML = `<div class="muted">Bạn chưa có voucher nào phù hợp.</div>`;
+              return;
+            }
+            vouchers.map(normalizeVoucher).forEach(v => {
+              const usable = canUse(v);
+              const end = v.EndDate ? new Date(v.EndDate).toLocaleDateString('vi-VN') : null;
+              const remain = v.RemainingUses ?? ((v.UsageLimit ?? null) && isFinite(v.UsageLimit) ? (v.UsageLimit - (v.UsedCount||0)) : null);
+
+              const item = document.createElement('div');
+              item.className = 'voucher-item';
+              item.innerHTML = `
+                <div class="left">
+                  <div class="title">
+                    ${v.Code}
+                    <span class="badge ${usable?'ok':(v.IsExpired?'danger':'warn')}">
+                      ${usable ? 'Dùng được' : (v.IsExpired ? 'Hết hạn' : 'Chưa đến hạn/đã hết lượt')}
+                    </span>
+                  </div>
+                  <div class="desc">${v.Description || 'Không có mô tả'}</div>
+                  <div class="meta">
+                    Giảm ${v.DiscountPercent}%${v.DiscountMaxAmount?` • Tối đa ${VND(v.DiscountMaxAmount)}`:''}
+                    ${end?` • HSD: ${end}`:''}
+                    ${remain!=null?` • Còn lượt: ${remain}`:''}
+                  </div>
+                </div>
+                <div class="right">
+                  <button class="apply"${usable?'':' disabled'} data-code="${v.Code}">Áp dụng</button>
+                </div>
+              `;
+              item.querySelector('.apply')?.addEventListener('click', () => applyVoucher(v));
+              listEl.appendChild(item);
+            });
+          }
+
+          async function fetchVouchers(){
+            try{
+              const res = await fetch('@Url.Action("GetCartVouchers", "BookingService", new { area = "Customer" })', { credentials: 'same-origin' });
+              if(!res.ok) throw new Error('Fetch vouchers failed');
+              const data = await res.json();
+              return Array.isArray(data) ? data : (data?.data ?? []);
+            }catch(e){
+              console.error(e);
+              return [];
+            }
+          }
+
+          async function openPanel(){
+            btnOpen.setAttribute('aria-expanded','true');
+            panel.hidden = false;
+            panel.classList.add('open');
+            if(VOUCHERS === null){
+              VOUCHERS = await fetchVouchers();
+              renderList(VOUCHERS);
+            }
+            setTimeout(()=> inputEl?.focus(), 50);
+          }
+          function closePanel(){
+            btnOpen.setAttribute('aria-expanded','false');
+            panel.classList.remove('open');
+            panel.hidden = true;
+          }
+
+          const INCLUDE_SHIPPING_IN_DISCOUNT = true;
+
+          function getSummaryEls(){
+            const rows = document.querySelectorAll('.summary-box .row strong');
+            return {
+              subtotalEl: rows[0] || null,
+              shippingEl: rows[1] || null,
+              discountEl: rows[2] || null,
+              totalEl:    rows[3] || null
+            };
+          }
+          function parseMoneyFromEl(el){
+            if(!el) return 0;
+            const raw = el.dataset?.raw;
+            if(raw != null && raw !== '') return Number(raw)||0;
+            const t = el.textContent || '';
+            const m = t.replace(/[^\d\-]/g,'');
+            return Number(m)||0;
+          }
+          function setMoney(el, amount, {prefix=''}={}){
+            if(!el) return;
+            const v = Math.max(0, Math.round(Number(amount||0)));
+            el.dataset.raw = String(v);
+            el.textContent = prefix + VND(v);
+          }
+          function computeDiscountLocal({subtotal, shipping}, voucher){
+            if(!voucher || !canUse(voucher)) return 0;
+            const base = INCLUDE_SHIPPING_IN_DISCOUNT ? (subtotal + shipping) : subtotal;
+            const pct  = Number(voucher.DiscountPercent || 0) / 100;
+            let discount = Math.round(base * pct);
+            if (voucher.DiscountMaxAmount != null && isFinite(voucher.DiscountMaxAmount)) {
+              discount = Math.min(discount, Number(voucher.DiscountMaxAmount));
+            }
+            return Math.max(0, discount);
+          }
+          function refreshTotalsLocal(){
+            const {subtotalEl, shippingEl, discountEl, totalEl} = getSummaryEls();
+            if(!subtotalEl || !shippingEl || !discountEl || !totalEl) return;
+
+            const subtotal = parseMoneyFromEl(subtotalEl);
+            const shipping = parseMoneyFromEl(shippingEl);
+            const discount = computeDiscountLocal({subtotal, shipping}, CURRENT_VOUCHER);
+            const total    = Math.max(0, subtotal + shipping - discount);
+
+            setMoney(discountEl, discount, {prefix:'-'});
+            setMoney(totalEl, total);
+
+            const info = document.getElementById('voucherAppliedInfo');
+            if (info && CURRENT_VOUCHER && (CURRENT_VOUCHER.Code||'').trim()) {
+              const pct  = CURRENT_VOUCHER.DiscountPercent || 0;
+              const maxA = CURRENT_VOUCHER.DiscountMaxAmount;
+              const end  = CURRENT_VOUCHER.EndDate;
+              info.textContent =
+                `Áp dụng mã ${CURRENT_VOUCHER.Code} • Giảm ${pct}%` +
+                (maxA ? ` (tối đa ${VND(Number(maxA))})` : '') +
+                (end  ? ` • HSD: ${new Date(end).toLocaleDateString('vi-VN')}` : '');
+              document.getElementById('voucherBreakdown').hidden = false;
+            }
+          }
+
+          function applyVoucher(v){
+            CURRENT_VOUCHER = normalizeVoucher(v);
+            voucherCodeInput.value = CURRENT_VOUCHER?.Code || '';
+            updateVoucherUI();
+            closePanel();
+            refreshTotalsLocal();
+          }
+          function applyTyped(){
+            const code = (inputEl.value || '').trim();
+            if(!code){ inputEl.focus(); return; }
+            const found = (VOUCHERS||[]).map(normalizeVoucher).find(x => (x.Code||'').toLowerCase() === code.toLowerCase());
+            CURRENT_VOUCHER = found || { Code: code, DiscountPercent: 0 };
+            voucherCodeInput.value = code;
+            updateVoucherUI();
+            closePanel();
+            refreshTotalsLocal();
+          }
+          function removeVoucher(){
+            CURRENT_VOUCHER = null;
+            voucherCodeInput.value = '';
+            updateVoucherUI();
+            refreshTotalsLocal();
+          }
+          window.removeVoucher = removeVoucher;
+
+          btnOpen?.addEventListener('click', (e) => { e.stopPropagation(); openPanel(); });
+          btnClose?.addEventListener('click', closePanel);
+          applyTypedBtn?.addEventListener('click', applyTyped);
+          panel?.addEventListener('click', (e)=>{ if(e.target === panel) closePanel(); });
+          document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && !panel.hidden) closePanel(); });
+
+          (function initFromServer(){
+            const firstCode = voucherCodeInput?.value?.trim();
+            if(firstCode){ CURRENT_VOUCHER = { Code: firstCode }; }
+            updateVoucherUI();
+            refreshTotalsLocal();
+          })();
+        })();
+
+        /* ========= TOS: Mở modal + đồng bộ checkbox/hidden + khóa submit ========= */
+        // async function openTosModal(providerId){
+        //   const body = document.getElementById('tosModalBody');
+        //   body.innerHTML = '<div class="muted">Đang tải điều khoản...</div>';
+        //   try{
+        //     const res = await fetch('/Customer/BookingService/GetTermsByProvider?providerId=' + providerId, {
+        //       method: 'GET',
+        //       headers: { 'X-Requested-With':'XMLHttpRequest' }
+        //     });
+        //     if(res.ok){
+        //       const html = await res.text();
+        //       body.innerHTML = html;
+        //     } else {
+        //       body.innerHTML = '<div style="color:#c00">Không tải được điều khoản từ máy chủ.</div>';
+        //     }
+        //   }catch(err){
+        //     body.innerHTML = '<div style="color:#c00">Không tải được điều khoản. Vui lòng thử lại.</div>';
+        //   }
+        //   document.getElementById('tosModal').classList.add('open');
+        // }
+
+                async function openTosModal(providerId){
+          const body = document.getElementById('tosModalBody');
+          body.innerHTML = '<div class="muted">Đang tải điều khoản...</div>';
+          try{
+            const url = '@Url.Action("GetTermsByProvider", "BookingService", new { area = "Customer" })' + '?providerId=' + providerId;
+            const res = await fetch(url, { method: 'GET', headers: { 'X-Requested-With':'XMLHttpRequest' } });
+            if(res.ok){
+              const html = await res.text();
+              body.innerHTML = html;
+            } else {
+              body.innerHTML = '<div style="color:#c00">Không tải được điều khoản từ máy chủ.</div>';
+            }
+          }catch(err){
+            body.innerHTML = '<div style="color:#c00">Không tải được điều khoản. Vui lòng thử lại.</div>';
+          }
+          document.getElementById('tosModal').classList.add('open');
+        }
+
+
+        function closeTosModal(){
+          document.getElementById('tosModal').classList.remove('open');
+          document.getElementById('tosModalBody').innerHTML = '';
+        }
+
+        function syncTosHidden(chk){
+          const providerId = chk.getAttribute('data-provider-id');
+          const hidden = document.querySelector(`input[type="hidden"][name="TosAccepted[${providerId}]"]`);
+          if(hidden) hidden.value = chk.checked ? 'true' : 'false';
+          updatePlaceOrderButtonState();
+        }
+
+        function updatePlaceOrderButtonState(){
+          const submitBtn = document.querySelector('#@placeOrderFormId button[type="submit"]');
+          if(!submitBtn) return;
+          const allChecks = Array.from(document.querySelectorAll('.tos-check'));
+          const allOk = allChecks.every(x => x.checked);
+          submitBtn.disabled = !allOk;
+        }
+
+        // Khởi tạo khi trang sẵn sàng
+        document.addEventListener('DOMContentLoaded', updatePlaceOrderButtonState);
+    </script>
+}

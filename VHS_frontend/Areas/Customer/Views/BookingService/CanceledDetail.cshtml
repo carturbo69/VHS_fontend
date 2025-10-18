@@ -1,0 +1,192 @@
+﻿@using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
+@model HistoryBookingDetailDTOs
+@{
+    ViewData["Title"] = "Chi tiết đơn đã hủy";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var cancel = ViewBag.Cancel as CancelBookingRequestDTO;
+
+    string FmtMoney(decimal v) => string.Format("{0:#,0}", v);
+    string FmtDate(DateTime? d) => d.HasValue ? d.Value.ToString("HH:mm dd-MM-yyyy") : "—";
+
+    var createdAt = FmtDate(Model?.CreatedAt);
+    var canceledAt = FmtDate(Model?.CompletedAt);
+
+    var serviceImg = string.IsNullOrWhiteSpace(Model?.Service?.Image)
+        ? Url.Content("~/images/VeSinh.jpg")
+        : Model.Service.Image;
+}
+
+<link rel="stylesheet" href="~/css/cancel-booking-detail.css" asp-append-version="true" />
+
+<div class="kb container py-4">
+    <!-- Header -->
+    <div class="kb-header d-flex flex-wrap align-items-center justify-content-between mb-4">
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="kb-title mb-0">Chi tiết hủy đơn</h2>
+            <span class="kb-badge kb-badge-danger"><i class="bi bi-x-circle me-1"></i>Đã hủy</span>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" class="btn btn-ghost">
+                <i class="bi bi-clock-history me-1"></i>Lịch sử đơn
+            </a>
+            <a href="javascript:history.back()" class="btn btn-brand">
+                <i class="bi bi-arrow-left-short me-1"></i>Quay lại
+            </a>
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    @if (Model?.Timeline?.Any() ?? false)
+    {
+        <div class="kb-card kb-timeline">
+            <div class="kb-card-header"><i class="bi bi-activity me-2"></i>Tiến trình</div>
+            <div class="kb-card-body">
+                <ol class="kb-steps">
+                    @foreach (var ev in Model.Timeline.OrderBy(t => t.Time))
+                    {
+                        <li class="kb-step">
+                            <div class="kb-step-dot"></div>
+                            <div class="kb-step-content">
+                                <div class="fw-semibold">@ev.Title</div>
+                                @if (!string.IsNullOrWhiteSpace(ev.Description))
+                                {
+                                    <div class="text-muted small">@ev.Description</div>
+                                }
+                                <div class="text-muted small mt-1"><i class="bi bi-clock me-1"></i>@ev.Time:HH:mm dd-MM-yyyy</div>
+                            </div>
+                        </li>
+                    }
+                </ol>
+            </div>
+        </div>
+    }
+
+    <!-- Service / Product -->
+    <div class="kb-card mb-4">
+        <div class="kb-card-header">
+            <i class="bi bi-bag me-2"></i>Sản phẩm / Dịch vụ
+        </div>
+        <div class="kb-card-body">
+            <div class="row g-3 align-items-start">
+                <div class="col-auto">
+                    <img src="@serviceImg" alt="Ảnh dịch vụ" class="kb-thumb" loading="lazy" decoding="async"
+                         onerror="this.onerror=null;this.src='@Url.Content("~/images/VeSinh.jpg")'" />
+                </div>
+                <div class="col">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="fw-bold fs-6">@Model?.Service?.Title</div>
+                        @if (!string.IsNullOrWhiteSpace(Model?.ProviderName))
+                        {
+                            <span class="kb-chip"><i class="bi bi-shop me-1"></i>@Model.ProviderName</span>
+                        }
+                    </div>
+                    <div class="text-muted small mt-1">
+                        Đơn giá: <strong>@FmtMoney(Model?.Service?.UnitPrice ?? 0)</strong> @Model?.Service?.UnitType ·
+                        SL: <strong>@(Model?.Service?.Quantity ?? 0)</strong>
+                    </div>
+
+                    @if (Model?.Options?.Any() ?? false)
+                    {
+                        <div class="mt-3">
+                            <div class="kb-label mb-2">Tuỳ chọn đã chọn</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var op in Model.Options)
+                                {
+                                    <span class="kb-option">
+                                        <i class="bi bi-check2 me-1"></i>@op.OptionName
+                                        <span class="text-muted">— @FmtMoney(op.Price) @op.UnitType</span>
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="kb-card-footer">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-6">
+                    <div class="kb-label">Phương thức thanh toán</div>
+                    <div class="fw-semibold">@(!string.IsNullOrWhiteSpace(Model?.PaymentMethod) ? Model.PaymentMethod : "—")</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="kb-price table-responsive">
+                        <table class="table table-borderless table-sm align-middle mb-1">
+                            <tbody>
+                                <tr>
+                                    <td class="text-muted">Tạm tính</td>
+                                    <td class="text-end fw-semibold">@FmtMoney(Model?.Subtotal ?? 0)</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Phí vận chuyển</td>
+                                    <td class="text-end fw-semibold">@FmtMoney(Model?.ShippingFee ?? 0)</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Voucher</td>
+                                    <td class="text-end fw-semibold">-@FmtMoney(Model?.VoucherDiscount ?? 0)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="d-flex justify-content-between border-top pt-2">
+                            <div class="fw-bold">Tổng tiền</div>
+                            <div class="fw-bold fs-5 text-brand">@FmtMoney(Model?.Total ?? 0) @Model?.Service?.UnitType</div>
+                        </div>
+                        <div class="text-end text-muted small mt-1">Đã thanh toán: @FmtMoney(Model?.PaidAmount ?? 0) @Model?.Service?.UnitType</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receiver & Address -->
+    <div class="kb-card mb-4">
+        <div class="kb-card-header"><i class="bi bi-geo-alt me-2"></i>Người nhận & địa chỉ</div>
+        <div class="kb-card-body">
+            <div class="d-flex flex-column gap-1">
+                <div class="fw-semibold">@Model?.RecipientFullName <span class="text-muted">— @Model?.RecipientPhone</span></div>
+                <div class="text-muted">@Model?.AddressLine</div>
+                @if (!string.IsNullOrWhiteSpace(Model?.ShippingTrackingCode))
+                {
+                    <div class="small text-muted"><i class="bi bi-truck me-1"></i>Mã vận đơn: @Model.ShippingTrackingCode</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Cancel / Refund info -->
+    <div class="kb-card mb-4">
+        <div class="kb-card-header"><i class="bi bi-receipt-cutoff me-2"></i>Thông tin hủy & hoàn tiền</div>
+        <div class="kb-card-body">
+            <div class="row g-3 mb-2">
+                <div class="col-12">
+                    <div class="kb-label">Lý do hủy</div>
+                    <div class="fw-semibold">@((cancel?.Reason ?? "—"))</div>
+                </div>
+                <div class="col-md-4 col-12">
+                    <div class="kb-label">Ngân hàng</div>
+                    <div class="fw-semibold">@((cancel?.BankName ?? "—"))</div>
+                </div>
+                <div class="col-md-4 col-12">
+                    <div class="kb-label">Chủ tài khoản</div>
+                    <div class="fw-semibold text-uppercase">@((cancel?.AccountHolderName ?? "—"))</div>
+                </div>
+                <div class="col-md-4 col-12">
+                    <div class="kb-label">Số tài khoản</div>
+                    <div class="fw-semibold">@((cancel?.BankAccountNumber ?? "—"))</div>
+                </div>
+            </div>
+            <div class="alert alert-warning d-flex align-items-start gap-2 mb-0 small">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <div>
+                    Nếu đã thanh toán, khoản hoàn sẽ được xử lý theo quy trình của hệ thống/nhà cung cấp.
+                    Vui lòng theo dõi thông báo để biết thời gian hoàn chính xác.
+                </div>
+            </div>
+        </div>
+    </div>
+
+  
+</div>
+
