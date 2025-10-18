@@ -54,6 +54,9 @@ builder.Services.AddHttpClient<NotificationService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+// ServiceShopService
+builder.Services.AddScoped<ServiceShopService>();
+
 // HttpClient cho AuthService
 builder.Services.AddHttpClient<AuthService>();
 
