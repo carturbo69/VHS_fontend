@@ -82,7 +82,7 @@
 
                 <div class="avatar-sec">
                     <div class="lbl">Ảnh đại diện</div>
-                    <div class="avatar">
+                    <div class="avatar" onclick="enlargeAvatar(this)">
                         @if (!string.IsNullOrWhiteSpace(Model.Images))
                         {
                             <img src="@Model.Images" alt="Ảnh đại diện" class="clickable-image" data-src="@Model.Images" />
@@ -144,8 +144,8 @@
                                     <div class="bl-grid">
                                         @foreach (var url in imgs)
                                         {
-                                            <figure class="thumb">
-                                                <img src="@url" alt="Giấy phép kinh doanh" loading="lazy" class="clickable-image" data-src="@url" />
+                                            <figure class="thumb" onclick="enlargeCategoryImage(this)">
+                                                <img src="@url" alt="Giấy phép kinh doanh" loading="lazy" data-src="@url" />
                                             </figure>
                                         }
                                     </div>
@@ -221,14 +221,187 @@
             const imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
             const modalImage = document.getElementById('modalImage');
             
-            // Add click handlers to all clickable images
+            // Add click handlers to all clickable images (except avatar images)
             document.querySelectorAll('.clickable-image').forEach(function(img) {
+                // Skip images inside .avatar to avoid conflict
+                if (img.closest('.avatar')) {
+                    return;
+                }
                 img.style.cursor = 'pointer';
                 img.addEventListener('click', function() {
                     modalImage.src = this.dataset.src || this.src;
                     imageModal.show();
                 });
             });
+        });
+
+        // Function to enlarge avatar
+        function enlargeAvatar(avatarElement) {
+            const img = avatarElement.querySelector('img');
+            if (!img) return;
+
+            // Check if already enlarged
+            if (document.querySelector('.avatar.enlarged')) {
+                console.log('Avatar already enlarged, skipping...');
+                return;
+            }
+
+            console.log('Enlarging avatar...');
+            const overlay = document.getElementById('avatarOverlay');
+            
+            // Hide original avatar
+            avatarElement.style.display = 'none';
+            console.log('Original avatar hidden');
+            
+            // Create a new enlarged avatar element
+            const enlargedAvatar = document.createElement('div');
+            enlargedAvatar.className = 'avatar enlarged';
+            enlargedAvatar.innerHTML = `
+                <img src="${img.src}" alt="${img.alt}" style="width: 100%; height: 100%; object-fit: contain;" />
+                <button type="button" class="close-btn" title="Đóng ảnh phóng to">
+                    <i class="bi bi-x"></i>
+                </button>
+            `;
+            
+            // Add close button functionality
+            const closeBtn = enlargedAvatar.querySelector('.close-btn');
+            closeBtn.onclick = function(e) {
+                e.stopPropagation();
+                closeEnlargedAvatar();
+            };
+            
+            // Add to body
+            document.body.appendChild(enlargedAvatar);
+            console.log('Enlarged avatar added to body');
+            
+            // Show overlay
+            overlay.classList.add('active');
+            console.log('Overlay activated');
+            
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Function to close enlarged avatar
+        function closeEnlargedAvatar() {
+            console.log('Closing enlarged avatar...');
+            const enlargedAvatar = document.querySelector('.avatar.enlarged');
+            if (!enlargedAvatar) {
+                console.log('No enlarged avatar found');
+                return;
+            }
+
+            const overlay = document.getElementById('avatarOverlay');
+            
+            // Show original avatar
+            const originalAvatar = document.querySelector('.avatar-sec .avatar');
+            if (originalAvatar) {
+                originalAvatar.style.display = 'flex';
+                console.log('Original avatar shown');
+            }
+            
+            // Remove enlarged avatar element
+            enlargedAvatar.remove();
+            console.log('Enlarged avatar removed');
+            
+            // Hide overlay
+            overlay.classList.remove('active');
+            console.log('Overlay deactivated');
+            
+            // Restore body scroll
+            document.body.style.overflow = '';
+        }
+
+        // Function to enlarge category image
+        function enlargeCategoryImage(thumbElement) {
+            const img = thumbElement.querySelector('img');
+            if (!img) return;
+
+            // Check if already enlarged
+            if (document.querySelector('.thumb.enlarged') || document.querySelector('.avatar.enlarged')) {
+                console.log('Image already enlarged, skipping...');
+                return;
+            }
+
+            console.log('Enlarging category image...');
+            const overlay = document.getElementById('avatarOverlay');
+            
+            // Store original position
+            const originalRect = thumbElement.getBoundingClientRect();
+            thumbElement.dataset.originalTop = originalRect.top + 'px';
+            thumbElement.dataset.originalLeft = originalRect.left + 'px';
+            thumbElement.dataset.originalWidth = originalRect.width + 'px';
+            thumbElement.dataset.originalHeight = originalRect.height + 'px';
+            
+            // Hide original thumb
+            thumbElement.style.display = 'none';
+            console.log('Original thumb hidden');
+            
+            // Create a new enlarged thumb element
+            const enlargedThumb = document.createElement('div');
+            enlargedThumb.className = 'thumb enlarged';
+            enlargedThumb.innerHTML = `
+                <img src="${img.src}" alt="${img.alt}" style="width: 100%; height: 100%; object-fit: contain;" />
+                <button type="button" class="close-btn" title="Đóng ảnh phóng to">
+                    <i class="bi bi-x"></i>
+                </button>
+            `;
+            
+            // Add close button functionality
+            const closeBtn = enlargedThumb.querySelector('.close-btn');
+            closeBtn.onclick = function(e) {
+                e.stopPropagation();
+                closeEnlargedCategoryImage();
+            };
+            
+            // Add to body
+            document.body.appendChild(enlargedThumb);
+            console.log('Enlarged thumb added to body');
+            
+            // Show overlay
+            overlay.classList.add('active');
+            console.log('Overlay activated');
+            
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Function to close enlarged category image
+        function closeEnlargedCategoryImage() {
+            console.log('Closing enlarged category image...');
+            const enlargedThumb = document.querySelector('.thumb.enlarged');
+            if (!enlargedThumb) {
+                console.log('No enlarged thumb found');
+                return;
+            }
+
+            const overlay = document.getElementById('avatarOverlay');
+            
+            // Show original thumb
+            const originalThumb = document.querySelector('.bl-grid .thumb');
+            if (originalThumb) {
+                originalThumb.style.display = 'block';
+                console.log('Original thumb shown');
+            }
+            
+            // Remove enlarged thumb element
+            enlargedThumb.remove();
+            console.log('Enlarged thumb removed');
+            
+            // Hide overlay
+            overlay.classList.remove('active');
+            console.log('Overlay deactivated');
+            
+            // Restore body scroll
+            document.body.style.overflow = '';
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeEnlargedAvatar();
+                closeEnlargedCategoryImage();
+            }
         });
     </script>
 }
@@ -242,3 +415,6 @@
         </div>
     </div>
 </div>
+
+<!-- Avatar Overlay -->
+<div class="avatar-overlay" id="avatarOverlay" onclick="closeEnlargedAvatar()"></div>
