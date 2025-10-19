@@ -1,6 +1,182 @@
 /* ============================================
-   NOTIFICATION SYSTEM STYLES
+   NOTIFICATION SYSTEM STYLES - SIMPLE VERSION
    ============================================ */
+
+/* Notification Menu */
+.notification-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    transform: translateX(-50%);
+    width: 380px;
+    max-height: 500px;
+    overflow-y: auto;
+    z-index: 1000;
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: white;
+    margin-top: 8px;
+    padding: 0;
+}
+
+/* Hover fallback CSS */
+.position-relative:hover .notification-menu {
+    display: block !important;
+}
+
+/* Notification Button */
+#notificationBtn {
+    position: relative;
+    padding: 8px !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    background: white !important;
+    border-radius: 8px !important;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#notificationBtn:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #20b2aa;
+    color: white;
+    font-size: .72rem;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    transition: transform .12s ease, filter .18s ease;
+    z-index: 1000;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Dropdown Header */
+.notification-menu .dropdown-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-radius: 12px 12px 0 0;
+}
+
+.notification-menu .dropdown-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* Dropdown Content */
+.notification-menu .dropdown-content {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Notification Items */
+.notification-menu li {
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.notification-menu li:hover {
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+.notification-menu li:last-child {
+    border-bottom: none;
+}
+
+/* Notification Item Links */
+.notification-menu li a {
+    color: #1e293b;
+    text-decoration: none;
+    display: block;
+    padding: 0;
+}
+
+.notification-menu li a:hover {
+    color: #3b82f6;
+    text-decoration: none;
+}
+
+/* Notification Time */
+.notification-menu .small {
+    color: #64748b;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+/* Notification Content */
+.notification-menu li div:not(.small) {
+    color: #1e293b;
+    font-size: 14px;
+    line-height: 1.4;
+    margin-bottom: 4px;
+}
+
+/* Mark All Read Button */
+.notification-menu li:last-child {
+    background: rgba(248, 250, 252, 0.5);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.notification-menu li:last-child a {
+    color: #3b82f6;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.notification-menu li:last-child a:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Empty State */
+.notification-menu .text-center {
+    padding: 40px 20px;
+    color: #64748b;
+    font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .notification-menu {
+        width: 320px;
+        right: 10px;
+        transform: translateX(-20px);
+        max-height: 70vh;
+    }
+}
+
+@media (max-width: 480px) {
+    .notification-menu {
+        width: calc(100vw - 20px);
+        right: 10px;
+        left: 10px;
+        transform: none;
+        max-height: 60vh;
+    }
+}
 
 /* Icon classes for Bootstrap Icons */
 .icon-bell::before { content: "\f3e8"; font-family: "bootstrap-icons"; }
@@ -16,7 +192,8 @@
 /* Notification Container */
 .notification-container {
     position: relative;
-    z-index: 999999 !important;
+    z-index: 10000 !important;
+    isolation: isolate; /* Tạo stacking context riêng */
 }
 
 .notify-btn-wrapper {
@@ -25,48 +202,83 @@
     z-index: 999999 !important;
 }
 
-/* CSS Hover fallback */
-.notify-btn-wrapper:hover .notification-dropdown {
-    opacity: 1 !important;
-    visibility: visible !important;
-    transform: translateY(0) !important;
-    pointer-events: auto !important;
-    display: block !important;
-    z-index: 999999 !important;
-}
-
 /* Force highest priority for all notification elements */
-.notification-container,
-.notify-btn-wrapper,
-.notification-dropdown,
+.notification-container {
+    z-index: 10000 !important;
+    position: relative;
+}
+
+.notify-btn-wrapper {
+    z-index: 10001 !important;
+    position: relative;
+}
+
+.notification-dropdown {
+    z-index: 10002 !important;
+}
+
 .notification-dropdown * {
-    z-index: 999999 !important;
+    z-index: 10003 !important;
 }
 
-/* Đã được định nghĩa ở trên */
+/* CSS Hover fallback đã bị loại bỏ để tránh conflict với JavaScript */
 
-/* Khi hover vào chuông, dropdown sẽ sổ xuống */
-.notify-btn:hover + .notification-dropdown,
-.notify-btn-wrapper:hover .notification-dropdown {
-    position: fixed !important;
-    top: 80px !important;
-    right: 20px !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    transform: translateY(0) !important;
-    pointer-events: auto !important;
-    display: block !important;
-    z-index: 999999 !important;
-    transition: all 0.3s ease !important;
-}
-
-/* Dropdown ẩn mặc định, chỉ hiện khi hover */
+/* Dropdown ẩn mặc định, chỉ hiện khi có class 'show' */
 .notification-dropdown {
     opacity: 0;
     visibility: hidden;
     transform: translateY(-10px);
     pointer-events: none;
     display: block;
+    /* Không có transition để hiển thị ngay lập tức */
+}
+
+/* Animation cho dropdown khi hiển thị */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+}
+
+/* Khi dropdown được hiển thị - ngay lập tức không có animation */
+.notification-dropdown.show {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateY(0) !important;
+    pointer-events: auto !important;
+    display: block !important;
+    z-index: 999999 !important;
+    /* Không có animation - hiển thị ngay lập tức */
+}
+
+/* Force show dropdown khi có class show */
+.notification-dropdown.show {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateY(0) !important;
+    pointer-events: auto !important;
+    display: block !important;
+    z-index: 10002 !important;
+}
+
+.notification-dropdown.hiding {
+    animation: slideUp 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Header Notification Bell */
@@ -85,6 +297,11 @@
 .notify-btn:hover {
     background-color: rgba(59, 130, 246, 0.1);
     transform: translateY(-1px);
+}
+
+.notify-btn:active {
+    transform: translateY(0);
+    background-color: rgba(59, 130, 246, 0.2);
 }
 
 .notify-icon {
@@ -125,23 +342,26 @@
 
 /* Notification Dropdown */
 .notification-dropdown {
-    position: fixed !important;
-    top: 80px !important;
-    right: 20px !important;
+    position: absolute !important;
+    top: 100% !important;
+    right: 0 !important;
     width: 380px;
     max-height: 500px;
     background: white;
     border-radius: 12px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     border: 1px solid rgba(0, 0, 0, 0.1);
-    z-index: 999999 !important;
+    z-index: 10002 !important;
     overflow: hidden;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-10px);
-    transition: all 0.3s ease;
+    /* Không có transition để hiển thị ngay lập tức */
     pointer-events: none;
     display: block;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    margin-top: 8px;
 }
 
 .notification-dropdown.show {
@@ -767,7 +987,23 @@
 @media (max-width: 768px) {
     .notification-dropdown {
         width: 320px;
-        right: -50px;
+        right: 0;
+        max-height: 70vh;
+    }
+    
+    .notification-dropdown.show {
+        animation: slideDownMobile 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes slideDownMobile {
+        from {
+            opacity: 0;
+            transform: translateY(-15px) scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
     }
     
     .notification-header {
@@ -811,8 +1047,25 @@
 
 @media (max-width: 480px) {
     .notification-dropdown {
-        width: 280px;
-        right: -80px;
+        width: calc(100vw - 20px);
+        right: 10px;
+        left: 10px;
+        max-height: 60vh;
+    }
+    
+    .notification-dropdown.show {
+        animation: slideDownMobileSmall 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes slideDownMobileSmall {
+        from {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.85);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
     }
     
     .page-title {
