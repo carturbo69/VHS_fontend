@@ -1,10 +1,43 @@
 ﻿using VHS_frontend.Models;
 using VHS_frontend.Services;
+using VHS_frontend.Services.Admin;
+using VHS_frontend.Services.Customer;
+using VHS_frontend.Services.Customer.Implementations;
+using VHS_frontend.Services.Customer.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Bind ApiSettings
-builder.Services.Configure<ApiSettings>(builder.Configuration.GetSection("ApiSettings"));
+// DI HttpClient dùng đúng BaseAddress
+var backendBase = builder.Configuration["Apis:Backend"];
+if (string.IsNullOrWhiteSpace(backendBase))
+    throw new InvalidOperationException("Missing configuration: Apis:Backend");
+
+builder.Services.AddHttpClient<IServiceCustomerService, ServiceCustomerService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+builder.Services.AddHttpClient<CartServiceCustomer>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+builder.Services.AddHttpClient<CategoryAdminService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+builder.Services.AddHttpClient<TagAdminService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+builder.Services.AddHttpClient<CustomerAdminService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+builder.Services.AddHttpClient<ProviderAdminService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 
 // HttpClient cho AuthService
 builder.Services.AddHttpClient<AuthService>();

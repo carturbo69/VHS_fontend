@@ -1,5 +1,6 @@
 ﻿<!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" class="preload">
+ <!-- Thêm .preload để chặn transition khi khởi động -->
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,9 +9,22 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+
+    @RenderSection("Styles", required: false)
 </head>
 
 <body>
+    <!-- Áp trạng thái sidebar RẤT SỚM để tránh FOUC/reflow -->
+    <script>
+        (function () {
+          try {
+            if (localStorage.getItem('vhs-sidebar') === 'collapsed') {
+              document.body.classList.add('sidebar-collapsed');
+            }
+          } catch (e) {}
+        })();
+    </script>
+
     <!-- Sidebar (fixed) -->
     <aside id="sidebar">
         <div class="sidebar-header">
@@ -20,56 +34,74 @@
 
         <nav class="sidebar-nav">
             <a asp-controller="AdminDashboard" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminDashboard" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminDashboard" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminDashboard" ? "page" : null)">
                 <i class="bi bi-house-door"></i><span>Tổng quan</span>
             </a>
+
             <a asp-controller="AdminCustomer" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminCustomer" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminCustomer" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminCustomer" ? "page" : null)">
                 <i class="bi bi-people"></i><span>Quản lí customer</span>
             </a>
 
             <a asp-controller="AdminProvider" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminProvider" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminProvider" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminProvider" ? "page" : null)">
                 <i class="bi bi-buildings"></i><span>Quản lí provider</span>
             </a>
 
             <a asp-controller="ProviderRegistration" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderRegistration" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderRegistration" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderRegistration" ? "page" : null)">
                 <i class="bi bi-clipboard-check"></i><span>Quản lí đăng kí provider</span>
             </a>
 
-            <a asp-controller="Category" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Category" ? "active" : "")">
+            <!-- Link có Area: so sánh cả Area để active chính xác -->
+            @{
+                var isCategoryActive =
+                (ViewContext.RouteData.Values["controller"]?.ToString() == "Category") &&
+                (ViewContext.RouteData.Values["area"]?.ToString() == "Admin");
+            }
+            <a asp-area="Admin" asp-controller="Category" asp-action="Index"
+               class="nav-link @(isCategoryActive ? "active" : "")"
+               aria-current="@(isCategoryActive ? "page" : null)">
                 <i class="bi bi-collection"></i><span>Quản lí danh mục</span>
             </a>
 
             <a asp-controller="Service" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Service" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Service" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Service" ? "page" : null)">
                 <i class="bi bi-tools"></i><span>Quản lí dịch vụ</span>
             </a>
 
             <a asp-controller="AdPayment" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdPayment" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdPayment" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="AdPayment" ? "page" : null)">
                 <i class="bi bi-credit-card-2-front"></i><span>Quản lí thanh toán</span>
             </a>
 
             <a asp-controller="Order" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" ? "page" : null)">
                 <i class="bi bi-receipt"></i><span>Quản lí order</span>
             </a>
 
             <a asp-controller="Feedback" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Feedback" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Feedback" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Feedback" ? "page" : null)">
                 <i class="bi bi-chat-dots"></i><span>Quản lí feedback</span>
             </a>
 
             <a asp-controller="Voucher" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Voucher" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Voucher" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Voucher" ? "page" : null)">
                 <i class="bi bi-ticket-perforated"></i><span>Quản lí voucher</span>
             </a>
 
             <a asp-controller="Complaint" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Complaint" ? "active" : "")">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Complaint" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Complaint" ? "page" : null)">
                 <i class="bi bi-flag"></i><span>Quản lí phản ánh</span>
             </a>
 
@@ -81,7 +113,11 @@
         <!-- Topbar -->
         <header class="topbar">
             <div class="left">
-                <button id="btnSidebarToggle" class="btn btn-outline-secondary btn-toggle" aria-label="Toggle sidebar">
+                <button id="btnSidebarToggle"
+                        class="btn btn-outline-secondary btn-toggle"
+                        aria-label="Toggle sidebar"
+                        aria-pressed="false">
+                    <!-- thêm aria-pressed -->
                     <i class="bi bi-list"></i>
                 </button>
                 <h5 class="page-title mb-0">@ViewData["Title"]</h5>
@@ -130,111 +166,179 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // Smooth sidebar (no reflow): page padding-left transitions with sidebar width
-        document.getElementById('btnSidebarToggle').addEventListener('click', () => {
-          document.body.classList.toggle('sidebar-collapsed');
-        });
+        // =========================
+        // Sidebar: giữ trạng thái + chống giật khi load
+        // =========================
+        (function () {
+          const SIDEBAR_KEY = 'vhs-sidebar';
+          const btn = document.getElementById('btnSidebarToggle');
 
+          function applySidebarState(state) {
+            const collapsed = state === 'collapsed';
+            document.body.classList.toggle('sidebar-collapsed', collapsed);
+            if (btn) {
+              btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+              btn.classList.toggle('is-active', collapsed);
+            }
+          }
+
+          function currentState() {
+            return document.body.classList.contains('sidebar-collapsed') ? 'collapsed' : 'expanded';
+          }
+
+          // Khởi tạo theo localStorage (fallback expanded)
+          document.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem(SIDEBAR_KEY) || 'expanded';
+            applySidebarState(saved);
+
+            // Bỏ .preload sau khi frame đầu đã áp xong trạng thái → không giật
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                document.documentElement.classList.remove('preload');
+              });
+            });
+          });
+
+          // Toggle + lưu
+          if (btn) {
+            btn.addEventListener('click', () => {
+              const next = currentState() === 'collapsed' ? 'expanded' : 'collapsed';
+              localStorage.setItem(SIDEBAR_KEY, next);
+              applySidebarState(next);
+            });
+          }
+        })();
+
+        // =========================
         // Theme sync + toggle
+        // =========================
         (function () {
           const KEY = "vhs-theme";
           const root = document.documentElement;
           const icon = document.querySelector(".theme-icon");
-          const saved = localStorage.getItem(KEY);
-          const apply = t => {
+
+          const apply = (t) => {
             root.classList.toggle("dark", t === "dark");
-            icon.innerHTML = root.classList.contains("dark")
-              ? '<i class="bi bi-moon-stars-fill fs-5"></i>'
-              : '<i class="bi bi-brightness-high-fill fs-5"></i>';
+            if (icon) {
+              icon.innerHTML = root.classList.contains("dark")
+                ? '<i class="bi bi-moon-stars-fill fs-5"></i>'
+                : '<i class="bi bi-brightness-high-fill fs-5"></i>';
+            }
           };
+
+          const saved = localStorage.getItem(KEY);
           if (saved === "light" || saved === "dark") apply(saved);
           else apply(matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+
           window.__toggleTheme = () => {
             const next = root.classList.contains("dark") ? "light" : "dark";
-            localStorage.setItem(KEY, next); apply(next);
+            localStorage.setItem(KEY, next);
+            apply(next);
           };
         })();
 
+        // =========================
         // Notifications
-        const proxyBase = '/notification-proxy';
-        const notifBtn = document.getElementById('notificationBtn');
-        const notifMenu = document.getElementById('notificationMenu');
-        const notifBadge = document.getElementById('notificationBadge');
+        // =========================
+        (function () {
+          const proxyBase = '/notification-proxy';
+          const notifBtn   = document.getElementById('notificationBtn');
+          const notifMenu  = document.getElementById('notificationMenu');
+          const notifBadge = document.getElementById('notificationBadge');
 
-        notifBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          if (notifMenu.style.display === 'block') {
-            notifMenu.style.display = 'none';
-            notifBtn.setAttribute('aria-expanded', 'false');
-            return;
+          async function loadUnreadCount() {
+            try {
+              const res = await fetch(`${proxyBase}/unread-count`);
+              const dto = await res.json();
+              if (dto.count > 0) {
+                notifBadge.textContent = dto.count;
+                notifBadge.style.display = 'inline-flex';
+              } else {
+                notifBadge.style.display = 'none';
+              }
+            } catch (e) { console.error(e); }
           }
-          await loadNotifications();
-          notifMenu.style.display = 'block';
-          notifBtn.setAttribute('aria-expanded', 'true');
-        });
 
-        document.addEventListener('click', (e) => {
-          if (!notifBtn.contains(e.target) && !notifMenu.contains(e.target)) {
-            notifMenu.style.display = 'none';
-            notifBtn.setAttribute('aria-expanded', 'false');
+          async function loadNotifications() {
+            try {
+              const res = await fetch(`${proxyBase}/unread-list`);
+              const list = await res.json();
+              notifMenu.innerHTML = '';
+              if (!list.length) {
+                notifMenu.innerHTML = '<li class="text-center text-muted py-2">No notifications</li>';
+                return;
+              }
+              list.forEach(n => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                  <a href="#" class="d-block text-decoration-none px-2 py-1" onclick="markRead('${n.notificationId}')">
+                    <div class="small text-muted">${new Date(n.createdAt).toLocaleString()}</div>
+                    <div>${n.content}</div>
+                    <div><strong>Booking Status:</strong> ${n.bookingStatus}</div>
+                  </a>`;
+                notifMenu.appendChild(li);
+              });
+              const hr = document.createElement('hr');
+              notifMenu.appendChild(hr);
+              const all = document.createElement('li');
+              all.innerHTML = `<a href="#" class="d-block text-center text-decoration-none py-1" onclick="markAllRead()">Mark all as read</a>`;
+              notifMenu.appendChild(all);
+            } catch (e) { console.error(e); }
           }
-        });
 
-        async function loadUnreadCount() {
-          try {
-            const res = await fetch(`${proxyBase}/unread-count`);
-            const dto = await res.json();
-            if (dto.count > 0) {
-              notifBadge.textContent = dto.count;
-              notifBadge.style.display = 'inline-flex';
-            } else {
-              notifBadge.style.display = 'none';
-            }
-          } catch (e) { console.error(e); }
-        }
+          async function markRead(id) {
+            try {
+              await fetch(`${proxyBase}/mark-read/${id}`, { method: 'PUT' });
+              await loadUnreadCount();
+              await loadNotifications();
+            } catch (e) { console.error(e); }
+          }
 
-        async function loadNotifications() {
-          try {
-            const res = await fetch(`${proxyBase}/unread-list`);
-            const list = await res.json();
-            notifMenu.innerHTML = '';
-            if (!list.length) {
-              notifMenu.innerHTML = '<li class="text-center text-muted py-2">No notifications</li>';
-              return;
-            }
-            list.forEach(n => {
-              const li = document.createElement('li');
-              li.innerHTML = `
-                <a href="#" class="d-block text-decoration-none px-2 py-1" onclick="markRead('${n.notificationId}')">
-                  <div class="small text-muted">${new Date(n.createdAt).toLocaleString()}</div>
-                  <div>${n.content}</div>
-                  <div><strong>Booking Status:</strong> ${n.bookingStatus}</div>
-                </a>`;
-              notifMenu.appendChild(li);
+          async function markAllRead() {
+            try {
+              const res = await fetch(`${proxyBase}/unread-list`);
+              const list = await res.json();
+              for (const n of list) {
+                await fetch(`${proxyBase}/mark-read/${n.notificationId}`, { method: 'PUT' });
+              }
+              await loadUnreadCount();
+              await loadNotifications();
+            } catch (e) { console.error(e); }
+          }
+
+          // Gắn vào window để onclick trong HTML dùng được
+          window.markRead = markRead;
+          window.markAllRead = markAllRead;
+
+          // Toggle popup
+          if (notifBtn && notifMenu) {
+            notifBtn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const open = notifMenu.style.display === 'block';
+              if (open) {
+                notifMenu.style.display = 'none';
+                notifBtn.setAttribute('aria-expanded', 'false');
+              } else {
+                await loadNotifications();
+                notifMenu.style.display = 'block';
+                notifBtn.setAttribute('aria-expanded', 'true');
+              }
             });
-            const hr = document.createElement('hr');
-            notifMenu.appendChild(hr);
-            const all = document.createElement('li');
-            all.innerHTML = `<a href="#" class="d-block text-center text-decoration-none py-1" onclick="markAllRead()">Mark all as read</a>`;
-            notifMenu.appendChild(all);
-          } catch (e) { console.error(e); }
-        }
 
-        async function markRead(id) {
-          await fetch(`${proxyBase}/mark-read/${id}`, { method: 'PUT' });
-          await loadUnreadCount(); await loadNotifications();
-        }
-        async function markAllRead() {
-          const res = await fetch(`${proxyBase}/unread-list`);
-          const list = await res.json();
-          for (const n of list) await fetch(`${proxyBase}/mark-read/${n.notificationId}`, { method: 'PUT' });
-          await loadUnreadCount(); await loadNotifications();
-        }
+            document.addEventListener('click', (e) => {
+              if (!notifBtn.contains(e.target) && !notifMenu.contains(e.target)) {
+                notifMenu.style.display = 'none';
+                notifBtn.setAttribute('aria-expanded', 'false');
+              }
+            });
+          }
 
-        document.addEventListener('DOMContentLoaded', () => {
-          loadUnreadCount();
-          setInterval(loadUnreadCount, 30000);
-        });
+          // Khởi chạy
+          document.addEventListener('DOMContentLoaded', () => {
+            loadUnreadCount();
+            setInterval(loadUnreadCount, 30000);
+          });
+        })();
     </script>
 
     @RenderSection("Scripts", required: false)

@@ -1,0 +1,424 @@
+﻿@using VHS_frontend.Areas.Admin.Models.Category
+@using VHS_frontend.Areas.Admin.Models.Tag
+@model List<CategoryDTO>
+
+@{
+    ViewData["Title"] = "Quản lý danh mục";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+    var includeDeleted = (bool)(ViewData["IncludeDeleted"] ?? false);
+    var total = Model.Count;
+    var active = Model.Count(x => x.Deleted != true);
+    var deleted = Model.Count(x => x.Deleted == true);
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/category.css" asp-append-version="true" />
+}
+
+<section class="cat-page container-fluid">
+    <!-- Header / Metrics -->
+    <div class="cat-head card-x glass">
+        <div class="left">
+            <div class="ico"><i class="bi bi-collection"></i></div>
+            <div>
+                <h3>Danh mục</h3>
+                <div class="sub">Quản lý danh mục &amp; tag con</div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="pill"><span class="lbl">Tổng</span><span class="val">@total</span></div>
+            <div class="pill good"><span class="lbl">Hoạt động</span><span class="val">@active</span></div>
+            <div class="pill mute"><span class="lbl">Đã xoá</span><span class="val">@deleted</span></div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="cat-toolbar">
+        <div class="actions">
+            <button class="btn btn-primary soft" id="btnCreate">
+                <i class="bi bi-plus-circle"></i> Thêm danh mục
+            </button>
+
+            <a class="btn btn-ghost soft"
+               asp-area="Admin" asp-controller="Category" asp-action="Index"
+               asp-route-includeDeleted="@( !includeDeleted )">
+                <i class="bi @(includeDeleted ? "bi-eye-slash" : "bi-eye")"></i>
+                @(includeDeleted ? "Ẩn đã xoá" : "Hiện cả đã xoá")
+            </a>
+        </div>
+
+        <div class="search">
+            <i class="bi bi-search"></i>
+            <input id="txtSearch" class="form-control" placeholder="Tìm danh mục theo tên…" />
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap card-x">
+        <table class="table table-hover align-middle mb-0" id="tblCats">
+            <thead>
+                <tr>
+                    <th style="width:100px;">Nhánh</th>
+                    <th>Tên danh mục</th>
+                    <th style="width:160px;">Trạng thái</th>
+                    <th style="width:260px;" class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < Model.Count; i++)
+                {
+                    var item = Model[i];
+                    <tr data-id="@item.CategoryId" class="cat-row">
+                        <td>
+                            <div class="branch">
+                                <button class="btn toggle-tags soft"
+                                        data-target="#tags-@item.CategoryId" aria-expanded="false" title="Mở danh sách tag">
+                                    <i class="bi bi-caret-right-fill"></i>
+                                </button>
+                                <!-- CHIP ĐẾM TAG (TRÊN) -->
+                                <span class="chip chip-count" data-count-for="@item.CategoryId">–</span>
+                            </div>
+                        </td>
+                        <td class="cat-name fw-semibold">@item.Name</td>
+                        <td>
+                            @if (item.Deleted == true)
+                            {
+                                <span class="state del">Đã xoá</span>
+                            }
+                            else
+                            {
+                                <span class="state ok">Hoạt động</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-primary soft btn-edit" @(item.Deleted == true ? "disabled" : "")>
+                                    <i class="bi bi-pencil-square"></i> Sửa
+                                </button>
+                                @if (item.Deleted == true)
+                                {
+                                    <button class="btn btn-sm btn-outline-warning soft btn-restore-cat">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Khôi phục
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-danger soft btn-delete-cat">
+                                        <i class="bi bi-trash"></i> Xoá
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Row con: danh sách tag -->
+                    <tr class="tag-row">
+                        <td colspan="4" class="p-0">
+                            <div id="tags-@item.CategoryId" class="tags-box collapse card-x" data-category-id="@item.CategoryId">
+                                <div class="tags-top">
+                                    <div class="ttl">
+                                        <i class="bi bi-tags-fill"></i>
+                                        <strong>Tags</strong>
+                                        <span class="hint">(nhánh con)</span>
+                                    </div>
+                                    <div class="top-right">
+                                        <!-- CHIP ĐẾM TAG (DƯỚI) -->
+                                        <span class="chip chip-mini chip-count-bottom" data-count-for="@item.CategoryId">0</span>
+                                        <button class="btn btn-ghost sm soft btn-add-tag" data-category-id="@item.CategoryId">
+                                            <i class="bi bi-plus-lg"></i> Thêm tag
+                                        </button>
+                                    </div>
+                                </div>
+                                <ul class="list-group tag-list" data-category-id="@item.CategoryId">
+                                    <li class="list-group-item note">Nhấn mũi tên để tải danh sách tag…</li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- Modal: Category -->
+<div class="modal fade" id="catModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content card-x" id="catForm">
+            <div class="modal-header">
+                <h5 class="modal-title" id="catModalTitle">Thêm danh mục</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="catId" />
+                <div class="mb-3">
+                    <label class="form-label">Tên danh mục</label>
+                    <input type="text" id="catName" class="form-control" maxlength="100" required />
+                    <div class="invalid-feedback">Vui lòng nhập tên danh mục.</div>
+                </div>
+                <div id="catError" class="text-danger small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-primary soft" id="btnSaveCat">Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Tag -->
+<div class="modal fade" id="tagModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content card-x" id="tagForm">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tagModalTitle">Thêm tag</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="tagId" />
+                <input type="hidden" id="tagCategoryId" />
+                <div class="mb-3">
+                    <label class="form-label">Tên tag</label>
+                    <input type="text" id="tagName" class="form-control" maxlength="100" required />
+                    <div class="invalid-feedback">Vui lòng nhập tên tag.</div>
+                </div>
+                <div id="tagError" class="text-danger small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-primary soft" id="btnSaveTag">Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const routes = {
+          catCreate : '@Url.Action("Create", "Category", new { area = "Admin" })',
+          catGet    : '@Url.Action("Get", "Category", new { area = "Admin" })',
+          catUpdate : '@Url.Action("Update", "Category", new { area = "Admin" })',
+          catDelete : '@Url.Action("Delete", "Category", new { area = "Admin" })',
+          catRestore: '@Url.Action("Restore", "Category", new { area = "Admin" })',
+          tagsByCat : '@Url.Action("GetTags", "Category", new { area = "Admin" })',
+          tagCreate : '@Url.Action("CreateTag", "Category", new { area = "Admin" })',
+          tagUpdate : '@Url.Action("UpdateTag", "Category", new { area = "Admin" })',
+          tagDelete : '@Url.Action("DeleteTag", "Category", new { area = "Admin" })',
+          tagRestore: '@Url.Action("RestoreTag", "Category", new { area = "Admin" })'
+        };
+        const includeDeleted = @includeDeleted.ToString().ToLower();
+
+        // Search
+        document.getElementById('txtSearch').addEventListener('input', function(){
+          const q = this.value.toLowerCase().trim();
+          document.querySelectorAll('#tblCats tbody tr.cat-row').forEach(tr=>{
+            const name = tr.querySelector('.cat-name').textContent.toLowerCase();
+            const show = name.includes(q);
+            tr.style.display = show ? '' : 'none';
+            const next = tr.nextElementSibling;
+            if (next?.classList.contains('tag-row')) next.style.display = show ? '' : 'none';
+          });
+        });
+
+        // Modals
+        const catModal = new bootstrap.Modal(document.getElementById('catModal'));
+        const catIdEl = document.getElementById('catId');
+        const catNameEl = document.getElementById('catName');
+        const catErr = document.getElementById('catError');
+        document.getElementById('btnCreate').addEventListener('click', ()=>{
+          document.getElementById('catModalTitle').textContent = 'Thêm danh mục';
+          catIdEl.value=''; catNameEl.value=''; catErr.textContent='';
+          catNameEl.classList.remove('is-invalid');
+          catModal.show();
+        });
+        catNameEl.addEventListener('input', ()=> { if (catNameEl.value.trim()) catNameEl.classList.remove('is-invalid'); });
+
+        // Table events
+        document.getElementById('tblCats').addEventListener('click', async (e)=>{
+          const btn = e.target.closest('button'); if (!btn) return;
+          const row = btn.closest('tr.cat-row') ?? btn.closest('tr')?.previousElementSibling;
+          const id = row?.dataset?.id; if (!id) return;
+
+          // toggle tags
+          if (btn.classList.contains('toggle-tags')) {
+            const targetSel = btn.getAttribute('data-target');
+            const pane = document.querySelector(targetSel);
+            const expanded = btn.getAttribute('aria-expanded') === 'true';
+            btn.setAttribute('aria-expanded', (!expanded).toString());
+            btn.querySelector('i').className = expanded ? 'bi bi-caret-right-fill' : 'bi bi-caret-down-fill';
+
+            if (!pane.classList.contains('loaded')) {
+              await loadTags(id, pane); pane.classList.add('loaded');
+            }
+            pane.classList.toggle('show');
+            row.classList.toggle('open', pane.classList.contains('show'));
+            return;
+          }
+
+          // edit
+          if (btn.classList.contains('btn-edit')) {
+            const res = await fetch(routes.catGet + `?id=${id}`);
+            if (!res.ok) { alert('Không đọc được dữ liệu'); return; }
+            const dto = await res.json();
+            document.getElementById('catModalTitle').textContent = 'Sửa danh mục';
+            catIdEl.value = dto.categoryId;
+            catNameEl.value = dto.name;
+            catErr.textContent = '';
+            catModal.show(); return;
+          }
+
+          // delete
+          if (btn.classList.contains('btn-delete-cat')) {
+            if (!confirm('Xoá danh mục này? (soft-delete)')) return;
+            const res = await fetch(routes.catDelete + `?id=${id}`, { method:'DELETE' });
+            if (res.status === 204) location.reload(); else alert(await res.text());
+            return;
+          }
+
+          // restore
+          if (btn.classList.contains('btn-restore-cat')) {
+            const res = await fetch(routes.catRestore + `?id=${id}`, { method:'POST' });
+            if (res.status === 204) location.reload(); else alert(await res.text());
+            return;
+          }
+        });
+
+        // Save category
+        document.getElementById('catForm').addEventListener('submit', async (e)=>{
+          e.preventDefault();
+          const id = catIdEl.value.trim();
+          const name = catNameEl.value.trim();
+          if (!name){ catNameEl.classList.add('is-invalid'); return; }
+          const body = JSON.stringify({ name });
+
+          let res;
+          if (!id) res = await fetch(routes.catCreate, { method:'POST', headers:{'Content-Type':'application/json'}, body });
+          else     res = await fetch(routes.catUpdate + `?id=${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body });
+
+          if (res.status === 200 || res.status === 201) location.reload();
+          else catErr.textContent = (await res.text()) || 'Có lỗi xảy ra.';
+        });
+
+        // ===== TAGS =====
+        async function loadTags(categoryId, pane){
+          const ul = pane.querySelector('.tag-list');
+          ul.innerHTML = '<li class="list-group-item note">Đang tải…</li>';
+
+          const res = await fetch(routes.tagsByCat + `?categoryId=${categoryId}&includeDeleted=${includeDeleted}`);
+          if (!res.ok) { ul.innerHTML = '<li class="list-group-item note text-danger">Lỗi tải tag</li>'; return; }
+          const list = await res.json();
+
+          // cập nhật CHIP ĐẾM ở TRÊN + DƯỚI
+          updateTagCountBadges(categoryId, list?.length ?? 0);
+
+          renderTagList(ul, list, categoryId, pane);
+        }
+
+        function updateTagCountBadges(categoryId, count){
+          document.querySelectorAll(`.chip-count[data-count-for="${categoryId}"]`)
+            .forEach(el => el.textContent = count);
+          document.querySelectorAll(`.chip-count-bottom[data-count-for="${categoryId}"]`)
+            .forEach(el => el.textContent = count);
+        }
+
+        function renderTagList(ul, list, categoryId, pane){
+          ul.innerHTML = '';
+          if (!list || !list.length){
+            ul.innerHTML = '<li class="list-group-item note">Chưa có tag nào.</li>'; return;
+          }
+          list.forEach(t=>{
+            const li = document.createElement('li');
+            li.className = 'list-group-item tag-item';
+            li.dataset.tagId = t.tagId;
+
+            li.innerHTML = `
+              <div class="l">
+                <span class="dot ${t.deleted ? 'muted' : 'ok'}"></span>
+                <i class="bi bi-tag-fill ${t.deleted ? 'muted-i' : 'pri-i'}"></i>
+                <span class="tag-name ${t.deleted ? 'cut' : ''}">${t.name}</span>
+                ${t.deleted ? '<span class="state del ms-2">Đã xoá</span>' : ''}
+              </div>
+              <div class="r btn-group">
+                <button class="btn btn-sm btn-outline-primary soft btn-edit-tag" ${t.deleted ? 'disabled' : ''}>
+                  <i class="bi bi-pencil-square"></i> Sửa
+                </button>
+                ${t.deleted
+                   ? `<button class="btn btn-sm btn-outline-warning soft btn-restore-tag"><i class="bi bi-arrow-counterclockwise"></i> Khôi phục</button>`
+                   : `<button class="btn btn-sm btn-outline-danger soft btn-delete-tag"><i class="bi bi-trash"></i> Xoá</button>`}
+              </div>`;
+            ul.appendChild(li);
+          });
+        }
+
+        // Tag modal
+        const tagModal = new bootstrap.Modal(document.getElementById('tagModal'));
+        const tagIdEl = document.getElementById('tagId');
+        const tagCatIdEl = document.getElementById('tagCategoryId');
+        const tagNameEl = document.getElementById('tagName');
+        const tagErr = document.getElementById('tagError');
+        tagNameEl.addEventListener('input', ()=> { if (tagNameEl.value.trim()) tagNameEl.classList.remove('is-invalid'); });
+
+        // Add tag
+        document.querySelectorAll('.tags-box').forEach(pane=>{
+          pane.addEventListener('click', (e)=>{
+            const btn = e.target.closest('.btn-add-tag');
+            if (!btn) return;
+            const catId = btn.getAttribute('data-category-id');
+            document.getElementById('tagModalTitle').textContent = 'Thêm tag';
+            tagIdEl.value = ''; tagCatIdEl.value = catId; tagNameEl.value = '';
+            tagErr.textContent = ''; tagNameEl.classList.remove('is-invalid');
+            tagModal.show();
+          });
+        });
+
+        // List tag events
+        document.querySelectorAll('.tag-list').forEach(ul=>{
+          ul.addEventListener('click', async (e)=>{
+            const btn = e.target.closest('button'); if (!btn) return;
+            const li = btn.closest('.tag-item'); const tagId = li?.dataset?.tagId; if (!tagId) return;
+            const pane = btn.closest('.tags-box'); const catId = pane.getAttribute('data-category-id');
+
+            if (btn.classList.contains('btn-edit-tag')) {
+              document.getElementById('tagModalTitle').textContent = 'Sửa tag';
+              tagIdEl.value = tagId; tagCatIdEl.value = catId;
+              tagNameEl.value = li.querySelector('.tag-name').textContent.trim();
+              tagErr.textContent = ''; tagNameEl.classList.remove('is-invalid');
+              tagModal.show(); return;
+            }
+
+            if (btn.classList.contains('btn-delete-tag')) {
+              if (!confirm('Xoá tag này? (soft-delete)')) return;
+              const res = await fetch(routes.tagDelete + `?id=${tagId}`, { method:'DELETE' });
+              if (!res.ok) return alert(await res.text());
+              await reloadTags(catId, pane); return;
+            }
+
+            if (btn.classList.contains('btn-restore-tag')) {
+              const res = await fetch(routes.tagRestore + `?id=${tagId}`, { method:'POST' });
+              if (!res.ok) return alert(await res.text());
+              await reloadTags(catId, pane); return;
+            }
+          });
+        });
+
+        async function reloadTags(catId, pane){
+          const res = await fetch(routes.tagsByCat + `?categoryId=${catId}&includeDeleted=${includeDeleted}`);
+          if (!res.ok) return;
+          const list = await res.json();
+          updateTagCountBadges(catId, list?.length ?? 0);
+          renderTagList(pane.querySelector('.tag-list'), list, catId, pane);
+        }
+
+        // Prefetch: lấy số lượng cho chip TRÊN/DƯỚI ngay khi vào trang (mềm mượt)
+        document.addEventListener('DOMContentLoaded', async ()=>{
+          const rows = Array.from(document.querySelectorAll('tr.cat-row'));
+          for (const r of rows){
+            const id = r.dataset.id;
+            fetch(routes.tagsByCat + `?categoryId=${id}&includeDeleted=${includeDeleted}`)
+              .then(res => res.ok ? res.json() : [])
+              .then(list => updateTagCountBadges(id, list?.length ?? 0))
+              .catch(()=>{});
+          }
+        });
+    </script>
+}
