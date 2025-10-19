@@ -65,37 +65,8 @@
 
     <!-- Notification System -->
     <script>
-        // Mock data cho testing
-        let mockNotifications = [
-            {
-                notificationId: '1',
-                content: 'Đơn hàng #12345 đã được xác nhận',
-                bookingStatus: 'Confirmed',
-                createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 giờ trước
-                isRead: false
-            },
-            {
-                notificationId: '2',
-                content: 'Dịch vụ vệ sinh nhà đã hoàn thành',
-                bookingStatus: 'Completed',
-                createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 giờ trước
-                isRead: false
-            },
-            {
-                notificationId: '3',
-                content: 'Thanh toán thành công cho đơn hàng #12346',
-                bookingStatus: 'Paid',
-                createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 ngày trước
-                isRead: true
-            },
-            {
-                notificationId: '4',
-                content: 'Đánh giá dịch vụ từ khách hàng',
-                bookingStatus: 'Review',
-                createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 ngày trước
-                isRead: false
-            }
-        ];
+        // Biến lưu trữ thông báo từ API
+        let notifications = [];
 
         // Hover để hiển thị dropdown
         const btn = document.getElementById('notificationBtn');
@@ -136,7 +107,7 @@
 
         // Đếm và hiển thị badge
         function loadUnreadCount() {
-            const unreadCount = mockNotifications.filter(n => !n.isRead).length;
+            const unreadCount = notifications.filter(n => !n.isRead).length;
             const badge = document.getElementById('notificationBadge');
             if (badge) {
                 if (unreadCount > 0) {
@@ -148,8 +119,22 @@
             }
         }
 
-        // Load danh sách thông báo
-        function loadNotifications() {
+        // Load danh sách thông báo từ API
+        async function loadNotifications() {
+            try {
+                const response = await fetch('/Customer/Notification/Unread');
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    notifications = data.data;
+                } else {
+                    notifications = [];
+                }
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+                notifications = [];
+            }
+            
             menu.innerHTML = '';
             
             // Add header
@@ -158,7 +143,7 @@
             header.innerHTML = '<h3>Thông báo</h3>';
             menu.appendChild(header);
             
-            const unreadNotifications = mockNotifications.filter(n => !n.isRead);
+            const unreadNotifications = notifications.filter(n => !n.isRead);
             
             if (unreadNotifications.length === 0) {
                 const empty = document.createElement('li');
@@ -172,9 +157,9 @@
                 const li = document.createElement('li');
                 li.innerHTML = `
                     <div class="d-block text-decoration-none">
-                        <div class="small text-muted">${n.createdAt.toLocaleString()}</div>
+                        <div class="small text-muted">${new Date(n.createdAt).toLocaleString()}</div>
                         <div>${n.content}</div>
-                        <div><strong>Booking Status:</strong> ${n.bookingStatus}</div>
+                        <div><strong>Loại:</strong> ${n.notificationType}</div>
                     </div>`;
                 menu.appendChild(li);
             });
@@ -190,9 +175,16 @@
         // Không có chức năng mark as read trong dropdown
         // Chỉ có thể clear thông báo qua trang thông báo
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load thông báo khi trang load
+            await loadNotifications();
             loadUnreadCount();
-            // Không cần setInterval vì dùng mock data
+            
+            // Cập nhật thông báo mỗi 30 giây
+            setInterval(async () => {
+                await loadNotifications();
+                loadUnreadCount();
+            }, 30000);
         });
     </script>
 
