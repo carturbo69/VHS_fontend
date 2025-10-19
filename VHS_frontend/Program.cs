@@ -53,6 +53,10 @@ builder.Services.AddHttpClient<NotificationService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+builder.Services.AddHttpClient<AdminNotificationService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 
 // ServiceShopService
 builder.Services.AddScoped<ServiceShopService>();
