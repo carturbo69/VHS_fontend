@@ -490,13 +490,16 @@
 
                 if (res.ok) {
                     notificationModal.hide();
+                    alert('Tạo thông báo thành công!');
                     location.reload();
                 } else {
                     const error = await res.json();
-                    showError('notificationError', error.message || 'Có lỗi xảy ra');
+                    console.error('Error creating notification:', error);
+                    showError('notificationError', error.message || 'Có lỗi xảy ra khi tạo thông báo');
                 }
             } catch (err) {
-                showError('notificationError', 'Không thể tạo thông báo');
+                console.error('Network error:', err);
+                showError('notificationError', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
             }
         });
 
@@ -548,9 +551,14 @@
         // ===== Load Accounts =====
         async function loadAccounts() {
             try {
+                console.log('Loading accounts...');
                 const res = await fetch(routes.getAccounts);
+                console.log('Response status:', res.status);
+                
                 if (res.ok) {
                     const accounts = await res.json();
+                    console.log('Loaded accounts:', accounts);
+                    
                     const select = document.getElementById('accountReceivedId');
                     const roleSelect = document.getElementById('receiverRole');
                     const selectedRole = roleSelect.value;
@@ -562,15 +570,31 @@
                         accounts.filter(account => account.role === selectedRole) : 
                         accounts;
                     
-                    filteredAccounts.forEach(account => {
+                    console.log('Filtered accounts:', filteredAccounts);
+                    
+                    if (filteredAccounts.length === 0) {
                         const option = document.createElement('option');
-                        option.value = account.accountId;
-                        option.textContent = account.accountName;
+                        option.value = '';
+                        option.textContent = selectedRole ? 'Không có tài khoản nào với vai trò này' : 'Không có tài khoản nào';
+                        option.disabled = true;
                         select.appendChild(option);
-                    });
+                    } else {
+                        filteredAccounts.forEach(account => {
+                            const option = document.createElement('option');
+                            option.value = account.accountId;
+                            option.textContent = `${account.accountName} (${account.email})`;
+                            select.appendChild(option);
+                        });
+                    }
+                } else {
+                    console.error('Failed to load accounts:', res.status, res.statusText);
+                    const select = document.getElementById('accountReceivedId');
+                    select.innerHTML = '<option value="">-- Lỗi khi tải danh sách tài khoản --</option>';
                 }
             } catch (err) {
                 console.error('Không thể tải danh sách tài khoản:', err);
+                const select = document.getElementById('accountReceivedId');
+                select.innerHTML = '<option value="">-- Lỗi khi tải danh sách tài khoản --</option>';
             }
         }
 

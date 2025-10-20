@@ -147,24 +147,84 @@ namespace VHS_frontend.Services.Admin
             var url = "/api/account/simple?includeDeleted=false";
             Console.WriteLine($"Calling API: {url}");
             
-            var res = await _http.GetAsync(url, ct);
-            Console.WriteLine($"Response status: {res.StatusCode}");
-            
-            if (!res.IsSuccessStatusCode) 
+            try
             {
-                var errorContent = await res.Content.ReadAsStringAsync(ct);
-                Console.WriteLine($"Error content: {errorContent}");
-                await HandleErrorAsync(res, ct);
+                var res = await _http.GetAsync(url, ct);
+                Console.WriteLine($"Response status: {res.StatusCode}");
+                
+                if (!res.IsSuccessStatusCode) 
+                {
+                    var errorContent = await res.Content.ReadAsStringAsync(ct);
+                    Console.WriteLine($"Error content: {errorContent}");
+                    await HandleErrorAsync(res, ct);
+                }
+                
+                var json = await res.Content.ReadAsStringAsync(ct);
+                Console.WriteLine($"Response content: {json}");
+                
+                using var doc = JsonDocument.Parse(json);
+                
+                return JsonSerializer.Deserialize<List<AccountItemDTO>>(
+                    doc.RootElement.GetRawText(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
             }
-            
-            var json = await res.Content.ReadAsStringAsync(ct);
-            Console.WriteLine($"Response content: {json}");
-            
-            using var doc = JsonDocument.Parse(json);
-            
-            return JsonSerializer.Deserialize<List<AccountItemDTO>>(
-                doc.RootElement.GetRawText(),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception in GetAccountsAsync: {ex.Message}");
+                throw;
+            }
+        }
+
+        // GET: Lấy số lượng thông báo chưa đọc
+        public async Task<int> GetUnreadCountAsync()
+        {
+            try
+            {
+                var response = await _http.GetFromJsonAsync<object>("/api/notification/unread-count");
+                // Parse response để lấy count
+                if (response != null)
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(response);
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("count", out var countElement))
+                    {
+                        return countElement.GetInt32();
+                    }
+                }
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting unread count: {ex.Message}");
+                return 0;
+            }
+        }
+
+        // GET: Lấy danh sách thông báo chưa đọc
+        public async Task<List<AdminNotificationDTO>> GetUnreadNotificationsAsync()
+        {
+            try
+            {
+                var response = await _http.GetFromJsonAsync<object>("/api/notification/unread");
+                // Parse response để lấy danh sách notifications
+                if (response != null)
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(response);
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("data", out var dataElement))
+                    {
+                        return System.Text.Json.JsonSerializer.Deserialize<List<AdminNotificationDTO>>(
+                            dataElement.GetRawText(),
+                            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<AdminNotificationDTO>();
+                    }
+                }
+                return new List<AdminNotificationDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting unread notifications: {ex.Message}");
+                return new List<AdminNotificationDTO>();
+            }
         }
     }
 

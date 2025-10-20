@@ -128,19 +128,151 @@ namespace VHS_frontend.Areas.Admin.Controllers
             {
                 AttachBearerIfAny();
                 var accounts = await _svc.GetAccountsAsync(ct);
+                
+                if (accounts == null || !accounts.Any())
+                {
+                    return Ok(new List<object>()); // Return empty list instead of error
+                }
+                
                 return Ok(accounts);
             }
             catch (ApiBadRequestException br)
             {
+                Console.WriteLine($"API Bad Request: {br.Message}");
                 return BadRequest(new { message = br.Message });
             }
             catch (HttpRequestException httpEx)
             {
+                Console.WriteLine($"HTTP Request Exception: {httpEx.Message}");
                 return BadRequest(new { message = $"Không thể kết nối đến API backend: {httpEx.Message}" });
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"General Exception: {ex.Message}");
                 return BadRequest(new { message = $"Lỗi khi lấy danh sách tài khoản: {ex.Message}" });
+            }
+        }
+
+        // GET: Admin/AdminNotification/GetUnreadCount - API cho chuông thông báo
+        [HttpGet]
+        public async Task<IActionResult> GetUnreadCount()
+        {
+            try
+            {
+                AttachBearerIfAny();
+                var count = await _svc.GetUnreadCountAsync();
+                return Json(new { count = count });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting unread count: {ex.Message}");
+                return Json(new { count = 0 });
+            }
+        }
+
+        // GET: Admin/AdminNotification/GetNotificationsPartial - Partial view cho dropdown
+        [HttpGet]
+        public async Task<IActionResult> GetNotificationsPartial()
+        {
+            try
+            {
+                AttachBearerIfAny();
+                var notifications = await _svc.GetUnreadNotificationsAsync();
+                
+                if (notifications == null || !notifications.Any())
+                {
+                    return PartialView("_AdminNotificationDropdown", new List<AdminNotificationDTO>());
+                }
+                
+                return PartialView("_AdminNotificationDropdown", notifications);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading notifications: {ex.Message}");
+                return PartialView("_AdminNotificationDropdown", new List<AdminNotificationDTO>());
+            }
+        }
+
+        // POST: Admin/AdminNotification/MarkRead/{id} - Đánh dấu đã đọc
+        [HttpPost]
+        public async Task<IActionResult> MarkRead(Guid id)
+        {
+            try
+            {
+                AttachBearerIfAny();
+                var result = await _svc.MarkAsReadAsync(id);
+                // Parse result để kiểm tra success
+                if (result != null)
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(result);
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("success", out var successElement))
+                    {
+                        var success = successElement.GetBoolean();
+                        if (success)
+                        {
+                            return Json(new { success = true, message = "Đã đánh dấu đã đọc" });
+                        }
+                    }
+                }
+                return Json(new { success = false, message = "Không thể đánh dấu đã đọc" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error marking as read: {ex.Message}");
+                return Json(new { success = false, message = "Có lỗi xảy ra khi đánh dấu đã đọc" });
+            }
+        }
+
+        // POST: Admin/AdminNotification/MarkAllRead - Đánh dấu tất cả đã đọc
+        [HttpPost]
+        public async Task<IActionResult> MarkAllRead()
+        {
+            try
+            {
+                AttachBearerIfAny();
+                var result = await _svc.MarkAllAsReadAsync();
+                // Parse result để kiểm tra success
+                if (result != null)
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(result);
+                    var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("success", out var successElement))
+                    {
+                        var success = successElement.GetBoolean();
+                        if (success)
+                        {
+                            return Json(new { success = true, message = "Đã đánh dấu tất cả đã đọc" });
+                        }
+                    }
+                }
+                return Json(new { success = false, message = "Không thể đánh dấu tất cả đã đọc" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error marking all as read: {ex.Message}");
+                return Json(new { success = false, message = "Có lỗi xảy ra khi đánh dấu tất cả đã đọc" });
+            }
+        }
+
+        // POST: Admin/AdminNotification/Delete/{id} - Xóa 1 thông báo (cho dropdown chuông)
+        [HttpPost]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            try
+            {
+                AttachBearerIfAny();
+                var ok = await _svc.DeleteAsync(id);
+                if (ok)
+                {
+                    return Json(new { success = true, message = "Đã xóa thông báo" });
+                }
+                return Json(new { success = false, message = "Không thể xóa thông báo" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deleting notification: {ex.Message}");
+                return Json(new { success = false, message = "Có lỗi xảy ra khi xóa thông báo" });
             }
         }
     }

@@ -2,173 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Customer.Models.Notification;
 using VHS_frontend.Services.Customer;
 
-// Class để quản lý dữ liệu ảo cho testing
-public static class MockNotificationData
-{
-    private static List<NotificationDTO> _notifications = new List<NotificationDTO>
-    {
-        new NotificationDTO
-        {
-            NotificationId = "1",
-            Content = "Đơn hàng #12345 đã được xác nhận",
-            NotificationType = "Booking",
-            IsRead = false,
-            CreatedAt = DateTime.Now.AddHours(-2),
-            RelatedId = "12345"
-        },
-        new NotificationDTO
-        {
-            NotificationId = "2",
-            Content = "Dịch vụ vệ sinh nhà đã hoàn thành",
-            NotificationType = "Booking",
-            IsRead = false,
-            CreatedAt = DateTime.Now.AddHours(-5),
-            RelatedId = "12346"
-        },
-        new NotificationDTO
-        {
-            NotificationId = "3",
-            Content = "Thanh toán thành công cho đơn hàng #12346",
-            NotificationType = "Payment",
-            IsRead = true,
-            CreatedAt = DateTime.Now.AddDays(-1),
-            RelatedId = "12346"
-        },
-        new NotificationDTO
-        {
-            NotificationId = "4",
-            Content = "Đánh giá dịch vụ từ khách hàng",
-            NotificationType = "System",
-            IsRead = false,
-            CreatedAt = DateTime.Now.AddDays(-2),
-            RelatedId = "12347"
-        },
-        new NotificationDTO
-        {
-            NotificationId = "5",
-            Content = "Đơn hàng #12348 đã được thanh toán",
-            NotificationType = "Payment",
-            IsRead = true,
-            CreatedAt = DateTime.Now.AddDays(-3),
-            RelatedId = "12348"
-        }
-    };
-
-    public static List<NotificationDTO> GetAllNotifications()
-    {
-        return _notifications.ToList();
-    }
-
-    public static List<NotificationDTO> GetUnreadNotifications()
-    {
-        return _notifications.Where(n => !n.IsRead).ToList();
-    }
-
-    public static int GetUnreadCount()
-    {
-        return _notifications.Count(n => !n.IsRead);
-    }
-
-    public static bool MarkAsRead(string id)
-    {
-        var notification = _notifications.FirstOrDefault(n => n.NotificationId == id);
-        if (notification != null)
-        {
-            notification.IsRead = true;
-            return true;
-        }
-        return false;
-    }
-
-    public static bool MarkAllAsRead()
-    {
-        foreach (var notification in _notifications)
-        {
-            notification.IsRead = true;
-        }
-        return true;
-    }
-
-    public static bool DeleteNotification(string id)
-    {
-        Console.WriteLine($"MockNotificationData.DeleteNotification called with ID: {id}");
-        Console.WriteLine($"Current notifications count: {_notifications.Count}");
-        Console.WriteLine($"Current notification IDs: {string.Join(", ", _notifications.Select(n => n.NotificationId))}");
-        
-        var notification = _notifications.FirstOrDefault(n => n.NotificationId == id);
-        if (notification != null)
-        {
-            Console.WriteLine($"Found notification to delete: {notification.NotificationId} - {notification.Content}");
-            _notifications.Remove(notification);
-            Console.WriteLine($"Notification removed. New count: {_notifications.Count}");
-            return true;
-        }
-        else
-        {
-            Console.WriteLine($"Notification with ID {id} not found!");
-            return false;
-        }
-    }
-
-    public static bool ClearAllNotifications()
-    {
-        _notifications.Clear();
-        return true;
-    }
-
-    public static void ResetData()
-    {
-        _notifications = new List<NotificationDTO>
-        {
-            new NotificationDTO
-            {
-                NotificationId = "1",
-                Content = "Đơn hàng #12345 đã được xác nhận",
-                NotificationType = "Booking",
-                IsRead = false,
-                CreatedAt = DateTime.Now.AddHours(-2),
-                RelatedId = "12345"
-            },
-            new NotificationDTO
-            {
-                NotificationId = "2",
-                Content = "Dịch vụ vệ sinh nhà đã hoàn thành",
-                NotificationType = "Booking",
-                IsRead = false,
-                CreatedAt = DateTime.Now.AddHours(-5),
-                RelatedId = "12346"
-            },
-            new NotificationDTO
-            {
-                NotificationId = "3",
-                Content = "Thanh toán thành công cho đơn hàng #12346",
-                NotificationType = "Payment",
-                IsRead = true,
-                CreatedAt = DateTime.Now.AddDays(-1),
-                RelatedId = "12346"
-            },
-            new NotificationDTO
-            {
-                NotificationId = "4",
-                Content = "Đánh giá dịch vụ từ khách hàng",
-                NotificationType = "System",
-                IsRead = false,
-                CreatedAt = DateTime.Now.AddDays(-2),
-                RelatedId = "12347"
-            },
-            new NotificationDTO
-            {
-                NotificationId = "5",
-                Content = "Đơn hàng #12348 đã được thanh toán",
-                NotificationType = "Payment",
-                IsRead = true,
-                CreatedAt = DateTime.Now.AddDays(-3),
-                RelatedId = "12348"
-            }
-        };
-    }
-}
-
 namespace VHS_frontend.Areas.Customer.Controllers
 {
     [Area("Customer")]
@@ -191,17 +24,21 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return RedirectToAction("Login", "Account", new { area = "" });
             }
 
-            // Sử dụng dữ liệu ảo từ MockNotificationData
-            var mockNotifications = MockNotificationData.GetAllNotifications();
+            // Sử dụng API thật để lấy danh sách thông báo
+            var response = await _notificationService.GetNotificationsAsync(token);
             
-            var response = new NotificationListResponse
-                {
-                    Success = true,
-                Message = "Lấy danh sách thông báo thành công",
-                Data = mockNotifications,
-                TotalCount = mockNotifications.Count,
-                UnreadCount = mockNotifications.Count(n => !n.IsRead)
-            };
+            if (!response.Success)
+            {
+                TempData["ErrorMessage"] = response.Message;
+                return View(new NotificationListResponse 
+                { 
+                    Success = false, 
+                    Message = response.Message,
+                    Data = new List<NotificationDTO>(),
+                    TotalCount = 0,
+                    UnreadCount = 0
+                });
+            }
             
             return View(response);
         }
@@ -215,17 +52,13 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Json(new { success = false, message = "Chưa đăng nhập" });
             }
 
-            // Sử dụng dữ liệu ảo từ MockNotificationData
-            var unreadNotifications = MockNotificationData.GetUnreadNotifications();
-
-            var response = new NotificationListResponse
+            // Sử dụng API thật để lấy thông báo chưa đọc
+            var response = await _notificationService.GetUnreadNotificationsAsync(token);
+            
+            if (!response.Success)
             {
-                Success = true,
-                Message = "Lấy thông báo chưa đọc thành công",
-                Data = unreadNotifications,
-                TotalCount = MockNotificationData.GetAllNotifications().Count,
-                UnreadCount = unreadNotifications.Count
-            };
+                return Json(new { success = false, message = response.Message });
+            }
 
             return Json(response);
         }
@@ -261,15 +94,15 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Json(new { success = false, message = "Chưa đăng nhập" });
             }
 
-            // Sử dụng MockNotificationData để đánh dấu đã đọc
-            var success = MockNotificationData.MarkAsRead(id);
+            // Sử dụng API thật để đánh dấu đã đọc
+            var success = await _notificationService.MarkAsReadAsync(id, token);
             if (success)
             {
                 return Json(new { success = true, message = "Đã đánh dấu đã đọc" });
             }
             else
             {
-                return Json(new { success = false, message = "Không tìm thấy thông báo" });
+                return Json(new { success = false, message = "Không thể đánh dấu đã đọc" });
             }
         }
 
@@ -284,15 +117,15 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Json(new { success = false, message = "Chưa đăng nhập" });
             }
 
-            // Sử dụng MockNotificationData để đánh dấu tất cả đã đọc
-            var success = MockNotificationData.MarkAllAsRead();
+            // Sử dụng API thật để đánh dấu tất cả đã đọc
+            var success = await _notificationService.MarkAllAsReadAsync(token);
             if (success)
             {
                 return Json(new { success = true, message = "Đã đánh dấu tất cả đã đọc" });
             }
             else
             {
-                return Json(new { success = false, message = "Có lỗi xảy ra" });
+                return Json(new { success = false, message = "Không thể đánh dấu tất cả đã đọc" });
             }
         }
 
@@ -307,14 +140,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Json(new { success = false, message = "Chưa đăng nhập" });
             }
 
-            // Debug logging
-            Console.WriteLine($"Attempting to delete notification with ID: {id}");
-            var allNotifications = MockNotificationData.GetAllNotifications();
-            Console.WriteLine($"Available notification IDs: {string.Join(", ", allNotifications.Select(n => n.NotificationId))}");
-
-            // Sử dụng MockNotificationData để xóa thông báo
-            var success = MockNotificationData.DeleteNotification(id);
-            Console.WriteLine($"Delete result: {success}");
+            // Sử dụng API thật để xóa thông báo
+            var success = await _notificationService.DeleteNotificationAsync(id, token);
             
             if (success)
             {
@@ -322,7 +149,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             else
             {
-                return Json(new { success = false, message = $"Không tìm thấy thông báo với ID: {id}" });
+                return Json(new { success = false, message = "Không thể xóa thông báo" });
             }
         }
 
@@ -337,15 +164,15 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Json(new { success = false, message = "Chưa đăng nhập" });
             }
 
-            // Sử dụng MockNotificationData để xóa tất cả thông báo
-            var success = MockNotificationData.ClearAllNotifications();
+            // Sử dụng API thật để xóa tất cả thông báo
+            var success = await _notificationService.ClearAllNotificationsAsync(token);
             if (success)
             {
                 return Json(new { success = true, message = "Đã xóa tất cả thông báo" });
             }
             else
             {
-                return Json(new { success = false, message = "Có lỗi xảy ra" });
+                return Json(new { success = false, message = "Không thể xóa tất cả thông báo" });
             }
         }
 
@@ -359,18 +186,11 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Json(new { count = 0 });
             }
 
-            // Sử dụng MockNotificationData để đếm thông báo chưa đọc
-            var count = MockNotificationData.GetUnreadCount();
+            // Sử dụng API thật để đếm thông báo chưa đọc
+            var count = await _notificationService.GetUnreadCountAsync(token);
             return Json(new { count = count });
         }
 
-        // GET: Customer/Notification/ResetData - Reset dữ liệu ảo cho testing
-        [HttpGet]
-        public IActionResult ResetData()
-        {
-            MockNotificationData.ResetData();
-            return Json(new { success = true, message = "Đã reset dữ liệu ảo" });
-        }
 
         // GET: Customer/Notification/GetNotificationsPartial - Partial view cho dropdown
         [HttpGet]

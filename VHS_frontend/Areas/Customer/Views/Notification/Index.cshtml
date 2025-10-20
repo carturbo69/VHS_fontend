@@ -26,26 +26,18 @@
                 </div>
             </div>
             
-            @if (Model.Data.Any())
-            {
-                <div class="header-actions">
-                    <button type="button" class="btn-action mark-read" id="markAllReadBtn"
-                            onclick="markAllReadInline()">
-                        <i class="bi bi-check-circle-fill"></i>
-                        <span>Đánh dấu tất cả đã đọc</span>
-                    </button>
-                    <button type="button" class="btn-action delete-all" id="clearAllBtn"
-                            onclick="clearAllInline()">
-                        <i class="bi bi-trash3-fill"></i>
-                        <span>Xóa tất cả</span>
-                    </button>
-                    <button type="button" class="btn-action reset" id="resetDataBtn"
-                            onclick="resetDataInline()">
-                        <i class="bi bi-arrow-clockwise"></i>
-                        <span>Reset dữ liệu test</span>
-                    </button>
-                </div>
-            }
+            <div class="header-actions" id="headerActions" style="display: @(Model.Data.Any() ? "flex" : "none")">
+                <button type="button" class="btn-action mark-read" id="markAllReadBtn"
+                        onclick="markAllReadInline()" style="display: @(Model.Data.Any(n => !n.IsRead) ? "flex" : "none")">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Đánh dấu tất cả đã đọc</span>
+                </button>
+                <button type="button" class="btn-action delete-all" id="clearAllBtn"
+                        onclick="clearAllInline()">
+                    <i class="bi bi-trash3-fill"></i>
+                    <span>Xóa tất cả</span>
+                </button>
+            </div>
         </div>
 
         <div class="notification-filters">
@@ -262,47 +254,7 @@
             const markAllReadBtn = document.getElementById('markAllReadBtn');
             const clearAllBtn = document.getElementById('clearAllBtn');
             
-            // Setup individual button handlers
-            setupIndividualButtonHandlers();
-            
-            // Function để setup individual button handlers
-            function setupIndividualButtonHandlers() {
-                // Tìm tất cả các nút mark-read
-                const markReadButtons = document.querySelectorAll('.action-btn.mark-read');
-                console.log('Found mark-read buttons:', markReadButtons.length);
-                
-                markReadButtons.forEach(button => {
-                    button.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        const notificationId = this.dataset.notificationId;
-                        console.log('Mark read button clicked, notificationId:', notificationId);
-                        
-                        if (notificationId) {
-                            markAsRead(notificationId, this);
-                        }
-                    });
-                });
-                
-                // Tìm tất cả các nút delete
-                const deleteButtons = document.querySelectorAll('.action-btn.delete');
-                console.log('Found delete buttons:', deleteButtons.length);
-                
-                deleteButtons.forEach(button => {
-                    button.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        const notificationId = this.dataset.notificationId;
-                        console.log('Delete button clicked, notificationId:', notificationId);
-                        
-                        if (notificationId) {
-                            deleteNotification(notificationId, this);
-                        }
-                    });
-                });
-            }
+            // Removed duplicate per-item handlers. Inline onclick handlers are used instead.
             
             // Không cần event listeners nữa vì đã dùng inline onclick handlers
             
@@ -419,10 +371,26 @@
                     }
                 });
                 
-                // Ẩn nút mark all read nếu không còn thông báo chưa đọc
+                // Tự động ẩn/hiện header actions dựa trên số lượng thông báo
+                const headerActions = document.getElementById('headerActions');
                 const markAllReadBtn = document.getElementById('markAllReadBtn');
-                if (unreadItems.length === 0 && markAllReadBtn) {
-                    markAllReadBtn.style.display = 'none';
+                const clearAllBtn = document.getElementById('clearAllBtn');
+                
+                if (notificationItems.length === 0) {
+                    // Ẩn toàn bộ header actions nếu không có thông báo
+                    if (headerActions) {
+                        headerActions.style.display = 'none';
+                    }
+                } else {
+                    // Hiện header actions nếu có thông báo
+                    if (headerActions) {
+                        headerActions.style.display = 'flex';
+                    }
+                    
+                    // Ẩn nút "Đánh dấu tất cả đã đọc" nếu không còn thông báo chưa đọc
+                    if (markAllReadBtn) {
+                        markAllReadBtn.style.display = unreadItems.length > 0 ? 'flex' : 'none';
+                    }
                 }
                 
                 // Hiển thị empty state nếu không còn thông báo
@@ -752,10 +720,26 @@
                 }
             });
             
-            // Ẩn nút mark all read nếu không còn thông báo chưa đọc
+            // Tự động ẩn/hiện header actions dựa trên số lượng thông báo
+            const headerActions = document.getElementById('headerActions');
             const markAllReadBtn = document.getElementById('markAllReadBtn');
-            if (unreadItems.length === 0 && markAllReadBtn) {
-                markAllReadBtn.style.display = 'none';
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            
+            if (notificationItems.length === 0) {
+                // Ẩn toàn bộ header actions nếu không có thông báo
+                if (headerActions) {
+                    headerActions.style.display = 'none';
+                }
+            } else {
+                // Hiện header actions nếu có thông báo
+                if (headerActions) {
+                    headerActions.style.display = 'flex';
+                }
+                
+                // Ẩn nút "Đánh dấu tất cả đã đọc" nếu không còn thông báo chưa đọc
+                if (markAllReadBtn) {
+                    markAllReadBtn.style.display = unreadItems.length > 0 ? 'flex' : 'none';
+                }
             }
             
             // Hiển thị empty state nếu không còn thông báo
@@ -767,6 +751,7 @@
             console.log('Updated counts:', {
                 total: notificationItems.length,
                 unread: unreadItems.length,
+                headerActionsVisible: headerActions ? headerActions.style.display !== 'none' : false,
                 markAllReadVisible: markAllReadBtn ? markAllReadBtn.style.display !== 'none' : false
             });
         };
@@ -942,7 +927,7 @@
                         }
                         
                         // Ẩn header actions
-                        const headerActions = document.querySelector('.header-actions');
+                        const headerActions = document.getElementById('headerActions');
                         if (headerActions) {
                             headerActions.style.display = 'none';
                         }
@@ -974,45 +959,6 @@
             }
         };
         
-        // Global function để reset dữ liệu ảo
-        window.resetDataInline = async function() {
-            console.log('resetDataInline called');
-            
-            const button = document.getElementById('resetDataBtn');
-            if (button.disabled) return;
-            
-            if (confirm('Bạn có chắc chắn muốn reset dữ liệu ảo về trạng thái ban đầu?')) {
-                // Disable button và thêm loading state
-                button.disabled = true;
-                button.style.opacity = '0.7';
-                button.style.cursor = 'not-allowed';
-                
-                const icon = button.querySelector('i');
-                icon.className = 'bi bi-hourglass-split';
-                icon.style.animation = 'spin 1s linear infinite';
-                try {
-                    const response = await fetch('/Customer/Notification/ResetData');
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        // Reload trang để hiển thị dữ liệu mới
-                        window.location.reload();
-                    } else {
-                        showToast('Có lỗi xảy ra khi reset dữ liệu', 'error');
-                    }
-                } catch (error) {
-                    console.error('Error resetting data:', error);
-                    showToast('Có lỗi xảy ra khi reset dữ liệu', 'error');
-                } finally {
-                    // Reset button state
-                    button.disabled = false;
-                    button.style.opacity = '';
-                    button.style.cursor = '';
-                    icon.className = 'bi bi-arrow-clockwise';
-                    icon.style.animation = '';
-                }
-            }
-        };
 
         // Global function để cập nhật chuông thông báo
         window.updateNotificationBell = function() {
