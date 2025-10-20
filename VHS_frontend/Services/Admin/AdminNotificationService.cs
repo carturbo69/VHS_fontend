@@ -41,7 +41,7 @@ namespace VHS_frontend.Services.Admin
         public async Task<(List<AdminNotificationItemDTO> Items, int Total)> GetListAsync(AdminNotificationQuery q, CancellationToken ct = default)
         {
             AttachAuth();
-            var url = $"/api/notification";
+            var url = $"/api/notification/admin/all";
             
             var queryParams = new List<string>();
             if (!string.IsNullOrWhiteSpace(q.Keyword))
@@ -140,5 +140,39 @@ namespace VHS_frontend.Services.Admin
             
             return await res.Content.ReadFromJsonAsync<object>(cancellationToken: ct)!;
         }
+
+        public async Task<List<AccountItemDTO>> GetAccountsAsync(CancellationToken ct = default)
+        {
+            AttachAuth();
+            var url = "/api/account/simple?includeDeleted=false";
+            Console.WriteLine($"Calling API: {url}");
+            
+            var res = await _http.GetAsync(url, ct);
+            Console.WriteLine($"Response status: {res.StatusCode}");
+            
+            if (!res.IsSuccessStatusCode) 
+            {
+                var errorContent = await res.Content.ReadAsStringAsync(ct);
+                Console.WriteLine($"Error content: {errorContent}");
+                await HandleErrorAsync(res, ct);
+            }
+            
+            var json = await res.Content.ReadAsStringAsync(ct);
+            Console.WriteLine($"Response content: {json}");
+            
+            using var doc = JsonDocument.Parse(json);
+            
+            return JsonSerializer.Deserialize<List<AccountItemDTO>>(
+                doc.RootElement.GetRawText(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+        }
+    }
+
+    public class AccountItemDTO
+    {
+        public Guid AccountId { get; set; }
+        public string AccountName { get; set; } = null!;
+        public string Email { get; set; } = null!;
+        public string Role { get; set; } = null!;
     }
 }

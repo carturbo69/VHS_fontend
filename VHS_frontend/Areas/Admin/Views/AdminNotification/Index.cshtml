@@ -98,7 +98,7 @@
                                 <div class="fb-label"><i class="bi bi-people me-1"></i>Vai trò</div>
                                 <select id="roleFilter" class="form-select">
                                     <option value="" selected="@(string.IsNullOrEmpty(role))">Tất cả vai trò</option>
-                                    <option value="Customer" selected="@(role == "Customer")">👤 Customer</option>
+                                    <option value="User" selected="@(role == "User")">👤 Customer</option>
                                     <option value="Provider" selected="@(role == "Provider")">🏢 Provider</option>
                                 </select>
                             </div>
@@ -248,7 +248,7 @@
                         <label class="form-label">Vai trò người nhận <span class="text-danger">*</span></label>
                         <select id="receiverRole" class="form-select" required>
                             <option value="">-- Chọn vai trò --</option>
-                            <option value="Customer">👤 Customer</option>
+                            <option value="User">👤 Customer</option>
                             <option value="Provider">🏢 Provider</option>
                         </select>
                         <div class="invalid-feedback">Vui lòng chọn vai trò.</div>
@@ -298,7 +298,7 @@
                         <label class="form-label">Vai trò <span class="text-danger">*</span></label>
                         <select id="sendToRoleRole" class="form-select" required>
                             <option value="">-- Chọn vai trò --</option>
-                            <option value="Customer">👤 Customer</option>
+                            <option value="User">👤 Customer</option>
                             <option value="Provider">🏢 Provider</option>
                         </select>
                         <div class="invalid-feedback">Vui lòng chọn vai trò.</div>
@@ -342,7 +342,8 @@
             sendToRole: '@Url.Action("SendToRole", "AdminNotification", new { area = "Admin" })',
             delete: '@Url.Action("Delete", "AdminNotification", new { area = "Admin" })',
             markAsRead: '@Url.Action("MarkAsRead", "AdminNotification", new { area = "Admin" })',
-            markAllAsRead: '@Url.Action("MarkAllAsRead", "AdminNotification", new { area = "Admin" })'
+            markAllAsRead: '@Url.Action("MarkAllAsRead", "AdminNotification", new { area = "Admin" })',
+            getAccounts: '@Url.Action("GetAccounts", "AdminNotification", new { area = "Admin" })'
         };
 
         // ===== Modals =====
@@ -352,16 +353,18 @@
         // ===== Create Notification Button =====
         document.getElementById('btnCreateNotification').addEventListener('click', () => {
             document.getElementById('notificationModalTitle').textContent = 'Tạo thông báo mới';
-            clearNotificationForm();
+            clearNotificationFormCompletely();
             clearError('notificationError');
+            loadAccounts(); // Load accounts when creating notification
             notificationModal.show();
         });
 
         // ===== Empty State Create Button =====
         document.getElementById('btnCreateNotificationEmpty')?.addEventListener('click', () => {
             document.getElementById('notificationModalTitle').textContent = 'Tạo thông báo mới';
-            clearNotificationForm();
+            clearNotificationFormCompletely();
             clearError('notificationError');
+            loadAccounts(); // Load accounts when creating notification
             notificationModal.show();
         });
 
@@ -370,6 +373,11 @@
             clearSendToRoleForm();
             clearError('sendToRoleError');
             sendToRoleModal.show();
+        });
+
+        // ===== Role Change Event =====
+        document.getElementById('receiverRole').addEventListener('change', () => {
+            loadAccounts(); // Reload accounts when role changes
         });
 
         // ===== Filter Functions =====
@@ -537,8 +545,44 @@
             }
         });
 
+        // ===== Load Accounts =====
+        async function loadAccounts() {
+            try {
+                const res = await fetch(routes.getAccounts);
+                if (res.ok) {
+                    const accounts = await res.json();
+                    const select = document.getElementById('accountReceivedId');
+                    const roleSelect = document.getElementById('receiverRole');
+                    const selectedRole = roleSelect.value;
+                    
+                    select.innerHTML = '<option value="">-- Chọn người nhận --</option>';
+                    
+                    // Filter accounts by selected role
+                    const filteredAccounts = selectedRole ? 
+                        accounts.filter(account => account.role === selectedRole) : 
+                        accounts;
+                    
+                    filteredAccounts.forEach(account => {
+                        const option = document.createElement('option');
+                        option.value = account.accountId;
+                        option.textContent = account.accountName;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (err) {
+                console.error('Không thể tải danh sách tài khoản:', err);
+            }
+        }
+
         // ===== Helper Functions =====
         function clearNotificationForm() {
+            document.getElementById('accountReceivedId').value = '';
+            document.getElementById('notificationType').value = '';
+            document.getElementById('content').value = '';
+            // Keep receiverRole to allow filtering
+        }
+
+        function clearNotificationFormCompletely() {
             document.getElementById('accountReceivedId').value = '';
             document.getElementById('receiverRole').value = '';
             document.getElementById('notificationType').value = '';

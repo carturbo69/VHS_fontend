@@ -120,5 +120,28 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 return BadRequest(new { message = br.Message });
             }
         }
+
+        [HttpGet("accounts")]
+        public async Task<IActionResult> GetAccounts(CancellationToken ct = default)
+        {
+            try
+            {
+                AttachBearerIfAny();
+                var accounts = await _svc.GetAccountsAsync(ct);
+                return Ok(accounts);
+            }
+            catch (ApiBadRequestException br)
+            {
+                return BadRequest(new { message = br.Message });
+            }
+            catch (HttpRequestException httpEx)
+            {
+                return BadRequest(new { message = $"Không thể kết nối đến API backend: {httpEx.Message}" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = $"Lỗi khi lấy danh sách tài khoản: {ex.Message}" });
+            }
+        }
     }
 }

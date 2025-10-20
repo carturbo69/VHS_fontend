@@ -12,18 +12,25 @@ namespace VHS_frontend.Services.Admin
         {
             PropertyNameCaseInsensitive = true
         };
+        private string? _bearer;
 
         public AdminRegisterProviderService(HttpClient http) => _http = http;
 
         // Nếu chưa dùng AuthHeaderHandler:
         public void SetBearerToken(string? token)
         {
-            if (!string.IsNullOrWhiteSpace(token))
-                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            _bearer = token;
+        }
+        
+        private void AttachAuth()
+        {
+            if (!string.IsNullOrWhiteSpace(_bearer))
+                _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _bearer);
         }
 
         public async Task<List<AdminProviderItemDTO>> GetListAsync(string status = "Pending", CancellationToken ct = default)
         {
+            AttachAuth();
             var res = await _http.GetAsync($"/api/admin/register-providers?status={status}", ct);
             res.EnsureSuccessStatusCode();
             return (await res.Content.ReadFromJsonAsync<List<AdminProviderItemDTO>>(_json, ct)) ?? new();
@@ -31,6 +38,7 @@ namespace VHS_frontend.Services.Admin
 
         public async Task<AdminProviderDetailDTO?> GetDetailAsync(Guid id, CancellationToken ct = default)
         {
+            AttachAuth();
             var res = await _http.GetAsync($"/api/admin/register-providers/{id}", ct);
             if (!res.IsSuccessStatusCode) return null;
 
@@ -81,12 +89,14 @@ namespace VHS_frontend.Services.Admin
 
         public async Task<bool> ApproveAsync(Guid id, CancellationToken ct = default)
         {
+            AttachAuth();
             var res = await _http.PostAsync($"/api/admin/register-providers/{id}/approve", content: null, ct);
             return res.IsSuccessStatusCode;
         }
 
         public async Task<bool> RejectAsync(Guid id, string? reason = null, CancellationToken ct = default)
         {
+            AttachAuth();
             var payload = JsonSerializer.Serialize(new { reason }, _json);
             var res = await _http.PostAsync(
                 $"/api/admin/register-providers/{id}/reject",

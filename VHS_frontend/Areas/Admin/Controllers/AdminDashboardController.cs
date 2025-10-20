@@ -38,10 +38,15 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
             ViewBag.Username = HttpContext.Session.GetString("Username") ?? "Admin";
             
-            // Set authentication token cho AdminRegisterProviderService
+            // Set authentication token cho tất cả services
             var token = HttpContext.Session.GetString("JWToken");
             if (!string.IsNullOrWhiteSpace(token))
+            {
                 _registerProviderService.SetBearerToken(token);
+                _customerService.SetBearerToken(token);
+                _providerService.SetBearerToken(token);
+                _voucherService.SetBearerToken(token);
+            }
             
             // Lấy dữ liệu thật từ API với error handling
             var customers = new List<VHS_frontend.Areas.Admin.Models.Customer.CustomerDTO>();
