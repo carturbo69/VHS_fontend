@@ -12,6 +12,37 @@
     var role = (string)(ViewBag.Role ?? "");
     var notificationType = (string)(ViewBag.NotificationType ?? "");
     var isRead = (bool?)ViewBag.IsRead;
+    
+    // Tách thông báo theo nhận/gửi
+    var inboxTotal = Model.Count(n => n.ReceiverRole == "Admin");
+    var sentTotal = Model.Count(n => n.ReceiverRole == "User" || n.ReceiverRole == "Provider");
+    var inboxUnread = Model.Count(n => n.ReceiverRole == "Admin" && n.IsRead != true);
+    var sentUnread = Model.Count(n => (n.ReceiverRole == "User" || n.ReceiverRole == "Provider") && n.IsRead != true);
+
+    // Helper function to convert role to Vietnamese
+    string GetRoleInVietnamese(string role)
+    {
+        return role switch
+        {
+            "User" => "Người dùng",
+            "Provider" => "Nhà cung cấp",
+            "Admin" => "Quản trị viên",
+            _ => role
+        };
+    }
+
+    // Helper function to convert notification type to Vietnamese
+    string GetNotificationTypeInVietnamese(string type)
+    {
+        return type switch
+        {
+            "System" => "Hệ thống",
+            "Booking" => "Đặt lịch",
+            "Payment" => "Thanh toán",
+            "Promotion" => "Khuyến mãi",
+            _ => type
+        };
+    }
 }
 
 @section Styles {
@@ -29,9 +60,26 @@
             </div>
         </div>
         <div class="right">
-            <div class="pill"><span class="lbl">Tổng</span><span class="val">@total</span></div>
-            <div class="pill warn"><span class="lbl">Chưa đọc</span><span class="val">@unread</span></div>
-            <div class="pill good"><span class="lbl">Đã đọc</span><span class="val">@read</span></div>
+            <div class="pill pill-total">
+                <span class="lbl">Tổng</span>
+                <span class="val">@total</span>
+            </div>
+            <div class="pill pill-inbox" onclick="switchToTab('inbox')" title="Click để xem thông báo nhận được">
+                <span class="lbl">Nhận được</span>
+                <span class="val">@inboxTotal</span>
+                @if (inboxUnread > 0)
+                {
+                    <span class="badge-notify">@inboxUnread chưa đọc</span>
+                }
+            </div>
+            <div class="pill pill-sent" onclick="switchToTab('sent')" title="Click để xem thông báo đã gửi">
+                <span class="lbl">Đã gửi</span>
+                <span class="val">@sentTotal</span>
+                @if (sentUnread > 0)
+                {
+                    <span class="badge-notify orange">@sentUnread chưa đọc</span>
+                }
+            </div>
         </div>
     </div>
 
@@ -64,26 +112,14 @@
                         <div class="section-header">
                             <h6 class="mb-0"><i class="bi bi-search me-2"></i>Tìm kiếm</h6>
                         </div>
-                        <form class="search-form" method="get" asp-area="Admin" asp-controller="AdminNotification" asp-action="Index">
+                        <div class="search-form">
                             <div class="input-group">
-                                <input name="keyword" value="@keyword" class="form-control" placeholder="Tìm theo nội dung thông báo…" />
-                                <button class="btn btn-outline-secondary" type="submit">
+                                <input name="keyword" value="@keyword" class="form-control" placeholder="Tìm theo nội dung thông báo…" id="keywordInput" />
+                                <button class="btn btn-outline-secondary" type="button" onclick="applyFilter()">
                                     <i class="bi bi-search"></i>
                                 </button>
-                                @if (!string.IsNullOrEmpty(role))
-                                {
-                                    <input type="hidden" name="role" value="@role" />
-                                }
-                                @if (!string.IsNullOrEmpty(notificationType))
-                                {
-                                    <input type="hidden" name="notificationType" value="@notificationType" />
-                                }
-                                @if (isRead.HasValue)
-                                {
-                                    <input type="hidden" name="isRead" value="@isRead.Value" />
-                                }
                             </div>
-                        </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -137,91 +173,185 @@
         </div>
     </div>
 
-    <!-- Notifications List -->
-    <div class="table-wrap card-x">
-        <div class="table-header">
-            <div class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Danh sách thông báo</h6>
-                <div class="table-info">
-                    <span class="text-muted small">Hiển thị @Model.Count trong tổng số @total thông báo</span>
+    <!-- Tabs Navigation -->
+    <div class="notification-tabs mb-3">
+        <ul class="nav nav-tabs" id="notificationTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="inbox-tab" data-bs-toggle="tab" data-bs-target="#inbox" type="button" role="tab" aria-controls="inbox" aria-selected="false">
+                    <i class="bi bi-inbox-fill me-2"></i>Thông báo nhận được
+                    <span class="badge bg-primary ms-2">@Model.Count(n => n.ReceiverRole == "Admin")</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sent-tab" data-bs-toggle="tab" data-bs-target="#sent" type="button" role="tab" aria-controls="sent" aria-selected="false">
+                    <i class="bi bi-send-fill me-2"></i>Thông báo đã gửi
+                    <span class="badge ms-2" style="background: var(--accent-orange); color: white;">@Model.Count(n => n.ReceiverRole == "User" || n.ReceiverRole == "Provider")</span>
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="notificationTabsContent">
+        <!-- Inbox Tab -->
+        <div class="tab-pane fade" id="inbox" role="tabpanel" aria-labelledby="inbox-tab">
+            <div class="table-wrap card-x">
+                <div class="table-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-inbox me-2"></i>Thông báo từ User & Provider</h6>
+                        <div class="table-info">
+                            @{
+                                var inboxNotifications = Model.Where(n => n.ReceiverRole == "Admin").ToList();
+                            }
+                            <span class="text-muted small">Hiển thị @inboxNotifications.Count thông báo</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="table table-hover align-middle mb-0" id="tblInboxNotifications">
+                        <thead>
+                            <tr>
+                                <th class="w-type"><i class="bi bi-tag me-1"></i>Loại</th>
+                                <th><i class="bi bi-chat-text me-1"></i>Nội dung</th>
+                                <th class="w-time"><i class="bi bi-clock me-1"></i>Thời gian</th>
+                                <th class="w-state"><i class="bi bi-eye me-1"></i>Trạng thái</th>
+                                <th class="text-end w-actions"><i class="bi bi-gear me-1"></i>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (inboxNotifications.Any())
+                            {
+                                @foreach (var notification in inboxNotifications)
+                                {
+                                    <tr data-id="@notification.NotificationId">
+                                        <td>
+                                            <span class="type-badge badge bg-info">@GetNotificationTypeInVietnamese(notification.NotificationType)</span>
+                                        </td>
+                                        <td class="content-text" title="@notification.Content">@notification.Content</td>
+                                        <td class="time-cell">
+                                            <div class="date-line">@(notification.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
+                                        </td>
+                                        <td>
+                                            @if (notification.IsRead != true)
+                                            {
+                                                <span class="state warn">Chưa đọc</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="state ok">Đã đọc</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group">
+                                                @if (notification.IsRead != true)
+                                                {
+                                                    <button class="btn btn-sm btn-success soft btn-mark-read" data-id="@notification.NotificationId">
+                                                        <i class="bi bi-check-circle"></i> Đánh dấu đã đọc
+                                                    </button>
+                                                }
+                                                <button class="btn btn-sm btn-outline-danger soft btn-delete" data-id="@notification.NotificationId">
+                                                    <i class="bi bi-trash"></i> Xóa
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-5">
+                                        <div class="empty-state">
+                                            <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                                            <div class="fs-5 fw-semibold mb-2">Chưa có thông báo nào</div>
+                                            <div class="text-muted">Bạn chưa nhận được thông báo nào từ User hoặc Provider.</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-        <div class="table-scroll">
-            <table class="table table-hover align-middle mb-0" id="tblNotifications">
-                <thead>
-                    <tr>
-                        <th class="w-receiver"><i class="bi bi-person me-1"></i>Người nhận</th>
-                        <th class="w-role"><i class="bi bi-people me-1"></i>Vai trò</th>
-                        <th class="w-type"><i class="bi bi-tag me-1"></i>Loại</th>
-                        <th><i class="bi bi-chat-text me-1"></i>Nội dung</th>
-                        <th class="w-time"><i class="bi bi-clock me-1"></i>Thời gian</th>
-                        <th class="w-state"><i class="bi bi-eye me-1"></i>Trạng thái</th>
-                        <th class="text-end w-actions"><i class="bi bi-gear me-1"></i>Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (Model.Any())
-                    {
-                        @foreach (var notification in Model)
-                        {
-                            <tr data-id="@notification.NotificationId">
-                                <td class="fw-semibold">@(notification.ReceiverName ?? notification.ReceiverEmail ?? "N/A")</td>
-                                <td>
-                                    <span class="role-badge badge bg-secondary">@notification.ReceiverRole</span>
-                                </td>
-                                <td>
-                                    <span class="type-badge badge bg-info">@notification.NotificationType</span>
-                                </td>
-                                <td class="content-text" title="@notification.Content">@notification.Content</td>
-                                <td class="time-cell">
-                                    <div class="date-line">@(notification.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
-                                </td>
-                                <td>
-                                    @if (notification.IsRead != true)
-                                    {
-                                        <span class="state warn">Chưa đọc</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="state ok">Đã đọc</span>
-                                    }
-                                </td>
-                                <td class="text-end">
-                                    <div class="btn-group">
-                                        @if (notification.IsRead != true)
-                                        {
-                                            <button class="btn btn-sm btn-success soft btn-mark-read" data-id="@notification.NotificationId">
-                                                <i class="bi bi-check-circle"></i> Đánh dấu đã đọc
-                                            </button>
-                                        }
-                                        <button class="btn btn-sm btn-outline-danger soft btn-delete" data-id="@notification.NotificationId">
-                                            <i class="bi bi-trash"></i> Xóa
-                                        </button>
-                                    </div>
-                                </td>
+
+        <!-- Sent Tab -->
+        <div class="tab-pane fade" id="sent" role="tabpanel" aria-labelledby="sent-tab">
+            <div class="table-wrap card-x">
+                <div class="table-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-send me-2"></i>Thông báo đã gửi cho User & Provider</h6>
+                        <div class="table-info">
+                            @{
+                                var sentNotifications = Model.Where(n => n.ReceiverRole == "User" || n.ReceiverRole == "Provider").ToList();
+                            }
+                            <span class="text-muted small">Hiển thị @sentNotifications.Count thông báo</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="table table-hover align-middle mb-0" id="tblSentNotifications">
+                        <thead>
+                            <tr>
+                                <th class="w-receiver"><i class="bi bi-person me-1"></i>Người nhận</th>
+                                <th class="w-role"><i class="bi bi-people me-1"></i>Vai trò</th>
+                                <th class="w-type"><i class="bi bi-tag me-1"></i>Loại</th>
+                                <th><i class="bi bi-chat-text me-1"></i>Nội dung</th>
+                                <th class="w-time"><i class="bi bi-clock me-1"></i>Thời gian</th>
+                                <th class="w-state"><i class="bi bi-eye me-1"></i>Trạng thái</th>
                             </tr>
-                        }
-                    }
-                    else
-                    {
-                        <tr>
-                            <td colspan="7" class="text-center py-5">
-                                <div class="empty-state">
-                                    <i class="bi bi-bell-slash fs-1 text-muted mb-3"></i>
-                                    <div class="fs-5 fw-semibold mb-2">Không có thông báo nào</div>
-                                    <div class="text-muted mb-4">Hãy tạo thông báo mới hoặc thay đổi bộ lọc để xem thêm.</div>
-                                    <div class="empty-actions">
-                                        <button class="btn btn-primary soft" id="btnCreateNotificationEmpty">
-                                            <i class="bi bi-plus-circle"></i> Tạo thông báo đầu tiên
-                                        </button>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                        </thead>
+                        <tbody>
+                            @if (sentNotifications.Any())
+                            {
+                                @foreach (var notification in sentNotifications)
+                                {
+                                    <tr data-id="@notification.NotificationId">
+                                        <td class="fw-semibold">@(notification.ReceiverName ?? notification.ReceiverEmail ?? "N/A")</td>
+                                        <td>
+                                            <span class="role-badge badge bg-secondary">@GetRoleInVietnamese(notification.ReceiverRole)</span>
+                                        </td>
+                                        <td>
+                                            <span class="type-badge badge bg-info">@GetNotificationTypeInVietnamese(notification.NotificationType)</span>
+                                        </td>
+                                        <td class="content-text" title="@notification.Content">@notification.Content</td>
+                                        <td class="time-cell">
+                                            <div class="date-line">@(notification.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
+                                        </td>
+                                        <td>
+                                            @if (notification.IsRead != true)
+                                            {
+                                                <span class="state warn">Chưa đọc</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="state ok">Đã đọc</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">
+                                        <div class="empty-state">
+                                            <i class="bi bi-send-slash fs-1 text-muted mb-3"></i>
+                                            <div class="fs-5 fw-semibold mb-2">Chưa gửi thông báo nào</div>
+                                            <div class="text-muted mb-4">Bạn chưa gửi thông báo nào cho User hoặc Provider.</div>
+                                            <div class="empty-actions">
+                                                <button class="btn btn-primary soft" id="btnCreateNotificationEmpty">
+                                                    <i class="bi bi-plus-circle"></i> Tạo thông báo đầu tiên
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -346,6 +476,90 @@
             getAccounts: '@Url.Action("GetAccounts", "AdminNotification", new { area = "Admin" })'
         };
 
+        // ===== Tab management with localStorage =====
+        const TAB_STORAGE_KEY = 'vhs-notification-active-tab';
+        
+        // ===== Function to switch tabs programmatically =====
+        function switchToTab(tabName, saveToStorage = true) {
+            const inboxTab = document.getElementById('inbox-tab');
+            const inboxPane = document.getElementById('inbox');
+            const sentTab = document.getElementById('sent-tab');
+            const sentPane = document.getElementById('sent');
+            
+            if (tabName === 'inbox' && inboxTab && inboxPane && sentTab && sentPane) {
+                inboxTab.classList.add('active');
+                inboxTab.setAttribute('aria-selected', 'true');
+                sentTab.classList.remove('active');
+                sentTab.setAttribute('aria-selected', 'false');
+                
+                inboxPane.classList.add('show', 'active');
+                sentPane.classList.remove('show', 'active');
+                
+                if (saveToStorage) {
+                    localStorage.setItem(TAB_STORAGE_KEY, 'inbox');
+                }
+                
+                // Smooth scroll to tabs
+                setTimeout(() => {
+                    document.querySelector('.notification-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            } else if (tabName === 'sent' && inboxTab && inboxPane && sentTab && sentPane) {
+                sentTab.classList.add('active');
+                sentTab.setAttribute('aria-selected', 'true');
+                inboxTab.classList.remove('active');
+                inboxTab.setAttribute('aria-selected', 'false');
+                
+                sentPane.classList.add('show', 'active');
+                inboxPane.classList.remove('show', 'active');
+                
+                if (saveToStorage) {
+                    localStorage.setItem(TAB_STORAGE_KEY, 'sent');
+                }
+                
+                // Smooth scroll to tabs
+                setTimeout(() => {
+                    document.querySelector('.notification-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            }
+        }
+
+        // ===== Load saved tab or from URL on page load =====
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlTab = urlParams.get('tab');
+            const savedTab = localStorage.getItem(TAB_STORAGE_KEY);
+            
+            // Priority: URL param > localStorage > default (inbox)
+            let activeTab = 'inbox';
+            if (urlTab === 'inbox' || urlTab === 'sent') {
+                activeTab = urlTab;
+            } else if (savedTab === 'inbox' || savedTab === 'sent') {
+                activeTab = savedTab;
+            }
+            
+            switchToTab(activeTab, false);
+            
+            // Add Enter key listener for search input
+            const keywordInput = document.getElementById('keywordInput');
+            if (keywordInput) {
+                keywordInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyFilter();
+                    }
+                });
+            }
+        });
+
+        // ===== Save tab when user clicks on tab =====
+        document.getElementById('inbox-tab')?.addEventListener('click', function() {
+            localStorage.setItem(TAB_STORAGE_KEY, 'inbox');
+        });
+        
+        document.getElementById('sent-tab')?.addEventListener('click', function() {
+            localStorage.setItem(TAB_STORAGE_KEY, 'sent');
+        });
+
         // ===== Modals =====
         const notificationModal = new bootstrap.Modal(document.getElementById('notificationModal'));
         const sendToRoleModal = new bootstrap.Modal(document.getElementById('sendToRoleModal'));
@@ -389,10 +603,11 @@
             applyFilter();
         });
 
-        function applyFilter() {
+        async function applyFilter() {
             const role = document.getElementById('roleFilter').value;
             const type = document.getElementById('typeFilter').value;
             const readStatus = document.getElementById('readStatusFilter').value;
+            const keyword = document.querySelector('input[name="keyword"]').value;
             
             let url = '@Url.Action("Index", "AdminNotification", new { area = "Admin" })';
             const params = new URLSearchParams();
@@ -400,13 +615,66 @@
             if (role) params.append('role', role);
             if (type) params.append('notificationType', type);
             if (readStatus) params.append('isRead', readStatus);
-            if ('@keyword') params.append('keyword', '@keyword');
+            if (keyword) params.append('keyword', keyword);
+            
+            const activeTab = localStorage.getItem(TAB_STORAGE_KEY) || 'inbox';
+            params.append('tab', activeTab);
             
             if (params.toString()) {
                 url += '?' + params.toString();
             }
             
-            window.location.href = url;
+            try {
+                // Show loading indicator
+                showLoadingIndicator();
+                
+                const response = await fetch(url);
+                const html = await response.text();
+                
+                // Parse HTML để lấy phần content cần thiết
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Update bảng dữ liệu cho cả 2 tabs
+                const newInboxTable = doc.querySelector('#inbox .table-scroll');
+                const newSentTable = doc.querySelector('#sent .table-scroll');
+                const newMetrics = doc.querySelector('.v-head .right');
+                
+                if (newInboxTable) {
+                    document.querySelector('#inbox .table-scroll').innerHTML = newInboxTable.innerHTML;
+                }
+                if (newSentTable) {
+                    document.querySelector('#sent .table-scroll').innerHTML = newSentTable.innerHTML;
+                }
+                if (newMetrics) {
+                    document.querySelector('.v-head .right').innerHTML = newMetrics.innerHTML;
+                }
+                
+                // Update URL without reload
+                window.history.pushState({}, '', url);
+                
+                // Hide loading indicator
+                hideLoadingIndicator();
+                
+            } catch (error) {
+                console.error('Error applying filter:', error);
+                hideLoadingIndicator();
+                alert('Có lỗi xảy ra khi lọc dữ liệu. Vui lòng thử lại.');
+            }
+        }
+
+        function showLoadingIndicator() {
+            const tables = document.querySelectorAll('.table-scroll');
+            tables.forEach(table => {
+                table.classList.add('loading');
+            });
+        }
+
+        function hideLoadingIndicator() {
+            const tables = document.querySelectorAll('.table-scroll');
+            tables.forEach(table => {
+                table.classList.remove('loading');
+            });
         }
 
         // ===== Mark as Read =====
@@ -418,7 +686,8 @@
                 try {
                     const res = await fetch(routes.markAsRead + `?id=${id}`, { method: 'POST' });
                     if (res.ok) {
-                        location.reload();
+                        // Refresh data without reload
+                        await applyFilter();
                     } else {
                         const error = await res.json();
                         alert(error.message || 'Có lỗi xảy ra');
@@ -440,7 +709,8 @@
                 try {
                     const res = await fetch(routes.delete + `?id=${id}`, { method: 'DELETE' });
                     if (res.status === 204) {
-                        location.reload();
+                        // Refresh data without reload
+                        await applyFilter();
                     } else {
                         const error = await res.json();
                         alert(error.message || 'Có lỗi xảy ra');
@@ -565,10 +835,10 @@
                     
                     select.innerHTML = '<option value="">-- Chọn người nhận --</option>';
                     
-                    // Filter accounts by selected role
+                    // Filter accounts by selected role and exclude Admin accounts
                     const filteredAccounts = selectedRole ? 
-                        accounts.filter(account => account.role === selectedRole) : 
-                        accounts;
+                        accounts.filter(account => account.role === selectedRole && account.role !== 'Admin') : 
+                        accounts.filter(account => account.role !== 'Admin');
                     
                     console.log('Filtered accounts:', filteredAccounts);
                     
@@ -582,7 +852,7 @@
                         filteredAccounts.forEach(account => {
                             const option = document.createElement('option');
                             option.value = account.accountId;
-                            option.textContent = `${account.accountName} (${account.email})`;
+                            option.textContent = account.accountName;
                             select.appendChild(option);
                         });
                     }
