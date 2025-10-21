@@ -48,10 +48,17 @@
 
             <select name="category" class="input">
                 <option value="">-- Tất cả loại --</option>
-                <option value="Vệ sinh" selected="@(category == "Vệ sinh")">Vệ sinh</option>
-                <option value="Nội trợ" selected="@(category == "Nội trợ")">Nội trợ</option>
-                <option value="Sự kiện nhỏ tại nhà" selected="@(category == "Sự kiện nhỏ tại nhà")">Sự kiện nhỏ tại nhà</option>
+                @if (ViewBag.Categories is IEnumerable<VHS_frontend.Areas.Admin.Models.Category.CategoryDTO> categories)
+                {
+                    foreach (var cat in categories)
+                    {
+                        <option value="@cat.CategoryId" selected="@(category == cat.CategoryId.ToString())">
+                            @cat.Name
+                        </option>
+                    }
+                }
             </select>
+
 
             <select name="sort" class="input">
                 <option value="">-- Khoảng giá / đánh giá --</option>
@@ -93,10 +100,20 @@
                                 <p class="service-desc description-text">@service.Description</p>
                             }
 
-                            @if (!string.IsNullOrWhiteSpace(service.UnitType))
+                            @if (!string.IsNullOrWhiteSpace(service.CategoryName))
+                            {
+                                <p><strong>Loại:</strong> @service.CategoryName</p>
+                            }
+
+                            @if (service.BaseUnit.HasValue && !string.IsNullOrWhiteSpace(service.UnitType))
+                            {
+                                <p><strong>Thời gian:</strong> @service.BaseUnit @service.UnitType</p>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(service.UnitType))
                             {
                                 <p><strong>Thời gian:</strong> @service.UnitType</p>
                             }
+
 
                             <p><strong>Giá:</strong> @priceDisplay</p>
 

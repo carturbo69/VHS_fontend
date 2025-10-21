@@ -17,6 +17,11 @@ builder.Services.AddHttpClient<IServiceCustomerService, ServiceCustomerService>(
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+builder.Services.AddHttpClient<CartServiceCustomer>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
 builder.Services.AddHttpClient<CategoryAdminService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
