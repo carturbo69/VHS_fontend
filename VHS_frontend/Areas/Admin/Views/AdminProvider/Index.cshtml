@@ -9,7 +9,7 @@
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/provider.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-provider.css" asp-append-version="true" />
 }
 
 <section class="cat-page container-fluid provider-ui">
@@ -54,7 +54,7 @@
                     <th style="width:30%">Tài khoản</th>
                     <th style="width:30%">Email</th>
                     <th style="width:20%">Ngày tạo</th>
-                    <th style="width:12%">Trạng thái</th>
+                    <th style="width:13%">Trạng thái</th>
                     <th style="width:8%" class="text-end">Thao tác</th>
                 </tr>
             </thead>
@@ -83,9 +83,6 @@
                         </td>
                         <td class="text-end">
                             <div class="btn-group action-inline">
-                                <button class="btn btn-sm btn-outline-primary soft" onclick="openView('@a.Id')">
-                                    <i class="bi bi-eye"></i><span>Xem</span>
-                                </button>
                                 @if (isDel)
                                 {
                                     <button class="btn btn-sm btn-outline-warning soft" onclick="doRestore('@a.Id')">
@@ -115,33 +112,10 @@
     <div id="notif-root" aria-live="polite" aria-atomic="true"></div>
 </section>
 
-<!-- Modal: View (read-only) — bỏ dòng mật khẩu -->
-<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content card-x">
-            <div class="modal-header">
-                <h5 class="modal-title">Chi tiết Provider</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-            </div>
-            <div class="modal-body">
-                <div class="stack">
-                    <div class="row-item"><span class="lbl">Account name</span><div class="val" id="vName">—</div></div>
-                    <div class="row-item"><span class="lbl">Email</span><div class="val" id="vEmail">—</div></div>
-                    <div class="row-item"><span class="lbl">Ngày tạo</span><div class="val" id="vCreated">—</div></div>
-                    <div class="row-item"><span class="lbl">Trạng thái</span><div class="val" id="vState">—</div></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 @section Scripts {
     <script>
         const routes = {
-          get     : '@Url.Action("Get", "AdminProvider", new { area = "Admin" })',
           del     : '@Url.Action("Delete", "AdminProvider", new { area = "Admin" })',
           restore : '@Url.Action("Restore", "AdminProvider", new { area = "Admin" })'
         };
@@ -174,19 +148,6 @@
           });
         });
 
-        // Modal View
-        const viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
-        async function openView(id){
-          const res = await fetch(routes.get + `?id=${id}`);
-          if(!res.ok){ showNotice('Không đọc được dữ liệu.', 'error', 1200); return; }
-          const x = await res.json();
-          document.getElementById('vName').textContent    = x.accountName ?? '—';
-          document.getElementById('vEmail').textContent   = x.email ?? '—';
-          document.getElementById('vCreated').textContent = (x.createdAt ? new Date(x.createdAt).toLocaleString() : '—');
-          document.getElementById('vState').textContent   = (x.deleted ? 'Đã xoá' : 'Hoạt động');
-          viewModal.show();
-        }
-        window.openView = openView;
 
         // Soft-delete / Restore
         async function doDelete(id){

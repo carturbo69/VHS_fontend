@@ -12,10 +12,17 @@ namespace VHS_frontend.Areas.Admin.Controllers
         private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
         public AdminCustomerController(CustomerAdminService svc) => _svc = svc;
+        
+        private void AttachBearerIfAny()
+        {
+            var token = HttpContext.Session.GetString("JWToken");
+            if (!string.IsNullOrWhiteSpace(token)) _svc.SetBearerToken(token);
+        }
 
         [HttpGet]
         public async Task<IActionResult> Index(bool includeDeleted = false)
         {
+            AttachBearerIfAny();
             var list = await _svc.GetAllAsync(includeDeleted);
             ViewData["IncludeDeleted"] = includeDeleted;
             return View(list);
@@ -24,6 +31,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         [HttpGet]
         public async Task<IActionResult> Get(Guid id)
         {
+            AttachBearerIfAny();
             var dto = await _svc.GetByIdAsync(id);
             if (dto is null) return NotFound();
             return Json(dto, _json);
@@ -37,6 +45,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                             || string.IsNullOrWhiteSpace(dto.Password))
                 return BadRequest("AccountName, Email, Password are required.");
 
+            AttachBearerIfAny();
             dto.Role = "User"; // khoá role
             var res = await _svc.CreateAsync(dto, ct);
             var text = await res.Content.ReadAsStringAsync(ct);
@@ -47,6 +56,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCustomerDTO dto, CancellationToken ct)
         {
             if (dto == null) return BadRequest("Body required.");
+            AttachBearerIfAny();
             dto.Role = "User"; // khoá role
 
             var res = await _svc.UpdateAsync(id, dto, ct);
@@ -57,6 +67,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         [HttpDelete]
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
         {
+            AttachBearerIfAny();
             var res = await _svc.DeleteAsync(id, ct);
             var text = await res.Content.ReadAsStringAsync(ct);
             return StatusCode((int)res.StatusCode, text);
@@ -65,6 +76,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         [HttpPost]
         public async Task<IActionResult> Restore(Guid id, CancellationToken ct)
         {
+            AttachBearerIfAny();
             var res = await _svc.RestoreAsync(id, ct);
             var text = await res.Content.ReadAsStringAsync(ct);
             return StatusCode((int)res.StatusCode, text);

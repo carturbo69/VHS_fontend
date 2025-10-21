@@ -1,0 +1,908 @@
+@using VHS_frontend.Areas.Admin.Models.Notification
+@model List<AdminNotificationItemDTO>
+
+@{
+    ViewData["Title"] = "Quản lý Thông báo";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+
+    var total = (int)(ViewBag.Total ?? Model.Count);
+    var unread = (int)(ViewBag.Unread ?? Model.Count(x => x.IsRead != true));
+    var read = (int)(ViewBag.Read ?? Model.Count(x => x.IsRead == true));
+    var keyword = (string)(ViewBag.Keyword ?? "");
+    var role = (string)(ViewBag.Role ?? "");
+    var notificationType = (string)(ViewBag.NotificationType ?? "");
+    var isRead = (bool?)ViewBag.IsRead;
+    
+    // Tách thông báo theo nhận/gửi
+    var inboxTotal = Model.Count(n => n.ReceiverRole == "Admin");
+    var sentTotal = Model.Count(n => n.ReceiverRole == "User" || n.ReceiverRole == "Provider");
+    var inboxUnread = Model.Count(n => n.ReceiverRole == "Admin" && n.IsRead != true);
+    var sentUnread = Model.Count(n => (n.ReceiverRole == "User" || n.ReceiverRole == "Provider") && n.IsRead != true);
+
+    // Helper function to convert role to Vietnamese
+    string GetRoleInVietnamese(string role)
+    {
+        return role switch
+        {
+            "User" => "Người dùng",
+            "Provider" => "Nhà cung cấp",
+            "Admin" => "Quản trị viên",
+            _ => role
+        };
+    }
+
+    // Helper function to convert notification type to Vietnamese
+    string GetNotificationTypeInVietnamese(string type)
+    {
+        return type switch
+        {
+            "System" => "Hệ thống",
+            "Booking" => "Đặt lịch",
+            "Payment" => "Thanh toán",
+            "Promotion" => "Khuyến mãi",
+            _ => type
+        };
+    }
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-notification.css" asp-append-version="true" />
+}
+
+<section class="v-page container-fluid">
+    <!-- Header / Metrics -->
+    <div class="v-head card-x glass">
+        <div class="left">
+            <div class="ico"><i class="bi bi-bell"></i></div>
+            <div>
+                <h3>Thông báo</h3>
+                <div class="sub">Quản lý thông báo hệ thống</div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="pill pill-total">
+                <span class="lbl">Tổng</span>
+                <span class="val">@total</span>
+            </div>
+            <div class="pill pill-inbox" onclick="switchToTab('inbox')" title="Click để xem thông báo nhận được">
+                <span class="lbl">Nhận được</span>
+                <span class="val">@inboxTotal</span>
+                @if (inboxUnread > 0)
+                {
+                    <span class="badge-notify">@inboxUnread chưa đọc</span>
+                }
+            </div>
+            <div class="pill pill-sent" onclick="switchToTab('sent')" title="Click để xem thông báo đã gửi">
+                <span class="lbl">Đã gửi</span>
+                <span class="val">@sentTotal</span>
+                @if (sentUnread > 0)
+                {
+                    <span class="badge-notify orange">@sentUnread chưa đọc</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="v-toolbar">
+        <div class="row g-3">
+            <!-- Actions & Search -->
+            <div class="col-md-5">
+                <div class="search-card card-x">
+                    <!-- Actions Section -->
+                    <div class="actions-section">
+                        <div class="section-header">
+                            <h6 class="mb-0"><i class="bi bi-tools me-2"></i>Thao tác</h6>
+                        </div>
+                        <div class="actions-grid">
+                            <button class="btn btn-primary soft action-btn" id="btnCreateNotification">
+                                <i class="bi bi-plus-circle"></i> Tạo thông báo
+                            </button>
+                            <button class="btn btn-success soft action-btn" id="btnSendToRole">
+                                <i class="bi bi-broadcast"></i> Gửi hàng loạt
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Divider -->
+                    <div class="section-divider"></div>
+                    
+                    <!-- Search Section -->
+                    <div class="search-section">
+                        <div class="section-header">
+                            <h6 class="mb-0"><i class="bi bi-search me-2"></i>Tìm kiếm</h6>
+                        </div>
+                        <div class="search-form">
+                            <div class="input-group">
+                                <input name="keyword" value="@keyword" class="form-control" placeholder="Tìm theo nội dung thông báo…" id="keywordInput" />
+                                <button class="btn btn-outline-secondary" type="button" onclick="applyFilter()">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="col-md-7">
+                <div class="filter-card card-x">
+                    <div class="filter-header">
+                        <h6 class="mb-3"><i class="bi bi-funnel me-2"></i>Bộ lọc nâng cao</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="fb-label"><i class="bi bi-people me-1"></i>Vai trò</div>
+                                <select id="roleFilter" class="form-select">
+                                    <option value="" selected="@(string.IsNullOrEmpty(role))">Tất cả vai trò</option>
+                                    <option value="User" selected="@(role == "User")">👤 Customer</option>
+                                    <option value="Provider" selected="@(role == "Provider")">🏢 Provider</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="fb-label"><i class="bi bi-tag me-1"></i>Loại thông báo</div>
+                                <select id="typeFilter" class="form-select">
+                                    <option value="" selected="@(string.IsNullOrEmpty(notificationType))">Tất cả loại</option>
+                                    <option value="System" selected="@(notificationType == "System")">⚙️ Hệ thống</option>
+                                    <option value="Booking" selected="@(notificationType == "Booking")">📅 Đặt lịch</option>
+                                    <option value="Payment" selected="@(notificationType == "Payment")">💳 Thanh toán</option>
+                                    <option value="Promotion" selected="@(notificationType == "Promotion")">🎁 Khuyến mãi</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="fb-label"><i class="bi bi-eye me-1"></i>Trạng thái</div>
+                                <select id="readStatusFilter" class="form-select">
+                                    <option value="" selected="@(!isRead.HasValue)">Tất cả trạng thái</option>
+                                    <option value="false" selected="@(isRead == false)">🔴 Chưa đọc</option>
+                                    <option value="true" selected="@(isRead == true)">🟢 Đã đọc</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <div class="filter-actions">
+                                    <button class="btn btn-primary soft" id="btnApplyFilter" type="button">
+                                        <i class="bi bi-funnel-fill"></i> Áp dụng bộ lọc
+                                    </button>
+                                    <button class="btn btn-ghost soft" id="btnClearFilter" type="button">
+                                        <i class="bi bi-arrow-clockwise"></i> Xóa bộ lọc
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <div class="notification-tabs mb-3">
+        <ul class="nav nav-tabs" id="notificationTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="inbox-tab" data-bs-toggle="tab" data-bs-target="#inbox" type="button" role="tab" aria-controls="inbox" aria-selected="false">
+                    <i class="bi bi-inbox-fill me-2"></i>Thông báo nhận được
+                    <span class="badge bg-primary ms-2">@Model.Count(n => n.ReceiverRole == "Admin")</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sent-tab" data-bs-toggle="tab" data-bs-target="#sent" type="button" role="tab" aria-controls="sent" aria-selected="false">
+                    <i class="bi bi-send-fill me-2"></i>Thông báo đã gửi
+                    <span class="badge ms-2" style="background: var(--accent-orange); color: white;">@Model.Count(n => n.ReceiverRole == "User" || n.ReceiverRole == "Provider")</span>
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="notificationTabsContent">
+        <!-- Inbox Tab -->
+        <div class="tab-pane fade" id="inbox" role="tabpanel" aria-labelledby="inbox-tab">
+            <div class="table-wrap card-x">
+                <div class="table-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-inbox me-2"></i>Thông báo từ User & Provider</h6>
+                        <div class="table-info">
+                            @{
+                                var inboxNotifications = Model.Where(n => n.ReceiverRole == "Admin").ToList();
+                            }
+                            <span class="text-muted small">Hiển thị @inboxNotifications.Count thông báo</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="table table-hover align-middle mb-0" id="tblInboxNotifications">
+                        <thead>
+                            <tr>
+                                <th class="w-type"><i class="bi bi-tag me-1"></i>Loại</th>
+                                <th><i class="bi bi-chat-text me-1"></i>Nội dung</th>
+                                <th class="w-time"><i class="bi bi-clock me-1"></i>Thời gian</th>
+                                <th class="w-state"><i class="bi bi-eye me-1"></i>Trạng thái</th>
+                                <th class="text-end w-actions"><i class="bi bi-gear me-1"></i>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (inboxNotifications.Any())
+                            {
+                                @foreach (var notification in inboxNotifications)
+                                {
+                                    <tr data-id="@notification.NotificationId">
+                                        <td>
+                                            <span class="type-badge badge bg-info">@GetNotificationTypeInVietnamese(notification.NotificationType)</span>
+                                        </td>
+                                        <td class="content-text" title="@notification.Content">@notification.Content</td>
+                                        <td class="time-cell">
+                                            <div class="date-line">@(notification.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
+                                        </td>
+                                        <td>
+                                            @if (notification.IsRead != true)
+                                            {
+                                                <span class="state warn">Chưa đọc</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="state ok">Đã đọc</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group">
+                                                @if (notification.IsRead != true)
+                                                {
+                                                    <button class="btn btn-sm btn-success soft btn-mark-read" data-id="@notification.NotificationId">
+                                                        <i class="bi bi-check-circle"></i> Đánh dấu đã đọc
+                                                    </button>
+                                                }
+                                                <button class="btn btn-sm btn-outline-danger soft btn-delete" data-id="@notification.NotificationId">
+                                                    <i class="bi bi-trash"></i> Xóa
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-5">
+                                        <div class="empty-state">
+                                            <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                                            <div class="fs-5 fw-semibold mb-2">Chưa có thông báo nào</div>
+                                            <div class="text-muted">Bạn chưa nhận được thông báo nào từ User hoặc Provider.</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sent Tab -->
+        <div class="tab-pane fade" id="sent" role="tabpanel" aria-labelledby="sent-tab">
+            <div class="table-wrap card-x">
+                <div class="table-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-send me-2"></i>Thông báo đã gửi cho User & Provider</h6>
+                        <div class="table-info">
+                            @{
+                                var sentNotifications = Model.Where(n => n.ReceiverRole == "User" || n.ReceiverRole == "Provider").ToList();
+                            }
+                            <span class="text-muted small">Hiển thị @sentNotifications.Count thông báo</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="table table-hover align-middle mb-0" id="tblSentNotifications">
+                        <thead>
+                            <tr>
+                                <th class="w-receiver"><i class="bi bi-person me-1"></i>Người nhận</th>
+                                <th class="w-role"><i class="bi bi-people me-1"></i>Vai trò</th>
+                                <th class="w-type"><i class="bi bi-tag me-1"></i>Loại</th>
+                                <th><i class="bi bi-chat-text me-1"></i>Nội dung</th>
+                                <th class="w-time"><i class="bi bi-clock me-1"></i>Thời gian</th>
+                                <th class="w-state"><i class="bi bi-eye me-1"></i>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (sentNotifications.Any())
+                            {
+                                @foreach (var notification in sentNotifications)
+                                {
+                                    <tr data-id="@notification.NotificationId">
+                                        <td class="fw-semibold">@(notification.ReceiverName ?? notification.ReceiverEmail ?? "N/A")</td>
+                                        <td>
+                                            <span class="role-badge badge bg-secondary">@GetRoleInVietnamese(notification.ReceiverRole)</span>
+                                        </td>
+                                        <td>
+                                            <span class="type-badge badge bg-info">@GetNotificationTypeInVietnamese(notification.NotificationType)</span>
+                                        </td>
+                                        <td class="content-text" title="@notification.Content">@notification.Content</td>
+                                        <td class="time-cell">
+                                            <div class="date-line">@(notification.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
+                                        </td>
+                                        <td>
+                                            @if (notification.IsRead != true)
+                                            {
+                                                <span class="state warn">Chưa đọc</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="state ok">Đã đọc</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">
+                                        <div class="empty-state">
+                                            <i class="bi bi-send-slash fs-1 text-muted mb-3"></i>
+                                            <div class="fs-5 fw-semibold mb-2">Chưa gửi thông báo nào</div>
+                                            <div class="text-muted mb-4">Bạn chưa gửi thông báo nào cho User hoặc Provider.</div>
+                                            <div class="empty-actions">
+                                                <button class="btn btn-primary soft" id="btnCreateNotificationEmpty">
+                                                    <i class="bi bi-plus-circle"></i> Tạo thông báo đầu tiên
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Modal: Create Notification -->
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <form class="modal-content card-x" id="notificationForm">
+            <div class="modal-header">
+                <h5 class="modal-title" id="notificationModalTitle">Tạo thông báo mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="notificationId" />
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Người nhận <span class="text-danger">*</span></label>
+                        <select id="accountReceivedId" class="form-select" required>
+                            <option value="">-- Chọn người nhận --</option>
+                        </select>
+                        <div class="invalid-feedback">Vui lòng chọn người nhận.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Vai trò người nhận <span class="text-danger">*</span></label>
+                        <select id="receiverRole" class="form-select" required>
+                            <option value="">-- Chọn vai trò --</option>
+                            <option value="User">👤 Customer</option>
+                            <option value="Provider">🏢 Provider</option>
+                        </select>
+                        <div class="invalid-feedback">Vui lòng chọn vai trò.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Loại thông báo <span class="text-danger">*</span></label>
+                        <select id="notificationType" class="form-select" required>
+                            <option value="">-- Chọn loại thông báo --</option>
+                            <option value="System">Hệ thống</option>
+                            <option value="Booking">Đặt lịch</option>
+                            <option value="Payment">Thanh toán</option>
+                            <option value="Promotion">Khuyến mãi</option>
+                        </select>
+                        <div class="invalid-feedback">Vui lòng chọn loại thông báo.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Nội dung thông báo <span class="text-danger">*</span></label>
+                        <textarea id="content" class="form-control" rows="4" maxlength="1000" required placeholder="Nhập nội dung thông báo..."></textarea>
+                        <div class="invalid-feedback">Vui lòng nhập nội dung thông báo.</div>
+                        <div class="form-text">Tối đa 1000 ký tự</div>
+                    </div>
+                </div>
+
+                <div id="notificationError" class="text-danger small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-primary soft" id="btnSaveNotification">Lưu</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Send to Role -->
+<div class="modal fade" id="sendToRoleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content card-x" id="sendToRoleForm">
+            <div class="modal-header">
+                <h5 class="modal-title">Gửi thông báo theo vai trò</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Vai trò <span class="text-danger">*</span></label>
+                        <select id="sendToRoleRole" class="form-select" required>
+                            <option value="">-- Chọn vai trò --</option>
+                            <option value="User">👤 Customer</option>
+                            <option value="Provider">🏢 Provider</option>
+                        </select>
+                        <div class="invalid-feedback">Vui lòng chọn vai trò.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Loại thông báo <span class="text-danger">*</span></label>
+                        <select id="sendToRoleType" class="form-select" required>
+                            <option value="">-- Chọn loại thông báo --</option>
+                            <option value="System">Hệ thống</option>
+                            <option value="Booking">Đặt lịch</option>
+                            <option value="Payment">Thanh toán</option>
+                            <option value="Promotion">Khuyến mãi</option>
+                        </select>
+                        <div class="invalid-feedback">Vui lòng chọn loại thông báo.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Nội dung thông báo <span class="text-danger">*</span></label>
+                        <textarea id="sendToRoleContent" class="form-control" rows="4" maxlength="1000" required placeholder="Nhập nội dung thông báo..."></textarea>
+                        <div class="invalid-feedback">Vui lòng nhập nội dung thông báo.</div>
+                        <div class="form-text">Tối đa 1000 ký tự</div>
+                    </div>
+                </div>
+
+                <div id="sendToRoleError" class="text-danger small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
+                <button type="submit" class="btn btn-success soft" id="btnSendToRoleSubmit">Gửi thông báo</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const routes = {
+            get: '@Url.Action("Get", "AdminNotification", new { area = "Admin" })',
+            create: '@Url.Action("Create", "AdminNotification", new { area = "Admin" })',
+            sendToRole: '@Url.Action("SendToRole", "AdminNotification", new { area = "Admin" })',
+            delete: '@Url.Action("Delete", "AdminNotification", new { area = "Admin" })',
+            markAsRead: '@Url.Action("MarkAsRead", "AdminNotification", new { area = "Admin" })',
+            markAllAsRead: '@Url.Action("MarkAllAsRead", "AdminNotification", new { area = "Admin" })',
+            getAccounts: '@Url.Action("GetAccounts", "AdminNotification", new { area = "Admin" })'
+        };
+
+        // ===== Tab management with localStorage =====
+        const TAB_STORAGE_KEY = 'vhs-notification-active-tab';
+        
+        // ===== Function to switch tabs programmatically =====
+        function switchToTab(tabName, saveToStorage = true) {
+            const inboxTab = document.getElementById('inbox-tab');
+            const inboxPane = document.getElementById('inbox');
+            const sentTab = document.getElementById('sent-tab');
+            const sentPane = document.getElementById('sent');
+            
+            if (tabName === 'inbox' && inboxTab && inboxPane && sentTab && sentPane) {
+                inboxTab.classList.add('active');
+                inboxTab.setAttribute('aria-selected', 'true');
+                sentTab.classList.remove('active');
+                sentTab.setAttribute('aria-selected', 'false');
+                
+                inboxPane.classList.add('show', 'active');
+                sentPane.classList.remove('show', 'active');
+                
+                if (saveToStorage) {
+                    localStorage.setItem(TAB_STORAGE_KEY, 'inbox');
+                }
+                
+                // Smooth scroll to tabs
+                setTimeout(() => {
+                    document.querySelector('.notification-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            } else if (tabName === 'sent' && inboxTab && inboxPane && sentTab && sentPane) {
+                sentTab.classList.add('active');
+                sentTab.setAttribute('aria-selected', 'true');
+                inboxTab.classList.remove('active');
+                inboxTab.setAttribute('aria-selected', 'false');
+                
+                sentPane.classList.add('show', 'active');
+                inboxPane.classList.remove('show', 'active');
+                
+                if (saveToStorage) {
+                    localStorage.setItem(TAB_STORAGE_KEY, 'sent');
+                }
+                
+                // Smooth scroll to tabs
+                setTimeout(() => {
+                    document.querySelector('.notification-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            }
+        }
+
+        // ===== Load saved tab or from URL on page load =====
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlTab = urlParams.get('tab');
+            const savedTab = localStorage.getItem(TAB_STORAGE_KEY);
+            
+            // Priority: URL param > localStorage > default (inbox)
+            let activeTab = 'inbox';
+            if (urlTab === 'inbox' || urlTab === 'sent') {
+                activeTab = urlTab;
+            } else if (savedTab === 'inbox' || savedTab === 'sent') {
+                activeTab = savedTab;
+            }
+            
+            switchToTab(activeTab, false);
+            
+            // Add Enter key listener for search input
+            const keywordInput = document.getElementById('keywordInput');
+            if (keywordInput) {
+                keywordInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyFilter();
+                    }
+                });
+            }
+        });
+
+        // ===== Save tab when user clicks on tab =====
+        document.getElementById('inbox-tab')?.addEventListener('click', function() {
+            localStorage.setItem(TAB_STORAGE_KEY, 'inbox');
+        });
+        
+        document.getElementById('sent-tab')?.addEventListener('click', function() {
+            localStorage.setItem(TAB_STORAGE_KEY, 'sent');
+        });
+
+        // ===== Modals =====
+        const notificationModal = new bootstrap.Modal(document.getElementById('notificationModal'));
+        const sendToRoleModal = new bootstrap.Modal(document.getElementById('sendToRoleModal'));
+
+        // ===== Create Notification Button =====
+        document.getElementById('btnCreateNotification').addEventListener('click', () => {
+            document.getElementById('notificationModalTitle').textContent = 'Tạo thông báo mới';
+            clearNotificationFormCompletely();
+            clearError('notificationError');
+            loadAccounts(); // Load accounts when creating notification
+            notificationModal.show();
+        });
+
+        // ===== Empty State Create Button =====
+        document.getElementById('btnCreateNotificationEmpty')?.addEventListener('click', () => {
+            document.getElementById('notificationModalTitle').textContent = 'Tạo thông báo mới';
+            clearNotificationFormCompletely();
+            clearError('notificationError');
+            loadAccounts(); // Load accounts when creating notification
+            notificationModal.show();
+        });
+
+        // ===== Send to Role Button =====
+        document.getElementById('btnSendToRole').addEventListener('click', () => {
+            clearSendToRoleForm();
+            clearError('sendToRoleError');
+            sendToRoleModal.show();
+        });
+
+        // ===== Role Change Event =====
+        document.getElementById('receiverRole').addEventListener('change', () => {
+            loadAccounts(); // Reload accounts when role changes
+        });
+
+        // ===== Filter Functions =====
+        document.getElementById('btnApplyFilter').addEventListener('click', applyFilter);
+        document.getElementById('btnClearFilter').addEventListener('click', () => {
+            document.getElementById('roleFilter').value = '';
+            document.getElementById('typeFilter').value = '';
+            document.getElementById('readStatusFilter').value = '';
+            applyFilter();
+        });
+
+        async function applyFilter() {
+            const role = document.getElementById('roleFilter').value;
+            const type = document.getElementById('typeFilter').value;
+            const readStatus = document.getElementById('readStatusFilter').value;
+            const keyword = document.querySelector('input[name="keyword"]').value;
+            
+            let url = '@Url.Action("Index", "AdminNotification", new { area = "Admin" })';
+            const params = new URLSearchParams();
+            
+            if (role) params.append('role', role);
+            if (type) params.append('notificationType', type);
+            if (readStatus) params.append('isRead', readStatus);
+            if (keyword) params.append('keyword', keyword);
+            
+            const activeTab = localStorage.getItem(TAB_STORAGE_KEY) || 'inbox';
+            params.append('tab', activeTab);
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            try {
+                // Show loading indicator
+                showLoadingIndicator();
+                
+                const response = await fetch(url);
+                const html = await response.text();
+                
+                // Parse HTML để lấy phần content cần thiết
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Update bảng dữ liệu cho cả 2 tabs
+                const newInboxTable = doc.querySelector('#inbox .table-scroll');
+                const newSentTable = doc.querySelector('#sent .table-scroll');
+                const newMetrics = doc.querySelector('.v-head .right');
+                
+                if (newInboxTable) {
+                    document.querySelector('#inbox .table-scroll').innerHTML = newInboxTable.innerHTML;
+                }
+                if (newSentTable) {
+                    document.querySelector('#sent .table-scroll').innerHTML = newSentTable.innerHTML;
+                }
+                if (newMetrics) {
+                    document.querySelector('.v-head .right').innerHTML = newMetrics.innerHTML;
+                }
+                
+                // Update URL without reload
+                window.history.pushState({}, '', url);
+                
+                // Hide loading indicator
+                hideLoadingIndicator();
+                
+            } catch (error) {
+                console.error('Error applying filter:', error);
+                hideLoadingIndicator();
+                alert('Có lỗi xảy ra khi lọc dữ liệu. Vui lòng thử lại.');
+            }
+        }
+
+        function showLoadingIndicator() {
+            const tables = document.querySelectorAll('.table-scroll');
+            tables.forEach(table => {
+                table.classList.add('loading');
+            });
+        }
+
+        function hideLoadingIndicator() {
+            const tables = document.querySelectorAll('.table-scroll');
+            tables.forEach(table => {
+                table.classList.remove('loading');
+            });
+        }
+
+        // ===== Mark as Read =====
+        document.addEventListener('click', async (e) => {
+            if (e.target.closest('.btn-mark-read')) {
+                const btn = e.target.closest('.btn-mark-read');
+                const id = btn.dataset.id;
+                
+                try {
+                    const res = await fetch(routes.markAsRead + `?id=${id}`, { method: 'POST' });
+                    if (res.ok) {
+                        // Refresh data without reload
+                        await applyFilter();
+                    } else {
+                        const error = await res.json();
+                        alert(error.message || 'Có lỗi xảy ra');
+                    }
+                } catch (err) {
+                    alert('Không thể đánh dấu đã đọc');
+                }
+            }
+        });
+
+        // ===== Delete Notification =====
+        document.addEventListener('click', async (e) => {
+            if (e.target.closest('.btn-delete')) {
+                const btn = e.target.closest('.btn-delete');
+                const id = btn.dataset.id;
+                
+                if (!confirm('Bạn có chắc chắn muốn xóa thông báo này?')) return;
+                
+                try {
+                    const res = await fetch(routes.delete + `?id=${id}`, { method: 'DELETE' });
+                    if (res.status === 204) {
+                        // Refresh data without reload
+                        await applyFilter();
+                    } else {
+                        const error = await res.json();
+                        alert(error.message || 'Có lỗi xảy ra');
+                    }
+                } catch (err) {
+                    alert('Không thể xóa thông báo');
+                }
+            }
+        });
+
+        // ===== Form Validation =====
+        document.getElementById('notificationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearError('notificationError');
+
+            const formData = {
+                accountReceivedId: document.getElementById('accountReceivedId').value,
+                receiverRole: document.getElementById('receiverRole').value,
+                notificationType: document.getElementById('notificationType').value,
+                content: document.getElementById('content').value.trim()
+            };
+
+            // Validate
+            if (!formData.accountReceivedId) {
+                showError('notificationError', 'Vui lòng chọn người nhận');
+                return;
+            }
+            if (!formData.receiverRole) {
+                showError('notificationError', 'Vui lòng chọn vai trò');
+                return;
+            }
+            if (!formData.notificationType) {
+                showError('notificationError', 'Vui lòng chọn loại thông báo');
+                return;
+            }
+            if (!formData.content) {
+                showError('notificationError', 'Vui lòng nhập nội dung thông báo');
+                return;
+            }
+
+            try {
+                const res = await fetch(routes.create, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (res.ok) {
+                    notificationModal.hide();
+                    alert('Tạo thông báo thành công!');
+                    location.reload();
+                } else {
+                    const error = await res.json();
+                    console.error('Error creating notification:', error);
+                    showError('notificationError', error.message || 'Có lỗi xảy ra khi tạo thông báo');
+                }
+            } catch (err) {
+                console.error('Network error:', err);
+                showError('notificationError', 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
+            }
+        });
+
+        // ===== Send to Role Form =====
+        document.getElementById('sendToRoleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearError('sendToRoleError');
+
+            const formData = {
+                role: document.getElementById('sendToRoleRole').value,
+                notificationType: document.getElementById('sendToRoleType').value,
+                content: document.getElementById('sendToRoleContent').value.trim()
+            };
+
+            // Validate
+            if (!formData.role) {
+                showError('sendToRoleError', 'Vui lòng chọn vai trò');
+                return;
+            }
+            if (!formData.notificationType) {
+                showError('sendToRoleError', 'Vui lòng chọn loại thông báo');
+                return;
+            }
+            if (!formData.content) {
+                showError('sendToRoleError', 'Vui lòng nhập nội dung thông báo');
+                return;
+            }
+
+            try {
+                const res = await fetch(routes.sendToRole, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (res.ok) {
+                    sendToRoleModal.hide();
+                    alert('Gửi thông báo thành công!');
+                    location.reload();
+                } else {
+                    const error = await res.json();
+                    showError('sendToRoleError', error.message || 'Có lỗi xảy ra');
+                }
+            } catch (err) {
+                showError('sendToRoleError', 'Không thể gửi thông báo');
+            }
+        });
+
+        // ===== Load Accounts =====
+        async function loadAccounts() {
+            try {
+                console.log('Loading accounts...');
+                const res = await fetch(routes.getAccounts);
+                console.log('Response status:', res.status);
+                
+                if (res.ok) {
+                    const accounts = await res.json();
+                    console.log('Loaded accounts:', accounts);
+                    
+                    const select = document.getElementById('accountReceivedId');
+                    const roleSelect = document.getElementById('receiverRole');
+                    const selectedRole = roleSelect.value;
+                    
+                    select.innerHTML = '<option value="">-- Chọn người nhận --</option>';
+                    
+                    // Filter accounts by selected role and exclude Admin accounts
+                    const filteredAccounts = selectedRole ? 
+                        accounts.filter(account => account.role === selectedRole && account.role !== 'Admin') : 
+                        accounts.filter(account => account.role !== 'Admin');
+                    
+                    console.log('Filtered accounts:', filteredAccounts);
+                    
+                    if (filteredAccounts.length === 0) {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = selectedRole ? 'Không có tài khoản nào với vai trò này' : 'Không có tài khoản nào';
+                        option.disabled = true;
+                        select.appendChild(option);
+                    } else {
+                        filteredAccounts.forEach(account => {
+                            const option = document.createElement('option');
+                            option.value = account.accountId;
+                            option.textContent = account.accountName;
+                            select.appendChild(option);
+                        });
+                    }
+                } else {
+                    console.error('Failed to load accounts:', res.status, res.statusText);
+                    const select = document.getElementById('accountReceivedId');
+                    select.innerHTML = '<option value="">-- Lỗi khi tải danh sách tài khoản --</option>';
+                }
+            } catch (err) {
+                console.error('Không thể tải danh sách tài khoản:', err);
+                const select = document.getElementById('accountReceivedId');
+                select.innerHTML = '<option value="">-- Lỗi khi tải danh sách tài khoản --</option>';
+            }
+        }
+
+        // ===== Helper Functions =====
+        function clearNotificationForm() {
+            document.getElementById('accountReceivedId').value = '';
+            document.getElementById('notificationType').value = '';
+            document.getElementById('content').value = '';
+            // Keep receiverRole to allow filtering
+        }
+
+        function clearNotificationFormCompletely() {
+            document.getElementById('accountReceivedId').value = '';
+            document.getElementById('receiverRole').value = '';
+            document.getElementById('notificationType').value = '';
+            document.getElementById('content').value = '';
+        }
+
+        function clearSendToRoleForm() {
+            document.getElementById('sendToRoleRole').value = '';
+            document.getElementById('sendToRoleType').value = '';
+            document.getElementById('sendToRoleContent').value = '';
+        }
+
+        function clearError(errorId) {
+            const errorEl = document.getElementById(errorId);
+            if (errorEl) {
+                errorEl.textContent = '';
+                errorEl.style.display = 'none';
+            }
+        }
+
+        function showError(errorId, message) {
+            const errorEl = document.getElementById(errorId);
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.style.display = 'block';
+            }
+        }
+    </script>
+}

@@ -1,6 +1,16 @@
-﻿<header class="site-header">
+﻿@using Microsoft.AspNetCore.Http
+@inject IHttpContextAccessor HttpContextAccessor
+
+@{
+    var tk = HttpContextAccessor.HttpContext?.Session.GetString("JWToken");
+    var username = HttpContextAccessor.HttpContext?.Session.GetString("Username");
+    bool isLoggedIn = !string.IsNullOrEmpty(tk);
+}
+
+<header class="site-header">
     <div class="glass-bar">
         <div class="container-xl nav-row">
+
             <!-- Brand + logo -->
             <div class="brand">
                 <img src="~/images/logo.png" alt="VHS Logo" class="brand-logo" />
@@ -13,26 +23,47 @@
                 <a asp-area="" asp-controller="Services" asp-action="Index" class="nav-link">Dịch vụ</a>
                 <a asp-area="" asp-controller="Home" asp-action="About" class="nav-link">Thông tin</a>
                 <a asp-area="" asp-controller="Home" asp-action="Index" asp-fragment="Contact" class="nav-link">Liên hệ</a>
-                <a asp-area="Customer" asp-controller="RegisterProvider" asp-action="Register" class="nav-link">Đăng ký Provider</a>
-
+                <a asp-area="" asp-controller="ServiceShop" asp-action="Index" class="nav-link">Shop dịch vụ</a>
+                @if (isLoggedIn)
+                {
+                    <!-- Nếu đã đăng nhập: cho phép đăng ký Provider -->
+                    <a asp-area="Customer" asp-controller="RegisterProvider" asp-action="Register" class="nav-link">
+                        Đăng ký Provider
+                    </a>
+                }
+                else
+                {
+                    <!-- Nếu chưa đăng nhập: đưa đến trang Login -->
+                    <a asp-area="" asp-controller="Account" asp-action="Login"
+                       asp-route-returnUrl="@Url.Action("Register","RegisterProvider", new { area="Customer" })"
+                       class="nav-link">
+                        Đăng ký Provider
+                    </a>
+                }
             </nav>
 
             <!-- Actions -->
             <div class="nav-actions">
 
-                @if (Context.Session.GetString("JWToken") is { } tk && !string.IsNullOrEmpty(tk))
+                @if (isLoggedIn)
                 {
-                    <!-- Notifications (giả sử có controller ngoài Area) -->
-                    <a asp-area="" asp-controller="Notifications" asp-action="Index"
-                       class="icon-btn notify-btn" aria-label="Thông báo">
-                        <svg class="notify-icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 2a7 7 0 00-7 7v4.5l-1.5 3h17l-1.5-3V9a7 7 0 00-7-7z" />
-                            <path d="M9 21h6a3 3 0 01-6 0z" />
-                        </svg>
-                        <span class="notify-badge" data-notify-count>3</span>
-                    </a>
+                    <!-- Notifications -->
+                    <div class="position-relative me-3">
+                        <a asp-area="Customer" asp-controller="Notification" asp-action="Index" 
+                           id="notificationBtn" class="btn btn-link p-0" aria-label="Thông báo">
+                            <i class="bi bi-bell fs-4"></i>
+                            <span id="notificationBadge"
+                                  class="notification-badge"
+                                  style="display:none">0</span>
+                        </a>
+                        <ul id="notificationMenu"
+                            class="notification-menu list-unstyled bg-white border shadow p-2"
+                            style="display:none">
+                            <li class="text-center text-muted py-2">Loading…</li>
+                        </ul>
+                    </div>
 
-                    <!-- Cart (Area Customer) -->
+                    <!-- Cart -->
                     <a asp-area="Customer" asp-controller="Cart" asp-action="Index"
                        class="icon-btn cart-btn" aria-label="Giỏ hàng">
                         <svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -48,9 +79,9 @@
                         <span class="theme-icon"></span>
                     </button>
 
-                    <!-- User dropdown (Account ở ngoài Area) -->
+                    <!-- User dropdown -->
                     <div class="dropdown">
-                        <button class="dropdown-toggle">👤 @Context.Session.GetString("Username")</button>
+                        <button class="dropdown-toggle">👤 @username</button>
                         <div class="dropdown-menu">
                             <a asp-area="" asp-controller="Account" asp-action="Profile" class="dropdown-item">Thông tin cá nhân</a>
                             <a asp-area="" asp-controller="Account" asp-action="History" class="dropdown-item">Lịch sử dịch vụ</a>
@@ -60,8 +91,9 @@
                 }
                 else
                 {
-                    <!-- Cart (Area Customer) -->
-                    <a asp-area="Customer" asp-controller="Cart" asp-action="Index" class="icon-btn cart-btn" aria-label="Giỏ hàng">
+                    <!-- Nếu chưa đăng nhập -->
+                    <a asp-area="Customer" asp-controller="Cart" asp-action="Index"
+                       class="icon-btn cart-btn" aria-label="Giỏ hàng">
                         <svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M6 6h15l-1.5 9h-12z" />
                             <circle cx="9" cy="20" r="1.5" />
@@ -70,6 +102,7 @@
                         <span class="cart-badge" data-cart-count>0</span>
                     </a>
 
+                    <!-- Theme -->
                     <button type="button" class="icon-btn" onclick="window.__toggleTheme()" aria-label="Đổi giao diện">
                         <span class="theme-icon"></span>
                     </button>
@@ -77,7 +110,6 @@
                     <a asp-area="" asp-controller="Account" asp-action="Login" class="btn btn-ghost btn-sm">Đăng nhập</a>
                     <a asp-area="" asp-controller="Account" asp-action="Register" class="btn btn-primary btn-sm">Đăng ký</a>
                 }
-                
             </div>
         </div>
     </div>
