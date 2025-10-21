@@ -1,0 +1,439 @@
+@model VHS_frontend.Areas.Provider.Models.Staff.StaffUpdateDTO
+@{
+    ViewData["Title"] = "Chỉnh sửa nhân viên";
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/staff-management-edit.css" />
+}
+
+
+<div class="staff-management">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-xl-6">
+                <div class="staff-form">
+                    <div class="staff-header">
+                        <h3 class="staff-title">
+                            <i class="bi bi-pencil-square me-2"></i>
+                            Chỉnh sửa nhân viên
+                        </h3>
+                        <a href="@Url.Action("Index", "StaffManagement")" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-2"></i>
+                            Quay lại
+                        </a>
+                    </div>
+                    
+                    <div class="staff-content">
+                        @if (TempData["Error"] != null)
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                @TempData["Error"]
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        }
+
+                        <form asp-action="Edit" method="post" enctype="multipart/form-data">
+                            <!-- Hidden fields to preserve current images -->
+                            <input type="hidden" asp-for="CurrentFaceImage" />
+                            <input type="hidden" asp-for="CurrentCitizenIDFrontImage" />
+                            <input type="hidden" asp-for="CurrentCitizenIDBackImage" />
+                            
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="form-group">
+                                        <label asp-for="StaffName" class="form-label">
+                                            Tên nhân viên <span class="text-danger">*</span>
+                                        </label>
+                                        <input asp-for="StaffName" class="form-control" placeholder="Nhập tên nhân viên" />
+                                        <span asp-validation-for="StaffName" class="text-danger"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Face Image Section -->
+                            <div class="image-card">
+                                <h3 class="section-header">
+                                    <i class="bi bi-person-badge me-2"></i>Ảnh chân dung
+                                </h3>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <i class="bi bi-camera me-2"></i>Ảnh chân dung chính diện
+                                    </label>
+                                    <input asp-for="FaceImage" type="file" class="form-control d-none" accept="image/*" id="faceImageInput" />
+                                    <span asp-validation-for="FaceImage" class="text-danger"></span>
+                                    <div class="form-text">Click vào ảnh để thay đổi (JPG, PNG, GIF - tối đa 5MB)</div>
+                                    
+                                    <div class="d-flex justify-content-center mt-4">
+                                        @if (!string.IsNullOrEmpty(Model.CurrentFaceImage))
+                                        {
+                                            <div class="image-container" style="width: 300px; height: 300px; cursor: pointer;" data-target-input="faceImageInput">
+                                                <img src="@Model.CurrentFaceImage" alt="Current face image" 
+                                                     style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />
+                                                <div class="edit-overlay">
+                                                    <div class="edit-overlay-content">
+                                                        <i class="bi bi-pencil-square edit-icon"></i>
+                                                        <div class="edit-text">Click để thay đổi</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="placeholder-container" 
+                                                 data-target-input="faceImageInput"
+                                                 style="width: 300px; height: 300px; cursor: pointer;">
+                                                <div class="placeholder-content">
+                                                    <i class="bi bi-camera placeholder-icon"></i>
+                                                    <div class="placeholder-text">Chưa có ảnh</div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="form-group">
+                                        <label asp-for="CitizenID" class="form-label">
+                                            CCCD/CMND <span class="text-danger">*</span>
+                                        </label>
+                                        <input asp-for="CitizenID" class="form-control" placeholder="Nhập 12 số CCCD/CMND" maxlength="12" />
+                                        <span asp-validation-for="CitizenID" class="text-danger"></span>
+                                        <div class="form-text">Nhập đúng 12 chữ số CCCD/CMND</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CCCD Images Section -->
+                            <div class="image-card">
+                                <h3 class="section-header">
+                                    <i class="bi bi-credit-card me-2"></i>Ảnh CCCD/CMND
+                                </h3>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label class="form-label">
+                                                <i class="bi bi-camera me-2"></i>Ảnh mặt trước CCCD
+                                            </label>
+                                            <input asp-for="CitizenIDFrontImage" type="file" class="form-control d-none" accept="image/*" id="cccdFrontInput" />
+                                            <span asp-validation-for="CitizenIDFrontImage" class="text-danger"></span>
+                                            <div class="form-text">Click vào ảnh để thay đổi (JPG, PNG, GIF - tối đa 5MB)</div>
+                                            
+                                            <div class="d-flex justify-content-center mt-3">
+                                                @if (!string.IsNullOrEmpty(Model.CurrentCitizenIDFrontImage))
+                                                {
+                                                    <div class="image-container" style="width: 280px; height: 200px; cursor: pointer;" data-target-input="cccdFrontInput">
+                                                        <img src="@Model.CurrentCitizenIDFrontImage" alt="Current CCCD front" 
+                                                             style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />
+                                                        <div class="edit-overlay">
+                                                            <div class="edit-overlay-content">
+                                                                <i class="bi bi-pencil-square edit-icon"></i>
+                                                                <div class="edit-text">Click để thay đổi</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="placeholder-container" 
+                                                         data-target-input="cccdFrontInput"
+                                                         style="width: 280px; height: 200px; cursor: pointer;">
+                                                        <div class="placeholder-content">
+                                                            <i class="bi bi-credit-card placeholder-icon"></i>
+                                                            <div class="placeholder-text">Chưa có ảnh</div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label class="form-label">
+                                                <i class="bi bi-camera me-2"></i>Ảnh mặt sau CCCD
+                                            </label>
+                                            <input asp-for="CitizenIDBackImage" type="file" class="form-control d-none" accept="image/*" id="cccdBackInput" />
+                                            <span asp-validation-for="CitizenIDBackImage" class="text-danger"></span>
+                                            <div class="form-text">Click vào ảnh để thay đổi (JPG, PNG, GIF - tối đa 5MB)</div>
+                                            
+                                            <div class="d-flex justify-content-center mt-3">
+                                                @if (!string.IsNullOrEmpty(Model.CurrentCitizenIDBackImage))
+                                                {
+                                                    <div class="image-container" style="width: 280px; height: 200px; cursor: pointer;" data-target-input="cccdBackInput">
+                                                        <img src="@Model.CurrentCitizenIDBackImage" alt="Current CCCD back" 
+                                                             style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />
+                                                        <div class="edit-overlay">
+                                                            <div class="edit-overlay-content">
+                                                                <i class="bi bi-pencil-square edit-icon"></i>
+                                                                <div class="edit-text">Click để thay đổi</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="placeholder-container" 
+                                                         data-target-input="cccdBackInput"
+                                                         style="width: 280px; height: 200px; cursor: pointer;">
+                                                        <div class="placeholder-content">
+                                                            <i class="bi bi-credit-card placeholder-icon"></i>
+                                                            <div class="placeholder-text">Chưa có ảnh</div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-check-circle me-2"></i>
+                                            Cập nhật nhân viên
+                                        </button>
+                                        <a href="@Url.Action("Index", "StaffManagement")" class="btn btn-secondary">
+                                            <i class="bi bi-x-circle me-2"></i>
+                                            Hủy
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Edit page loaded, initializing image handlers...');
+            
+            // Add click event listeners to all image containers and placeholders
+            document.querySelectorAll('.image-container, .placeholder-container').forEach(function(container) {
+                container.addEventListener('click', function() {
+                    const targetInputId = this.getAttribute('data-target-input');
+                    console.log('Image clicked, target input:', targetInputId);
+                    
+                    // Find the corresponding file input
+                    const fileInput = document.getElementById(targetInputId);
+                    if (fileInput) {
+                        // Trigger the file input click
+                        fileInput.click();
+                        
+                        // Add visual feedback
+                        this.style.transform = 'scale(0.95)';
+                        setTimeout(() => {
+                            this.style.transform = '';
+                        }, 150);
+                    }
+                });
+            });
+            
+            // Add error handling for images
+            document.querySelectorAll('img').forEach(function(img) {
+                img.addEventListener('error', function() {
+                    console.log('Image failed to load:', this.src);
+                    this.style.display = 'none';
+                    // Show placeholder if image fails to load
+                    const container = this.closest('.image-container');
+                    if (container) {
+                        const placeholder = container.querySelector('.placeholder-content');
+                        if (placeholder) {
+                            placeholder.style.display = 'flex';
+                        }
+                    }
+                });
+            });
+        });
+
+        // Face image - replace current image directly
+        document.getElementById('faceImageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const currentImage = document.querySelector('img[data-target-input="faceImageInput"]');
+            const placeholder = document.querySelector('div[data-target-input="faceImageInput"]');
+            
+            console.log('Face image changed:', file);
+            console.log('Current image element:', currentImage);
+            console.log('Placeholder element:', placeholder);
+            
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Ảnh không được vượt quá 5MB');
+                    return;
+                }
+                
+                if (!file.type.startsWith('image/')) {
+                    alert('Chỉ chấp nhận file hình ảnh');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    console.log('File read successfully, updating image...');
+                    // Replace current image or placeholder with new image
+                    if (currentImage) {
+                        currentImage.src = e.target.result;
+                    } else if (placeholder) {
+                        placeholder.outerHTML = `<div class="image-container" style="width: 300px; height: 300px; cursor: pointer;" data-target-input="faceImageInput">
+                            <img src="${e.target.result}" alt="Current face image" 
+                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />
+                            <div class="edit-overlay">
+                                <div class="edit-overlay-content">
+                                    <i class="bi bi-pencil-square edit-icon"></i>
+                                    <div class="edit-text">Click để thay đổi</div>
+                                </div>
+                            </div>
+                        </div>`;
+                        
+                        // Re-add click event listener to new element
+                        const newContainer = document.querySelector('div[data-target-input="faceImageInput"]');
+                        if (newContainer) {
+                            newContainer.addEventListener('click', function() {
+                                const fileInput = document.getElementById('faceImageInput');
+                                if (fileInput) {
+                                    fileInput.click();
+                                }
+                            });
+                        }
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // CCCD front image - replace current image directly
+        document.getElementById('cccdFrontInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const currentImage = document.querySelector('img[data-target-input="cccdFrontInput"]');
+            const placeholder = document.querySelector('div[data-target-input="cccdFrontInput"]');
+            
+            console.log('CCCD front image changed:', file);
+            console.log('Current image element:', currentImage);
+            console.log('Placeholder element:', placeholder);
+            
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Ảnh không được vượt quá 5MB');
+                    return;
+                }
+                
+                if (!file.type.startsWith('image/')) {
+                    alert('Chỉ chấp nhận file hình ảnh');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    console.log('CCCD front file read successfully, updating image...');
+                    // Replace current image or placeholder with new image
+                    if (currentImage) {
+                        currentImage.src = e.target.result;
+                    } else if (placeholder) {
+                        placeholder.outerHTML = `<div class="image-container" style="width: 280px; height: 200px; cursor: pointer;" data-target-input="cccdFrontInput">
+                            <img src="${e.target.result}" alt="Current CCCD front" 
+                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />
+                            <div class="edit-overlay">
+                                <div class="edit-overlay-content">
+                                    <i class="bi bi-pencil-square edit-icon"></i>
+                                    <div class="edit-text">Click để thay đổi</div>
+                                </div>
+                            </div>
+                        </div>`;
+                        
+                        // Re-add click event listener to new element
+                        const newContainer = document.querySelector('div[data-target-input="cccdFrontInput"]');
+                        if (newContainer) {
+                            newContainer.addEventListener('click', function() {
+                                const fileInput = document.getElementById('cccdFrontInput');
+                                if (fileInput) {
+                                    fileInput.click();
+                                }
+                            });
+                        }
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // CCCD back image - replace current image directly
+        document.getElementById('cccdBackInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const currentImage = document.querySelector('img[data-target-input="cccdBackInput"]');
+            const placeholder = document.querySelector('div[data-target-input="cccdBackInput"]');
+            
+            console.log('CCCD back image changed:', file);
+            console.log('Current image element:', currentImage);
+            console.log('Placeholder element:', placeholder);
+            
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Ảnh không được vượt quá 5MB');
+                    return;
+                }
+                
+                if (!file.type.startsWith('image/')) {
+                    alert('Chỉ chấp nhận file hình ảnh');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    console.log('CCCD back file read successfully, updating image...');
+                    // Replace current image or placeholder with new image
+                    if (currentImage) {
+                        currentImage.src = e.target.result;
+                    } else if (placeholder) {
+                        placeholder.outerHTML = `<div class="image-container" style="width: 280px; height: 200px; cursor: pointer;" data-target-input="cccdBackInput">
+                            <img src="${e.target.result}" alt="Current CCCD back" 
+                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;" />
+                            <div class="edit-overlay">
+                                <div class="edit-overlay-content">
+                                    <i class="bi bi-pencil-square edit-icon"></i>
+                                    <div class="edit-text">Click để thay đổi</div>
+                                </div>
+                            </div>
+                        </div>`;
+                        
+                        // Re-add click event listener to new element
+                        const newContainer = document.querySelector('div[data-target-input="cccdBackInput"]');
+                        if (newContainer) {
+                            newContainer.addEventListener('click', function() {
+                                const fileInput = document.getElementById('cccdBackInput');
+                                if (fileInput) {
+                                    fileInput.click();
+                                }
+                            });
+                        }
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // CCCD input validation
+        document.querySelector('input[name="CitizenID"]').addEventListener('input', function(e) {
+            // Only allow numbers
+            e.target.value = e.target.value.replace(/\D/g, '');
+            
+            // Limit to 12 digits
+            if (e.target.value.length > 12) {
+                e.target.value = e.target.value.substring(0, 12);
+            }
+        });
+    </script>
+}

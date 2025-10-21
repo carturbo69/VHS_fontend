@@ -88,7 +88,7 @@ namespace VHS_frontend.Controllers
             return normalized switch
             {
                 "admin" => RedirectToAction("Index", "AdminDashboard", new { area = "Admin" }),
-                "provider" => RedirectToAction("Index", "HomePage", new { area = "Provider" }),
+                "provider" => RedirectToAction("Index", "ProviderDashboard", new { area = "Provider" }),
                 "customer" => RedirectToAction("Index", "Home", new { area = "Customer" }),
                 _ => RedirectToAction("Index", "Home")
             };

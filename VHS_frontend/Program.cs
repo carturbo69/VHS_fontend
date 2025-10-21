@@ -4,6 +4,7 @@ using VHS_frontend.Services.Admin;
 using VHS_frontend.Services.Customer;
 using VHS_frontend.Services.Customer.Implementations;
 using VHS_frontend.Services.Customer.Interfaces;
+using VHS_frontend.Services.Provider;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,8 +40,23 @@ builder.Services.AddHttpClient<ProviderAdminService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+// HttpClient cho Provider Profile Service
+builder.Services.AddHttpClient<ProviderProfileService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+// HttpClient cho Provider Review Service
+builder.Services.AddHttpClient<ProviderReviewService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
 // HttpClient cho AuthService
 builder.Services.AddHttpClient<AuthService>();
+builder.Services.AddHttpClient<StaffManagementService>(client => { 
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); 
+});
 
 builder.Services.AddControllersWithViews();
 

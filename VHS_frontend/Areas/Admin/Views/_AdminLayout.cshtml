@@ -249,14 +249,25 @@
           async function loadUnreadCount() {
             try {
               const res = await fetch(`${proxyBase}/unread-count`);
-              const dto = await res.json();
+              if (!res.ok) {
+                console.log('Notification service not available');
+                return;
+              }
+              const text = await res.text();
+              if (!text) {
+                console.log('Empty response from notification service');
+                return;
+              }
+              const dto = JSON.parse(text);
               if (dto.count > 0) {
                 notifBadge.textContent = dto.count;
                 notifBadge.style.display = 'inline-flex';
               } else {
                 notifBadge.style.display = 'none';
               }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+              console.log('Notification service error:', e.message);
+            }
           }
 
           async function loadNotifications() {

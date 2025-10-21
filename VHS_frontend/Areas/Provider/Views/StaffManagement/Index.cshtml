@@ -1,0 +1,300 @@
+@model List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>
+@{
+    ViewData["Title"] = "Quản lý Nhân viên";
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/staff-management-index.css" />
+}
+
+<div class="staff-management">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-12">
+                @if (TempData["Warning"] != null)
+                {
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        @TempData["Warning"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        @TempData["Error"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                
+                @if (TempData["Success"] != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        @TempData["Success"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                
+                <div class="staff-card">
+                    <div class="staff-header">
+                        <h3 class="staff-title">
+                            <i class="bi bi-people-fill me-2"></i>
+                            Quản lý Nhân viên
+                        </h3>
+                        <a href="@Url.Action("Create", "StaffManagement")" class="btn btn-primary">
+                            <i class="bi bi-person-plus me-2"></i>
+                            Thêm nhân viên mới
+                        </a>
+                    </div>
+                    
+                    <div class="staff-content">
+                        @Html.AntiForgeryToken()
+                        
+                        @if (Model == null || !Model.Any())
+                        {
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i class="bi bi-people"></i>
+                                </div>
+                                <h4>Chưa có nhân viên nào</h4>
+                                <p>Hãy thêm nhân viên đầu tiên để bắt đầu quản lý</p>
+                                <a href="@Url.Action("Create", "StaffManagement")" class="btn btn-primary">
+                                    <i class="bi bi-person-plus me-2"></i>
+                                    Thêm nhân viên
+                                </a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="staff-list">
+                                @{
+                                    var activeStaff = Model.Where(s => !s.IsLocked).ToList();
+                                    var lockedStaff = Model.Where(s => s.IsLocked).ToList();
+                                    
+                                    // Debug log
+                                    Console.WriteLine($"Total staff: {Model.Count()}");
+                                    Console.WriteLine($"Active staff: {activeStaff.Count}");
+                                    Console.WriteLine($"Locked staff: {lockedStaff.Count}");
+                                }
+                                
+                                @* Debug: Hiển thị thông tin debug *@
+                                <div class="alert alert-info">
+                                    <strong>Debug Info:</strong><br/>
+                                    Total: @Model.Count() | Active: @activeStaff.Count | Locked: @lockedStaff.Count
+                                </div>
+                                
+                                @* Hiển thị nhân viên hoạt động trước *@
+                                @if (activeStaff.Any())
+                                {
+                                    <div class="staff-section">
+                                        <h6 class="section-title">
+                                            <i class="bi bi-person-check me-2"></i>
+                                            Nhân viên hoạt động (@activeStaff.Count)
+                                        </h6>
+                                        @foreach (var staff in activeStaff)
+                                        {
+                                            <div class="staff-row">
+                                                <div class="staff-avatar">
+                                                    @if (!string.IsNullOrEmpty(staff.FaceImage))
+                                                    {
+                                                        <img src="@($"http://localhost:5154{staff.FaceImage}")" alt="@staff.StaffName" class="avatar-img" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="avatar-placeholder">
+                                                            <i class="bi bi-person"></i>
+                                                        </div>
+                                                    }
+                                                </div>
+                                                
+                                                <div class="staff-info">
+                                                    <h5 class="staff-name">@staff.StaffName</h5>
+                                                    <p class="staff-citizen-id">CCCD: @staff.CitizenID</p>
+                                                </div>
+                                                
+                                                <div class="staff-status">
+                                                    <span class="status-badge status-active">
+                                                        <i class="bi bi-check-circle me-1"></i>
+                                                        Hoạt động
+                                                    </span>
+                                                </div>
+                                                
+                                                <div class="staff-actions">
+                                                    <a href="@Url.Action("Edit", "StaffManagement", new { id = staff.StaffId })" 
+                                                       class="action-btn edit-btn" title="Chỉnh sửa">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    
+                                                    <button type="button" 
+                                                            class="action-btn lock-btn" 
+                                                            title="Khóa tài khoản"
+                                                            onclick="lockStaff('@staff.StaffId', '@staff.StaffName')">
+                                                        <i class="bi bi-lock"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                
+                                @* Hiển thị nhân viên bị khóa sau *@
+                                @if (lockedStaff.Any())
+                                {
+                                    <div class="staff-section">
+                                        <h6 class="section-title">
+                                            <i class="bi bi-person-x me-2"></i>
+                                            Nhân viên bị khóa (@lockedStaff.Count)
+                                        </h6>
+                                        @foreach (var staff in lockedStaff)
+                                        {
+                                            <div class="staff-row locked-staff">
+                                                <div class="staff-avatar">
+                                                    @if (!string.IsNullOrEmpty(staff.FaceImage))
+                                                    {
+                                                        <img src="@($"http://localhost:5154{staff.FaceImage}")" alt="@staff.StaffName" class="avatar-img" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="avatar-placeholder">
+                                                            <i class="bi bi-person"></i>
+                                                        </div>
+                                                    }
+                                                </div>
+                                                
+                                                <div class="staff-info">
+                                                    <h5 class="staff-name">@staff.StaffName</h5>
+                                                    <p class="staff-citizen-id">CCCD: @staff.CitizenID</p>
+                                                </div>
+                                                
+                                                <div class="staff-status">
+                                                    <span class="status-badge status-locked">
+                                                        <i class="bi bi-lock-fill me-1"></i>
+                                                        Đã khóa
+                                                    </span>
+                                                </div>
+                                                
+                                                <div class="staff-actions">
+                                                    <a href="@Url.Action("Edit", "StaffManagement", new { id = staff.StaffId })" 
+                                                       class="action-btn edit-btn" title="Chỉnh sửa">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    
+                                                    <button type="button" 
+                                                            class="action-btn unlock-btn" 
+                                                            title="Mở khóa"
+                                                            onclick="unlockStaff('@staff.StaffId', '@staff.StaffName')">
+                                                        <i class="bi bi-unlock"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        function lockStaff(staffId, staffName) {
+            if (confirm(`Bạn có chắc chắn muốn khóa tài khoản của nhân viên "${staffName}"?`)) {
+                // Get AntiForgeryToken
+                const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                console.log('Locking staff:', staffId, 'Token:', antiForgeryToken);
+                
+                fetch(`/Provider/StaffManagement/${staffId}/lock`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'RequestVerificationToken': antiForgeryToken || ''
+                    }
+                })
+                .then(response => {
+                    console.log('Lock response status:', response.status);
+                    console.log('Lock response headers:', response.headers);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        return response.text().then(text => {
+                            console.error('Non-JSON response:', text);
+                            throw new Error('Server trả về dữ liệu không phải JSON');
+                        });
+                    }
+                    
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Lock response data:', data);
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Lỗi: ' + (data.error || 'Không xác định'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Lock error:', error);
+                    alert('Có lỗi xảy ra: ' + error.message);
+                });
+            }
+        }
+
+        function unlockStaff(staffId, staffName) {
+            if (confirm(`Bạn có chắc chắn muốn mở khóa tài khoản của nhân viên "${staffName}"?`)) {
+                // Get AntiForgeryToken
+                const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                console.log('Unlocking staff:', staffId, 'Token:', antiForgeryToken);
+                
+                fetch(`/Provider/StaffManagement/${staffId}/unlock`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'RequestVerificationToken': antiForgeryToken || ''
+                    }
+                })
+                .then(response => {
+                    console.log('Unlock response status:', response.status);
+                    console.log('Unlock response headers:', response.headers);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        return response.text().then(text => {
+                            console.error('Non-JSON response:', text);
+                            throw new Error('Server trả về dữ liệu không phải JSON');
+                        });
+                    }
+                    
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Unlock response data:', data);
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Lỗi: ' + (data.error || 'Không xác định'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Unlock error:', error);
+                    alert('Có lỗi xảy ra: ' + error.message);
+                });
+            }
+        }
+    </script>
+}
