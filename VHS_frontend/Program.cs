@@ -52,6 +52,24 @@ builder.Services.AddHttpClient<ProviderReviewService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+// HttpClient cho Service Management Service
+builder.Services.AddHttpClient<ServiceManagementService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+// HttpClient cho Tag Management Service
+builder.Services.AddHttpClient<TagManagementService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+// HttpClient cho Option Management Service
+builder.Services.AddHttpClient<OptionManagementService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
 // HttpClient cho AuthService
 builder.Services.AddHttpClient<AuthService>();
 builder.Services.AddHttpClient<StaffManagementService>(client => { 

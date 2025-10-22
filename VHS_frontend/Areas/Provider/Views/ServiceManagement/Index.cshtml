@@ -1,0 +1,203 @@
+@model List<VHS_frontend.Areas.Provider.Models.Service.ServiceProviderReadDTO>
+@{
+    ViewData["Title"] = "Quản lý Dịch vụ";
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/service-management.css" asp-append-version="true" />
+}
+
+<div class="service-management-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>
+            <i class="bi bi-briefcase me-2"></i>
+            Quản lý Dịch vụ
+        </h3>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>
+            Tạo dịch vụ mới
+        </a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Danh sách Dịch vụ</h5>
+        </div>
+        <div class="card-body">
+            @if (Model != null && Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Hình ảnh</th>
+                                <th>Tên dịch vụ</th>
+                                <th>Danh mục</th>
+                                <th>Giá</th>
+                                <th>Đơn vị</th>
+                                <th>Tags</th>
+                                <th>Options</th>
+                                <th>Trạng thái</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var service in Model)
+                            {
+                                <tr>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(service.Images))
+                                        {
+                                            var imageUrl = service.Images.StartsWith("http") 
+                                                ? service.Images 
+                                                : $"http://localhost:5154{service.Images}";
+                                            
+                                            <img src="@imageUrl" 
+                                                 alt="@service.Title" 
+                                                 class="service-thumbnail" 
+                                                 data-original-path="@service.Images"
+                                                 data-full-url="@imageUrl"
+                                                 onerror="console.error('Image load error:', this.dataset.fullUrl); this.onerror=null; this.parentElement.innerHTML='<div class=\'no-image-placeholder\'><i class=\'bi bi-image\'></i><small class=\'text-danger\'>Lỗi</small></div>';" 
+                                                 onload="console.log('Image loaded:', this.dataset.fullUrl);" />
+                                        }
+                                        else
+                                        {
+                                            <div class="no-image-placeholder">
+                                                <i class="bi bi-image"></i>
+                                                <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">Chưa có ảnh</small>
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <strong>@service.Title</strong>
+                                        <br />
+                                        <small class="text-muted">@service.Description</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">@service.CategoryName</span>
+                                    </td>
+                                    <td>@service.Price.ToString("N0") VNĐ</td>
+                                    <td>@service.UnitType (@service.BaseUnit)</td>
+                                    <td>
+                                        @if (service.Tags.Any())
+                                        {
+                                            @foreach (var tag in service.Tags)
+                                            {
+                                                <span class="badge bg-info me-1">@tag.Name</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Không có</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (service.Options.Any())
+                                        {
+                                            @foreach (var option in service.Options)
+                                            {
+                                                <span class="badge bg-warning text-dark me-1">@option.OptionName</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Không có</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (service.Status == "Active")
+                                        {
+                                            <span class="badge bg-success">Hoạt động</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">Không hoạt động</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a asp-action="Edit" asp-route-id="@service.ServiceId" class="btn btn-sm btn-warning" title="Chỉnh sửa">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" data-service-id="@service.ServiceId" data-service-name="@service.Title" title="Xóa">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted"></i>
+                    <p class="text-muted mt-3">Chưa có dịch vụ nào. Hãy tạo dịch vụ đầu tiên của bạn!</p>
+                    <a asp-action="Create" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Tạo dịch vụ mới
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">Xác nhận xóa</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" id="deleteForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa dịch vụ <strong id="serviceName"></strong>?</p>
+                    <p class="text-muted">Hành động này không thể hoàn tác.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger">Xóa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        var deleteModal = document.getElementById('deleteModal');
+        deleteModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var serviceId = button.getAttribute('data-service-id');
+            var serviceName = button.getAttribute('data-service-name');
+
+            var modalServiceName = deleteModal.querySelector('#serviceName');
+            var deleteForm = deleteModal.querySelector('#deleteForm');
+
+            modalServiceName.textContent = serviceName;
+            deleteForm.action = '@Url.Action("Delete", "ServiceManagement", new { area = "Provider" })?id=' + serviceId;
+        });
+    </script>
+}
+
