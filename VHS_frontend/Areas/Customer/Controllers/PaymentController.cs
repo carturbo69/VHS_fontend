@@ -179,7 +179,7 @@
                             {
                                 BookingIds = bookingIds,
                                 PaymentMethod = "VNPAY",
-                                GatewayTxnId = $"VNPAY:{Guid.NewGuid():N}",
+                                GatewayTxnId = $"VNPAY:{Guid.NewGuid():N}", //này gom chung
                                 CartItemIdsForCleanup = cartItemIds
                             },
                             jwt,
