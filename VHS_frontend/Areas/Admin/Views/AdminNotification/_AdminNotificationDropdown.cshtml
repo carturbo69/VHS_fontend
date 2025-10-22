@@ -1,0 +1,44 @@
+@model List<VHS_frontend.Areas.Admin.Models.Notification.AdminNotificationDTO>
+
+@if (Model == null || !Model.Any())
+{
+    <li class="text-center text-muted py-2">Không có thông báo nào</li>
+}
+else
+{
+    @foreach (var notification in Model)
+    {
+        <li class="notification-item @(notification.IsRead == true ? "read" : "unread") d-flex justify-content-between align-items-start" data-notification-id="@notification.NotificationId">
+            <a href="#" class="d-block text-decoration-none px-2 py-1 flex-grow-1" onclick="markRead('@notification.NotificationId')">
+                <div class="notification-content">
+                    <div class="notification-text">@notification.Content</div>
+                    <div class="notification-meta">
+                        <small class="text-muted">@(notification.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</small>
+                        @if (!string.IsNullOrEmpty(notification.NotificationType))
+                        {
+                            <span class="badge badge-@(notification.NotificationType.ToLower())">@notification.NotificationType</span>
+                        }
+                    </div>
+                </div>
+            </a>
+            <button class="btn btn-sm btn-outline-danger me-2" title="Xóa" onclick="deleteAdminNotification('@notification.NotificationId'); event.stopPropagation(); return false;">
+                <i class="bi bi-trash"></i>
+            </button>
+        </li>
+    }
+    
+    <hr class="my-1">
+    <li>
+        <a href="#" class="d-block text-center text-decoration-none py-1" onclick="markAllRead()">
+            <i class="bi bi-check-circle me-1"></i>
+            Đánh dấu tất cả đã đọc
+        </a>
+    </li>
+    <li>
+        <a href="/Admin/AdminNotification?tab=inbox" class="d-block text-center text-decoration-none py-1">
+            <i class="bi bi-bell me-1"></i>
+            Xem tất cả thông báo
+        </a>
+    </li>
+}
+

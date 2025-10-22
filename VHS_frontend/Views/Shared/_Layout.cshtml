@@ -16,6 +16,8 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/about.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/footer.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/notification.css" asp-append-version="true" />
+    <!-- <link rel="stylesheet" href="~/css/service-shop.css" asp-append-version="true" /> -->
 
 
     @* THÊM DÒNG NÀY để các view bơm CSS riêng *@
@@ -58,6 +60,131 @@
           const id = a.getAttribute("href");
           const el = document.querySelector(id);
           if (el) { e.preventDefault(); el.scrollIntoView({ behavior: "smooth", block: "start" }); }
+        });
+    </script>
+
+    <!-- Notification System -->
+    <script>
+        // Biến lưu trữ thông báo từ API
+        let notifications = [];
+
+        // Hover để hiển thị dropdown
+        const btn = document.getElementById('notificationBtn');
+        const menu = document.getElementById('notificationMenu');
+        let hoverTimeout;
+
+        if (btn && menu) {
+            // Hover để hiển thị dropdown
+            btn.addEventListener('mouseenter', async () => {
+                clearTimeout(hoverTimeout);
+                await loadNotifications();
+                menu.style.display = 'block';
+            });
+
+            // Mouse leave button - delay ẩn dropdown
+            btn.addEventListener('mouseleave', () => {
+                hoverTimeout = setTimeout(() => {
+                    menu.style.display = 'none';
+                }, 100);
+            });
+
+            // Hover vào dropdown để giữ mở
+            menu.addEventListener('mouseenter', () => {
+                clearTimeout(hoverTimeout);
+                menu.style.display = 'block';
+            });
+
+            // Mouse leave khỏi dropdown để ẩn
+            menu.addEventListener('mouseleave', () => {
+                hoverTimeout = setTimeout(() => {
+                    menu.style.display = 'none';
+                }, 100);
+            });
+
+            // Click vào chuông sẽ chuyển trang (không prevent default)
+            // Link sẽ hoạt động bình thường
+        }
+
+        // Đếm và hiển thị badge
+        function loadUnreadCount() {
+            const unreadCount = notifications.filter(n => !n.isRead).length;
+            const badge = document.getElementById('notificationBadge');
+            if (badge) {
+                if (unreadCount > 0) {
+                    badge.textContent = unreadCount;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        }
+
+        // Load danh sách thông báo từ API
+        async function loadNotifications() {
+            try {
+                const response = await fetch('/Customer/Notification/Unread');
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    notifications = data.data;
+                } else {
+                    notifications = [];
+                }
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+                notifications = [];
+            }
+            
+            menu.innerHTML = '';
+            
+            // Add header
+            const header = document.createElement('div');
+            header.className = 'dropdown-header';
+            header.innerHTML = '<h3>Thông báo</h3>';
+            menu.appendChild(header);
+            
+            const unreadNotifications = notifications.filter(n => !n.isRead);
+            
+            if (unreadNotifications.length === 0) {
+                const empty = document.createElement('li');
+                empty.className = 'text-center text-muted py-2';
+                empty.innerHTML = '<i class="bi bi-bell-slash me-2"></i>Không có thông báo nào';
+                menu.appendChild(empty);
+                return;
+            }
+            
+            unreadNotifications.forEach(n => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <div class="d-block text-decoration-none">
+                        <div class="small text-muted">${new Date(n.createdAt).toLocaleString()}</div>
+                        <div>${n.content}</div>
+                        <div><strong>Loại:</strong> ${n.notificationType}</div>
+                    </div>`;
+                menu.appendChild(li);
+            });
+            
+            // View all notifications button
+            const all = document.createElement('li');
+            all.innerHTML = `<a href="/Customer/Notification/Index" class="d-block text-center text-decoration-none">
+                <i class="bi bi-arrow-right me-2"></i>Xem tất cả thông báo
+            </a>`;
+            menu.appendChild(all);
+        }
+
+        // Không có chức năng mark as read trong dropdown
+        // Chỉ có thể clear thông báo qua trang thông báo
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load thông báo khi trang load
+            await loadNotifications();
+            loadUnreadCount();
+            
+            // Cập nhật thông báo mỗi 30 giây
+            setInterval(async () => {
+                await loadNotifications();
+                loadUnreadCount();
+            }, 30000);
         });
     </script>
 

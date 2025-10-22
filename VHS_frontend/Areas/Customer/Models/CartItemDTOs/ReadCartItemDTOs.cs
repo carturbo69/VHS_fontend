@@ -13,6 +13,7 @@
         public string? ServiceImage { get; set; }
 
         // Provider của dịch vụ
+        public Guid ProviderId { get; set; }
         public string? ProviderName { get; set; }
 
         // Tuỳ chọn của cart item (nếu dùng)
