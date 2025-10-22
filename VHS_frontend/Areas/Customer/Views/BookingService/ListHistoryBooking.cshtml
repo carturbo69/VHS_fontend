@@ -1,0 +1,404 @@
+﻿@model VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.ListHistoryBookingServiceDTOs
+@{
+    ViewData["Title"] = "Lịch sử đơn dịch vụ";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    string[] tabs = (string[])ViewBag.StatusTabs ?? Array.Empty<string>();
+    var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+
+<!-- link tới file CSS đã tách -->
+<link href="~/css/list-histrory-booking.css" rel="stylesheet" />
+
+<div class="container my-3">
+    <!-- Toast kết quả (tuỳ chọn) -->
+    @if (TempData["ToastSuccess"] != null || TempData["ToastError"] != null)
+    {
+        <div class="alert @(TempData["ToastSuccess"] != null ? "alert-success" : "alert-danger")" role="alert">
+            @(TempData["ToastSuccess"] ?? TempData["ToastError"])
+        </div>
+    }
+
+    <!-- Tabs trạng thái -->
+    <ul class="nav nav-tabs border-0 nav-status">
+        @foreach (var st in tabs)
+        {
+            <li class="nav-item">
+                <a class="nav-link @(st == "Tất cả" ? "active" : "")" data-status="@st" href="javascript:void(0)">@st</a>
+            </li>
+        }
+    </ul>
+
+    <!-- Tìm kiếm -->
+    <div class="my-3">
+        <div class="search-bar d-flex align-items-center gap-2">
+            <i class="bi bi-search"></i>
+            <input id="q" class="form-control form-control-sm border-0 bg-transparent"
+                   placeholder="Bạn có thể tìm kiếm theo tên Shop, ID đơn hàng hoặc Tên Sản phẩm" />
+        </div>
+    </div>
+
+    <!-- Danh sách đơn -->
+    <div id="order-list" class="d-flex flex-column gap-3">
+        @foreach (var o in Model.Items)
+        {
+            var price = $"{o.TotalPrice:N0}đ";
+            var isDone = string.Equals(o.Status?.Trim(), "Hoàn thành", StringComparison.OrdinalIgnoreCase);
+
+            <div class="shop-row order-card" data-status="@o.Status" data-title="@o.ServiceTitle @o.ProviderName">
+                <!-- Header -->
+                <div class="shop-head">
+                    <img src="/images/shop-badge.svg" width="24" height="24" alt="shop" />
+                    <div class="shop-name">@o.ProviderName</div>
+                    <button class="btn btn-sm btn-outline-danger ms-2">Chat</button>
+                    <button class="btn btn-sm btn-outline-secondary">Xem Shop</button>
+
+                    <div class="ms-auto d-flex align-items-center gap-3">
+                        <div class="status-pill">
+                            <i class="bi bi-truck"></i>
+                            @(isDone ? "Hoàn thành dịch vụ" :
+                                                    o.Status == "Vận chuyển" ? "Đang vận chuyển" :
+                                                    o.Status == "Chờ giao hàng" ? "Chờ giao hàng" :
+                                                    o.Status == "Đã hủy" ? "Đơn đã hủy" :
+                                                    o.Status == "Trả hàng/Hoàn tiền" ? "Yêu cầu trả hàng/hoàn tiền" :
+                                                    o.Status)
+                    </div>
+                    @if (isDone)
+                        {
+                            <a class="text-danger text-decoration-none fw-bold"
+                               href="javascript:void(0)"
+                               data-bs-toggle="modal"
+                               data-bs-target="#reviewModal-@o.BookingId">ĐÁNH GIÁ</a>
+                        }
+                    </div>
+                </div>
+
+                <!-- Body -->
+                <div class="item-body">
+                    <img class="order-cover"
+                         src="@(o.ServiceImages ?? fallbackImg)"
+                         onerror="this.onerror=null;this.src='@fallbackImg';" />
+                    <div class="flex-grow-1">
+                        <div class="order-title">@o.ServiceTitle</div>
+                        <div class="muted">x1</div>
+                        @if (o.Options?.Any() == true)
+                        {
+                            <div class="mt-1">
+                                @foreach (var opt in o.Options)
+                                {
+                                    <span class="option-badge" title="@opt.Description">
+                                        @opt.OptionName • @opt.Price.ToString("N0") @opt.UnitType
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="text-end">
+                        <div class="text-strike">@((o.ServicePrice * 1.2m).ToString("N0"))đ</div>
+                        <div class="price-now">@o.ServicePrice.ToString("N0")đ</div>
+                    </div>
+                </div>
+
+                <!-- Tổng tiền -->
+                <div class="price-line">
+                    <div>Thành tiền: <span class="fw-bold price-now">@price</span></div>
+                </div>
+
+                <!-- Action -->
+                @{
+                    var st = (o.Status ?? "").Trim();
+                    // Chọn action theo trạng thái
+                    var actionName =
+                    st.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase) ? "CanceledDetail" :
+                    st.Equals("Trả hàng/Hoàn tiền", StringComparison.OrdinalIgnoreCase) ? "ReportDetail" :
+                    "HistoryBookingDetail";
+
+                    // Chọn text nút theo action
+                    var detailText =
+                    actionName == "CanceledDetail" ? "Xem chi tiết hủy dịch vụ" :
+                    actionName == "ReportDetail" ? "Xem chi tiết báo cáo dịch vụ" :
+                    "Xem chi tiết";
+                }
+                <div class="action-line">
+                    <a asp-area="Customer"
+                       asp-controller="BookingService"
+                       asp-action="@actionName"
+                       asp-route-id="@o.BookingId"
+                       asp-route-status="@o.Status"
+                       class="btn btn-outline-primary">
+                        @detailText
+                    </a>
+
+                    @if (isDone)
+                    {
+                        <button class="btn btn-danger">Mua Lại</button>
+                        <a asp-area="Customer"
+                           asp-controller="BookingService"
+                           asp-action="ReportService"
+                           asp-route-bookingId="@o.BookingId"
+                           class="btn btn-outline-secondary">
+                            Báo cáo / Hoàn tiền
+                        </a>
+                        <button class="btn btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#reviewModal-@o.BookingId">
+                            Đánh giá
+                        </button>
+                    }
+                    else if (st.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <button class="btn btn-outline-secondary">Liên hệ Shop</button>
+                        <button class="btn btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#cancelModal-@o.BookingId">
+                            Hủy đơn
+                        </button>
+                    }
+                    else if (st.Equals("Vận chuyển", StringComparison.OrdinalIgnoreCase)
+                    || st.Equals("Chờ giao hàng", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <button class="btn btn-primary">Xem vận đơn</button>
+                        <button class="btn btn-outline-secondary">Liên hệ Shipper</button>
+                    }
+                    else if (st.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <button class="btn btn-outline-secondary">Lý do hủy</button>
+                        <button class="btn btn-danger">Mua Lại</button>
+                    }
+                </div>
+
+            </div>
+
+            <!-- Modal Đánh Giá -->
+            <div class="modal fade" id="reviewModal-@o.BookingId" tabindex="-1" aria-labelledby="reviewModalLabel-@o.BookingId" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content">
+                        <form asp-action="Create" asp-controller="Review" method="post" enctype="multipart/form-data">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Đánh Giá Sản Phẩm</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="OrderId" value="@o.BookingId" />
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <img src="@(o.ServiceImages ?? fallbackImg)" width="60" height="60" style="object-fit:cover;border-radius:4px;border:1px solid #eee" />
+                                    <div>
+                                        <div class="fw-bold">@o.ServiceTitle</div>
+                                        <small class="text-muted">@o.ProviderName</small>
+                                    </div>
+                                </div>
+
+                                <!-- Rating -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Chất lượng sản phẩm:</label>
+                                    <div class="rating" data-target="rating-@o.BookingId">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            <i class="bi bi-star fs-3 text-warning" data-value="@i"></i>
+                                        }
+                                    </div>
+                                    <input type="hidden" name="Rating" id="rating-@o.BookingId" value="0" />
+                                </div>
+
+                                <!-- Nội dung -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Nội dung đánh giá:</label>
+                                    <textarea name="Comment" class="form-control" rows="3" placeholder="Hãy chia sẻ trải nghiệm của bạn..."></textarea>
+                                </div>
+
+                                <!-- Uploader ảnh -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Hình ảnh (tối đa 5 ảnh):</label>
+                                    <div class="d-flex gap-2 mb-2">
+                                        <button type="button" class="btn-upload-like" onclick="openPicker('file-@o.BookingId')">
+                                            <i class="bi bi-camera"></i> Thêm Hình ảnh
+                                        </button>
+                                    </div>
+                                    <input id="file-@o.BookingId" name="Images" type="file" class="d-none" accept="image/*" multiple
+                                           onchange="uploaderAddFiles('uploader-@o.BookingId', this.files, 5, this)" />
+                                    <div id="uploader-@o.BookingId" class="uploader" data-input="file-@o.BookingId" data-max="5"></div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                <button type="submit" class="btn btn-danger">Gửi đánh giá</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Hủy Đơn -->
+            <div class="modal fade" id="cancelModal-@o.BookingId" tabindex="-1" aria-labelledby="cancelModalLabel-@o.BookingId" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post">
+                            @Html.AntiForgeryToken()
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="cancelModalLabel-@o.BookingId">Hủy đơn hàng</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+
+                            <div class="modal-body">
+                                <input type="hidden" name="BookingId" value="@o.BookingId" />
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Lý do hủy <span class="text-danger">*</span></label>
+                                    <textarea class="form-control" name="Reason" rows="3" required placeholder="Vui lòng mô tả ngắn gọn lý do hủy..."></textarea>
+                                    <div class="form-text">Ví dụ: Đặt nhầm dịch vụ, thay đổi thời gian, tìm được nhà cung cấp khác...</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Tên ngân hàng <span class="text-danger">*</span></label>
+                                    <input class="form-control" name="BankName" required placeholder="VD: Vietcombank" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Tên chủ tài khoản <span class="text-danger">*</span></label>
+                                    <input class="form-control" name="AccountHolderName" required placeholder="VD: NGUYEN VAN A" />
+                                </div>
+
+                                <div class="mb-1">
+                                    <label class="form-label fw-bold">Số tài khoản <span class="text-danger">*</span></label>
+                                    <input class="form-control" name="BankAccountNumber" required inputmode="numeric" pattern="[0-9]{6,20}" placeholder="Chỉ nhập số, 6–20 ký tự" />
+                                </div>
+                                <small class="text-muted">Thông tin ngân hàng được dùng để hoàn tiền (nếu áp dụng).</small>
+                            </div>
+
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                                <button type="submit" class="btn btn-danger">Xác nhận hủy</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Tabs filter
+            const tabs = document.querySelectorAll('.nav-status .nav-link');
+            const input = document.getElementById('q');
+            const cards = () => Array.from(document.querySelectorAll('.order-card'));
+
+            function applyFilter(status) {
+                const q = (input.value || '').toLowerCase();
+                cards().forEach(c => {
+                    const okStatus = (status === 'Tất cả') || (c.dataset.status.trim().toLowerCase() === status.trim().toLowerCase());
+                    const okQuery = c.dataset.title.toLowerCase().includes(q);
+                    c.style.display = (okStatus && okQuery) ? '' : 'none';
+                });
+            }
+
+            tabs.forEach(t => {
+                t.addEventListener('click', () => {
+                    document.querySelector('.nav-status .nav-link.active')?.classList.remove('active');
+                    t.classList.add('active');
+                    applyFilter(t.dataset.status);
+                });
+            });
+
+            input.addEventListener('input', () => {
+                const active = document.querySelector('.nav-status .nav-link.active')?.dataset.status || 'Tất cả';
+                applyFilter(active);
+            });
+
+            // Rating
+            document.querySelectorAll('.rating').forEach(group => {
+                const stars = group.querySelectorAll('i');
+                const target = document.getElementById(group.dataset.target);
+                stars.forEach(star => {
+                    star.addEventListener('click', () => {
+                        const val = star.dataset.value;
+                        target.value = val;
+                        stars.forEach(s => { s.classList.remove('bi-star-fill'); s.classList.add('bi-star'); });
+                        for (let i = 0; i < val; i++) {
+                            stars[i].classList.remove('bi-star');
+                            stars[i].classList.add('bi-star-fill');
+                        }
+                    });
+                });
+            });
+        });
+
+        // === Uploader ảnh ===
+        const uploaderState = new Map();
+        function getDT(id) {
+            if (!uploaderState.has(id)) uploaderState.set(id, new DataTransfer());
+            return uploaderState.get(id);
+        }
+        function openPicker(inputId) {
+            document.getElementById(inputId).click();
+        }
+        function uploaderAddFiles(id, files, max, inputEl) {
+            const dt = getDT(id);
+            const allowed = Math.max(0, max - dt.files.length);
+            Array.from(files).slice(0, allowed).forEach(f => dt.items.add(f));
+            inputEl.files = dt.files;
+            renderUploader(id);
+            inputEl.value = '';
+        }
+        function uploaderRemove(id, idx) {
+            const dt = getDT(id);
+            const tmp = new DataTransfer();
+            Array.from(dt.files).forEach((f, i) => { if (i !== idx) tmp.items.add(f); });
+            uploaderState.set(id, tmp);
+            const input = document.getElementById(document.getElementById(id).dataset.input);
+            input.files = tmp.files;
+            renderUploader(id);
+        }
+        function renderUploader(id) {
+            const wrap = document.getElementById(id);
+            const max = parseInt(wrap.dataset.max || '5', 10);
+            const inputId = wrap.dataset.input;
+            const dt = getDT(id);
+            wrap.innerHTML = '';
+
+            Array.from(dt.files).forEach((f, i) => {
+                const box = document.createElement('div');
+                box.className = 'thumb';
+                const img = document.createElement('img');
+                const r = new FileReader();
+                r.onload = e => img.src = e.target.result;
+                r.readAsDataURL(f);
+                const rm = document.createElement('button');
+                rm.type = 'button';
+                rm.className = 'remove';
+                rm.innerText = '×';
+                rm.onclick = () => uploaderRemove(id, i);
+                box.appendChild(img); box.appendChild(rm);
+                wrap.appendChild(box);
+            });
+
+            const rest = max - dt.files.length;
+            if (rest > 0) {
+                const add = document.createElement('div');
+                add.className = 'slot slot-add';
+                add.onclick = () => openPicker(inputId);
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-camera';
+                add.appendChild(icon);
+                const counter = document.createElement('span');
+                counter.className = 'counter';
+                counter.textContent = `${dt.files.length}/${max}`;
+                add.appendChild(counter);
+                wrap.appendChild(add);
+                for (let i = 1; i < rest; i++) {
+                    const empty = document.createElement('div');
+                    empty.className = 'slot';
+                    wrap.appendChild(empty);
+                }
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.uploader').forEach(w => renderUploader(w.id));
+        });
+    </script>
+}
