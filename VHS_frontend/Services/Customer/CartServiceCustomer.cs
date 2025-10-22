@@ -5,6 +5,7 @@ using VHS_frontend.Areas.Customer.Models.CartItemDTOs;
 using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
 using VHS_frontend.Areas.Customer.Models.VoucherDTOs;
 using System.Net.Http.Json;
+using VHS_frontend.Models.ServiceDTOs;
 
 namespace VHS_frontend.Services.Customer
 {
@@ -61,6 +62,49 @@ namespace VHS_frontend.Services.Customer
             var items = await JsonSerializer.DeserializeAsync<List<ReadCartItemDTOs>>(stream, options)
                         ?? new List<ReadCartItemDTOs>();
 
+            return items;
+        }
+
+        /// <summary>
+        /// Lấy các CartItem theo danh sách CartItemId đã chọn (dùng GET, phù hợp khi số lượng ID ít).
+        /// Gọi: GET api/carts/account/{accountId}/items/by-ids?ids=GUID1&ids=GUID2...
+        /// </summary>
+        public async Task<List<ReadCartItemDTOs>> GetCartItemsByIdsAsync(
+            Guid accountId, IEnumerable<Guid> cartItemIds, string? jwtToken)
+        {
+            // Auth header
+            _httpClient.DefaultRequestHeaders.Authorization = null;
+            if (!string.IsNullOrWhiteSpace(jwtToken))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", jwtToken);
+            }
+
+            var ids = (cartItemIds ?? Enumerable.Empty<Guid>())
+                      .Where(g => g != Guid.Empty)
+                      .Distinct()
+                      .ToList();
+            if (accountId == Guid.Empty || ids.Count == 0)
+                return new List<ReadCartItemDTOs>();
+
+            // build query: ?ids=GUID1&ids=GUID2...
+            var query = string.Join("&", ids.Select(g => $"ids={Uri.EscapeDataString(g.ToString())}"));
+            var url = $"api/carts/account/{accountId}/items/by-ids?{query}";
+
+            using var resp = await _httpClient.GetAsync(url);
+
+            if (resp.StatusCode == HttpStatusCode.Unauthorized)
+                throw new UnauthorizedAccessException("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
+
+            // backend có thể trả 200 với list rỗng; nếu 404 thì coi như không có item hợp lệ
+            if (resp.StatusCode == HttpStatusCode.NotFound)
+                return new List<ReadCartItemDTOs>();
+
+            resp.EnsureSuccessStatusCode();
+
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var items = await resp.Content.ReadFromJsonAsync<List<ReadCartItemDTOs>>(options)
+                        ?? new List<ReadCartItemDTOs>();
             return items;
         }
 
@@ -303,6 +347,89 @@ namespace VHS_frontend.Services.Customer
 
         // helper nhỏ để đọc { ok = true } từ API
         private sealed class OkFlag { public bool Ok { get; set; } }
-    
-}
+
+        // ====== CHỈNH Ở ĐÂY: các using đã có sẵn trong file ======
+        // using System.Net;
+        // using System.Net.Http.Headers;
+        // using System.Text.Json;
+        // using VHS_frontend.Areas.Customer.Models.CartItemDTOs;
+        // using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
+        // using VHS_frontend.Areas.Customer.Models.VoucherDTOs;
+        // using System.Net.Http.Json;
+        // using VHS_frontend.Models.ServiceDTOs; // cần nếu chưa có
+
+        // ...
+
+        /// <summary>
+        /// (Direct checkout) Lấy chi tiết 1 dịch vụ để dựng "cart item ảo"
+        /// GET: api/Services/{serviceId}
+        /// </summary>
+        public async Task<ServiceDetailDTOs?> GetServiceDetailAsync(Guid serviceId, string? jwtToken)
+        {
+            if (serviceId == Guid.Empty) return null;
+
+            SetAuthHeader(jwtToken);
+
+            using var resp = await _httpClient.GetAsync($"api/Services/{serviceId}");
+            if (resp.StatusCode == HttpStatusCode.Unauthorized)
+                throw new UnauthorizedAccessException("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
+
+            if (!resp.IsSuccessStatusCode) return null;
+
+            var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            return await resp.Content.ReadFromJsonAsync<ServiceDetailDTOs>(opt);
+        }
+
+        /// <summary>
+        /// (Direct checkout) Lấy danh sách option theo danh sách optionIds.
+        /// Ưu tiên endpoint POST: api/Services/options:by-ids { optionIds: [...] }.
+        /// Nếu backend CHƯA có endpoint này, fallback: GET toàn bộ option theo service rồi filter.
+        /// </summary>
+        /// <param name="serviceId">Bắt buộc để fallback khi server chưa hỗ trợ by-ids</param>
+        public async Task<List<ReadServiceOptionDTOs>> GetOptionsByIdsAsync(
+            Guid serviceId, IEnumerable<Guid> optionIds, string? jwtToken)
+        {
+            var ids = (optionIds ?? Enumerable.Empty<Guid>())
+                      .Where(g => g != Guid.Empty)
+                      .Distinct()
+                      .ToList();
+
+            if (ids.Count == 0) return new();
+
+            SetAuthHeader(jwtToken);
+
+            // 1) Thử endpoint tối ưu: POST /api/Services/options:by-ids
+            try
+            {
+                var url = $"api/Services/options:by-ids";
+                var body = new { optionIds = ids };
+
+                using var resp = await _httpClient.PostAsJsonAsync(url, body);
+                if (resp.StatusCode == HttpStatusCode.Unauthorized)
+                    throw new UnauthorizedAccessException("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
+
+                if (resp.IsSuccessStatusCode)
+                {
+                    var opt = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var list = await resp.Content.ReadFromJsonAsync<List<ReadServiceOptionDTOs>>(opt);
+                    return list ?? new();
+                }
+
+                // Nếu 404/405… coi như server chưa có route -> rơi xuống fallback
+            }
+            catch
+            {
+                // bỏ qua, chuyển sang fallback
+            }
+
+            // 2) Fallback: GET toàn bộ option theo service rồi filter
+            if (serviceId == Guid.Empty) return new(); // không có serviceId thì không fallback được
+
+            var all = await GetAllOptionsByServiceIdAsync(serviceId) ?? new List<ReadServiceOptionDTOs>();
+            var set = ids.ToHashSet();
+            return all.Where(o => set.Contains(o.OptionId)).ToList();
+        }
+
+
+    }
 }

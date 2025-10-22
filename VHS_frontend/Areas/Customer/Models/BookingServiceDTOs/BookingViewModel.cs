@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 
-namespace VHS_frontend.Areas.Customer.Models.Booking
+namespace VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
 {
     public class BookingViewModel
     {
@@ -11,25 +10,40 @@ namespace VHS_frontend.Areas.Customer.Models.Booking
         public string RecipientFullName { get; set; } = string.Empty;
         public string RecipientPhone { get; set; } = string.Empty;
 
-        // Địa chỉ hiện chọn (dùng DTO này)
+        // Địa chỉ hiện chọn (hiển thị)
         public UserAddressDto Address { get; set; } = new UserAddressDto();
 
         // Cho modal thay đổi
         public List<UserAddressDto> Addresses { get; set; } = new();
         public Guid? SelectedAddressId { get; set; }
 
+        // Chuỗi địa chỉ snapshot sẽ post khi PlaceOrder
+        public string AddressText { get; set; } = "";
+
+        // Giỏ hàng
         public List<BookItem> Items { get; set; } = new();
-        public string? VoucherCode { get; set; }
+
+        // Voucher
+        //public string? VoucherCode { get; set; }
+        public Guid? VoucherId { get; set; }
         public decimal VoucherDiscount { get; set; }
-        public decimal ShippingFee { get; set; }
+
+        // 👉 Thêm để client hiển thị breakdown ngay khi vào trang
+        public decimal VoucherPercent { get; set; }                 // % giảm (nếu có)
+        public decimal VoucherMaxAmount { get; set; }           // trần giảm (nếu có)
+
+        // Thanh toán
         public List<PaymentMethod> PaymentMethods { get; set; } = new();
-        public string SelectedPaymentCode { get; set; } = "BANK_TRANSFER";
 
-        public decimal Subtotal => Items.Sum(i => i.LineTotal);
-        public decimal Total => Subtotal + ShippingFee - VoucherDiscount;
+        // KHÔNG auto-chọn để ép người dùng chọn trong UI
+        public string? SelectedPaymentCode { get; set; } = null;
 
-        // ---- Sample data để test ----
-        public static BookingViewModel Sample()
+        // Tổng tiền (set từ controller sau khi tính)
+        public decimal Subtotal { get; set; }                   // Tổng tiền hàng (items + options)
+        public decimal Total { get; set; }                      // = Subtotal - VoucherDiscount (và >= 0 ở controller)
+
+        // ======= Helpers / Samples =======
+        public static List<UserAddressDto> AddressSample()
         {
             var address1 = new UserAddressDto
             {
@@ -39,6 +53,7 @@ namespace VHS_frontend.Areas.Customer.Models.Booking
                 WardName = "Hưng Lợi",
                 StreetAddress = "118/22, Hẻm 107 Đường 3/2, Ngang Quán Nhậu Tư Minh"
             };
+
             var address2 = new UserAddressDto
             {
                 AddressId = Guid.NewGuid(),
@@ -48,65 +63,7 @@ namespace VHS_frontend.Areas.Customer.Models.Booking
                 StreetAddress = "12 Lê Duẩn"
             };
 
-      
-
-            var vm = new BookingViewModel
-            {
-                RecipientFullName = "Trần Hoài Anh",
-                RecipientPhone = "+84 977 817 277",
-                Address = address1,
-                Addresses = new List<UserAddressDto> { address1, address2 },
-                ShippingFee = 51100,
-                //VoucherCode = "HELLO15K",
-                //VoucherDiscount = 15540,
-                PaymentMethods = new List<PaymentMethod>
-                {
-                    new PaymentMethod { Code = "EWALLET", DisplayName = "Ví ShopeePay" },
-                    new PaymentMethod { Code = "CARD", DisplayName = "Thẻ Tín dụng/Ghi nợ" },
-                    new PaymentMethod { Code = "GOOGLE_PAY", DisplayName = "Google Pay" },
-                    new PaymentMethod { Code = "NAPAS", DisplayName = "Thẻ nội địa NAPAS" },
-                    new PaymentMethod { Code = "COD", DisplayName = "Thanh toán khi nhận hàng" },
-                    new PaymentMethod { Code = "BANK_TRANSFER", DisplayName = "Chuyển khoản ngân hàng" }
-                }
-            };
-
-            // BookingViewModel.Sample()
-
-            // ✅ Mỗi nhà cung cấp một ProviderId cố định (demo)
-            var pidZiaja = Guid.Parse("11111111-1111-1111-1111-111111111111");
-            var pidGift = Guid.Parse("22222222-2222-2222-2222-222222222222");
-
-            vm.Items.Add(new BookItem
-            {
-                ProviderId = pidZiaja,                 // ⬅️ THÊM
-                Provider = "Intimate Ziaja Store",
-                ServiceId = Guid.NewGuid(),
-                ServiceName = "Dung Dịch Vệ Sinh Intimate With Lactic Acid Ziaja 200ml",
-                Image = "/images/VeSinh.jpg",
-                UnitPrice = 259000,
-                BookingTime = DateTime.Now,
-                Options = new List<BookItemOption>
-    {
-        new() { Name = "Bảo hiểm bảo vệ người tiêu dùng", Price = 2999,  Description = "Bảo hiểm trong quá trình sử dụng." },
-        new() { Name = "Gói quà tặng cao cấp",            Price = 15000, Description = "Gói quà sang trọng thích hợp làm quà tặng." },
-        new() { Name = "Giao hàng hỏa tốc",               Price = 30000, Description = "Giao trong ngày cho khu vực nội thành." },
-        new() { Name = "Phiếu giảm giá lần sau",          Price = 0,     Description = "Tặng kèm phiếu giảm giá 10% cho đơn hàng kế tiếp." }
-    }
-            });
-
-            vm.Items.Add(new BookItem
-            {
-                ProviderId = pidGift,                  // ⬅️ THÊM
-                Provider = "(GIFT) Quà Tặng Ziaja",
-                ServiceId = Guid.NewGuid(),
-                ServiceName = "Quà tặng khách hàng",
-                Image = "/images/VeSinh.jpg",
-                UnitPrice = 0,
-                BookingTime = DateTime.Now
-            });
-
-
-            return vm;
+            return new List<UserAddressDto> { address1, address2 };
         }
     }
 
@@ -120,8 +77,14 @@ namespace VHS_frontend.Areas.Customer.Models.Booking
         public string Image { get; set; } = "/images/placeholder.png";
         public decimal UnitPrice { get; set; }
         public DateTime BookingTime { get; set; } = DateTime.Now;
+
         public List<BookItemOption> Options { get; set; } = new();
+
+        // ✅ thêm: chỉ những OptionIds hiển thị trên trang này sẽ được post về
+        public List<Guid> OptionIds { get; set; } = new();
+
         public decimal OptionsTotal => Options?.Sum(o => o.Price) ?? 0m;
+
         public decimal LineTotal => UnitPrice + OptionsTotal;
     }
 

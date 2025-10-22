@@ -311,12 +311,13 @@
 
                 <!-- Form GET Checkout độc lập (ngoài danh sách item) -->
                 <form id="checkoutForm"
-                      asp-area=""
-                      asp-controller="Checkout"
-                      asp-action="Checkout"
+                  asp-area="Customer"
+                  asp-controller="BookingService"
+                  asp-action="Index"
                       method="get">
                     <input type="hidden" name="selectedKeysCsv" id="selectedKeysCsv" />
                     <input type="hidden" name="voucherId" id="voucherId" />
+                <input type="hidden" name="voucherCode" id="voucherCode" />
                 </form>
 
                 <!-- Voucher + thanh toán dính dưới -->
@@ -331,7 +332,7 @@
                         </button>
                     </div>
                     <!-- input ẩn để submit mã -->
-                    <input type="hidden" name="voucherCode" id="voucherCode" />
+                    @* <input type="hidden" name="voucherCode" id="voucherCode" /> *@
 
                     <!-- Panel voucher, sẽ được bốc lên PORTAL khi mở -->
                     <div id="opt_voucher" class="opt-panel" hidden aria-label="Danh sách voucher">
@@ -394,7 +395,7 @@
                                 <span>Tổng cộng</span>
                                 <strong id="selTotal">0₫</strong>
                             </div>
-                            <button id="btnCheckout" class="btn-primary co-btn" disabled onclick="submitSelected()">Thanh toán</button>
+                            <button id="btnCheckout" class="btn-primary co-btn" disabled onclick="submitSelected()">Đặt Dịch Vụ</button>
                         </div>
                     </div>
                 </div>
@@ -408,7 +409,7 @@
 
             /* ====== Helpers ====== */
             const VND = n => (n||0).toLocaleString('vi-VN') + '₫';
-            const voucherCodeHid = document.getElementById('voucherCode');
+        const voucherCodeHid = document.querySelector('#checkoutForm #voucherCode');
             const voucherListEl  = document.getElementById('voucherList');
             const voucherInputEl = document.getElementById('voucherInput');
             const btnApplyTyped  = document.getElementById('btnApplyTyped');
@@ -554,7 +555,8 @@
 
             function setVoucher(v){
               CURRENT_VOUCHER = normalizeVoucher(v);
-              if (voucherCodeHid) voucherCodeHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.Code || '') : '';
+                      if (voucherCodeHid) {
+           voucherCodeHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.Code || '') : '';}
 
               // reset input gõ tay nếu bỏ voucher
               if(!CURRENT_VOUCHER && voucherInputEl) voucherInputEl.value = '';
@@ -671,6 +673,7 @@
                 if(!code) return;
                 // set tạm để server validate khi submit
                 setVoucher({ code, discountPercent: 0, discountMaxAmount: 0 });
+                 if (voucherCodeHid) voucherCodeHid.value = code;
                 const closer = document.querySelector('[data-close="#opt_voucher"]');
                 if(closer) closer.click();
               });

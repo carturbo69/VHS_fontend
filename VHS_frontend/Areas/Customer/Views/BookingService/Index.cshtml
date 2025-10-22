@@ -1,4 +1,4 @@
-﻿@using VHS_frontend.Areas.Customer.Models.Booking
+﻿
 @using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
 @model BookingViewModel
 @{
@@ -27,64 +27,6 @@
 
 <link rel="stylesheet" href="~/css/booking-service.css" asp-append-version="true" />
 
-<style>
-    .opt-panel {
-        max-height: 80vh;
-        overflow: auto;
-        padding-right: 6px;
-    }
-
-    .opt-name > div {
-        white-space: normal;
-        word-break: break-word;
-    }
-
-    .opt-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .opt-value {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 220px;
-    }
-
-    .opt-badge {
-        min-width: 22px;
-        height: 22px;
-        border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        background: #f3f4f6;
-        color: #111;
-        padding: 0 6px;
-    }
-
-    /* Thêm nhẹ cho hàng điều khoản */
-    .tos-accept {
-        padding: 10px 16px;
-        border-top: 1px dashed #eee;
-        border-bottom: 1px dashed #eee;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #fafafa;
-    }
-
-        .tos-accept a {
-            text-decoration: underline;
-        }
-
-    .modal#tosModal .modal-card {
-        max-width: 760px;
-    }
-</style>
-
 <section class="checkout-page">
     <!-- Địa chỉ nhận hàng -->
     <div class="address-card">
@@ -94,7 +36,8 @@
         </div>
         <div class="addr-body">
             <div><strong>@Model.RecipientFullName</strong> (@Model.RecipientPhone)</div>
-            <div>@Model.Address.ToDisplayString()</div>
+            <!-- ✅ thêm id để JS cập nhật khi chọn trong modal -->
+            <div id="currentAddressText">@Model.Address.ToDisplayString()</div>
         </div>
     </div>
 
@@ -169,9 +112,20 @@
                             <div class="line-total">@Money(it.LineTotal)</div>
                         </div>
 
-                        <!-- CHỈNH: các input post theo mảng Items[i].* và "gắn" vào form chính bằng thuộc tính form -->
+                        <!-- ✅ CHÈN MỚI: gửi đúng danh sách OptionIds đang hiển thị cho item này -->
+                        @for (var j = 0; j < options.Count; j++)
+                        {
+                            <input type="hidden"
+                                   form="@placeOrderFormId"
+                                   name="Items[@i].OptionIds[@j]"
+                                   value="@options[j].OptionId" />
+                        }
+
+
+                        <!-- Các hidden khác giữ nguyên -->
                         <input type="hidden" form="@placeOrderFormId" name="Items[@i].CartItemId" value="@it.CartItemId" />
                         <input type="hidden" form="@placeOrderFormId" name="Items[@i].ServiceId" value="@it.ServiceId" />
+                        <input type="hidden" form="@placeOrderFormId" name="Items[@i].ProviderId" value="@it.ProviderId" />
 
                         <!-- Giờ đặt -->
                         <div class="booking-time">
@@ -187,14 +141,15 @@
                                    class="booking-input" />
                         </div>
 
-
                         i++;
+
+                        <!-- nhớ tăng i sau mỗi item -->
                     }
 
-                    @* ====== CHÈN Ô TÍCH + LINK MỞ ĐIỀU KHOẢN THEO PROVIDER ====== *@
+
+                    @* ====== Ô tích + link mở điều khoản theo Provider ====== *@
                     @{
                         var firstItem = shop.FirstOrDefault();
-                        // YÊU CẦU: BookItem có ProviderId. Nếu chưa có thì thêm vào model.
                         var providerId = firstItem?.ProviderId ?? Guid.Empty;
                     }
                     <div class="tos-accept">
@@ -219,11 +174,10 @@
                                value="false"
                                form="@placeOrderFormId" />
                     </div>
-                    @* ====== HẾT PHẦN Ô TÍCH ====== *@
                 </div>
             }
 
-            <!-- Voucher + thanh toán dính dưới -->
+            <!-- Voucher -->
             <div class="shop-block">
                 <div class="voucher-row">
                     <div class="left">
@@ -235,8 +189,13 @@
                     </button>
                 </div>
 
-                <!-- CHỈNH: gắn vào form chính -->
-                <input type="hidden" form="@placeOrderFormId" name="VoucherCode" id="voucherCode" value="@Model.VoucherCode" />
+                <!-- gắn vào form chính -->
+                @* <input type="hidden" form="@placeOrderFormId" name="VoucherCode" id="voucherCode" value="@Model.VoucherCode" /> *@
+                <!-- ✅ chỉ gửi VoucherId -->
+                <input type="hidden" form="@placeOrderFormId" name="VoucherId" id="voucherId" value="@Model.VoucherId" />
+                <!-- 👇 thêm 2 input ẩn để client biết % và max từ server -->
+                <input type="hidden" id="voucherPercent" value="@Model.VoucherPercent" />
+                <input type="hidden" id="voucherMaxAmount" value="@Model.VoucherMaxAmount" />
             </div>
 
             <!-- Panel voucher (PORTAL) -->
@@ -248,10 +207,10 @@
                     </div>
 
                     <div class="opt-body">
-                        <div class="voucher-toolbar">
+                        @* <div class="voucher-toolbar">
                             <input id="voucherInput" class="input" placeholder="Nhập mã voucher..." />
                             <button id="btnApplyTyped" class="btn" type="button">Áp dụng</button>
-                        </div>
+                        </div> *@
 
                         <div id="voucherList" class="voucher-list"></div>
                         <div class="tiny muted">* Chỉ voucher còn hiệu lực và còn lượt dùng mới có thể áp dụng.</div>
@@ -264,46 +223,74 @@
                 <div class="shop-head">Phương thức thanh toán</div>
                 <div style="padding:12px 16px">
                     <div class="pm-list">
-                        @for (int j = 0; j < Model.PaymentMethods.Count; j++)
-                        {
-                            var pm = Model.PaymentMethods[j];
-                            var active = pm.Code == Model.SelectedPaymentCode ? "active" : "";
-                            <label class="pm @active">
-                                <!-- CHỈNH: gắn radio vào form chính -->
-                                <input type="radio"
-                                       form="@placeOrderFormId"
-                                       name="SelectedPaymentCode"
-                                       value="@pm.Code"
-                                       @(pm.Code == Model.SelectedPaymentCode ? "checked" : "")
-                                       style="display:none" />
-                                @pm.DisplayName
-                            </label>
-                        }
+                        <!-- VNPay -->
+                        <label class="pm @(Model.SelectedPaymentCode?.ToUpperInvariant() == "VNPAY" ? "active" : "")">
+                            <input type="radio"
+                                   form="@placeOrderFormId"
+                                   name="SelectedPaymentCode"
+                                   value="VNPAY"
+                                   @(Model.SelectedPaymentCode?.ToUpperInvariant() == "VNPAY" ? "checked" : "")
+                                   class="pm-radio"
+                                   style="display:none" />
+                            VNPay (QR/ATM/Thẻ)
+                        </label>
+
+                        <!-- MoMo -->
+                        <label class="pm @(Model.SelectedPaymentCode?.ToUpperInvariant() == "MOMO" ? "active" : "")">
+                            <input type="radio"
+                                   form="@placeOrderFormId"
+                                   name="SelectedPaymentCode"
+                                   value="MOMO"
+                                   @(Model.SelectedPaymentCode?.ToUpperInvariant() == "MOMO" ? "checked" : "")
+                                   class="pm-radio"
+                                   style="display:none" />
+                            MoMo (Ví điện tử)
+                        </label>
+
+                        <!-- (tuỳ chọn) COD hoặc Bank Transfer nếu bạn vẫn muốn giữ -->
+                        @* 
+      <label class="pm @(Model.SelectedPaymentCode?.ToUpperInvariant()=="COD" ? "active" : "")">
+        <input type="radio"
+               form="@placeOrderFormId"
+               name="SelectedPaymentCode"
+               value="COD"
+               @(Model.SelectedPaymentCode?.ToUpperInvariant()=="COD" ? "checked" : "")
+               class="pm-radio"
+               style="display:none" />
+        Thanh toán khi nhận hàng
+      </label>
+      *@
                     </div>
                 </div>
             </div>
+
         </div>
 
         <!-- Tóm tắt -->
         <div>
             <div class="summary-box">
-                <!-- CHỈNH: thêm id cho form chính -->
-                <form id="@placeOrderFormId" asp-area="Customer" asp-controller="Booking" asp-action="PlaceOrder" method="post">
+                <form id="@placeOrderFormId" asp-area="Customer" asp-controller="BookingService" asp-action="PlaceOrder" method="post">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="SelectedAddressId" value="@Model.Address.AddressId" />
+
+                    <!-- ✅ Chuỗi địa chỉ sẽ ghi vào Booking.Address -->
+                    <input type="hidden" name="AddressText" id="AddressText" value="@Model.Address.ToDisplayString()" />
 
                     <div class="row">
                         <span class="muted">Tổng tiền hàng</span>
                         <strong data-subtotal data-raw="@Model.Subtotal">@Money(Model.Subtotal)</strong>
                     </div>
-                    <div class="row">
-                        <span class="muted">Tổng tiền phí vận chuyển</span>
+
+                    @* Nếu có phí vận chuyển, bỏ comment block dưới và JS sẽ tự đọc qua data-shipping *@
+                    @* <div class="row">
+                        <span class="muted">Phí vận chuyển</span>
                         <strong data-shipping data-raw="@Model.ShippingFee">@Money(Model.ShippingFee)</strong>
-                    </div>
+                    </div> *@
+
                     <div class="row">
                         <span class="muted">Tổng cộng Voucher giảm giá</span>
                         <strong data-discount data-raw="@Model.VoucherDiscount">-@Money(Model.VoucherDiscount)</strong>
                     </div>
+
                     <hr />
                     <div class="row" style="font-size:20px">
                         <span>Tổng thanh toán</span>
@@ -331,10 +318,8 @@
             <button class="btn" type="button" onclick="closeAddressModal()">✕</button>
         </div>
 
-        <!-- Form CHỌN địa chỉ -->
-        <form asp-area="Customer" asp-controller="Booking" asp-action="ChangeAddress" method="post" style="margin-top:8px">
-            @Html.AntiForgeryToken()
-
+        <!-- ✅ KHÔNG submit nữa, chỉ để chọn và xác nhận -->
+        <div style="margin-top:8px">
             <div class="addr-list">
                 @if (Model.Addresses?.Any() == true)
                 {
@@ -347,7 +332,7 @@
                              data-district="@addr.DistrictName"
                              data-ward="@addr.WardName"
                              data-street="@addr.StreetAddress">
-                            <input type="radio" name="SelectedAddressId" value="@addr.AddressId" @isChecked style="margin-top:3px" />
+                            <input type="radio" name="addressChoice" value="@addr.AddressId" @isChecked style="margin-top:3px" />
                             <div style="flex:1">
                                 <div><strong>@Model.RecipientFullName</strong> (@Model.RecipientPhone)</div>
                                 <div class="muted">@addr.ToDisplayString()</div>
@@ -376,10 +361,11 @@
                 <button type="button" class="btn" onclick="closeAddressModal()">Hủy</button>
                 <div style="display:flex;gap:8px">
                     <button type="button" class="btn" onclick="openCreateAddressForm()">➕ Thêm địa chỉ</button>
-                    <button type="submit" class="btn primary">Xác nhận</button>
+                    <!-- ✅ xác nhận chọn địa chỉ, cập nhật AddressText + UI -->
+                    <button type="button" class="btn primary" onclick="applySelectedAddress()">Xác nhận</button>
                 </div>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
@@ -448,9 +434,88 @@
 
 @section Scripts {
     <script>
+
+                /* ========= Chọn phương thức thanh toán: chỉ đổi UI, KHÔNG auto submit ========= */
+        (function bindPaymentPickUIOnly(){
+          // Toggle .active khi đổi radio
+          document.querySelectorAll('input.pm-radio[name="SelectedPaymentCode"]').forEach(r => {
+            r.addEventListener('change', (e) => {
+              document.querySelectorAll('.pm').forEach(l => l.classList.remove('active'));
+              e.target.closest('.pm')?.classList.add('active');
+            });
+          });
+
+          // Click vào label (radio ẩn) vẫn cập nhật .active
+          document.querySelectorAll('.pm').forEach(lab => {
+            lab.addEventListener('click', () => {
+              setTimeout(() => {
+                const checked = document.querySelector('input.pm-radio[name="SelectedPaymentCode"]:checked');
+                document.querySelectorAll('.pm').forEach(l => l.classList.remove('active'));
+                checked?.closest('.pm')?.classList.add('active');
+              }, 0);
+            });
+          });
+
+          // Khởi tạo trạng thái .active đúng theo model khi load
+          document.addEventListener('DOMContentLoaded', () => {
+            const checked = document.querySelector('input.pm-radio[name="SelectedPaymentCode"]:checked');
+            if (checked) checked.closest('.pm')?.classList.add('active');
+          });
+        })();
+
+        /* ========= Validate trước khi submit: phải có Payment + TOS + Địa chỉ ========= */
+        (function validateBeforeSubmit(){
+          const form = document.getElementById('@placeOrderFormId');
+          if(!form) return;
+
+          function allTosAccepted(){
+            const allChecks = Array.from(document.querySelectorAll('.tos-check'));
+            return allChecks.length === 0 || allChecks.every(x => x.checked);
+          }
+          function hasAddress(){
+            const v = (document.getElementById('AddressText')?.value || '').trim();
+            return v.length > 0;
+          }
+
+          form.addEventListener('submit', function(e){
+            const chosen = document.querySelector('input.pm-radio[name="SelectedPaymentCode"]:checked');
+            if(!chosen){
+              e.preventDefault();
+              alert('Vui lòng chọn phương thức thanh toán.');
+              return;
+            }
+            if(!allTosAccepted()){
+              e.preventDefault();
+              alert('Vui lòng đồng ý điều khoản của tất cả nhà cung cấp.');
+              return;
+            }
+            if(!hasAddress()){
+              e.preventDefault();
+              alert('Vui lòng chọn địa chỉ nhận hàng.');
+              return;
+            }
+            // Cho submit bình thường -> Controller PlaceOrder -> switch-case redirect
+          });
+        })();
+
         /* ========= Modal chọn địa chỉ ========= */
         function openAddressModal(){ document.getElementById('addressModal').classList.add('open'); }
         function closeAddressModal(){ document.getElementById('addressModal').classList.remove('open'); }
+
+        /* ✅ Áp địa chỉ đang chọn trong modal vào hidden + UI */
+        function applySelectedAddress(){
+          const checked = document.querySelector('.addr-item input[type="radio"][name="addressChoice"]:checked');
+          if(!checked){ closeAddressModal(); return; }
+          const row = checked.closest('.addr-item');
+          const parts = [row.dataset.street, row.dataset.ward, row.dataset.district, row.dataset.province]
+                        .filter(s => s && s.trim() !== '');
+          const text = parts.join(', ');
+          const hidden = document.getElementById('AddressText');
+          const view = document.getElementById('currentAddressText');
+          if(hidden) hidden.value = text;
+          if(view) view.textContent = text;
+          closeAddressModal();
+        }
 
         /* ========= Modal Upsert Address ========= */
         function openCreateAddressForm(){
@@ -511,14 +576,12 @@
         })();
 
         /* ========= Voucher MODULE + TẠM TÍNH CLIENT ========= */
-        (function(){
+               (function(){
           const panel   = document.getElementById('opt_voucher');
           const btnOpen = document.getElementById('btnOpenVoucher');
           const btnClose= document.getElementById('btnCloseVoucher');
           const listEl  = document.getElementById('voucherList');
-          const inputEl = document.getElementById('voucherInput');
-          const applyTypedBtn = document.getElementById('btnApplyTyped');
-          const voucherCodeInput = document.getElementById('voucherCode');
+          const voucherIdInput = document.getElementById('voucherId');
           const voucherHint = document.getElementById('voucherHint');
 
           let VOUCHERS = null;
@@ -530,6 +593,7 @@
           function normalizeVoucher(o){
             if(!o) return null;
             return {
+              VoucherId: pick(o,'VoucherId','voucherId','Id','id') ?? null,
               Code: pick(o,'Code','code') ?? '',
               Description: pick(o,'Description','description') ?? '',
               DiscountPercent: Number(pick(o,'DiscountPercent','discountPercent') || 0),
@@ -564,29 +628,29 @@
           }
 
           function updateVoucherUI() {
-            const code = voucherCodeInput.value?.trim();
-            if (code) {
+            const id = (voucherIdInput.value || '').trim();
+            if (id) {
+              const code = CURRENT_VOUCHER?.Code || 'Voucher đã chọn';
               voucherHint.textContent = `Đã áp dụng: ${code}`;
               btnOpen.textContent = 'Đổi voucher';
             } else {
-              voucherHint.textContent = 'Chọn/nhập mã để áp dụng';
+              voucherHint.textContent = 'Chọn voucher để áp dụng';
               btnOpen.textContent = 'Chọn voucher';
             }
             ensureBreakdown();
           }
 
           function ensureBreakdown(){
-            const totalRow = document.querySelector('.summary-box .row:last-of-type');
-            if(!totalRow) return;
             const bd = document.getElementById('voucherBreakdown');
             const info = document.getElementById('voucherAppliedInfo');
-            const code = voucherCodeInput.value?.trim();
-            if(code && CURRENT_VOUCHER){
+            if(CURRENT_VOUCHER && voucherIdInput.value){
               const pct  = CURRENT_VOUCHER.DiscountPercent || 0;
               const maxA = CURRENT_VOUCHER.DiscountMaxAmount;
               const end  = CURRENT_VOUCHER.EndDate;
+              const code = CURRENT_VOUCHER.Code;
               info.textContent =
-                `Áp dụng mã ${code} • Giảm ${pct}%` +
+                (code ? `Áp dụng mã ${code} • ` : '') +
+                `Giảm ${pct}%` +
                 (maxA ? ` (tối đa ${VND(Number(maxA))})` : '') +
                 (end  ? ` • HSD: ${new Date(end).toLocaleDateString('vi-VN')}` : '');
               bd.hidden = false;
@@ -594,43 +658,6 @@
               info.textContent = '';
               bd.hidden = true;
             }
-          }
-
-          function renderList(vouchers){
-            listEl.innerHTML = '';
-            if(!vouchers || vouchers.length === 0){
-              listEl.innerHTML = `<div class="muted">Bạn chưa có voucher nào phù hợp.</div>`;
-              return;
-            }
-            vouchers.map(normalizeVoucher).forEach(v => {
-              const usable = canUse(v);
-              const end = v.EndDate ? new Date(v.EndDate).toLocaleDateString('vi-VN') : null;
-              const remain = v.RemainingUses ?? ((v.UsageLimit ?? null) && isFinite(v.UsageLimit) ? (v.UsageLimit - (v.UsedCount||0)) : null);
-
-              const item = document.createElement('div');
-              item.className = 'voucher-item';
-              item.innerHTML = `
-                <div class="left">
-                  <div class="title">
-                    ${v.Code}
-                    <span class="badge ${usable?'ok':(v.IsExpired?'danger':'warn')}">
-                      ${usable ? 'Dùng được' : (v.IsExpired ? 'Hết hạn' : 'Chưa đến hạn/đã hết lượt')}
-                    </span>
-                  </div>
-                  <div class="desc">${v.Description || 'Không có mô tả'}</div>
-                  <div class="meta">
-                    Giảm ${v.DiscountPercent}%${v.DiscountMaxAmount?` • Tối đa ${VND(v.DiscountMaxAmount)}`:''}
-                    ${end?` • HSD: ${end}`:''}
-                    ${remain!=null?` • Còn lượt: ${remain}`:''}
-                  </div>
-                </div>
-                <div class="right">
-                  <button class="apply"${usable?'':' disabled'} data-code="${v.Code}">Áp dụng</button>
-                </div>
-              `;
-              item.querySelector('.apply')?.addEventListener('click', () => applyVoucher(v));
-              listEl.appendChild(item);
-            });
           }
 
           async function fetchVouchers(){
@@ -653,7 +680,6 @@
               VOUCHERS = await fetchVouchers();
               renderList(VOUCHERS);
             }
-            setTimeout(()=> inputEl?.focus(), 50);
           }
           function closePanel(){
             btnOpen.setAttribute('aria-expanded','false');
@@ -661,15 +687,50 @@
             panel.hidden = true;
           }
 
-          const INCLUDE_SHIPPING_IN_DISCOUNT = true;
+          function renderList(vouchers){
+            listEl.innerHTML = '';
+            const arr = (vouchers||[]).map(normalizeVoucher);
+            if(arr.length === 0){
+              listEl.innerHTML = `<div class="muted">Bạn chưa có voucher nào phù hợp.</div>`;
+              return;
+            }
+            arr.forEach(v => {
+              const usable = canUse(v);
+              const end = v.EndDate ? new Date(v.EndDate).toLocaleDateString('vi-VN') : null;
+              const remain = v.RemainingUses ?? ((v.UsageLimit ?? null) && isFinite(v.UsageLimit) ? (v.UsageLimit - (v.UsedCount||0)) : null);
+
+              const item = document.createElement('div');
+              item.className = 'voucher-item';
+              item.innerHTML = `
+                <div class="left">
+                  <div class="title">
+                    ${v.Code || '(Không có mã)'}
+                    <span class="badge ${usable?'ok':(v.IsExpired?'danger':'warn')}">
+                      ${usable ? 'Dùng được' : (v.IsExpired ? 'Hết hạn' : 'Chưa đến hạn/đã hết lượt')}
+                    </span>
+                  </div>
+                  <div class="desc">${v.Description || 'Không có mô tả'}</div>
+                  <div class="meta">
+                    Giảm ${v.DiscountPercent}%${v.DiscountMaxAmount?` • Tối đa ${VND(v.DiscountMaxAmount)}`:''}
+                    ${end?` • HSD: ${end}`:''}
+                    ${remain!=null?` • Còn lượt: ${remain}`:''}
+                  </div>
+                </div>
+                <div class="right">
+                  <button class="apply"${usable?'':' disabled'}>Áp dụng</button>
+                </div>
+              `;
+              item.querySelector('.apply')?.addEventListener('click', () => applyVoucher(v));
+              listEl.appendChild(item);
+            });
+          }
 
           function getSummaryEls(){
-            const rows = document.querySelectorAll('.summary-box .row strong');
             return {
-              subtotalEl: rows[0] || null,
-              shippingEl: rows[1] || null,
-              discountEl: rows[2] || null,
-              totalEl:    rows[3] || null
+              subtotalEl: document.querySelector('[data-subtotal]') || null,
+              shippingEl: document.querySelector('[data-shipping]') || null,
+              discountEl: document.querySelector('[data-discount]') || null,
+              totalEl:    document.querySelector('[data-total]') || null
             };
           }
           function parseMoneyFromEl(el){
@@ -688,7 +749,7 @@
           }
           function computeDiscountLocal({subtotal, shipping}, voucher){
             if(!voucher || !canUse(voucher)) return 0;
-            const base = INCLUDE_SHIPPING_IN_DISCOUNT ? (subtotal + shipping) : subtotal;
+            const base = subtotal + (parseMoneyFromEl(document.querySelector('[data-shipping]'))||0);
             const pct  = Number(voucher.DiscountPercent || 0) / 100;
             let discount = Math.round(base * pct);
             if (voucher.DiscountMaxAmount != null && isFinite(voucher.DiscountMaxAmount)) {
@@ -697,8 +758,9 @@
             return Math.max(0, discount);
           }
           function refreshTotalsLocal(){
+            if (!CURRENT_VOUCHER) return;
             const {subtotalEl, shippingEl, discountEl, totalEl} = getSummaryEls();
-            if(!subtotalEl || !shippingEl || !discountEl || !totalEl) return;
+            if(!subtotalEl || !discountEl || !totalEl) return;
 
             const subtotal = parseMoneyFromEl(subtotalEl);
             const shipping = parseMoneyFromEl(shippingEl);
@@ -708,39 +770,19 @@
             setMoney(discountEl, discount, {prefix:'-'});
             setMoney(totalEl, total);
 
-            const info = document.getElementById('voucherAppliedInfo');
-            if (info && CURRENT_VOUCHER && (CURRENT_VOUCHER.Code||'').trim()) {
-              const pct  = CURRENT_VOUCHER.DiscountPercent || 0;
-              const maxA = CURRENT_VOUCHER.DiscountMaxAmount;
-              const end  = CURRENT_VOUCHER.EndDate;
-              info.textContent =
-                `Áp dụng mã ${CURRENT_VOUCHER.Code} • Giảm ${pct}%` +
-                (maxA ? ` (tối đa ${VND(Number(maxA))})` : '') +
-                (end  ? ` • HSD: ${new Date(end).toLocaleDateString('vi-VN')}` : '');
-              document.getElementById('voucherBreakdown').hidden = false;
-            }
+            ensureBreakdown();
           }
 
           function applyVoucher(v){
             CURRENT_VOUCHER = normalizeVoucher(v);
-            voucherCodeInput.value = CURRENT_VOUCHER?.Code || '';
-            updateVoucherUI();
-            closePanel();
-            refreshTotalsLocal();
-          }
-          function applyTyped(){
-            const code = (inputEl.value || '').trim();
-            if(!code){ inputEl.focus(); return; }
-            const found = (VOUCHERS||[]).map(normalizeVoucher).find(x => (x.Code||'').toLowerCase() === code.toLowerCase());
-            CURRENT_VOUCHER = found || { Code: code, DiscountPercent: 0 };
-            voucherCodeInput.value = code;
+            voucherIdInput.value = CURRENT_VOUCHER?.VoucherId || '';
             updateVoucherUI();
             closePanel();
             refreshTotalsLocal();
           }
           function removeVoucher(){
             CURRENT_VOUCHER = null;
-            voucherCodeInput.value = '';
+            voucherIdInput.value = '';
             updateVoucherUI();
             refreshTotalsLocal();
           }
@@ -748,40 +790,25 @@
 
           btnOpen?.addEventListener('click', (e) => { e.stopPropagation(); openPanel(); });
           btnClose?.addEventListener('click', closePanel);
-          applyTypedBtn?.addEventListener('click', applyTyped);
           panel?.addEventListener('click', (e)=>{ if(e.target === panel) closePanel(); });
-          document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && !panel.hidden) closePanel(); });
 
+          // Khởi tạo từ server (nếu đã có VoucherId trong model)
           (function initFromServer(){
-            const firstCode = voucherCodeInput?.value?.trim();
-            if(firstCode){ CURRENT_VOUCHER = { Code: firstCode }; }
+            const firstId = (voucherIdInput?.value || '').trim();
+            const percent   = Number('@Model.VoucherPercent'.toString().replace(',', '.'));
+            const maxAmount = Number('@Model.VoucherMaxAmount'.toString().replace(',', '.'));
+                  if(firstId){
+          CURRENT_VOUCHER = { VoucherId: firstId, DiscountPercent: percent||0, DiscountMaxAmount: maxAmount||0 };
+        }
+
             updateVoucherUI();
-            refreshTotalsLocal();
+            if (CURRENT_VOUCHER) refreshTotalsLocal();
           })();
+
         })();
 
-        /* ========= TOS: Mở modal + đồng bộ checkbox/hidden + khóa submit ========= */
-        // async function openTosModal(providerId){
-        //   const body = document.getElementById('tosModalBody');
-        //   body.innerHTML = '<div class="muted">Đang tải điều khoản...</div>';
-        //   try{
-        //     const res = await fetch('/Customer/BookingService/GetTermsByProvider?providerId=' + providerId, {
-        //       method: 'GET',
-        //       headers: { 'X-Requested-With':'XMLHttpRequest' }
-        //     });
-        //     if(res.ok){
-        //       const html = await res.text();
-        //       body.innerHTML = html;
-        //     } else {
-        //       body.innerHTML = '<div style="color:#c00">Không tải được điều khoản từ máy chủ.</div>';
-        //     }
-        //   }catch(err){
-        //     body.innerHTML = '<div style="color:#c00">Không tải được điều khoản. Vui lòng thử lại.</div>';
-        //   }
-        //   document.getElementById('tosModal').classList.add('open');
-        // }
-
-                async function openTosModal(providerId){
+        /* ========= TOS ========= */
+        async function openTosModal(providerId){
           const body = document.getElementById('tosModalBody');
           body.innerHTML = '<div class="muted">Đang tải điều khoản...</div>';
           try{
@@ -798,20 +825,16 @@
           }
           document.getElementById('tosModal').classList.add('open');
         }
-
-
         function closeTosModal(){
           document.getElementById('tosModal').classList.remove('open');
           document.getElementById('tosModalBody').innerHTML = '';
         }
-
         function syncTosHidden(chk){
           const providerId = chk.getAttribute('data-provider-id');
           const hidden = document.querySelector(`input[type="hidden"][name="TosAccepted[${providerId}]"]`);
           if(hidden) hidden.value = chk.checked ? 'true' : 'false';
           updatePlaceOrderButtonState();
         }
-
         function updatePlaceOrderButtonState(){
           const submitBtn = document.querySelector('#@placeOrderFormId button[type="submit"]');
           if(!submitBtn) return;
@@ -819,8 +842,6 @@
           const allOk = allChecks.every(x => x.checked);
           submitBtn.disabled = !allOk;
         }
-
-        // Khởi tạo khi trang sẵn sàng
         document.addEventListener('DOMContentLoaded', updatePlaceOrderButtonState);
     </script>
 }

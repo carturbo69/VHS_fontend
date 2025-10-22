@@ -22,6 +22,11 @@ builder.Services.AddHttpClient<CartServiceCustomer>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+builder.Services.AddHttpClient<BookingServiceCustomer>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
 builder.Services.AddHttpClient<CategoryAdminService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
@@ -38,6 +43,9 @@ builder.Services.AddHttpClient<ProviderAdminService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+
+builder.Services.AddScoped<VnPayService>();
+builder.Services.AddScoped<MoMoService>();
 
 // HttpClient cho AuthService
 builder.Services.AddHttpClient<AuthService>();
