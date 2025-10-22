@@ -21,6 +21,9 @@ namespace VHS_frontend.Areas.Customer.Controllers
         private const string SS_VOUCHER_ID = "CHECKOUT_VOUCHER_ID";   // ✅ dùng VoucherId thay vì Code
         private const string SS_SELECTED_ADDR = "CHECKOUT_SELECTED_ADDRESS";
 
+        private const string SS_PENDING_BOOKING_IDS = "CHECKOUT_PENDING_BOOKING_IDS";
+
+
         private const string SS_CHECKOUT_DIRECT = "CHECKOUT_DIRECT_JSON";
 
         public BookingServiceController(CartServiceCustomer cartService, BookingServiceCustomer bookingServiceCustomer)
@@ -91,13 +94,20 @@ namespace VHS_frontend.Areas.Customer.Controllers
         /// Hỗ trợ cả luồng "Mua ngay" (SS_CHECKOUT_DIRECT) không đi qua giỏ.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId)
+        public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId, bool refresh = false)
         {
+            var jwt = HttpContext.Session.GetString("JWToken"); // 👈 kéo dòng này lên đầu để dùng cho cancel
+
+            if (refresh)
+            {
+                HttpContext.Session.Remove("BookingBreakdownJson");
+                await CancelPendingIfAnyAsync(jwt);             // 👈 THÊM DÒNG NÀY
+            }
+
             // ====== Helpers ======
             static decimal LineTotalOf(ReadCartItemDTOs it)
                 => (it?.ServicePrice ?? 0m) + (it?.Options?.Sum(o => o?.Price ?? 0m) ?? 0m);
 
-            var jwt = HttpContext.Session.GetString("JWToken");
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
@@ -296,6 +306,56 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
         }
 
+        private async Task CancelPendingIfAnyAsync(string? jwt, CancellationToken ct = default)
+        {
+            var csv = HttpContext.Session.GetString(SS_PENDING_BOOKING_IDS);
+            if (string.IsNullOrWhiteSpace(csv)) return;
+
+            var pendingIds = csv
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                .Where(g => g != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (pendingIds.Count == 0)
+            {
+                HttpContext.Session.Remove(SS_PENDING_BOOKING_IDS);
+                return;
+            }
+
+            // Nếu chưa có JWT thì đừng gọi API, và GIỮ session để có thể hủy lại sau khi login
+            if (string.IsNullOrWhiteSpace(jwt))
+            {
+                // Optional: TempData["ToastError"] = "Phiên đăng nhập đã hết hạn, không thể hủy đơn đang chờ.";
+                return;
+            }
+
+            var canceledOk = false;
+            try
+            {
+                await _bookingServiceCustomer.CancelUnpaidAsync(pendingIds, jwt, ct);
+                canceledOk = true;
+            }
+            catch (HttpRequestException ex)
+            {
+                // Optional: log hoặc hiện toast rõ lý do (401/403/400/500)
+                // _logger.LogWarning(ex, "CancelUnpaid failed");
+                // TempData["ToastError"] = "Không thể hủy đơn đang chờ thanh toán. Vui lòng thử lại.";
+            }
+            catch (TaskCanceledException)
+            {
+                // Optional: _logger.LogWarning("CancelUnpaid timed out");
+            }
+
+            // ❗ Chỉ xóa flag khi HỦY THÀNH CÔNG
+            if (canceledOk)
+            {
+                HttpContext.Session.Remove(SS_PENDING_BOOKING_IDS);
+            }
+        }
+
+
 
 
         ///// <summary>
@@ -444,6 +504,12 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     TempData["ToastError"] = "Tạo đơn thất bại. Vui lòng thử lại.";
                     return RedirectToAction(nameof(Index));
                 }
+
+                // ✅ LƯU BOOKING ĐANG CHỜ THANH TOÁN (để hủy nếu user quay lại / hủy thanh toán)
+                HttpContext.Session.SetString(
+                    SS_PENDING_BOOKING_IDS,
+                    string.Join(",", result.BookingIds)
+                );
 
                 // Lưu để Success/COD hiển thị và Payment verify
                 TempData["BookingIds"] = string.Join(",", result.BookingIds);
