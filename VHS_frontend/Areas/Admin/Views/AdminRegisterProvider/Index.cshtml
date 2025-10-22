@@ -1,0 +1,132 @@
+﻿@using VHS_frontend.Areas.Admin.Models.RegisterProvider
+@model List<AdminProviderItemDTO>
+
+@{
+    ViewData["Title"] = "Duyệt đăng ký Provider";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+
+    var status = (string)(ViewBag.Status ?? "All"); // mặc định Tất cả
+    var total = Model.Count;
+    var pending = Model.Count(x => string.Equals(x.Status, "Pending", StringComparison.OrdinalIgnoreCase));
+    var approved = Model.Count(x => string.Equals(x.Status, "Approved", StringComparison.OrdinalIgnoreCase));
+    var rejected = Model.Count(x => string.Equals(x.Status, "Rejected", StringComparison.OrdinalIgnoreCase));
+
+    string StatusBadgeClass(string s) => s?.ToLower() switch
+    {
+        "pending" => "st-badge pending",
+        "approved" => "st-badge ok",
+        "rejected" => "st-badge rej", // đỏ (đã style ở css bên dưới)
+        _ => "st-badge"
+    };
+    string StatusVi(string s) => s?.ToLower() switch
+    {
+        "pending" => "Chờ phê duyệt",
+        "approved" => "Đã phê duyệt",
+        "rejected" => "Bị từ chối",
+        _ => s
+    };
+    string Short(string? t, int max = 90)
+        => string.IsNullOrWhiteSpace(t) ? "" : (t.Length <= max ? t : (t.Substring(0, max).TrimEnd() + "…"));
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-register-provider.css" asp-append-version="true" />
+}
+
+<section class="arp container-fluid">
+    <!-- Header / Metrics -->
+    <div class="arp__head card-x glass">
+        <div class="left">
+            <div class="ico"><i class="bi bi-person-workspace"></i></div>
+            <div>
+                <h3>Đăng ký Provider</h3>
+                <div class="sub">Duyệt hồ sơ nhà cung cấp dịch vụ</div>
+            </div>
+        </div>
+        <div class="right">
+            <div class="pill"><span class="lbl">Tổng</span><span class="val">@total</span></div>
+            <div class="pill warn"><span class="lbl">Chờ phê duyệt</span><span class="val">@pending</span></div>
+            <div class="pill good"><span class="lbl">Đã phê duyệt</span><span class="val">@approved</span></div>
+            <div class="pill mute"><span class="lbl">Bị từ chối</span><span class="val">@rejected</span></div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="arp__toolbar">
+        <form method="get" class="filters">
+            <label class="lbl">Trạng thái</label>
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="All">Tất cả</option>
+                <option value="Pending">Chờ phê duyệt</option>
+                <option value="Approved">Đã phê duyệt</option>
+                <option value="Rejected">Bị từ chối</option>
+            </select>
+        </form>
+
+
+        <div class="search">
+            <i class="bi bi-search"></i>
+            <input id="txtSearch" class="form-control" placeholder="Tìm theo tên provider, tài khoản hoặc số điện thoại…" />
+        </div>
+    </div>
+
+    <!-- Table -->
+    <table class="table table-hover align-middle mb-0 arp-table" id="tblProviders">
+        <thead>
+            <tr>
+                <th class="col-name">Tên Provider</th>
+                <th class="col-account">Tên tài khoản</th>
+                <th class="col-desc">Mô tả</th>
+                <th class="col-status">Trạng thái</th>
+                <th class="col-phone">Số điện thoại</th>
+                <th class="col-act text-end">Chi tiết</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in Model)
+            {
+                var badgeCls = StatusBadgeClass(p.Status);
+                var statusVi = StatusVi(p.Status);
+                <tr class="prow">
+                    <td class="pname text-truncate">@p.ProviderName</td>
+                    <td class="paccount text-truncate">@p.AccountName</td>
+                    <td class="td-desc" title="@p.Description">@Short(p.Description, 70)</td>
+                    <td><span class="@badgeCls">@statusVi</span></td>
+                    <td class="pphone">@p.PhoneNumber</td>
+                    <td class="text-end col-act">
+                        <a class="btn btn-sm btn-primary soft"
+                           asp-area="Admin" asp-controller="AdminRegisterProvider" asp-action="Detail" asp-route-id="@p.ProviderId">
+                            <i class="bi bi-eye"></i> Xem
+                        </a>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted">Không có hồ sơ</td></tr>
+            }
+        </tbody>
+    </table>
+
+</section>
+
+@section Scripts {
+    <script>
+        //Fillter
+              (function () {
+          var sel = document.querySelector('select[name="status"]');
+          if (sel) sel.value = '@status'; // "@status" render ra chuỗi, không đụng Tag Helper
+        })();
+
+        // Search client-side
+        document.getElementById('txtSearch').addEventListener('input', function () {
+            const q = this.value.toLowerCase().trim();
+            document.querySelectorAll('#tblProviders tbody tr.prow').forEach(tr => {
+                const name = tr.querySelector('.pname')?.textContent?.toLowerCase() ?? '';
+                const account = tr.querySelector('.paccount')?.textContent?.toLowerCase() ?? '';
+                const phone = tr.querySelector('.pphone')?.textContent?.toLowerCase() ?? '';
+                tr.style.display = (name.includes(q) || account.includes(q) || phone.includes(q)) ? '' : 'none';
+            });
+        });
+    </script>
+}

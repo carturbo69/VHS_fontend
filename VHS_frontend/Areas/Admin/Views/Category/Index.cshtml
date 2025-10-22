@@ -7,8 +7,8 @@
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
     var includeDeleted = (bool)(ViewData["IncludeDeleted"] ?? false);
     var total = Model.Count;
-    var active = Model.Count(x => x.Deleted != true);
-    var deleted = Model.Count(x => x.Deleted == true);
+    var active = Model.Count(x => x.IsDeleted != true);
+    var deleted = Model.Count(x => x.IsDeleted == true);
 }
 
 @section Styles {
@@ -68,7 +68,7 @@
                 @for (int i = 0; i < Model.Count; i++)
                 {
                     var item = Model[i];
-                    <tr data-id="@item.CategoryId" class="cat-row">
+                    <tr data-id="@item.CategoryId" class="cat-row @(item.IsDeleted == true ? "deleted" : "")">
                         <td>
                             <div class="branch">
                                 <button class="btn toggle-tags soft"
@@ -79,9 +79,9 @@
                                 <span class="chip chip-count" data-count-for="@item.CategoryId">–</span>
                             </div>
                         </td>
-                        <td class="cat-name fw-semibold">@item.Name</td>
+                        <td class="cat-name fw-semibold @(item.IsDeleted == true ? "cut" : "")">@item.Name</td>
                         <td>
-                            @if (item.Deleted == true)
+                            @if (item.IsDeleted == true)
                             {
                                 <span class="state del">Đã xoá</span>
                             }
@@ -92,10 +92,10 @@
                         </td>
                         <td class="text-end">
                             <div class="btn-group">
-                                <button class="btn btn-sm btn-outline-primary soft btn-edit" @(item.Deleted == true ? "disabled" : "")>
+                                <button class="btn btn-sm btn-outline-primary soft btn-edit" @(item.IsDeleted == true ? "disabled" : "")>
                                     <i class="bi bi-pencil-square"></i> Sửa
                                 </button>
-                                @if (item.Deleted == true)
+                                @if (item.IsDeleted == true)
                                 {
                                     <button class="btn btn-sm btn-outline-warning soft btn-restore-cat">
                                         <i class="bi bi-arrow-counterclockwise"></i> Khôi phục
@@ -208,6 +208,7 @@
         };
         const includeDeleted = @includeDeleted.ToString().ToLower();
 
+
         // Search
         document.getElementById('txtSearch').addEventListener('input', function(){
           const q = this.value.toLowerCase().trim();
@@ -267,20 +268,101 @@
             catModal.show(); return;
           }
 
-          // delete
-          if (btn.classList.contains('btn-delete-cat')) {
-            if (!confirm('Xoá danh mục này? (soft-delete)')) return;
-            const res = await fetch(routes.catDelete + `?id=${id}`, { method:'DELETE' });
-            if (res.status === 204) location.reload(); else alert(await res.text());
-            return;
-          }
+           // delete
+           if (btn.classList.contains('btn-delete-cat')) {
+             if (!confirm('Xóa danh mục này?')) return;
+             
+             const res = await fetch(routes.catDelete + `?id=${id}`, { method:'DELETE' });
+             if (res.status === 204) {
+               // Hide immediately when successful
+               if (!includeDeleted) {
+                 row.style.display = 'none';
+                 const tagRow = row.nextElementSibling;
+                 if (tagRow && tagRow.classList.contains('tag-row')) {
+                   tagRow.style.display = 'none';
+                 }
+               } else {
+                 // Update UI when showing deleted items
+                 row.classList.add('deleted');
+                 const catName = row.querySelector('.cat-name');
+                 const priI = row.querySelector('.pri-i');
+                 const state = row.querySelector('.state');
+                 
+                 if (catName) catName.classList.add('cut');
+                 if (priI) priI.classList.add('muted-i');
+                 if (state) state.innerHTML = '<span class="state del">Đã xoá</span>';
+                 
+                 btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Khôi phục';
+                 btn.className = 'btn btn-sm btn-warning soft btn-restore-cat';
+                 
+                 const editBtn = btn.closest('.btn-group').querySelector('.btn-edit');
+                 if (editBtn) editBtn.disabled = true;
+                 
+                 const tagRow = row.nextElementSibling;
+                 if (tagRow && tagRow.classList.contains('tag-row')) {
+                   tagRow.style.opacity = '0.6';
+                 }
+               }
+               
+               // Update metrics immediately
+               updateMetrics();
+               
+               // Show success message
+               alert('✅ Xóa danh mục thành công!');
+             } else {
+               const errorText = await res.text();
+               alert(`Lỗi: ${errorText || 'Không thể xóa danh mục'}`);
+             }
+             return;
+           }
 
-          // restore
-          if (btn.classList.contains('btn-restore-cat')) {
-            const res = await fetch(routes.catRestore + `?id=${id}`, { method:'POST' });
-            if (res.status === 204) location.reload(); else alert(await res.text());
-            return;
-          }
+           // restore
+           if (btn.classList.contains('btn-restore-cat')) {
+             if (!confirm('Khôi phục danh mục này?')) return;
+             
+             const res = await fetch(routes.catRestore + `?id=${id}`, { method:'POST' });
+             if (res.status === 204) {
+               // Hide immediately when successful
+               if (!includeDeleted) {
+                 row.style.display = 'none';
+                 const tagRow = row.nextElementSibling;
+                 if (tagRow && tagRow.classList.contains('tag-row')) {
+                   tagRow.style.display = 'none';
+                 }
+               } else {
+                 // Update UI when showing deleted items
+                 row.classList.remove('deleted');
+                 const catName = row.querySelector('.cat-name');
+                 const priI = row.querySelector('.pri-i');
+                 const state = row.querySelector('.state');
+                 
+                 if (catName) catName.classList.remove('cut');
+                 if (priI) priI.classList.remove('muted-i');
+                 if (state) state.innerHTML = '<span class="state ok">Hoạt động</span>';
+                 
+                 btn.innerHTML = '<i class="bi bi-trash"></i> Xoá';
+                 btn.className = 'btn btn-sm btn-outline-danger soft btn-delete-cat';
+                 
+                 const editBtn = btn.closest('.btn-group').querySelector('.btn-edit');
+                 if (editBtn) editBtn.disabled = false;
+                 
+                 const tagRow = row.nextElementSibling;
+                 if (tagRow && tagRow.classList.contains('tag-row')) {
+                   tagRow.style.opacity = '';
+                 }
+               }
+               
+               // Update metrics immediately
+               updateMetrics();
+               
+               // Show success message
+               alert('✅ Khôi phục danh mục thành công!');
+             } else {
+               const errorText = await res.text();
+               alert(`Lỗi: ${errorText || 'Không thể khôi phục danh mục'}`);
+             }
+             return;
+           }
         });
 
         // Save category
@@ -289,14 +371,50 @@
           const id = catIdEl.value.trim();
           const name = catNameEl.value.trim();
           if (!name){ catNameEl.classList.add('is-invalid'); return; }
+          
+          // Client-side validation: check for duplicate names
+          const existingNames = Array.from(document.querySelectorAll('.cat-name:not(.cut)'))
+            .map(el => el.textContent.trim().toLowerCase())
+            .filter((n, i, arr) => arr.indexOf(n) === i); // Remove duplicates
+          
+          if (existingNames.includes(name.toLowerCase()) && !id) {
+            catErr.textContent = 'Tên danh mục đã tồn tại. Vui lòng chọn tên khác.';
+            return;
+          }
           const body = JSON.stringify({ name });
 
           let res;
           if (!id) res = await fetch(routes.catCreate, { method:'POST', headers:{'Content-Type':'application/json'}, body });
           else     res = await fetch(routes.catUpdate + `?id=${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body });
 
-          if (res.status === 200 || res.status === 201) location.reload();
-          else catErr.textContent = (await res.text()) || 'Có lỗi xảy ra.';
+           if (res.status === 200 || res.status === 201) {
+             catModal.hide();
+             if (!id) {
+               // Create new category - reload page to show new item
+               location.reload();
+             } else {
+               // Update existing category - update UI immediately
+               const row = document.querySelector(`tr[data-id="${id}"]`);
+               if (row) {
+                 row.querySelector('.cat-name').textContent = name;
+                 row.querySelector('.cat-name').classList.remove('cut');
+                 
+                 // Update metrics
+                 updateMetrics();
+               }
+             }
+           } else {
+            const errorText = await res.text();
+            if (res.status === 409) {
+              catErr.textContent = 'Tên danh mục đã tồn tại. Vui lòng chọn tên khác.';
+            } else if (res.status === 400) {
+              catErr.textContent = errorText || 'Dữ liệu không hợp lệ.';
+            } else if (res.status === 404) {
+              catErr.textContent = 'Không tìm thấy danh mục.';
+            } else {
+              catErr.textContent = errorText || 'Có lỗi xảy ra.';
+            }
+          }
         });
 
         // ===== TAGS =====
@@ -333,16 +451,16 @@
 
             li.innerHTML = `
               <div class="l">
-                <span class="dot ${t.deleted ? 'muted' : 'ok'}"></span>
-                <i class="bi bi-tag-fill ${t.deleted ? 'muted-i' : 'pri-i'}"></i>
-                <span class="tag-name ${t.deleted ? 'cut' : ''}">${t.name}</span>
-                ${t.deleted ? '<span class="state del ms-2">Đã xoá</span>' : ''}
+                <span class="dot ${t.isDeleted ? 'muted' : 'ok'}"></span>
+                <i class="bi bi-tag-fill ${t.isDeleted ? 'muted-i' : 'pri-i'}"></i>
+                <span class="tag-name ${t.isDeleted ? 'cut' : ''}">${t.name}</span>
+                ${t.isDeleted ? '<span class="state del ms-2">Đã xoá</span>' : ''}
               </div>
               <div class="r btn-group">
-                <button class="btn btn-sm btn-outline-primary soft btn-edit-tag" ${t.deleted ? 'disabled' : ''}>
+                <button class="btn btn-sm btn-outline-primary soft btn-edit-tag" ${t.isDeleted ? 'disabled' : ''}>
                   <i class="bi bi-pencil-square"></i> Sửa
                 </button>
-                ${t.deleted
+                ${t.isDeleted
                    ? `<button class="btn btn-sm btn-outline-warning soft btn-restore-tag"><i class="bi bi-arrow-counterclockwise"></i> Khôi phục</button>`
                    : `<button class="btn btn-sm btn-outline-danger soft btn-delete-tag"><i class="bi bi-trash"></i> Xoá</button>`}
               </div>`;
@@ -387,18 +505,77 @@
             }
 
             if (btn.classList.contains('btn-delete-tag')) {
-              if (!confirm('Xoá tag này? (soft-delete)')) return;
+              if (!confirm('Xóa tag này?')) return;
+              
               const res = await fetch(routes.tagDelete + `?id=${tagId}`, { method:'DELETE' });
-              if (!res.ok) return alert(await res.text());
-              await reloadTags(catId, pane); return;
+              if (res.status === 204) {
+                await reloadTags(catId, pane);
+              } else {
+                const errorText = await res.text();
+                alert(`Lỗi: ${errorText || 'Không thể xóa tag'}`);
+              }
+              return;
             }
 
             if (btn.classList.contains('btn-restore-tag')) {
+              if (!confirm('Khôi phục tag này?')) return;
+              
               const res = await fetch(routes.tagRestore + `?id=${tagId}`, { method:'POST' });
-              if (!res.ok) return alert(await res.text());
-              await reloadTags(catId, pane); return;
+              if (res.status === 204) {
+                await reloadTags(catId, pane);
+              } else {
+                const errorText = await res.text();
+                alert(`Lỗi: ${errorText || 'Không thể khôi phục tag'}`);
+              }
+              return;
             }
           });
+        });
+
+        // Save tag
+        document.getElementById('tagForm').addEventListener('submit', async (e)=>{
+          e.preventDefault();
+          const id = tagIdEl.value.trim();
+          const categoryId = tagCatIdEl.value.trim();
+          const name = tagNameEl.value.trim();
+          if (!name){ tagNameEl.classList.add('is-invalid'); return; }
+          if (!categoryId){ tagErr.textContent = 'Lỗi: không xác định được danh mục'; return; }
+          
+          // Client-side validation: check for duplicate tag names in the same category
+          const categoryPane = document.querySelector(`[data-category-id="${categoryId}"]`);
+          if (categoryPane) {
+            const existingTagNames = Array.from(categoryPane.querySelectorAll('.tag-name:not(.cut)'))
+              .map(el => el.textContent.trim().toLowerCase());
+            
+            if (existingTagNames.includes(name.toLowerCase()) && !id) {
+              tagErr.textContent = 'Tên tag đã tồn tại trong danh mục này. Vui lòng chọn tên khác.';
+              return;
+            }
+          }
+          
+          const body = JSON.stringify({ categoryId, name });
+
+          let res;
+          if (!id) res = await fetch(routes.tagCreate, { method:'POST', headers:{'Content-Type':'application/json'}, body });
+          else     res = await fetch(routes.tagUpdate + `?id=${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body });
+
+          if (res.status === 200 || res.status === 201) {
+            tagModal.hide();
+            // Reload tags for this category
+            const pane = document.querySelector(`[data-category-id="${categoryId}"]`);
+            if (pane) await reloadTags(categoryId, pane);
+          } else {
+            const errorText = await res.text();
+            if (res.status === 409) {
+              tagErr.textContent = 'Tên tag đã tồn tại trong danh mục này. Vui lòng chọn tên khác.';
+            } else if (res.status === 400) {
+              tagErr.textContent = errorText || 'Dữ liệu không hợp lệ.';
+            } else if (res.status === 404) {
+              tagErr.textContent = 'Không tìm thấy tag hoặc danh mục.';
+            } else {
+              tagErr.textContent = errorText || 'Có lỗi xảy ra.';
+            }
+          }
         });
 
         async function reloadTags(catId, pane){
@@ -409,16 +586,51 @@
           renderTagList(pane.querySelector('.tag-list'), list, catId, pane);
         }
 
-        // Prefetch: lấy số lượng cho chip TRÊN/DƯỚI ngay khi vào trang (mềm mượt)
-        document.addEventListener('DOMContentLoaded', async ()=>{
-          const rows = Array.from(document.querySelectorAll('tr.cat-row'));
-          for (const r of rows){
-            const id = r.dataset.id;
-            fetch(routes.tagsByCat + `?categoryId=${id}&includeDeleted=${includeDeleted}`)
-              .then(res => res.ok ? res.json() : [])
-              .then(list => updateTagCountBadges(id, list?.length ?? 0))
-              .catch(()=>{});
-          }
-        });
+         // Function to update metrics (số lượng) ngay lập tức
+         function updateMetrics() {
+           const rows = document.querySelectorAll('tr.cat-row');
+           let total = rows.length;
+           let active = 0;
+           let deleted = 0;
+           
+           rows.forEach(row => {
+             if (row.classList.contains('deleted')) {
+               deleted++;
+             } else {
+               active++;
+             }
+           });
+           
+           // Update metrics in header
+           const totalPill = document.querySelector('.pill .val');
+           const activePill = document.querySelector('.pill.good .val');
+           const deletedPill = document.querySelector('.pill.mute .val');
+           
+           if (totalPill) totalPill.textContent = total;
+           if (activePill) activePill.textContent = active;
+           if (deletedPill) deletedPill.textContent = deleted;
+         }
+
+         // Prefetch: lấy số lượng cho chip TRÊN/DƯỚI ngay khi vào trang (mềm mượt)
+         document.addEventListener('DOMContentLoaded', async ()=>{
+           const rows = Array.from(document.querySelectorAll('tr.cat-row'));
+           for (const r of rows){
+             const id = r.dataset.id;
+             fetch(routes.tagsByCat + `?categoryId=${id}&includeDeleted=${includeDeleted}`)
+               .then(res => res.ok ? res.json() : [])
+               .then(list => {
+                 updateTagCountBadges(id, list?.length ?? 0);
+                 
+                 // Check if category has active tags and update delete button
+                 const activeTags = list?.filter(tag => !tag.isDeleted) || [];
+                 const deleteBtn = r.querySelector('.btn-delete-cat');
+                 if (deleteBtn && activeTags.length > 0) {
+                   deleteBtn.title = `Không thể xóa vì còn ${activeTags.length} tag đang hoạt động`;
+                   deleteBtn.style.opacity = '0.6';
+                 }
+               })
+               .catch(()=>{});
+           }
+         });
     </script>
 }
