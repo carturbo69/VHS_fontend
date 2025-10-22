@@ -125,5 +125,24 @@ namespace VHS_frontend.Services.Customer
             };
         }
 
+        public async Task CancelUnpaidAsync(
+    List<Guid> bookingIds,
+    string? jwtToken = null,
+    CancellationToken cancellationToken = default)
+        {
+            SetAuthHeader(jwtToken);
+
+            var url = "api/Bookings/cancel-unpaid";
+            var payload = new { BookingIds = bookingIds };
+
+            using var resp = await _httpClient.PostAsJsonAsync(url, payload, cancellationToken);
+            if (resp.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                var msg = await resp.Content.ReadAsStringAsync(cancellationToken);
+                throw new HttpRequestException(string.IsNullOrWhiteSpace(msg) ? "BadRequest" : msg);
+            }
+            resp.EnsureSuccessStatusCode();
+        }
+
     }
 }

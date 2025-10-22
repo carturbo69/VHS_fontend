@@ -302,6 +302,7 @@
                     </div>
 
                     <div style="margin-top:12px">
+
                         <button class="btn" type="button" onclick="cancelCheckout()">Hủy</button>
                         <button class="btn-place" type="submit">Đặt hàng</button>
                     </div>
@@ -435,89 +436,9 @@
 
 @section Scripts {
     <script>
-
                   function cancelCheckout() {
-          // Cho phép rời đi mà không bật beforeunload lần này
-          window.__checkoutGuard?.allowLeaveOnce?.();
-
-          // Nếu có trang trước và cùng origin, quay lại; nếu không thì về trang giỏ hàng
-          const sameOriginRef = document.referrer && new URL(document.referrer).origin === location.origin;
-          if (sameOriginRef) {
-            history.back();
-          } else {
-            window.location.href = '@Url.Action("Index", "Cart", new { area = "Customer" })';
-          }
+            window.location.href = '/Customer/Cart/Index';
         }
-
-
-                // ====== BẢO VỆ RỜI TRANG KHI CHƯA HOÀN TẤT THANH TOÁN ======
-        (function protectCheckoutLeave(){
-          const form = document.getElementById('@placeOrderFormId');
-          if (!form) return;
-
-          let isDirty = false;
-          let isPlacingOrder = false;
-          let suppressNextBeforeUnload = false; // dùng khi mình chủ động điều hướng (ví dụ nút Hủy)
-
-          // Đánh dấu "đang gửi" để không chặn rời trang sau khi nhấn Đặt hàng
-          form.addEventListener('submit', () => {
-            isPlacingOrder = true;
-            suppressNextBeforeUnload = true;
-          });
-
-          // Đánh dấu "có chỉnh sửa" khi người dùng thay đổi dữ liệu
-          const markDirty = () => { isDirty = true; };
-          // Lắng nghe thay đổi trên toàn trang (các input/ select/ textarea có thể nằm ngoài form mà still "form=placeOrderFormId")
-          document.addEventListener('change', (e) => {
-            if (e.target.matches('input, select, textarea')) markDirty();
-          });
-          document.addEventListener('input', (e) => {
-            if (e.target.matches('input, textarea')) markDirty();
-          });
-
-          // 1) Chặn rời trang nói chung
-          window.addEventListener('beforeunload', function (e) {
-            if (suppressNextBeforeUnload) return;                // cho phép rời trang do mình chủ động
-            if (isPlacingOrder) return;                          // đang submit
-            if (!isDirty) return;                                // không có thay đổi
-            e.preventDefault();
-            // Một số trình duyệt cần returnValue khác rỗng để hiển thị prompt
-            e.returnValue = '';
-          });
-
-          // 2) Bắt nút Back để hỏi confirm "tuỳ biến"
-          // Đẩy state hiện tại vào history để popstate kích hoạt khi Back
-          const stateToken = { guard: 'checkout-guard' };
-          history.replaceState(stateToken, document.title, location.href);
-          history.pushState(stateToken, document.title, location.href);
-
-          let handlingPop = false;
-          window.addEventListener('popstate', function (e) {
-            if (handlingPop) return;
-
-            // Nếu không bẩn hoặc đang submit thì cho phép rời
-            if (!isDirty || isPlacingOrder) return;
-
-            // Hỏi xác nhận khi bấm Back
-            handlingPop = true;
-            const ok = confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang thanh toán không?');
-            if (ok) {
-              // Cho phép quay lại thực sự: lùi thêm 1 bước nữa
-              suppressNextBeforeUnload = true; // tránh beforeunload ngay sau đây
-              history.back();
-            } else {
-              // Ở lại trang: đẩy lại state để giữ người dùng ở đây
-              history.pushState(stateToken, document.title, location.href);
-            }
-            handlingPop = false;
-          });
-
-          // Expose nhỏ để nút Hủy chủ động bỏ chặn trước khi điều hướng
-          window.__checkoutGuard = {
-            allowLeaveOnce: () => { suppressNextBeforeUnload = true; }
-          };
-        })();
-
 
                 /* ========= Chọn phương thức thanh toán: chỉ đổi UI, KHÔNG auto submit ========= */
         (function bindPaymentPickUIOnly(){
