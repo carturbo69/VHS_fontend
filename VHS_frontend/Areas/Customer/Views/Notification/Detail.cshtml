@@ -1,0 +1,163 @@
+@model VHS_frontend.Areas.Customer.Models.Notification.NotificationDTO
+@{
+    ViewData["Title"] = "Chi tiết thông báo";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="notification-detail-page">
+    <div class="container">
+        <div class="detail-header">
+            <a asp-action="Index" class="back-btn">
+                <i class="icon-arrow-left"></i>
+                Quay lại
+            </a>
+            <h1 class="page-title">Chi tiết thông báo</h1>
+        </div>
+
+        <div class="notification-detail-card">
+            <div class="detail-header-info">
+                <div class="notification-icon-large">
+                    @switch (Model.NotificationType.ToLower())
+                    {
+                        case "booking":
+                            <i class="icon-calendar"></i>
+                            break;
+                        case "payment":
+                            <i class="icon-credit-card"></i>
+                            break;
+                        case "system":
+                            <i class="icon-settings"></i>
+                            break;
+                        default:
+                            <i class="icon-bell"></i>
+                            break;
+                    }
+                </div>
+                
+                <div class="notification-info">
+                    <h2 class="notification-title">@Model.Content</h2>
+                    <div class="notification-meta">
+                        <span class="type-badge type-@Model.NotificationType.ToLower()">
+                            @Model.NotificationType
+                        </span>
+                        <span class="time">@Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                        @if (!Model.IsRead)
+                        {
+                            <span class="status-badge unread">Chưa đọc</span>
+                        }
+                        else
+                        {
+                            <span class="status-badge read">Đã đọc</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="notification-content">
+                <div class="content-section">
+                    <h3>Nội dung thông báo</h3>
+                    <p>@Model.Content</p>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Model.RelatedId))
+                {
+                    <div class="content-section">
+                        <h3>Thông tin liên quan</h3>
+                        <p>ID: @Model.RelatedId</p>
+                    </div>
+                }
+            </div>
+
+            <div class="detail-actions">
+                @if (!Model.IsRead)
+                {
+                    <button type="button" class="btn btn-primary" id="markReadBtn" 
+                            data-notification-id="@Model.NotificationId">
+                        <i class="icon-check"></i>
+                        Đánh dấu đã đọc
+                    </button>
+                }
+                
+                <button type="button" class="btn btn-outline-danger" id="deleteBtn" 
+                        data-notification-id="@Model.NotificationId">
+                    <i class="icon-trash"></i>
+                    Xóa thông báo
+                </button>
+                
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="icon-list"></i>
+                    Xem tất cả thông báo
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const markReadBtn = document.getElementById('markReadBtn');
+            const deleteBtn = document.getElementById('deleteBtn');
+
+            if (markReadBtn) {
+                markReadBtn.addEventListener('click', function() {
+                    const notificationId = this.dataset.notificationId;
+                    markAsRead(notificationId);
+                });
+            }
+
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', function() {
+                    const notificationId = this.dataset.notificationId;
+                    deleteNotification(notificationId);
+                });
+            }
+        });
+
+        function markAsRead(notificationId) {
+            fetch(`/Customer/Notification/MarkRead/${notificationId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Có lỗi xảy ra: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra');
+            });
+        }
+
+        function deleteNotification(notificationId) {
+            if (confirm('Bạn có chắc chắn muốn xóa thông báo này?')) {
+                fetch(`/Customer/Notification/Delete/${notificationId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/Customer/Notification';
+                    } else {
+                        alert('Có lỗi xảy ra: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Có lỗi xảy ra');
+                });
+            }
+        }
+    </script>
+}

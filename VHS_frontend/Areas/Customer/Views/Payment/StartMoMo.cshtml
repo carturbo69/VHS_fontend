@@ -1,0 +1,61 @@
+﻿@model VHS_frontend.Areas.Customer.Controllers.PaymentController.PaymentDemoViewModel
+@{
+    ViewData["Title"] = "Thanh toán MoMo (Demo)";
+}
+<section style="max-width:600px;margin:20px auto;padding:20px;border:1px solid #ddd;border-radius:8px;">
+    <h2>Demo Thanh toán MoMo</h2>
+    <p>@Model.Message</p>
+    <hr />
+    <p><strong>Booking IDs:</strong> @string.Join(", ", Model.BookingIds)</p>
+    <p><strong>Số tiền:</strong> @Model.Amount.ToString("N0") ₫</p>
+
+    <div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;">
+        <!-- XÁC NHẬN (success) -->
+        <form method="get" action="@Url.Action("MoMoReturn", "Payment", new { area = "Customer" })">
+            <input type="hidden" name="result" value="success" />
+            <input type="hidden" name="resultCode" value="0" />
+
+            @* Gửi nhiều bookingIds *@
+            @foreach (var id in Model.BookingIds)
+            {
+                <input type="hidden" name="bookingIds" value="@id" />
+            }
+
+            <input type="hidden" name="amount" value="@Model.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+            <input type="hidden" name="orderInfo" value="Thanh toán các booking" />
+            <button type="submit" class="btn btn-success">Xác nhận thanh toán</button>
+        </form>
+
+        <!-- HỦY (fail) -->
+        @* <form method="get" action="@Url.Action("MoMoReturn", "Payment", new { area = "Customer" })">
+            <input type="hidden" name="result" value="fail" />
+            <input type="hidden" name="resultCode" value="49" />
+            <input type="hidden" name="message" value="User canceled" />
+
+            @foreach (var id in Model.BookingIds)
+            {
+                <input type="hidden" name="bookingIds" value="@id" />
+            }
+
+            <input type="hidden" name="amount" value="@Model.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+            <input type="hidden" name="orderInfo" value="Thanh toán các booking" />
+            <button type="submit" class="btn btn-outline-danger">Hủy</button>
+        </form> *@
+
+
+        <!-- HỦY (hủy pending -> về Giỏ hàng) -->
+        <form method="post" action="@Url.Action("CancelToCart", "Payment", new { area = "Customer" })">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-danger">Hủy</button>
+        </form>
+
+        <!-- QUAY LẠI (hủy pending -> về Index BookingService) -->
+        <form method="post" action="@Url.Action("CancelAndBack", "Payment", new { area = "Customer" })">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn">Quay lại</button>
+        </form>
+
+
+
+    </div>
+</section>

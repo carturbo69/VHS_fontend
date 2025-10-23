@@ -13,11 +13,18 @@ namespace VHS_frontend.Areas.Admin.Controllers
         {
             _svc = svc;
         }
+        
+        private void AttachBearerIfAny()
+        {
+            var token = HttpContext.Session.GetString("JWToken");
+            if (!string.IsNullOrWhiteSpace(token)) _svc.SetBearerToken(token);
+        }
 
         // GET: /Admin/AdminProvider?includeDeleted=false
         [HttpGet]
         public async Task<IActionResult> Index(bool includeDeleted = false, CancellationToken ct = default)
         {
+            AttachBearerIfAny();
             var list = await _svc.GetAllAsync(includeDeleted, ct);
             ViewData["IncludeDeleted"] = includeDeleted;
             return View(list); // View: Areas/Admin/Views/AdminProvider/Index.cshtml (model: List<ProviderDTO>)
@@ -28,6 +35,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         [HttpGet]
         public async Task<IActionResult> Get(Guid id, CancellationToken ct = default)
         {
+            AttachBearerIfAny();
             var dto = await _svc.GetByIdAsync(id, ct);
             if (dto == null) return NotFound("Không tìm thấy Provider.");
             return Json(dto);
@@ -38,6 +46,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         [HttpDelete]
         public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
         {
+            AttachBearerIfAny();
             var res = await _svc.DeleteAsync(id, ct);
             if (res.IsSuccessStatusCode) return NoContent();
 
@@ -49,6 +58,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         [HttpPost]
         public async Task<IActionResult> Restore(Guid id, CancellationToken ct = default)
         {
+            AttachBearerIfAny();
             var res = await _svc.RestoreAsync(id, ct);
             if (res.IsSuccessStatusCode) return NoContent();
 

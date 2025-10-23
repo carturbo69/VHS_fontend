@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Net.Http.Headers;
 using VHS_frontend.Areas.Admin.Models.Provider;
 
 namespace VHS_frontend.Services.Admin
@@ -12,8 +13,18 @@ namespace VHS_frontend.Services.Admin
     {
         private readonly HttpClient _http;
         private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
+        private string? _bearer;
 
         public ProviderAdminService(HttpClient http) => _http = http;
+        
+        public void SetBearerToken(string token) => _bearer = token;
+
+        private void AttachAuth()
+        {
+            if (!string.IsNullOrWhiteSpace(_bearer))
+                _http.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", _bearer);
+        }
 
         /// <summary>
         /// Lấy toàn bộ provider. includeDeleted = true để hiện cả bản ghi đã ẩn.
@@ -23,6 +34,7 @@ namespace VHS_frontend.Services.Admin
             bool includeDeleted = false,
             CancellationToken ct = default)
         {
+            AttachAuth();
             var url =
                 $"/api/account?includeDeleted={includeDeleted.ToString().ToLower()}" +
                 $"&$filter=Role eq 'Provider'";
@@ -35,18 +47,27 @@ namespace VHS_frontend.Services.Admin
         /// Xem chi tiết 1 provider theo Id.
         /// </summary>
         public Task<ProviderDTO?> GetByIdAsync(Guid id, CancellationToken ct = default)
-            => _http.GetFromJsonAsync<ProviderDTO>($"/api/account/{id}", _json, ct);
+        {
+            AttachAuth();
+            return _http.GetFromJsonAsync<ProviderDTO>($"/api/account/{id}", _json, ct);
+        }
 
         /// <summary>
         /// Soft-delete (ẩn) provider.
         /// </summary>
         public Task<HttpResponseMessage> DeleteAsync(Guid id, CancellationToken ct = default)
-            => _http.DeleteAsync($"/api/account/{id}", ct);
+        {
+            AttachAuth();
+            return _http.DeleteAsync($"/api/account/{id}", ct);
+        }
 
         /// <summary>
         /// Khôi phục provider đã bị ẩn.
         /// </summary>
         public Task<HttpResponseMessage> RestoreAsync(Guid id, CancellationToken ct = default)
-            => _http.PostAsync($"/api/account/{id}/restore", content: null, ct);
+        {
+            AttachAuth();
+            return _http.PostAsync($"/api/account/{id}/restore", content: null, ct);
+        }
     }
 }
