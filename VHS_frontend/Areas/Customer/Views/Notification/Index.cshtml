@@ -4,6 +4,50 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
+<style>
+/* CRITICAL FIX - Force chat icon on notification page */
+/* Let Bootstrap Icons CSS handle content, just ensure visibility */
+body .site-header a.icon-btn.chat-btn i#chatIcon.bi.bi-chat-dots-fill.fs-4::before,
+body .site-header .nav-actions .chat-btn i#chatIcon.bi.bi-chat-dots-fill::before,
+html body #chatIcon.bi.bi-chat-dots-fill::before,
+i#chatIcon.bi-chat-dots-fill::before,
+i#chatIcon.bi::before,
+#chatIcon::before {
+    font-family: "bootstrap-icons" !important;
+    font-style: normal !important;
+    font-weight: normal !important;
+    font-variant: normal !important;
+    text-transform: none !important;
+    line-height: 1 !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    width: auto !important;
+    height: auto !important;
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    z-index: auto !important;
+}
+
+/* Ensure chat icon element itself is visible */
+#chatIcon,
+i#chatIcon,
+.bi-chat-dots-fill#chatIcon,
+a.chat-btn > #chatIcon {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    height: auto !important;
+}
+</style>
+
 @Html.AntiForgeryToken()
 
 <div class="notification-page">
@@ -134,10 +178,11 @@
                 }
             });
             
-            // Remove tất cả elements có class chứa "dot", "indicator" (nhưng không xóa badge chính)
-            const dotElements = document.querySelectorAll('[class*="dot"]:not(#notificationBadge), [class*="indicator"]:not(#notificationBadge)');
+            // Remove tất cả elements có class chứa "dot", "indicator" (nhưng không xóa badge chính và KHÔNG ẨN CHAT ICON)
+            const dotElements = document.querySelectorAll('[class*="dot"]:not(#notificationBadge):not(#chatIcon), [class*="indicator"]:not(#notificationBadge)');
             dotElements.forEach(element => {
-                if (element.style && element.id !== 'notificationBadge') {
+                // Không ẩn chatIcon hoặc notificationBadge
+                if (element.style && element.id !== 'notificationBadge' && element.id !== 'chatIcon') {
                     element.style.display = 'none';
                     element.style.visibility = 'hidden';
                     element.style.opacity = '0';
@@ -156,7 +201,7 @@
                     .notification-item *::after,
                     .unread-indicator,
                     .notification-dot,
-                    [class*="dot"]:not(#notificationBadge),
+                    [class*="dot"]:not(#notificationBadge):not(#chatIcon):not(.bi-chat-dots-fill),
                     [class*="indicator"]:not(#notificationBadge) {
                         display: none !important;
                         content: none !important;
@@ -200,6 +245,72 @@
         
         // Chạy ngay khi load
         forceRemoveGreenDots();
+        
+        // ============================================
+        // FORCE FIX CHAT ICON - APPLY STYLES VIA JAVASCRIPT
+        // ============================================
+        function forceChatIconVisible() {
+            console.log('🔧 [Notification Page] Forcing chat icon visible...');
+            
+            const chatBtn = document.querySelector('.chat-btn');
+            const chatIcon = document.getElementById('chatIcon');
+            const chatBadge = document.querySelector('.chat-badge');
+            
+            console.log('Chat elements found:', {
+                chatBtn: !!chatBtn,
+                chatIcon: !!chatIcon,
+                chatBadge: !!chatBadge
+            });
+            
+            if (chatBtn) {
+                chatBtn.style.setProperty('opacity', '1', 'important');
+                chatBtn.style.setProperty('visibility', 'visible', 'important');
+                chatBtn.style.setProperty('display', 'grid', 'important');
+                chatBtn.style.setProperty('pointer-events', 'auto', 'important');
+                chatBtn.style.setProperty('position', 'relative', 'important');
+                console.log('✅ Chat button styles applied');
+            } else {
+                console.warn('⚠️ Chat button not found!');
+            }
+            
+            if (chatIcon) {
+                const isDark = document.documentElement.classList.contains('dark');
+                const color = isDark ? '#ffffff' : '#2f2f2f';
+                
+                // Only set color, opacity and visibility - DON'T override font-family!
+                chatIcon.style.setProperty('color', color, 'important');
+                chatIcon.style.setProperty('opacity', '1', 'important');
+                chatIcon.style.setProperty('visibility', 'visible', 'important');
+                chatIcon.style.setProperty('display', 'inline-block', 'important');
+                
+                console.log('✅ Chat icon styles applied, color:', color);
+            } else {
+                console.warn('⚠️ Chat icon not found!');
+            }
+            
+            if (chatBadge) {
+                chatBadge.style.setProperty('opacity', '1', 'important');
+                chatBadge.style.setProperty('visibility', 'visible', 'important');
+                chatBadge.style.setProperty('display', 'grid', 'important');
+                chatBadge.style.setProperty('z-index', '1000', 'important');
+                console.log('✅ Chat badge styles applied');
+            }
+        }
+        
+        // Apply styles - chỉ set color, không cần inject CSS nữa
+        forceChatIconVisible();
+        
+        // Apply lại sau 100ms để đảm bảo
+        setTimeout(forceChatIconVisible, 100);
+        
+        // Theo dõi theme changes và reapply
+        const themeObserver = new MutationObserver(() => {
+            forceChatIconVisible();
+        });
+        themeObserver.observe(document.documentElement, { 
+            attributes: true, 
+            attributeFilter: ['class'] 
+        });
         
         // Set để theo dõi các notification đang được xóa
         window.deletingNotifications = new Set();
@@ -1002,3 +1113,4 @@
         };
     </script>
 }
+

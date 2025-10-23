@@ -87,12 +87,7 @@
                     <!-- Chat -->
                     <a asp-area="Customer" asp-controller="ChatCustomer" asp-action="Index"
                        class="icon-btn chat-btn" aria-label="Chat">
-                        <svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M4 4h16v12H5.17L4 17.17V4z" fill="none" stroke="currentColor" stroke-width="2" />
-                            <circle cx="8" cy="10" r="1.5" />
-                            <circle cx="12" cy="10" r="1.5" />
-                            <circle cx="16" cy="10" r="1.5" />
-                        </svg>
+                        <i id="chatIcon" class="bi bi-chat-dots-fill fs-4"></i>
                         <span class="chat-badge" data-chat-count>0</span>
                     </a>
 
@@ -179,5 +174,56 @@
 
         // 👉 Tự động refresh mỗi 30 giây (30000 ms)
         setInterval(updateCartCount, 30000);
+
+        // 👉 FIX: Force chat icon visibility and color
+        const chatIcon = document.getElementById('chatIcon');
+        const chatBtn = document.querySelector('.chat-btn');
+        
+        if (chatIcon) {
+            // Function to apply chat icon styles
+            function applyChatIconStyles() {
+                const isDark = document.documentElement.classList.contains('dark');
+                const color = isDark ? '#ffffff' : '#2f2f2f';
+                
+                // Fix icon itself
+                chatIcon.style.setProperty('color', color, 'important');
+                chatIcon.style.setProperty('opacity', '1', 'important');
+                chatIcon.style.setProperty('visibility', 'visible', 'important');
+                chatIcon.style.setProperty('display', 'inline-block', 'important');
+                chatIcon.style.setProperty('filter', 'none', 'important');
+                chatIcon.style.setProperty('font-size', '1rem', 'important');
+                chatIcon.style.setProperty('width', 'auto', 'important');
+                chatIcon.style.setProperty('height', 'auto', 'important');
+                
+                // Fix chat button container
+                if (chatBtn) {
+                    chatBtn.style.setProperty('opacity', '1', 'important');
+                    chatBtn.style.setProperty('visibility', 'visible', 'important');
+                    chatBtn.style.setProperty('display', 'grid', 'important');
+                    chatBtn.style.setProperty('pointer-events', 'auto', 'important');
+                }
+            }
+            
+            // Apply immediately
+            applyChatIconStyles();
+            
+            // Re-apply on theme change
+            const observer = new MutationObserver(() => {
+                applyChatIconStyles();
+            });
+            observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+            
+            // Re-apply on page visibility change
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    applyChatIconStyles();
+                }
+            });
+            
+            // Re-apply after a short delay to ensure it overrides any other styles
+            setTimeout(() => {
+                applyChatIconStyles();
+            }, 100);
+        }
     });
 </script>
