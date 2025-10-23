@@ -1,0 +1,1007 @@
+/* ===================== MODERN AUTH DESIGN - POLISH VERSION ===================== */
+
+/* Reset for auth pages */
+body {
+    margin: 0;
+    padding: 0;
+}
+
+#main {
+    margin: 0;
+    padding: 0;
+}
+
+/* Enhanced CSS Variables */
+:root {
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-soft: cubic-bezier(0.25, 0.8, 0.25, 1);
+    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --dur-fast: 0.2s;
+    --dur: 0.3s;
+    --dur-slow: 0.6s;
+    
+    /* Custom gradients - Light Mode */
+    --gradient-primary: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 85%, #16a085) 100%);
+    --gradient-accent: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+    --gradient-bg: linear-gradient(135deg, #f5f7fa 0%, #e8f5f1 100%);
+    --auth-card-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+    --auth-side-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.7) 100%);
+    --auth-input-bg: rgba(255, 255, 255, 0.8);
+    --auth-input-focus-bg: rgba(255, 255, 255, 1);
+}
+
+.dark {
+    /* Custom gradients - Dark Mode - Match header colors */
+    --gradient-bg: linear-gradient(135deg, #121212 0%, #1a1a1a 100%);
+    --auth-card-bg: linear-gradient(135deg, rgba(31, 31, 31, 0.95) 0%, rgba(31, 31, 31, 0.98) 100%);
+    --auth-side-bg: linear-gradient(135deg, rgba(31, 31, 31, 0.85) 0%, rgba(31, 31, 31, 0.7) 100%);
+    --auth-input-bg: rgba(22, 22, 22, 0.6);
+    --auth-input-focus-bg: rgba(22, 22, 22, 0.85);
+}
+
+/* Main wrapper with animated background */
+.auth-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    position: relative;
+    overflow: hidden;
+    background: var(--gradient-bg);
+}
+
+/* Animated background particles */
+.auth-wrap::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+        radial-gradient(circle at 20% 30%, color-mix(in oklab, var(--primary) 15%, transparent) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, color-mix(in oklab, var(--ring) 12%, transparent) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, color-mix(in oklab, var(--primary) 8%, transparent) 0%, transparent 50%);
+    animation: floatBg 20s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.dark .auth-wrap::before {
+    background: 
+        radial-gradient(circle at 20% 30%, color-mix(in oklab, #1abc9c 18%, transparent) 0%, transparent 50%),
+        radial-gradient(circle at 80% 70%, color-mix(in oklab, #16a085 15%, transparent) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, color-mix(in oklab, #1abc9c 12%, transparent) 0%, transparent 50%);
+}
+
+@keyframes floatBg {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    33% { transform: translate(30px, -30px) rotate(120deg); }
+    66% { transform: translate(-20px, 20px) rotate(240deg); }
+}
+
+.auth-wrap .container-xl {
+    max-width: 1200px;
+    width: 100%;
+    padding: 32px 20px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Grid layout - Enhanced */
+.auth-grid {
+    display: grid;
+    gap: 32px;
+    grid-template-columns: 1fr;
+    align-items: center;
+}
+
+@media (min-width: 992px) {
+    .auth-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 48px;
+    }
+}
+
+/* Left panel - Glassmorphism effect */
+.auth-side {
+    border: 1px solid color-mix(in oklab, white 20%, transparent);
+    border-radius: 24px;
+    background: var(--auth-side-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+        0 8px 32px 0 color-mix(in oklab, var(--foreground) 15%, transparent),
+        inset 0 1px 0 0 color-mix(in oklab, white 20%, transparent);
+    transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.dark .auth-side {
+    border-color: color-mix(in oklab, white 10%, transparent);
+    box-shadow: 
+        0 8px 32px 0 rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 0 color-mix(in oklab, white 8%, transparent);
+}
+
+/* Animated gradient overlay */
+.auth-side::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+        radial-gradient(circle at center, 
+            color-mix(in oklab, var(--primary) 20%, transparent) 0%, 
+            transparent 70%
+        );
+    animation: rotateGradient 15s linear infinite;
+    pointer-events: none;
+}
+
+.dark .auth-side::before {
+    background: 
+        radial-gradient(circle at center, 
+            color-mix(in oklab, var(--primary) 25%, transparent) 0%, 
+            transparent 70%
+        );
+}
+
+@keyframes rotateGradient {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@media (hover: hover) {
+    .auth-side:hover {
+        transform: translateY(-8px);
+    }
+}
+
+.auth-side-inner {
+    padding: 48px 36px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Logo with pulse animation */
+.auth-logo {
+    display: block;
+    margin: 0 auto 24px;
+    height: 100px;
+    width: auto;
+    filter: drop-shadow(0 4px 12px color-mix(in oklab, var(--primary) 30%, transparent));
+    animation: logoPulse 3s ease-in-out infinite;
+}
+
+@keyframes logoPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.auth-heading {
+    font-size: clamp(26px, 3vw, 34px);
+    font-weight: 800;
+    margin: 0 0 16px;
+    line-height: 1.3;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dark .auth-heading {
+    background: linear-gradient(135deg, #1abc9c 0%, #48d1b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.text-primary {
+    position: relative;
+    display: inline-block;
+}
+
+.text-primary::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+    border-radius: 2px;
+    opacity: 0.3;
+}
+
+.dark .text-primary::after {
+    background: linear-gradient(135deg, #1abc9c 0%, #48d1b8 100%);
+    opacity: 0.4;
+}
+
+.auth-sub {
+    color: var(--muted-foreground);
+    line-height: 1.7;
+    margin-bottom: 20px;
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.auth-usp {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--foreground);
+    line-height: 2;
+}
+
+.auth-usp li {
+    position: relative;
+    padding-left: 32px;
+    margin-bottom: 12px;
+    transition: transform var(--dur) var(--ease-out);
+}
+
+.auth-usp li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    background: var(--gradient-primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    box-shadow: 0 4px 12px color-mix(in oklab, var(--primary) 30%, transparent);
+}
+
+.dark .auth-usp li::before {
+    background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+    box-shadow: 0 4px 12px color-mix(in oklab, var(--primary) 40%, transparent);
+}
+
+@media (hover: hover) {
+    .auth-usp li:hover {
+        transform: translateX(8px);
+    }
+}
+
+/* Right panel - Form card */
+.auth-card {
+    border: 1px solid color-mix(in oklab, white 20%, transparent);
+    border-radius: 24px;
+    background: var(--auth-card-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    padding: 48px 40px;
+    display: grid;
+    gap: 20px;
+    box-shadow: 
+        0 8px 32px 0 color-mix(in oklab, var(--foreground) 15%, transparent),
+        inset 0 1px 0 0 color-mix(in oklab, white 20%, transparent);
+    transition: transform var(--dur-slow) var(--ease-out), box-shadow var(--dur-slow) var(--ease-out);
+    position: relative;
+    overflow: hidden;
+}
+
+.dark .auth-card {
+    border-color: color-mix(in oklab, white 10%, transparent);
+    box-shadow: 
+        0 8px 32px 0 rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 0 color-mix(in oklab, white 8%, transparent);
+}
+
+/* Shimmer effect on card */
+.auth-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in oklab, white 5%, transparent),
+        transparent
+    );
+    transform: rotate(45deg);
+    animation: shimmer 3s infinite;
+}
+
+.dark .auth-card::after {
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in oklab, white 3%, transparent),
+        transparent
+    );
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) rotate(45deg); }
+}
+
+@media (max-width: 767px) {
+    .auth-card {
+        padding: 36px 28px;
+    }
+}
+
+@media (hover: hover) {
+    .auth-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 
+            0 20px 60px 0 color-mix(in oklab, var(--foreground) 20%, transparent),
+            inset 0 1px 0 0 color-mix(in oklab, white 30%, transparent);
+    }
+    
+    .dark .auth-card:hover {
+        box-shadow: 
+            0 20px 60px 0 rgba(0, 0, 0, 0.5),
+            inset 0 1px 0 0 color-mix(in oklab, white 12%, transparent);
+    }
+}
+
+/* Titles */
+.auth-title {
+    font-size: clamp(28px, 3vw, 36px);
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -0.5px;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative;
+    z-index: 1;
+}
+
+.dark .auth-title {
+    background: linear-gradient(135deg, #1abc9c 0%, #48d1b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.auth-desc {
+    color: var(--muted-foreground);
+    margin: 0 0 8px;
+    letter-spacing: 0.2px;
+    font-size: 1rem;
+    position: relative;
+    z-index: 1;
+}
+
+.link {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    position: relative;
+    transition: color var(--dur) var(--ease-out);
+}
+
+.link::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--gradient-primary);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform var(--dur) var(--ease-out);
+}
+
+@media (hover: hover) {
+    .link:hover::after {
+        transform: scaleX(1);
+        transform-origin: left;
+    }
+}
+
+/* Form */
+.form {
+    display: grid;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.field {
+    display: grid;
+    gap: 10px;
+}
+
+.label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--foreground);
+    letter-spacing: 0.2px;
+}
+
+.input {
+    width: 100%;
+    height: 52px;
+    padding: 0 18px;
+    font-size: 1rem;
+    color: var(--foreground);
+    background: var(--auth-input-bg);
+    border: 2px solid color-mix(in oklab, var(--border) 60%, transparent);
+    border-radius: 14px;
+    outline: none;
+    transition: all var(--dur) var(--ease-out);
+}
+
+.input::placeholder {
+    color: color-mix(in oklab, var(--muted-foreground) 70%, transparent);
+}
+
+.input:hover {
+    border-color: color-mix(in oklab, var(--ring) 50%, transparent);
+    background: color-mix(in oklab, var(--auth-input-bg) 90%, white);
+}
+
+.dark .input:hover {
+    background: var(--auth-input-focus-bg);
+    border-color: color-mix(in oklab, var(--primary) 40%, transparent);
+}
+
+.input:focus {
+    border-color: var(--primary);
+    background: var(--auth-input-focus-bg);
+    box-shadow: 
+        0 0 0 4px color-mix(in oklab, var(--primary) 15%, transparent),
+        0 4px 12px color-mix(in oklab, var(--primary) 20%, transparent);
+    transform: translateY(-2px);
+}
+
+.dark .input:focus {
+    background: var(--auth-input-focus-bg);
+    box-shadow: 
+        0 0 0 4px color-mix(in oklab, var(--primary) 20%, transparent),
+        0 4px 12px color-mix(in oklab, var(--primary) 30%, transparent);
+}
+
+.input.input-error {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 4px color-mix(in oklab, #ef4444 15%, transparent);
+}
+
+.hint {
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    margin-top: -4px;
+    opacity: 0.8;
+}
+
+/* Password toggle with smooth transition */
+.input-pass {
+    position: relative;
+}
+
+.input-pass .input {
+    padding-right: 56px;
+}
+
+.pass-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 38px;
+    width: 38px;
+    padding: 0;
+    border-radius: 12px;
+    border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+    background: color-mix(in oklab, var(--foreground) 4%, transparent);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: all var(--dur) var(--ease-out);
+}
+
+.pass-toggle .ico {
+    width: 20px;
+    height: 20px;
+    fill: var(--foreground);
+    opacity: 0.7;
+    transition: all var(--dur) var(--ease-out);
+}
+
+@media (hover: hover) {
+    .pass-toggle:hover {
+        background: color-mix(in oklab, var(--primary) 15%, transparent);
+        border-color: var(--primary);
+        transform: translateY(-50%) scale(1.1);
+    }
+    
+    .pass-toggle:hover .ico {
+        fill: var(--primary);
+        opacity: 1;
+    }
+}
+
+.pass-toggle.on {
+    background: color-mix(in oklab, var(--primary) 20%, transparent);
+    border-color: var(--primary);
+}
+
+.pass-toggle.on .ico {
+    fill: var(--primary);
+    opacity: 1;
+}
+
+.dark .pass-toggle {
+    background: color-mix(in oklab, white 8%, transparent);
+    border-color: color-mix(in oklab, white 15%, transparent);
+}
+
+.dark .pass-toggle .ico {
+    fill: white;
+    opacity: 0.8;
+}
+
+.dark .pass-toggle:hover {
+    background: color-mix(in oklab, var(--primary) 20%, transparent);
+    border-color: var(--primary);
+}
+
+.dark .pass-toggle:hover .ico {
+    fill: var(--primary);
+    opacity: 1;
+}
+
+.dark .pass-toggle.on {
+    background: color-mix(in oklab, var(--primary) 25%, transparent);
+}
+
+.dark .pass-toggle.on .ico {
+    fill: var(--primary);
+    opacity: 1;
+}
+
+/* Form row & checkbox */
+.form-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 4px 0;
+    font-size: 0.95rem;
+}
+
+.check {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: transform var(--dur) var(--ease-out);
+}
+
+@media (hover: hover) {
+    .check:hover {
+        transform: translateX(4px);
+    }
+}
+
+.check input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 20px;
+    width: 20px;
+    border-radius: 6px;
+    border: 2px solid color-mix(in oklab, var(--border) 70%, transparent);
+    background: var(--auth-input-bg);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: all var(--dur) var(--ease-bounce);
+}
+
+.dark .check input[type="checkbox"] {
+    background: var(--auth-input-bg);
+    border-color: color-mix(in oklab, var(--border) 50%, transparent);
+}
+
+.check input[type="checkbox"]::after {
+    content: "✓";
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    transform: scale(0);
+    transition: transform var(--dur) var(--ease-bounce);
+}
+
+.check input[type="checkbox"]:checked {
+    background: var(--gradient-primary);
+    border-color: var(--primary);
+}
+
+.check input[type="checkbox"]:checked::after {
+    transform: scale(1);
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 52px;
+    padding: 0 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all var(--dur) var(--ease-out);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: 
+        0 4px 16px color-mix(in oklab, var(--primary) 30%, transparent),
+        inset 0 1px 0 color-mix(in oklab, white 20%, transparent);
+}
+
+.dark .btn-primary {
+    background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+    box-shadow: 
+        0 4px 16px color-mix(in oklab, var(--primary) 40%, transparent),
+        inset 0 1px 0 color-mix(in oklab, white 15%, transparent);
+}
+
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, color-mix(in oklab, white 25%, transparent), transparent);
+    transition: left var(--dur-slow) var(--ease-out);
+}
+
+@media (hover: hover) {
+    .btn-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 
+            0 8px 24px color-mix(in oklab, var(--primary) 40%, transparent),
+            inset 0 1px 0 color-mix(in oklab, white 30%, transparent);
+    }
+    
+    .dark .btn-primary:hover {
+        box-shadow: 
+            0 8px 28px color-mix(in oklab, var(--primary) 50%, transparent),
+            inset 0 1px 0 color-mix(in oklab, white 20%, transparent);
+    }
+    
+    .btn-primary:hover::before {
+        left: 100%;
+    }
+}
+
+.btn-primary:active {
+    transform: translateY(-1px);
+}
+
+.btn-lg {
+    height: 56px;
+    font-size: 1.05rem;
+}
+
+.w-full {
+    width: 100%;
+}
+
+.btn-glow {
+    animation: glow 2s ease-in-out infinite;
+}
+
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 
+            0 4px 16px color-mix(in oklab, var(--primary) 30%, transparent),
+            inset 0 1px 0 color-mix(in oklab, white 20%, transparent);
+    }
+    50% {
+        box-shadow: 
+            0 4px 24px color-mix(in oklab, var(--primary) 45%, transparent),
+            inset 0 1px 0 color-mix(in oklab, white 30%, transparent);
+    }
+}
+
+.dark .btn-glow {
+    animation: glowDark 2s ease-in-out infinite;
+}
+
+@keyframes glowDark {
+    0%, 100% {
+        box-shadow: 
+            0 4px 16px color-mix(in oklab, var(--primary) 40%, transparent),
+            inset 0 1px 0 color-mix(in oklab, white 15%, transparent);
+    }
+    50% {
+        box-shadow: 
+            0 4px 28px color-mix(in oklab, var(--primary) 55%, transparent),
+            inset 0 1px 0 color-mix(in oklab, white 25%, transparent);
+    }
+}
+
+/* Divider */
+.or {
+    display: grid;
+    place-items: center;
+    margin: 8px 0;
+    position: relative;
+}
+
+.or span {
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+    position: relative;
+    padding: 0 16px;
+    background: transparent;
+    z-index: 1;
+}
+
+.dark .or span {
+    background: transparent;
+}
+
+.or::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in oklab, var(--border) 60%, transparent) 50%,
+        transparent
+    );
+}
+
+/* Social buttons */
+.socials {
+    display: grid;
+    gap: 12px;
+}
+
+.btn-google {
+    background: white;
+    color: #1f2937;
+    border: 2px solid color-mix(in oklab, var(--border) 50%, transparent);
+    box-shadow: 0 2px 8px color-mix(in oklab, black 8%, transparent);
+}
+
+.dark .btn-google {
+    background: rgba(31, 31, 31, 0.8);
+    color: var(--foreground);
+    border-color: color-mix(in oklab, var(--border) 40%, transparent);
+}
+
+.dark .btn-google:hover {
+    background: rgba(31, 31, 31, 0.95);
+}
+
+.btn-google .g-ico {
+    width: 20px;
+    height: 20px;
+}
+
+@media (hover: hover) {
+    .btn-google:hover {
+        transform: translateY(-3px);
+        border-color: var(--primary);
+        box-shadow: 0 6px 20px color-mix(in oklab, var(--primary) 20%, transparent);
+    }
+}
+
+.btn-google:active {
+    transform: translateY(-1px);
+}
+
+/* Terms */
+.terms {
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    margin-top: 12px;
+    line-height: 1.7;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+/* Validation errors */
+.text-danger {
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin-top: 4px;
+    display: block;
+}
+
+.validation-summary-errors,
+[asp-validation-summary].text-danger {
+    background: color-mix(in oklab, #ef4444 10%, transparent);
+    border: 2px solid #ef4444;
+    color: #dc2626;
+    padding: 16px;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 12px color-mix(in oklab, #ef4444 20%, transparent);
+}
+
+.dark .validation-summary-errors,
+.dark [asp-validation-summary].text-danger {
+    background: color-mix(in oklab, #ef4444 20%, transparent);
+    border-color: #f87171;
+    color: #fca5a5;
+    box-shadow: 0 4px 12px color-mix(in oklab, #ef4444 30%, transparent);
+}
+
+/* Shake animation for errors */
+.has-error {
+    animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(4px); }
+    30%, 50%, 70% { transform: translateX(-8px); }
+    40%, 60% { transform: translateX(8px); }
+}
+
+/* Page entrance animations */
+@media (prefers-reduced-motion: no-preference) {
+    .auth-grid {
+        animation: fadeIn 0.6s var(--ease-out) both;
+    }
+    
+    .auth-side {
+        animation: slideInLeft 0.8s var(--ease-out) 0.1s both;
+    }
+    
+    .auth-card {
+        animation: slideInRight 0.8s var(--ease-out) 0.2s both;
+    }
+    
+    .auth-title {
+        animation: fadeInUp 0.6s var(--ease-out) 0.4s both;
+    }
+    
+    .form .field {
+        animation: fadeInUp 0.5s var(--ease-out) both;
+    }
+    
+    .form .field:nth-child(1) { animation-delay: 0.5s; }
+    .form .field:nth-child(2) { animation-delay: 0.6s; }
+    .form .field:nth-child(3) { animation-delay: 0.7s; }
+    .form .field:nth-child(4) { animation-delay: 0.8s; }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+    .auth-side {
+        order: 2;
+    }
+    
+    .auth-card {
+        order: 1;
+    }
+}
+
+@media (max-width: 576px) {
+    .auth-wrap .container-xl {
+        padding: 20px 16px;
+    }
+    
+    .auth-grid {
+        gap: 24px;
+    }
+    
+    .auth-side-inner {
+        padding: 32px 24px;
+    }
+    
+    .auth-card {
+        padding: 32px 24px;
+    }
+    
+    .form-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Focus visible for keyboard navigation */
+.input:focus-visible,
+.btn:focus-visible,
+.link:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 3px;
+}
+
+/* Print styles */
+@media print {
+    .auth-wrap::before {
+        display: none;
+    }
+    
+    .auth-side {
+        display: none;
+    }
+}
+
