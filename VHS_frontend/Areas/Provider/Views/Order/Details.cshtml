@@ -1,0 +1,402 @@
+@model VHS_frontend.Areas.Provider.Models.Booking.BookingDetailDTO
+@{
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+    ViewData["Title"] = "Chi tiết đơn hàng";
+}
+
+<div class="order-detail-container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">Đơn hàng @Model.BookingCode</h4>
+            <p class="text-muted mb-0">
+                <i class="bi bi-calendar"></i> Tạo lúc: @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+            </p>
+        </div>
+        <div>
+            <a asp-action="Index" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Quay lại
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left Column -->
+        <div class="col-lg-8">
+            <!-- Customer Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person-circle me-2"></i>
+                        Thông tin khách hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Họ tên:</strong> @Model.CustomerName</p>
+                            <p><strong>Email:</strong> @Model.CustomerEmail</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Số điện thoại:</strong> @Model.CustomerPhone</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-briefcase me-2"></i>
+                        Thông tin dịch vụ
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex">
+                        @if (!string.IsNullOrEmpty(Model.ServiceImages))
+                        {
+                            var firstImage = Model.ServiceImages.Split(',').FirstOrDefault();
+                            <img src="@firstImage" alt="@Model.ServiceName" class="service-image me-3" />
+                        }
+                        <div class="flex-grow-1">
+                            <h5>@Model.ServiceName</h5>
+                            <p class="text-muted">@Model.ServiceDescription</p>
+                            <p><strong>Giá cơ bản:</strong> <span class="text-primary">@Model.ServicePrice.ToString("N0") VND</span></p>
+                            
+                            @if (Model.Options.Any())
+                            {
+                                <div class="mt-3">
+                                    <strong>Tùy chọn đã chọn:</strong>
+                                    <ul class="list-unstyled mt-2">
+                                        @foreach (var option in Model.Options)
+                                        {
+                                            <li class="mb-2">
+                                                <i class="bi bi-check-circle text-success"></i>
+                                                @option.OptionName
+                                                @if (!string.IsNullOrEmpty(option.Description))
+                                                {
+                                                    <span class="text-muted">(@option.Description)</span>
+                                                }
+                                                - <strong>@option.Price.ToString("N0") VND</strong>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Booking Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar-check me-2"></i>
+                        Thông tin đặt hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Thời gian thực hiện:</strong> @Model.BookingTime.ToString("dd/MM/yyyy HH:mm")</p>
+                    <p><strong>Địa chỉ:</strong> @Model.Address</p>
+                    @if (!string.IsNullOrEmpty(Model.VoucherCode))
+                    {
+                        <p>
+                            <strong>Mã giảm giá:</strong> 
+                            <span class="badge bg-success">@Model.VoucherCode</span>
+                        </p>
+                    }
+                </div>
+            </div>
+
+            <!-- Staff Assignment Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-people me-2"></i>
+                        Phân công nhân viên
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.StaffId.HasValue)
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-person-check-fill"></i>
+                            Đã phân công cho: <strong>@Model.StaffName</strong>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Chưa phân công nhân viên
+                        </div>
+                    }
+
+                    @if (ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
+                    {
+                        <div class="mt-3">
+                            <label class="form-label">Chọn nhân viên:</label>
+                            <div class="input-group">
+                                <select id="staffSelect" class="form-select">
+                                    <option value="">-- Chọn nhân viên --</option>
+                                    @foreach (var staff in (List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList)
+                                    {
+                                        var isSelected = Model.StaffId.HasValue && 
+                                                        Guid.TryParse(staff.StaffId, out var staffGuid) && 
+                                                        staffGuid == Model.StaffId.Value;
+                                        <option value="@staff.StaffId" selected="@isSelected">
+                                            @staff.StaffName
+                                        </option>
+                                    }
+                                </select>
+                                <button type="button" class="btn btn-primary" onclick="assignStaff()">
+                                    <i class="bi bi-check"></i> Phân công
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Checker Records -->
+            @if (Model.CheckerRecords.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-camera me-2"></i>
+                            Check-in/Check-out
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var record in Model.CheckerRecords)
+                        {
+                            <div class="checker-record mb-3 p-3 border rounded">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <strong>@record.ForStatus</strong>
+                                    <small class="text-muted">@record.UploadedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                </div>
+                                @if (!string.IsNullOrEmpty(record.StaffName))
+                                {
+                                    <p class="mb-2"><small>Bởi: @record.StaffName</small></p>
+                                }
+                                @if (record.MediaType.Contains("image"))
+                                {
+                                    <img src="@record.FileUrl" alt="Checker media" class="img-fluid rounded" />
+                                }
+                                else if (record.MediaType.Contains("video"))
+                                {
+                                    <video controls class="w-100 rounded">
+                                        <source src="@record.FileUrl" type="video/mp4" />
+                                    </video>
+                                }
+                                @if (!string.IsNullOrEmpty(record.Description))
+                                {
+                                    <p class="mt-2 mb-0"><em>@record.Description</em></p>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-lg-4">
+            <!-- Status Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Trạng thái đơn hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <span class="status-badge-lg status-@Model.Status.ToLower()">
+                            @GetStatusText(Model.Status)
+                        </span>
+                    </div>
+
+                    @if (Model.Status == "Pending")
+                    {
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-success" onclick="updateStatus('Confirmed')">
+                                <i class="bi bi-check-circle"></i> Xác nhận đơn hàng
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="cancelOrder()">
+                                <i class="bi bi-x-circle"></i> Hủy đơn hàng
+                            </button>
+                        </div>
+                    }
+                    else if (Model.Status == "Confirmed")
+                    {
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-success" onclick="updateStatus('Completed')">
+                                <i class="bi bi-check-circle-fill"></i> Hoàn thành
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="cancelOrder()">
+                                <i class="bi bi-x-circle"></i> Hủy đơn hàng
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Payment Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-credit-card me-2"></i>
+                        Thanh toán
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="payment-summary">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Tổng tiền:</span>
+                            <strong class="text-primary">@Model.TotalAmount.ToString("N0") VND</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Phương thức:</span>
+                            <span>@(Model.PaymentMethod ?? "Chưa thanh toán")</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Trạng thái:</span>
+                            <span class="badge bg-@(Model.PaymentStatus == "Paid" ? "success" : "warning")">
+                                @(Model.PaymentStatus ?? "Chưa thanh toán")
+                            </span>
+                        </div>
+                        @if (Model.PaymentDate.HasValue)
+                        {
+                            <div class="d-flex justify-content-between mt-2">
+                                <span>Ngày thanh toán:</span>
+                                <span>@Model.PaymentDate.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script>
+        const bookingId = '@Model.BookingId';
+
+        function updateStatus(newStatus) {
+            if (!confirm(`Bạn có chắc chắn muốn ${newStatus === 'Confirmed' ? 'xác nhận' : 'hoàn thành'} đơn hàng này?`)) {
+                return;
+            }
+
+            fetch('/Provider/Order/UpdateStatus', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    bookingId: bookingId,
+                    newStatus: newStatus,
+                    reason: null
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra. Vui lòng thử lại.');
+            });
+        }
+
+        function cancelOrder() {
+            const reason = prompt('Nhập lý do hủy đơn:');
+            if (!reason) return;
+
+            fetch('/Provider/Order/UpdateStatus', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    bookingId: bookingId,
+                    newStatus: 'Canceled',
+                    reason: reason
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra. Vui lòng thử lại.');
+            });
+        }
+
+        function assignStaff() {
+            const staffId = document.getElementById('staffSelect').value;
+            if (!staffId) {
+                alert('Vui lòng chọn nhân viên');
+                return;
+            }
+
+            fetch('/Provider/Order/AssignStaff', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    bookingId: bookingId,
+                    staffId: staffId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra. Vui lòng thử lại.');
+            });
+        }
+    </script>
+}
+
+@functions {
+    string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ xử lý",
+            "Confirmed" => "Đã xác nhận",
+            "Completed" => "Hoàn thành",
+            "Canceled" => "Đã hủy",
+            _ => status
+        };
+    }
+}
+
