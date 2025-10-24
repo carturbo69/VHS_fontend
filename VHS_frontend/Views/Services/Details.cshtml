@@ -45,72 +45,42 @@
         </nav>
 
         <div class="detail-grid">
-            <!-- GALLERY -->
-            <div class="detail-grid">
-                <div class="detail-grid">
-                    <div>
-                        <div class="gallery">
-                            <div class="gallery-main">
-                                <img id="mainImage" src="@mainSrc" alt="@Model.Title" data-fallback="@fallbackImg" />
-                            </div>
-
-                            <div class="thumbs" id="thumbs">
-                                @if (imgs.Any())
-                                {
-                                    foreach (var img in imgs)
-                                    {
-                                        var src = string.IsNullOrWhiteSpace(img) ? fallbackMain : Url.Content(img);
-                                        <button type="button" class="thumb" data-src="@src" title="Xem ảnh">
-                                            <img src="@src" alt="@Model.Title" data-fallback="@fallbackImg" />
-                                        </button>
-                                    }
-                                }
-                                else
-                                {
-                                    var thumb = fallbackMain;
-                                    for (int i = 0; i < 3; i++)
-                                    {
-                                        <button type="button" class="thumb" data-src="@thumb" title="Xem ảnh">
-                                            <img src="@thumb" alt="@Model.Title" />
-                                        </button>
-                                    }
-                                }
-                            </div>
-                        </div>
+            <!-- LEFT: GALLERY -->
+            <div class="gallery-column">
+                <div class="gallery">
+                    <div class="gallery-main">
+                        <img id="mainImage" src="@mainSrc" alt="@Model.Title" data-fallback="@fallbackImg" />
                     </div>
 
-                    <!-- INFO -->
-                    <div class="info">
-                        <h1 class="title">@Model.Title</h1>
-
-                        <span class="stars">
-                            @{
-                                var avg = Model.AverageRating;
-                                for (int s = 1; s <= 5; s++)
-                                {
-                                    var fill = Math.Max(0, Math.Min(1, avg - (s - 1)));
-                                    var pct = (int)Math.Round(fill * 100);
-                                    if (pct >= 100)
-                                    {
-                                        <span class="star filled">★</span>
-                                        ;
-                                    }
-                                    else if (pct <= 0)
-                                    {
-
-                                        <span class="star">★</span>
-                                        ;
-                                    }
-                                    else
-                                    {
-
-                                        <span class="star frac" style="--p:@pct%;">★</span>
-                                        ;
-                                    }
-                                }
+                    <div class="thumbs" id="thumbs">
+                        @if (imgs.Any())
+                        {
+                            foreach (var img in imgs)
+                            {
+                                var src = string.IsNullOrWhiteSpace(img) ? fallbackMain : Url.Content(img);
+                                <button type="button" class="thumb" data-src="@src" title="Xem ảnh">
+                                    <img src="@src" alt="@Model.Title" data-fallback="@fallbackImg" />
+                                </button>
                             }
-                        </span>
-                        <span class="rating-text">@Model.AverageRating.ToString("0.#") / 5 (@Model.TotalReviews đánh giá)</span>
+                        }
+                        else
+                        {
+                            var thumb = fallbackMain;
+                            for (int i = 0; i < 5; i++)
+                            {
+                                <button type="button" class="thumb" data-src="@thumb" title="Xem ảnh">
+                                    <img src="@thumb" alt="@Model.Title" />
+                                </button>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: INFO -->
+            <div class="info-column">
+                <div class="info">
+                        <h1 class="title">@Model.Title</h1>
 
                         <div class="price">
                             @string.Format("{0:#,0}đ", Model.Price)
@@ -118,6 +88,37 @@
                             {
                                 <text>/ @Model.UnitType</text>
                             }
+                        </div>
+
+                        <div class="rating-row">
+                            <span class="stars">
+                                @{
+                                    var avg = Model.AverageRating;
+                                    for (int s = 1; s <= 5; s++)
+                                    {
+                                        var fill = Math.Max(0, Math.Min(1, avg - (s - 1)));
+                                        var pct = (int)Math.Round(fill * 100);
+                                        if (pct >= 100)
+                                        {
+                                            <span class="star filled">★</span>
+                                            ;
+                                        }
+                                        else if (pct <= 0)
+                                        {
+
+                                            <span class="star">★</span>
+                                            ;
+                                        }
+                                        else
+                                        {
+
+                                            <span class="star frac" style="--p:@pct%;">★</span>
+                                            ;
+                                        }
+                                    }
+                                }
+                            </span>
+                            <span class="rating-text">@Model.AverageRating.ToString("0.#") / 5 (@Model.TotalReviews đánh giá)</span>
                         </div>
 
                         <ul class="brief">
@@ -148,21 +149,26 @@
                             @if (Model.ServiceOptions?.Any() == true)
                             {
                                 <section class="svc-options">
-                                    <h3 class="addons-title">Tuỳ chọn thêm</h3>
+                                    <h3 class="addons-title">
+                                        <span class="title-icon">➕</span>
+                                        Tuỳ chọn thêm
+                                    </h3>
                                     <div class="addons-list">
                                         @foreach (var o in Model.ServiceOptions)
                                         {
-                                            <div class="addon-item option-select-box" style="position: relative;">
-                                                <!-- Đặt name=optionIds để binder map vào List<Guid>? optionIds -->
+                                            <label class="addon-item option-select-box">
                                                 <input type="checkbox"
                                                        name="optionIds"
                                                        value="@o.OptionId"
-                                                       class="option-checkbox"
-                                                       style="position: absolute; top: 8px; right: 8px; transform: scale(1.2);" />
-
+                                                       class="option-checkbox" />
+                                                <span class="option-checkmark"></span>
+                                                
                                                 <div class="option-body">
                                                     <div class="option-head">
-                                                        <div class="addon-name">@o.OptionName</div>
+                                                        <div class="addon-name">
+                                                            <span class="addon-icon">✨</span>
+                                                            @o.OptionName
+                                                        </div>
                                                         <div class="addon-price">
                                                             @string.Format("{0:#,0}đ / {1}", o.Price, o.UnitType)
                                                         </div>
@@ -172,7 +178,7 @@
                                                         <div class="addon-desc">@o.Description</div>
                                                     }
                                                 </div>
-                                            </div>
+                                            </label>
                                         }
                                     </div>
                                 </section>
@@ -184,20 +190,27 @@
                                         class="btn btn-buy"
                                         formaction="@(Url.Action("StartDirect","BookingService", new { area="Customer" }))"
                                         formmethod="post">
-                                    Mua ngay
+                                    Đặt ngay
                                 </button>
                             </div>
                         </form>
 
-                        <div class="safety">
-                            <span>✓ Bảo hành theo chính sách</span>
-                            <span>✓ Lịch hẹn linh hoạt</span>
-                            <span>✓ Thanh toán an toàn</span>
+                    <div class="safety">
+                        <div class="safety-item">
+                            <span class="safety-icon">🛡️</span>
+                            <span class="safety-text">Bảo hành theo chính sách</span>
+                        </div>
+                        <div class="safety-item">
+                            <span class="safety-icon">📅</span>
+                            <span class="safety-text">Lịch hẹn linh hoạt</span>
+                        </div>
+                        <div class="safety-item">
+                            <span class="safety-icon">💳</span>
+                            <span class="safety-text">Thanh toán an toàn</span>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
 
 
