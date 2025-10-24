@@ -6,6 +6,8 @@ using VHS_frontend.Areas.Customer.Models.CartItemDTOs;
 using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
 using VHS_frontend.Areas.Customer.Models.VoucherDTOs;
 using VHS_frontend.Services.Customer;
+using VHS_frontend.Services.Customer.Interfaces;
+using VHS_frontend.Models.Payment;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
@@ -15,6 +17,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
     {
         private readonly CartServiceCustomer _cartService;
         private readonly BookingServiceCustomer _bookingServiceCustomer;
+        private readonly IVnPayService _vnPayService;
 
         // Session keys để giữ lựa chọn trong flow checkout
         private const string SS_SELECTED_IDS = "CHECKOUT_SELECTED_IDS";
@@ -26,10 +29,14 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
         private const string SS_CHECKOUT_DIRECT = "CHECKOUT_DIRECT_JSON";
 
-        public BookingServiceController(CartServiceCustomer cartService, BookingServiceCustomer bookingServiceCustomer)
+        public BookingServiceController(
+            CartServiceCustomer cartService, 
+            BookingServiceCustomer bookingServiceCustomer,
+            IVnPayService vnPayService)
         {
             _cartService = cartService;
             _bookingServiceCustomer = bookingServiceCustomer;
+            _vnPayService = vnPayService;
         }
 
         // Helper: lấy AccountId từ claim/session
@@ -562,9 +569,20 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 switch (model.SelectedPaymentCode?.ToUpperInvariant())
                 {
                     case "VNPAY":
-                        return RedirectToAction(
-                            "StartVnPay", "Payment",
-                            new { area = "Customer", bookingIds = result.BookingIds, amount = amountStr });
+                        // Tạo thông tin thanh toán cho VNPay
+                        // 🔑 GỬI BOOKING IDS QUA VNPAY để tránh mất session khi redirect
+                        var bookingIdsCsv = string.Join(",", result.BookingIds);
+                        var vnpayPayment = new PaymentInformationModel
+                        {
+                            OrderType = "billpayment",
+                            Amount = (double)result.Total,
+                            OrderDescription = $"BOOKINGS:{bookingIdsCsv}",  // 🔑 Encode booking IDs vào đây
+                            Name = model.RecipientFullName ?? "Khách hàng"
+                        };
+
+                        // Tạo URL VNPay và redirect trực tiếp
+                        var vnpayUrl = _vnPayService.CreatePaymentUrl(vnpayPayment, HttpContext);
+                        return Redirect(vnpayUrl);
 
                     case "MOMO":
                         return RedirectToAction(

@@ -71,7 +71,8 @@ builder.Services.AddHttpClient<AdminNotificationService>(client =>
 // ServiceShopService
 builder.Services.AddScoped<ServiceShopService>();
 
-builder.Services.AddScoped<VnPayService>();
+// Connect VNPay API
+builder.Services.AddScoped<IVnPayService, VnPayService>();
 builder.Services.AddScoped<MoMoService>();
 
 // HttpClient cho AuthService

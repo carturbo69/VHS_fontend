@@ -3,6 +3,8 @@ using System.Text.Json;
 using System.Globalization;
 using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 using VHS_frontend.Services.Customer;
+using VHS_frontend.Services.Customer.Interfaces;
+using VHS_frontend.Models.Payment;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
@@ -10,10 +12,12 @@ namespace VHS_frontend.Areas.Customer.Controllers
     public class PaymentController : Controller
     {
         private readonly BookingServiceCustomer _bookingServiceCustomer;
+        private readonly IVnPayService _vnPayService;
 
-        public PaymentController(BookingServiceCustomer bookingServiceCustomer)
+        public PaymentController(BookingServiceCustomer bookingServiceCustomer, IVnPayService vnPayService)
         {
             _bookingServiceCustomer = bookingServiceCustomer;
+            _vnPayService = vnPayService;
         }
 
         // ====== Helpers chung ======
@@ -487,6 +491,274 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             await CancelPendingFromIdsOrSessionAsync(null, ct);
             return RedirectToAction("Index", "BookingService", new { area = "Customer", refresh = 1 });
+        }
+
+        // ====== VNPay Integration - Standard Methods ======
+
+        /// <summary>
+        /// Tạo URL thanh toán VNPay và chuyển hướng người dùng đến cổng thanh toán
+        /// </summary>
+        public IActionResult CreatePaymentUrlVnpay(PaymentInformationModel model)
+        {
+            var url = _vnPayService.CreatePaymentUrl(model, HttpContext);
+            return Redirect(url);
+        }
+
+        /// <summary>
+        /// Callback từ VNPay sau khi thanh toán (trả về JSON - dùng cho API)
+        /// </summary>
+        [HttpGet]
+        public IActionResult PaymentCallbackVnpay()
+        {
+            var response = _vnPayService.PaymentExecute(Request.Query);
+            return Json(response);
+        }
+
+        /// <summary>
+        /// Confirm VNPay payment sau khi user login lại (do mất session khi redirect qua ngrok)
+        /// URL: /Customer/Payment/ConfirmVnPayAfterLogin
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> ConfirmVnPayAfterLogin(string? bookingIds, string? transactionId, CancellationToken ct = default)
+        {
+            if (NotLoggedIn())
+            {
+                TempData["ToastError"] = "Bạn cần đăng nhập.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            if (string.IsNullOrWhiteSpace(bookingIds))
+            {
+                TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
+
+            var bookingIdList = bookingIds
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                .Where(g => g != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (bookingIdList.Count == 0)
+            {
+                TempData["ToastError"] = "Danh sách booking không hợp lệ.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
+
+            try
+            {
+                var jwt = HttpContext.Session.GetString("JWToken");
+
+                // Lấy thời gian hiện tại theo timezone Việt Nam
+                var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+                var paymentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+                
+                // Confirm payment với backend
+                await _bookingServiceCustomer.ConfirmPaymentsAsync(
+                    new ConfirmPaymentsDto
+                    {
+                        BookingIds = bookingIdList,
+                        PaymentMethod = "VNPAY",
+                        GatewayTxnId = $"VNPAY:{transactionId ?? "UNKNOWN"}",
+                        CartItemIdsForCleanup = null, // Không cleanup cart vì đã mất session
+                        PaymentTime = paymentTime // ✅ Gửi thời gian chính xác
+                    },
+                    jwt,
+                    ct);
+
+                TempData["ToastSuccess"] = $"Thanh toán VNPay thành công! Mã giao dịch: {transactionId}";
+                
+                // 🎉 Hiển thị trang success đẹp
+                ViewBag.TransactionId = transactionId;
+                ViewBag.BookingIds = bookingIdList;
+                ViewBag.NeedLogin = false;
+                
+                return View("VnPaySuccess");
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastError"] = "Có lỗi khi xác nhận thanh toán: " + ex.Message;
+                return RedirectToAction("ListHistoryBooking", "BookingService", new { area = "Customer" });
+            }
+        }
+
+        /// <summary>
+        /// Return URL từ VNPay sau khi người dùng thanh toán (xử lý và hiển thị kết quả)
+        /// URL: /Customer/Payment/VnPayReturnUrl
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> VnPayReturnUrl(CancellationToken ct = default)
+        {
+            try
+            {
+                // Parse và validate response từ VNPay
+                var response = _vnPayService.PaymentExecute(Request.Query);
+
+                if (!response.Success)
+                {
+                    // Thanh toán thất bại
+                    TempData["ToastError"] = $"Thanh toán VNPay thất bại. Mã lỗi: {response.VnPayResponseCode}";
+                    
+                    // Nếu chưa login, hiển thị thông báo
+                    if (NotLoggedIn())
+                    {
+                        return Content($"Thanh toán thất bại. Mã lỗi: {response.VnPayResponseCode}. Vui lòng đăng nhập lại và thử lại.");
+                    }
+                    
+                    // Hủy các booking đang chờ
+                    await CancelPendingFromIdsOrSessionAsync(null, ct);
+                    
+                    return RedirectToAction("Index", "BookingService", new { area = "Customer", refresh = 1 });
+                }
+
+                // LẤY BOOKING IDS TỪ VNPAY RESPONSE TRƯỚC (không cần login)
+                var jwt = HttpContext.Session.GetString("JWToken");
+                
+                // 🔑 Parse booking IDs từ OrderDescription (format: "BOOKINGS:guid1,guid2,guid3")
+                var orderInfo = response.OrderDescription ?? "";
+                List<Guid> bookingIds;
+                
+                // 🐛 DEBUG: Log để xem VNPay trả về gì
+                System.Diagnostics.Debug.WriteLine($"[VNPay Debug] OrderDescription: '{orderInfo}'");
+                System.Diagnostics.Debug.WriteLine($"[VNPay Debug] TransactionId: {response.TransactionId}");
+                
+                if (orderInfo.StartsWith("BOOKINGS:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var bookingIdsPart = orderInfo.Substring("BOOKINGS:".Length);
+                    bookingIds = bookingIdsPart
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                        .Where(g => g != Guid.Empty)
+                        .Distinct()
+                        .ToList();
+                    
+                    System.Diagnostics.Debug.WriteLine($"[VNPay Debug] Parsed {bookingIds.Count} booking IDs from OrderDescription");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[VNPay Debug] OrderDescription không có format 'BOOKINGS:', thử lấy từ session");
+                    
+                    // Fallback: thử lấy từ session (cho backward compatibility)
+                    var pendingBookingsCsv = HttpContext.Session.GetString("CHECKOUT_PENDING_BOOKING_IDS");
+                    
+                    System.Diagnostics.Debug.WriteLine($"[VNPay Debug] Session CHECKOUT_PENDING_BOOKING_IDS: '{pendingBookingsCsv ?? "(null)"}'");
+                    
+                    if (string.IsNullOrWhiteSpace(pendingBookingsCsv))
+                    {
+                        // ❌ Không tìm thấy ở cả 2 nơi → Hiển thị debug info
+                        var debugInfo = $@"
+                        <h2>Debug Info - VNPay Callback</h2>
+                        <p><strong>Thanh toán thành công!</strong></p>
+                        <p>Mã giao dịch: <strong>{response.TransactionId}</strong></p>
+                        <p>Response Code: <strong>{response.VnPayResponseCode}</strong></p>
+                        <hr/>
+                        <h3>❌ Không tìm thấy thông tin booking</h3>
+                        <p>OrderDescription từ VNPay: <code>{System.Net.WebUtility.HtmlEncode(orderInfo)}</code></p>
+                        <p>Session CHECKOUT_PENDING_BOOKING_IDS: <code>null hoặc empty</code></p>
+                        <hr/>
+                        <p>Vui lòng chụp màn hình này và kiểm tra log!</p>
+                        <p><a href='/Customer/BookingService/ListHistoryBooking'>Xem lịch sử booking</a></p>
+                        ";
+                        
+                        return Content(debugInfo, "text/html");
+                    }
+                    
+                    bookingIds = pendingBookingsCsv
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                        .Where(g => g != Guid.Empty)
+                        .Distinct()
+                        .ToList();
+                    
+                    System.Diagnostics.Debug.WriteLine($"[VNPay Debug] Parsed {bookingIds.Count} booking IDs from session");
+                }
+
+                if (bookingIds.Count == 0)
+                {
+                    TempData["ToastError"] = "Danh sách booking không hợp lệ.";
+                    return RedirectToAction("Index", "Cart", new { area = "Customer" });
+                }
+
+                // ✅ Kiểm tra đăng nhập NGAY TẠI ĐÂY (sau khi đã parse được booking IDs)
+                if (NotLoggedIn())
+                {
+                    // 🎉 Hiển thị trang success đẹp thay vì redirect login
+                    ViewBag.TransactionId = response.TransactionId;
+                    ViewBag.BookingIds = bookingIds;
+                    ViewBag.NeedLogin = true;
+                    
+                    TempData["ToastSuccess"] = $"Thanh toán VNPay thành công! Mã giao dịch: {response.TransactionId}";
+                    
+                    return View("VnPaySuccess");
+                }
+
+                // Lấy cartItemIds để cleanup (nếu có)
+                var cartCsv = HttpContext.Session.GetString("CHECKOUT_SELECTED_IDS");
+                List<Guid>? cartItemIds = null;
+                if (!string.IsNullOrWhiteSpace(cartCsv))
+                {
+                    cartItemIds = cartCsv
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                        .Where(g => g != Guid.Empty)
+                        .Distinct()
+                        .ToList();
+                }
+
+                // Lấy thời gian hiện tại theo timezone Việt Nam
+                var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+                var paymentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+                
+                // Confirm payment với backend
+                await _bookingServiceCustomer.ConfirmPaymentsAsync(
+                    new ConfirmPaymentsDto
+                    {
+                        BookingIds = bookingIds,
+                        PaymentMethod = "VNPAY",
+                        GatewayTxnId = $"VNPAY:{response.TransactionId}",
+                        CartItemIdsForCleanup = cartItemIds,
+                        PaymentTime = paymentTime // ✅ Gửi thời gian chính xác
+                    },
+                    jwt,
+                    ct);
+
+                // Tính lại total từ breakdown
+                var total = 0m;
+                try
+                {
+                    total = ComputeAmountFromSession(bookingIds);
+                }
+                catch
+                {
+                    // Nếu không lấy được từ session, lấy từ response
+                    if (decimal.TryParse(response.OrderId, out var amt))
+                    {
+                        total = amt;
+                    }
+                }
+
+                // Dọn session
+                HttpContext.Session.Remove("CHECKOUT_PENDING_BOOKING_IDS");
+                HttpContext.Session.Remove("CHECKOUT_DIRECT_JSON");
+                HttpContext.Session.Remove("CHECKOUT_SELECTED_IDS");
+
+                TempData["ToastSuccess"] = "Thanh toán VNPay thành công!";
+                
+                // 🎉 Hiển thị trang success đẹp
+                ViewBag.TransactionId = response.TransactionId;
+                ViewBag.BookingIds = bookingIds;
+                ViewBag.NeedLogin = false;
+                ViewBag.Total = total;
+                
+                return View("VnPaySuccess");
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastError"] = "Có lỗi khi xử lý thanh toán: " + ex.Message;
+                await CancelPendingFromIdsOrSessionAsync(null, ct);
+                return RedirectToAction("Index", "Cart", new { area = "Customer" });
+            }
         }
 
     }

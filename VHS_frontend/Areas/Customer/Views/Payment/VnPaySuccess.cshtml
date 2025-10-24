@@ -1,0 +1,294 @@
+@{
+    ViewData["Title"] = "Thanh toán thành công";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var transactionId = ViewBag.TransactionId as string;
+    var bookingIds = ViewBag.BookingIds as List<Guid>;
+    var needLogin = ViewBag.NeedLogin as bool? ?? false;
+    var total = ViewBag.Total as decimal? ?? 0;
+    
+    // Lấy thời gian hiện tại theo timezone Việt Nam (UTC+7)
+    var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+    var currentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+}
+
+@section Styles {
+<style>
+    .vnpay-success-wrapper {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem 1rem;
+    }
+
+    .vnpay-success-card {
+        background: white;
+        border-radius: 20px;
+        padding: 3rem 2rem;
+        max-width: 600px;
+        width: 100%;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        text-align: center;
+        animation: slideUp 0.5s ease-out;
+    }
+
+    @@keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .success-icon {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: scaleIn 0.5s ease-out 0.2s both;
+    }
+
+    @@keyframes scaleIn {
+        from {
+            transform: scale(0);
+        }
+        to {
+            transform: scale(1);
+        }
+    }
+
+    .success-icon svg {
+        width: 60px;
+        height: 60px;
+        stroke: white;
+        stroke-width: 3;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-dasharray: 100;
+        stroke-dashoffset: 100;
+        animation: checkmark 0.8s ease-out 0.5s forwards;
+    }
+
+    @@keyframes checkmark {
+        to {
+            stroke-dashoffset: 0;
+        }
+    }
+
+    .vnpay-success-card h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 1rem;
+    }
+
+    .vnpay-success-card p {
+        color: #718096;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+
+    .transaction-info {
+        background: #f7fafc;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 2rem 0;
+        text-align: left;
+    }
+
+    .transaction-info-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .transaction-info-item:last-child {
+        border-bottom: none;
+    }
+
+    .transaction-info-item label {
+        font-weight: 600;
+        color: #4a5568;
+    }
+
+    .transaction-info-item span {
+        color: #2d3748;
+        font-weight: 500;
+    }
+
+    .btn-group {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-primary-gradient {
+        flex: 1;
+        min-width: 200px;
+        padding: 1rem 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-primary-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .btn-secondary {
+        flex: 1;
+        min-width: 200px;
+        padding: 1rem 2rem;
+        background: white;
+        color: #667eea;
+        border: 2px solid #667eea;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-secondary:hover {
+        background: #667eea;
+        color: white;
+    }
+
+    .warning-box {
+        background: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1.5rem 0;
+        text-align: left;
+    }
+
+    .warning-box p {
+        margin: 0;
+        color: #92400e;
+        font-size: 0.95rem;
+    }
+
+    @@media (max-width: 768px) {
+        .vnpay-success-card {
+            padding: 2rem 1.5rem;
+        }
+
+        .vnpay-success-card h1 {
+            font-size: 1.5rem;
+        }
+
+        .btn-group {
+            flex-direction: column;
+        }
+
+        .btn-primary-gradient,
+        .btn-secondary {
+            width: 100%;
+            min-width: unset;
+        }
+    }
+</style>
+}
+
+<div class="vnpay-success-wrapper">
+    <div class="vnpay-success-card">
+        <div class="success-icon">
+            <svg viewBox="0 0 52 52">
+                <path d="M14 27l9 9 19-19" />
+            </svg>
+        </div>
+
+        <h1>🎉 Thanh toán thành công!</h1>
+        <p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi. Giao dịch của bạn đã được xử lý thành công.</p>
+
+        <div class="transaction-info">
+            <div class="transaction-info-item">
+                <label>Phương thức thanh toán:</label>
+                <span>VNPay</span>
+            </div>
+            @if (!string.IsNullOrEmpty(transactionId))
+            {
+                <div class="transaction-info-item">
+                    <label>Mã giao dịch:</label>
+                    <span>@transactionId</span>
+                </div>
+            }
+            @if (bookingIds != null && bookingIds.Any())
+            {
+                <div class="transaction-info-item">
+                    <label>Số lượng booking:</label>
+                    <span>@bookingIds.Count</span>
+                </div>
+            }
+            @if (total > 0)
+            {
+                <div class="transaction-info-item">
+                    <label>Tổng thanh toán:</label>
+                    <span style="color: #667eea; font-weight: 700; font-size: 1.2rem;">@total.ToString("N0") VNĐ</span>
+                </div>
+            }
+            <div class="transaction-info-item">
+                <label>Thời gian:</label>
+                <span>@currentTime.ToString("dd/MM/yyyy HH:mm:ss")</span>
+            </div>
+        </div>
+
+        @if (needLogin)
+        {
+            <div class="warning-box">
+                <p><strong>⚠️ Lưu ý:</strong> Vui lòng đăng nhập để xem chi tiết đơn hàng và theo dõi trạng thái dịch vụ.</p>
+            </div>
+
+            <div class="btn-group">
+                <a href="@Url.Action("Login", "Account", new { area = "", returnUrl = Url.Action("ConfirmVnPayAfterLogin", "Payment", new { area = "Customer", bookingIds = string.Join(",", bookingIds ?? new List<Guid>()), transactionId }) })" 
+                   class="btn-primary-gradient">
+                    Đăng nhập ngay
+                </a>
+                <a href="@Url.Action("Index", "Home", new { area = "" })" class="btn-secondary">
+                    Về trang chủ
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="btn-group">
+                <a href="@Url.Action("ListHistoryBooking", "BookingService", new { area = "Customer" })" 
+                   class="btn-primary-gradient">
+                    Xem lịch sử booking
+                </a>
+                <a href="@Url.Action("Index", "Home", new { area = "" })" class="btn-secondary">
+                    Về trang chủ
+                </a>
+            </div>
+        }
+
+        <p style="margin-top: 2rem; font-size: 0.9rem; color: #a0aec0;">
+            Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi qua hotline hoặc email hỗ trợ.
+        </p>
+    </div>
+</div>
+
