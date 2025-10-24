@@ -1,0 +1,346 @@
+@model VHS_frontend.Areas.Customer.Models.Profile.ProfileViewModel
+@{
+    ViewData["Title"] = "Thông tin cá nhân";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/profile.css" asp-append-version="true" />
+}
+
+@await Html.PartialAsync("_Breadcrumb")
+@await Html.PartialAsync("_ProfileNavigation")
+
+<div class="profile-container">
+    <!-- Header Section -->
+    <div class="profile-header">
+        <div class="profile-avatar-section">
+            <div class="avatar-container">
+                <img id="profileAvatar" 
+                     src="@Model.GetProfileImageUrl()" 
+                     alt="@Model.GetDisplayName()" 
+                     class="profile-avatar" />
+                <div class="avatar-overlay">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="openImageUpload()">
+                        <i class="bi bi-camera"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="avatar-actions">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="openImageUpload()">
+                    <i class="bi bi-camera me-1"></i>Đổi ảnh
+                </button>
+                @if (Model.HasProfileImage)
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteProfileImage()">
+                        <i class="bi bi-trash me-1"></i>Xóa ảnh
+                    </button>
+                }
+            </div>
+        </div>
+        
+        <div class="profile-info">
+            <h1 class="profile-name">@Model.GetDisplayName()</h1>
+            <p class="profile-email">@Model.Email</p>
+            <div class="profile-meta">
+                <span class="meta-item">
+                    <i class="bi bi-person-badge"></i>
+                    @Model.Role
+                </span>
+                <span class="meta-item">
+                    <i class="bi bi-calendar-event"></i>
+                    Tham gia @Model.CreatedAt?.ToString("dd/MM/yyyy")
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Completion -->
+    <div class="profile-completion-card">
+        <div class="completion-header">
+            <h3>Hoàn thiện hồ sơ</h3>
+            <span class="completion-percentage">@Model.GetProfileCompletionPercentage()%</span>
+        </div>
+        <div class="completion-progress">
+            <div class="progress-bar" style="width: @Model.GetProfileCompletionPercentage()%"></div>
+        </div>
+        <div class="completion-items">
+            <div class="completion-item @(string.IsNullOrEmpty(Model.FullName) ? "incomplete" : "complete")">
+                <i class="bi bi-@(string.IsNullOrEmpty(Model.FullName) ? "x-circle" : "check-circle")"></i>
+                <span>Họ và tên</span>
+            </div>
+            <div class="completion-item @(string.IsNullOrEmpty(Model.PhoneNumber) ? "incomplete" : "complete")">
+                <i class="bi bi-@(string.IsNullOrEmpty(Model.PhoneNumber) ? "x-circle" : "check-circle")"></i>
+                <span>Số điện thoại</span>
+            </div>
+            <div class="completion-item @(string.IsNullOrEmpty(Model.Address) ? "incomplete" : "complete")">
+                <i class="bi bi-@(string.IsNullOrEmpty(Model.Address) ? "x-circle" : "check-circle")"></i>
+                <span>Địa chỉ</span>
+            </div>
+            <div class="completion-item @(!Model.HasProfileImage ? "incomplete" : "complete")">
+                <i class="bi bi-@(!Model.HasProfileImage ? "x-circle" : "check-circle")"></i>
+                <span>Ảnh đại diện</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Details -->
+    <div class="profile-details-grid">
+        <!-- Personal Information Card -->
+        <div class="detail-card">
+            <div class="card-header">
+                <h3><i class="bi bi-person"></i> Thông tin cá nhân</h3>
+                <a asp-action="Edit" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil"></i> Chỉnh sửa
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="info-row">
+                    <label>Tên tài khoản</label>
+                    <span>@Model.AccountName</span>
+                </div>
+                <div class="info-row">
+                    <label>Email</label>
+                    <span>@Model.Email</span>
+                </div>
+                <div class="info-row">
+                    <label>Họ và tên</label>
+                    <span>@(string.IsNullOrEmpty(Model.FullName) ? "Chưa cập nhật" : Model.FullName)</span>
+                </div>
+                <div class="info-row">
+                    <label>Số điện thoại</label>
+                    <span>@(string.IsNullOrEmpty(Model.PhoneNumber) ? "Chưa cập nhật" : Model.PhoneNumber)</span>
+                </div>
+                <div class="info-row">
+                    <label>Địa chỉ</label>
+                    <span>@(string.IsNullOrEmpty(Model.Address) ? "Chưa cập nhật" : Model.Address)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Security Card -->
+        <div class="detail-card">
+            <div class="card-header">
+                <h3><i class="bi bi-shield-lock"></i> Bảo mật tài khoản</h3>
+            </div>
+            <div class="card-body">
+                <div class="security-item">
+                    <div class="security-info">
+                        <i class="bi bi-key"></i>
+                        <div>
+                            <h4>Mật khẩu</h4>
+                            <p>Đổi mật khẩu để bảo mật tài khoản</p>
+                        </div>
+                    </div>
+                    <a asp-action="ChangePassword" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-pencil"></i> Đổi mật khẩu
+                    </a>
+                </div>
+                <div class="security-item">
+                    <div class="security-info">
+                        <i class="bi bi-envelope"></i>
+                        <div>
+                            <h4>Email</h4>
+                            <p>Đổi email đăng nhập</p>
+                        </div>
+                    </div>
+                    <a asp-action="ChangeEmail" class="btn btn-outline-info btn-sm">
+                        <i class="bi bi-pencil"></i> Đổi email
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Statistics Card -->
+        <div class="detail-card">
+            <div class="card-header">
+                <h3><i class="bi bi-graph-up"></i> Thống kê tài khoản</h3>
+            </div>
+            <div class="card-body">
+                <div class="stat-item">
+                    <div class="stat-icon">
+                        <i class="bi bi-calendar-check"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value">0</span>
+                        <span class="stat-label">Đơn hàng đã đặt</span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon">
+                        <i class="bi bi-star"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value">0</span>
+                        <span class="stat-label">Đánh giá đã viết</span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value">@((DateTime.Now - (Model.CreatedAt ?? DateTime.Now)).Days)</span>
+                        <span class="stat-label">Ngày tham gia</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Upload Modal -->
+<div class="modal fade" id="imageUploadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Đổi ảnh đại diện</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="imageUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="profileImage" class="form-label">Chọn ảnh</label>
+                        <input type="file" class="form-control" id="profileImage" name="image" accept="image/*" required>
+                        <div class="form-text">Chỉ chấp nhận file JPG, PNG, GIF, BMP, WEBP (tối đa 5MB)</div>
+                    </div>
+                    <div class="image-preview" id="imagePreview" style="display: none;">
+                        <img id="previewImg" src="" alt="Preview" class="img-fluid rounded">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="uploadProfileImage()">
+                    <span class="spinner-border spinner-border-sm d-none" id="uploadSpinner"></span>
+                    <i class="bi bi-upload" id="uploadIcon"></i>
+                    Tải lên
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Image upload functionality
+        function openImageUpload() {
+            const modal = new bootstrap.Modal(document.getElementById('imageUploadModal'));
+            modal.show();
+        }
+
+        // Preview image before upload
+        document.getElementById('profileImage').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewImg').src = e.target.result;
+                    document.getElementById('imagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Upload profile image
+        async function uploadProfileImage() {
+            const fileInput = document.getElementById('profileImage');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showToast('Vui lòng chọn ảnh để tải lên', 'error');
+                return;
+            }
+
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Kích thước file không được vượt quá 5MB', 'error');
+                return;
+            }
+
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showToast('Chỉ chấp nhận file ảnh JPG, PNG, GIF, BMP, WEBP', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            const uploadBtn = document.querySelector('#imageUploadModal .btn-primary');
+            const spinner = document.getElementById('uploadSpinner');
+            const icon = document.getElementById('uploadIcon');
+
+            // Show loading state
+            uploadBtn.disabled = true;
+            spinner.classList.remove('d-none');
+            icon.classList.add('d-none');
+
+            try {
+                const response = await fetch('@Url.Action("UploadImage")', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Tải ảnh lên thành công!', 'success');
+                    document.getElementById('profileAvatar').src = result.imageUrl;
+                    bootstrap.Modal.getInstance(document.getElementById('imageUploadModal')).hide();
+                    
+                    // Reset form
+                    document.getElementById('imageUploadForm').reset();
+                    document.getElementById('imagePreview').style.display = 'none';
+                } else {
+                    showToast(result.message || 'Có lỗi xảy ra khi tải ảnh lên', 'error');
+                }
+            } catch (error) {
+                showToast('Có lỗi xảy ra khi tải ảnh lên', 'error');
+            } finally {
+                // Hide loading state
+                uploadBtn.disabled = false;
+                spinner.classList.add('d-none');
+                icon.classList.remove('d-none');
+            }
+        }
+
+        // Delete profile image
+        async function deleteProfileImage() {
+            if (!confirm('Bạn có chắc chắn muốn xóa ảnh đại diện?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('@Url.Action("DeleteImage")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Xóa ảnh thành công!', 'success');
+                    document.getElementById('profileAvatar').src = '/images/default-avatar.png';
+                } else {
+                    showToast(result.message || 'Có lỗi xảy ra khi xóa ảnh', 'error');
+                }
+            } catch (error) {
+                showToast('Có lỗi xảy ra khi xóa ảnh', 'error');
+            }
+        }
+
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            // Implementation depends on your toast system
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+    </script>
+}
