@@ -798,13 +798,42 @@
           panel?.addEventListener('click', (e)=>{ if(e.target === panel) closePanel(); });
 
           // Khởi tạo từ server (nếu đã có VoucherId trong model)
-          (function initFromServer(){
+          (async function initFromServer(){
             const firstId = (voucherIdInput?.value || '').trim();
             const percent   = Number('@Model.VoucherPercent'.toString().replace(',', '.'));
             const maxAmount = Number('@Model.VoucherMaxAmount'.toString().replace(',', '.'));
-                  if(firstId){
-          CURRENT_VOUCHER = { VoucherId: firstId, DiscountPercent: percent||0, DiscountMaxAmount: maxAmount||0 };
-        }
+            
+            if(firstId){
+              // ✅ Fetch đầy đủ thông tin voucher từ server để có Code
+              try {
+                const vouchers = await fetchVouchers();
+                const found = vouchers.find(v => {
+                  const vid = pick(v, 'VoucherId', 'voucherId', 'Id', 'id');
+                  return vid && vid.toString().toLowerCase() === firstId.toLowerCase();
+                });
+                
+                if (found) {
+                  CURRENT_VOUCHER = normalizeVoucher(found);
+                } else {
+                  // Fallback nếu không tìm thấy trong danh sách
+                  CURRENT_VOUCHER = { 
+                    VoucherId: firstId, 
+                    DiscountPercent: percent||0, 
+                    DiscountMaxAmount: maxAmount||0,
+                    Code: '' // để updateVoucherUI không bị lỗi
+                  };
+                }
+              } catch (e) {
+                console.error('Failed to load voucher details:', e);
+                // Fallback
+                CURRENT_VOUCHER = { 
+                  VoucherId: firstId, 
+                  DiscountPercent: percent||0, 
+                  DiscountMaxAmount: maxAmount||0,
+                  Code: ''
+                };
+              }
+            }
 
             updateVoucherUI();
             if (CURRENT_VOUCHER) refreshTotalsLocal();

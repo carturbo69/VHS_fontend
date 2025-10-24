@@ -90,12 +90,18 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         /// <summary>
-        /// Trang Checkout. Chỉ nhận VoucherId (không dùng code).
+        /// Trang Checkout. Nhận VoucherId hoặc VoucherCode.
         /// Hỗ trợ cả luồng "Mua ngay" (SS_CHECKOUT_DIRECT) không đi qua giỏ.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId, bool refresh = false)
+        public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId, string? voucherCode, bool refresh = false)
         {
+            // ✅ Debug: Log parameters nhận được
+            System.Diagnostics.Debug.WriteLine($"🎫 BookingService.Index received:");
+            System.Diagnostics.Debug.WriteLine($"  - selectedKeysCsv: {selectedKeysCsv ?? "(null)"}");
+            System.Diagnostics.Debug.WriteLine($"  - voucherId: {voucherId?.ToString() ?? "(null)"}");
+            System.Diagnostics.Debug.WriteLine($"  - voucherCode: {voucherCode ?? "(null)"}");
+            
             var jwt = HttpContext.Session.GetString("JWToken"); // 👈 kéo dòng này lên đầu để dùng cho cancel
 
             if (refresh)
@@ -120,6 +126,23 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var voucherIdStr = HttpContext.Session.GetString(SS_VOUCHER_ID);
                 if (Guid.TryParse(voucherIdStr, out var vid)) voucherId = vid;
+            }
+            
+            // ====== Nếu không có voucherId nhưng có voucherCode, tìm VoucherId từ code ======
+            if (!voucherId.HasValue && !string.IsNullOrWhiteSpace(voucherCode))
+            {
+                var allVouchers = await _cartService.GetCartVouchersAsync(jwt) ?? new List<ReadVoucherByCustomerDTOs>();
+                var foundByCode = allVouchers.FirstOrDefault(v => 
+                    string.Equals(v.Code, voucherCode, StringComparison.OrdinalIgnoreCase));
+                if (foundByCode != null)
+                {
+                    voucherId = foundByCode.VoucherId;
+                    System.Diagnostics.Debug.WriteLine($"  ✅ Found voucherId from code '{voucherCode}': {voucherId}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"  ❌ Could not find voucherId for code '{voucherCode}'");
+                }
             }
 
             // ----------------------------------------------------------------
@@ -294,6 +317,17 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 vm.VoucherId = chosen?.VoucherId;
                 vm.VoucherPercent = (int)Math.Round(pctDec);
                 vm.VoucherMaxAmount = maxCap;
+                
+                // ✅ Debug: Log voucher được gán vào ViewModel
+                System.Diagnostics.Debug.WriteLine($"  📋 ViewModel voucher info:");
+                System.Diagnostics.Debug.WriteLine($"     - VoucherId: {vm.VoucherId?.ToString() ?? "(null)"}");
+                System.Diagnostics.Debug.WriteLine($"     - VoucherPercent: {vm.VoucherPercent}%");
+                System.Diagnostics.Debug.WriteLine($"     - VoucherMaxAmount: {vm.VoucherMaxAmount}");
+                System.Diagnostics.Debug.WriteLine($"     - Discount: {discount}");
+                if (chosen != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"     - Code: {chosen.Code}");
+                }
 
                 // Lưu session cho flow (CHỈ NHÁNH GIỎ)
                 HttpContext.Session.SetString(SS_SELECTED_IDS, string.Join(',', ids));
