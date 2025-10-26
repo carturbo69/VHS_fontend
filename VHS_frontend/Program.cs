@@ -67,6 +67,10 @@ builder.Services.AddHttpClient<AdminNotificationService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+builder.Services.AddHttpClient<VHS_frontend.Services.Provider.ProviderNotificationService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 
 // ServiceShopService
 builder.Services.AddScoped<ServiceShopService>();
