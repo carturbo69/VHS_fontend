@@ -40,9 +40,15 @@ namespace VHS_frontend.Services.Customer
                     VnPayResponseCode = vnpResponseCode ?? "99"
                 };
 
+            // ✅ Kiểm tra response code: chỉ "00" mới là thành công
+            bool isSuccess = vnpResponseCode == "00";
+
+            // 🐛 Debug log
+            System.Diagnostics.Debug.WriteLine($"[VNPay] Response Code: {vnpResponseCode}, Success: {isSuccess}");
+
             return new PaymentResponseModel()
             {
-                Success = true,
+                Success = isSuccess,
                 PaymentMethod = "VnPay",
                 OrderDescription = orderInfo,
                 OrderId = txnRef,

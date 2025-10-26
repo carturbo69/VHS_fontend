@@ -201,7 +201,7 @@
                 <div class="card__body">
                     <!-- Avatar -->
                     <div class="field">
-                        <label for="ProfileImage">Ảnh đại diện</label>
+                        <label for="ProfileImage">Ảnh đại diện <span class="req">*</span></label>
                         <button type="button" id="avatarPlaceholder" class="avatar-tile" aria-label="Chọn ảnh từ tệp">
                             <div class="tile-icon">📷</div>
                             <div class="tile-text">Chọn từ tệp</div>
@@ -236,9 +236,9 @@
                     </div>
 
                     <div class="field">
-                        <label for="Description">Mô tả dịch vụ</label>
+                        <label for="Description">Mô tả dịch vụ <span class="req">*</span></label>
                         <textarea id="Description" name="Description" class="input autosize" rows="3"
-                                  placeholder="Kinh nghiệm, phạm vi phục vụ, điểm mạnh..."></textarea>
+                                  placeholder="Kinh nghiệm, phạm vi phục vụ, điểm mạnh..." required></textarea>
                     </div>
                 </div>
             </section>
@@ -275,21 +275,21 @@
                         </div>
 
                         <div class="field">
-                            <label for="BL_0">Hình ảnh giấy phép kinh doanh (có thể chọn nhiều)</label>
+                            <label for="BL_0">Hình ảnh giấy phép kinh doanh <span class="req">*</span> (có thể chọn nhiều)</label>
                             <input id="BL_0" type="file" name="Certificates[0].BusinessLicenses" class="file-input bl-input"
-                                   accept="image/*" multiple />
+                                   accept="image/*" multiple required />
                             <div class="file-actions">
                                 <span class="file-name bl-name">Chưa chọn tệp</span>
                                 <label for="BL_0" class="btn ghost">Chọn ảnh</label>
                             </div>
                             <div class="img-grid bl-previews" aria-live="polite"></div>
-                            <div class="field-error text-danger small d-none">Vui lòng tải lên ít nhất 1 hình giấy phép kinh doanh mới.</div>
+                            <div class="field-error text-danger small d-none">Vui lòng tải lên ít nhất 1 hình giấy phép kinh doanh.</div>
                         </div>
 
                         <div class="field">
-                            <label>Mô tả dịch vụ kinh doanh</label>
+                            <label>Mô tả dịch vụ kinh doanh <span class="req">*</span></label>
                             <textarea class="input autosize" rows="3" name="Certificates[0].Description"
-                                      placeholder="Mô tả ngắn, năm cấp, đơn vị cấp..."></textarea>
+                                      placeholder="Mô tả ngắn, năm cấp, đơn vị cấp..." required></textarea>
                             <div class="field-error text-danger small d-none">Vui lòng nhập mô tả cho chứng chỉ 1.</div>
                         </div>
                     </div>
@@ -664,13 +664,55 @@
             const tiTitle      = tiTitleEl?.value?.trim() || "";
             const tiDesc       = tiDescEl?.value?.trim() || "";
 
-            // basic field validation
-            if (providerName.length === 0) errors.push({ msg: "Vui lòng nhập tên Provider.", el: nameEl });
-            if (isResubmit && (!fileInput?.files || fileInput.files.length === 0)) {
-              errors.push({ msg: "Vui lòng chọn ảnh đại diện mới.", el: fileInput });
+            // basic field validation - BẮT BUỘC TẤT CẢ
+            if (providerName.length === 0) {
+              errors.push({ msg: "Vui lòng nhập tên Provider.", el: nameEl });
+              nameEl?.classList.add('is-invalid');
+            } else {
+              nameEl?.classList.remove('is-invalid');
             }
-            if (tiTitle.length === 0) errors.push({ msg: "Vui lòng nhập Title cho Điều khoản & Bảo hiểm.", el: tiTitleEl });
-            if (tiDesc.length === 0) errors.push({ msg: "Vui lòng nhập Description cho Điều khoản & Bảo hiểm.", el: tiDescEl });
+
+            // BẮT BUỘC ảnh đại diện (cho cả lần đầu và resubmit)
+            if (!fileInput?.files || fileInput.files.length === 0) {
+              errors.push({ msg: "Vui lòng chọn ảnh đại diện.", el: fileInput });
+              placeholder?.classList.add('is-invalid');
+            } else {
+              placeholder?.classList.remove('is-invalid');
+            }
+
+            // Validate phone number format (nếu có nhập)
+            if (phoneTrim.length > 0) {
+              const phoneRegex = /^[0-9]{10,11}$/;
+              if (!phoneRegex.test(phoneTrim)) {
+                errors.push({ msg: "Số điện thoại phải có 10-11 chữ số.", el: phoneEl });
+                phoneEl?.classList.add('is-invalid');
+              } else {
+                phoneEl?.classList.remove('is-invalid');
+              }
+            }
+
+            // BẮT BUỘC mô tả Provider
+            if (descVal.trim().length === 0) {
+              errors.push({ msg: "Vui lòng nhập mô tả dịch vụ.", el: descEl });
+              descEl?.classList.add('is-invalid');
+            } else {
+              descEl?.classList.remove('is-invalid');
+            }
+
+            // BẮT BUỘC Title và Description cho Điều khoản & Bảo hiểm
+            if (tiTitle.length === 0) {
+              errors.push({ msg: "Vui lòng nhập Title cho Điều khoản & Bảo hiểm.", el: tiTitleEl });
+              tiTitleEl?.classList.add('is-invalid');
+            } else {
+              tiTitleEl?.classList.remove('is-invalid');
+            }
+            
+            if (tiDesc.length === 0) {
+              errors.push({ msg: "Vui lòng nhập Description cho Điều khoản & Bảo hiểm.", el: tiDescEl });
+              tiDescEl?.classList.add('is-invalid');
+            } else {
+              tiDescEl?.classList.remove('is-invalid');
+            }
 
             // certificates validation: at least 1
             const certBlocks = Array.from(list.querySelectorAll('.cert'));
@@ -682,26 +724,35 @@
               const descTa = blk.querySelector('textarea[name$=".Description"]');
               const input  = blk.querySelector('.bl-input');
               const files  = ensureStore(input);
+              
               const errCat = blk.querySelector('.field-error');
-              // per-field UI
+              const errDesc = blk.querySelectorAll('.field-error')[2] || blk.querySelectorAll('.field-error')[1];
+              const blErr = blk.querySelectorAll('.field-error')[1] || blk.querySelector('.field-error:nth-of-type(2)');
+              
+              // BẮT BUỘC chọn danh mục
               if (catSel && !catSel.value) {
                 errors.push({ msg: `Vui lòng chọn danh mục cho chứng chỉ ${idx+1}.`, el: catSel });
+                catSel.classList.add('is-invalid');
                 errCat?.classList.remove('d-none');
               } else {
+                catSel?.classList.remove('is-invalid');
                 errCat?.classList.add('d-none');
               }
+              
+              // BẮT BUỘC nhập mô tả
               if ((descTa?.value?.trim()?.length || 0) === 0) {
-                const e = blk.querySelectorAll('.field-error')[2] || blk.querySelector('.field-error');
-                e?.classList.remove('d-none');
                 errors.push({ msg: `Vui lòng nhập mô tả cho chứng chỉ ${idx+1}.`, el: descTa });
+                descTa?.classList.add('is-invalid');
+                errDesc?.classList.remove('d-none');
               } else {
-                const e = blk.querySelectorAll('.field-error')[2] || blk.querySelector('.field-error');
-                e?.classList.add('d-none');
+                descTa?.classList.remove('is-invalid');
+                errDesc?.classList.add('d-none');
               }
-              const blErr = blk.querySelectorAll('.field-error')[1];
+              
+              // BẮT BUỘC tải lên ít nhất 1 hình giấy phép
               if (!files || files.length === 0) {
+                errors.push({ msg: `Vui lòng tải lên ít nhất 1 hình giấy phép kinh doanh cho chứng chỉ ${idx+1}.`, el: input });
                 blErr?.classList.remove('d-none');
-                errors.push({ msg: `Vui lòng tải lên ít nhất 1 hình giấy phép kinh doanh mới.`, el: input });
               } else {
                 blErr?.classList.add('d-none');
               }
@@ -739,9 +790,23 @@
 
             if (errors.length > 0) {
               ev.preventDefault();
+              
+              // Hiển thị tất cả lỗi (tối đa 5 lỗi đầu tiên)
+              const errorMessages = errors.slice(0, 5).map(e => `• ${e.msg}`).join('\n');
+              const moreErrors = errors.length > 5 ? `\n\n... và ${errors.length - 5} lỗi khác.` : '';
+              alert(`Vui lòng kiểm tra lại thông tin:\n\n${errorMessages}${moreErrors}`);
+              
+              // Scroll đến trường có lỗi đầu tiên và focus
               const first = errors[0];
-              if (first.el && typeof first.el.focus === 'function') first.el.focus();
-              alert(errors[0].msg);
+              if (first.el) {
+                first.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => {
+                  if (typeof first.el.focus === 'function') {
+                    first.el.focus();
+                  }
+                }, 500);
+              }
+              
               return;
             }
 

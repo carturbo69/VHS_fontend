@@ -563,8 +563,22 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     System.Text.Json.JsonSerializer.Serialize(result.Breakdown)
                 );
 
-                // ✨ Hiển thị số tiền ngay: truyền amount theo InvariantCulture
-                var amountStr = result.Total.ToString(CultureInfo.InvariantCulture);
+                // ✅ Lưu mapping BookingId -> ServiceName từ Breakdown (backend đã trả về ServiceName)
+                var serviceNamesMap = new Dictionary<string, string>();
+                if (result.Breakdown != null && result.Breakdown.Any())
+                {
+                    foreach (var item in result.Breakdown)
+                    {
+                        if (!string.IsNullOrWhiteSpace(item.ServiceName))
+                        {
+                            serviceNamesMap[item.BookingId.ToString()] = item.ServiceName;
+                        }
+                    }
+                }
+                HttpContext.Session.SetString(
+                    "BookingServiceNamesJson",
+                    System.Text.Json.JsonSerializer.Serialize(serviceNamesMap)
+                );
 
                 switch (model.SelectedPaymentCode?.ToUpperInvariant())
                 {
@@ -583,11 +597,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         // Tạo URL VNPay và redirect trực tiếp
                         var vnpayUrl = _vnPayService.CreatePaymentUrl(vnpayPayment, HttpContext);
                         return Redirect(vnpayUrl);
-
-                    case "MOMO":
-                        return RedirectToAction(
-                            "StartMoMo", "Payment",
-                            new { area = "Customer", bookingIds = result.BookingIds, amount = amountStr });
 
                     default:
                         // COD
@@ -952,20 +961,21 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         ProviderId = providerId,
                         ProviderName = "Nhà cung cấp",
                         Url = "#",
+                        Title = "Điều khoản dịch vụ",
                         Description = @"<p>Chưa có điều khoản cụ thể cho nhà cung cấp này.</p>",
                         CreatedAt = DateTime.UtcNow
                     };
                 }
 
                 var providerName = System.Net.WebUtility.HtmlEncode(tos.ProviderName ?? "Nhà cung cấp");
+                var title = System.Net.WebUtility.HtmlEncode(tos.Title ?? "Điều khoản dịch vụ");
 
                 var html = $@"
 <div>
-  <div style=""font-weight:600;margin-bottom:6px"">{providerName}</div>
+  <div>{providerName}</div>
+  {(!string.IsNullOrWhiteSpace(tos.Title) ? $"<div>{title}</div>" : "")}
   <div>{tos.Description}</div>
-  <div style=""margin-top:8px"">
-    <a href=""{tos.Url}"" target=""_blank"" rel=""noopener"">Xem đầy đủ điều khoản</a>
-  </div>
+  {(!string.IsNullOrWhiteSpace(tos.Url) && tos.Url != "#" ? $"<div><a href=\"{tos.Url}\" target=\"_blank\" rel=\"noopener\">📄 Xem đầy đủ điều khoản</a></div>" : "")}
 </div>";
 
                 return Content(html, "text/html; charset=utf-8");
