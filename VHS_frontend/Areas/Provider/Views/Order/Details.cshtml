@@ -223,23 +223,60 @@
                     @if (Model.Status == "Pending")
                     {
                         <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-success" onclick="updateStatus('Confirmed')">
+                            <button type="button" class="btn btn-success btn-lg" onclick="updateStatus('Confirmed')">
                                 <i class="bi bi-check-circle"></i> Xác nhận đơn hàng
                             </button>
                             <button type="button" class="btn btn-danger" onclick="cancelOrder()">
-                                <i class="bi bi-x-circle"></i> Hủy đơn hàng
+                                <i class="bi bi-x-circle"></i> Từ chối đơn hàng
                             </button>
                         </div>
                     }
                     else if (Model.Status == "Confirmed")
                     {
-                        <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-success" onclick="updateStatus('Completed')">
-                                <i class="bi bi-check-circle-fill"></i> Hoàn thành
-                            </button>
-                            <button type="button" class="btn btn-danger" onclick="cancelOrder()">
-                                <i class="bi bi-x-circle"></i> Hủy đơn hàng
-                            </button>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Đơn hàng đã được xác nhận</strong>
+                            <p class="mb-0 mt-2 small">
+                                Nhân viên <strong>@(Model.StaffName ?? "chưa phân công")</strong> sẽ thực hiện công việc và cập nhật trạng thái qua ứng dụng Staff.
+                            </p>
+                        </div>
+                        <!-- Chỉ cho phép hủy nếu thực sự cần -->
+                        @* <button type="button" class="btn btn-outline-danger btn-sm" onclick="cancelOrder()">
+                            <i class="bi bi-x-circle"></i> Hủy đơn hàng (khẩn cấp)
+                        </button> *@
+                    }
+                    else if (Model.Status == "Completed")
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle-fill"></i>
+                            <strong>Đơn hàng đã hoàn thành</strong>
+                            <p class="mb-0 mt-2 small">
+                                Công việc đã được nhân viên hoàn thành.
+                            </p>
+                        </div>
+                    }
+                    else if (Model.Status == "Canceled")
+                    {
+                        <div class="alert alert-danger">
+                            <h5 class="alert-heading">
+                                <i class="bi bi-x-circle-fill"></i>
+                                <strong>Đơn hàng đã bị từ chối</strong>
+                            </h5>
+                            @if (!string.IsNullOrEmpty(Model.CancelReason))
+                            {
+                                <hr />
+                                <p class="mb-0">
+                                    <strong>Lý do từ chối:</strong><br />
+                                    <span class="text-dark">@Model.CancelReason</span>
+                                </p>
+                            }
+                            else
+                            {
+                                <hr />
+                                <p class="mb-0 text-muted">
+                                    <em>(Không có lý do cụ thể)</em>
+                                </p>
+                            }
                         </div>
                     }
                 </div>
@@ -290,101 +327,277 @@
 @section Scripts {
     <script>
         const bookingId = '@Model.BookingId';
+        console.log('Booking ID:', bookingId);
 
         function updateStatus(newStatus) {
-            if (!confirm(`Bạn có chắc chắn muốn ${newStatus === 'Confirmed' ? 'xác nhận' : 'hoàn thành'} đơn hàng này?`)) {
+            console.log('[DEBUG] updateStatus called with:', newStatus);
+            
+            const confirmMsg = newStatus === 'Confirmed' ? 'xác nhận' : 
+                              newStatus === 'Completed' ? 'hoàn thành' : 'cập nhật';
+            
+            if (!confirm(`Bạn có chắc chắn muốn ${confirmMsg} đơn hàng này?`)) {
+                console.log('[DEBUG] User cancelled');
                 return;
             }
+
+            const payload = {
+                bookingId: bookingId,
+                newStatus: newStatus,
+                reason: null
+            };
+            
+            console.log('[DEBUG] Sending payload:', payload);
 
             fetch('/Provider/Order/UpdateStatus', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    bookingId: bookingId,
-                    newStatus: newStatus,
-                    reason: null
-                })
+                body: JSON.stringify(payload)
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('[DEBUG] Response status:', response.status);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('[ERROR] Response error:', text);
+                        throw new Error('HTTP ' + response.status + ': ' + text);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('[DEBUG] Response data:', data);
                 if (data.success) {
-                    alert(data.message);
+                    alert('✅ ' + data.message);
                     location.reload();
                 } else {
-                    alert('Lỗi: ' + data.message);
+                    alert('❌ Lỗi: ' + data.message);
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Có lỗi xảy ra. Vui lòng thử lại.');
+                console.error('[ERROR] Catch error:', error);
+                alert('❌ Có lỗi xảy ra: ' + error.message);
             });
+        }
+
+        function updateCharCount() {
+            const textarea = document.getElementById('cancelReason');
+            const charCount = document.getElementById('charCount');
+            charCount.textContent = textarea.value.length;
+            
+            // Đổi màu nếu chưa đủ 10 ký tự
+            if (textarea.value.length < 10) {
+                charCount.classList.add('text-danger');
+                charCount.classList.remove('text-success');
+            } else {
+                charCount.classList.add('text-success');
+                charCount.classList.remove('text-danger');
+            }
         }
 
         function cancelOrder() {
-            const reason = prompt('Nhập lý do hủy đơn:');
-            if (!reason) return;
+            console.log('[DEBUG] cancelOrder called');
+            
+            // Reset form
+            document.getElementById('cancelReason').value = '';
+            updateCharCount(); // Reset counter
+            
+            // Mở modal thay vì dùng prompt()
+            const modal = new bootstrap.Modal(document.getElementById('cancelReasonModal'));
+            modal.show();
+        }
 
+        function submitCancelReason() {
+            console.log('=== [SUBMIT CANCEL] START ===');
+            
+            const textarea = document.getElementById('cancelReason');
+            const reason = textarea.value.trim();
+            
+            console.log('[SUBMIT CANCEL] Reason length:', reason.length);
+            console.log('[SUBMIT CANCEL] Reason value:', reason);
+            
+            // Validation
+            if (!reason) {
+                alert('⚠️ Vui lòng nhập lý do từ chối đơn hàng!');
+                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Empty reason');
+                return;
+            }
+            
+            if (reason.length < 10) {
+                alert('⚠️ Lý do từ chối phải có ít nhất 10 ký tự! (Hiện tại: ' + reason.length + ' ký tự)');
+                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Too short');
+                return;
+            }
+            
+            if (reason.length > 500) {
+                alert('⚠️ Lý do từ chối không được quá 500 ký tự!');
+                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Too long');
+                return;
+            }
+
+            // Tạo payload
+            const payload = {
+                bookingId: bookingId,
+                newStatus: 'Canceled',
+                reason: reason  // ✨ LÝ DO Ở ĐÂY
+            };
+            
+            console.log('=== [SUBMIT CANCEL] PAYLOAD ===');
+            console.log(JSON.stringify(payload, null, 2));
+            console.log('===============================');
+
+            // Đóng modal
+            const modalElement = document.getElementById('cancelReasonModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+
+            // Gửi request
+            console.log('[SUBMIT CANCEL] Sending request to /Provider/Order/UpdateStatus...');
+            
             fetch('/Provider/Order/UpdateStatus', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
-                body: JSON.stringify({
-                    bookingId: bookingId,
-                    newStatus: 'Canceled',
-                    reason: reason
-                })
+                body: JSON.stringify(payload)
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('[SUBMIT CANCEL] Response status:', response.status, response.statusText);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('[SUBMIT CANCEL] ERROR Response:', text);
+                        throw new Error('HTTP ' + response.status + ': ' + text);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('[SUBMIT CANCEL] SUCCESS Response:', data);
                 if (data.success) {
-                    alert(data.message);
+                    alert('✅ ' + data.message);
+                    console.log('[SUBMIT CANCEL] Reloading page...');
                     location.reload();
                 } else {
-                    alert('Lỗi: ' + data.message);
+                    alert('❌ Lỗi: ' + data.message);
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Có lỗi xảy ra. Vui lòng thử lại.');
+                console.error('[SUBMIT CANCEL] CATCH Error:', error);
+                alert('❌ Có lỗi xảy ra: ' + error.message);
             });
+            
+            console.log('=== [SUBMIT CANCEL] END ===');
         }
 
         function assignStaff() {
-            const staffId = document.getElementById('staffSelect').value;
-            if (!staffId) {
-                alert('Vui lòng chọn nhân viên');
+            console.log('[DEBUG] assignStaff called');
+            
+            const staffSelect = document.getElementById('staffSelect');
+            const staffId = staffSelect.value;
+            
+            console.log('[DEBUG] Selected staff ID:', staffId);
+            
+            if (!staffId || staffId === '') {
+                alert('⚠️ Vui lòng chọn nhân viên');
                 return;
             }
+
+            const payload = {
+                bookingId: bookingId,
+                staffId: staffId
+            };
+            
+            console.log('[DEBUG] Assign staff payload:', payload);
 
             fetch('/Provider/Order/AssignStaff', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    bookingId: bookingId,
-                    staffId: staffId
-                })
+                body: JSON.stringify(payload)
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('[DEBUG] Response status:', response.status);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('[ERROR] Response error:', text);
+                        throw new Error('HTTP ' + response.status + ': ' + text);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('[DEBUG] Response data:', data);
                 if (data.success) {
-                    alert(data.message);
+                    alert('✅ ' + data.message);
                     location.reload();
                 } else {
-                    alert('Lỗi: ' + data.message);
+                    alert('❌ Lỗi: ' + data.message);
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('Có lỗi xảy ra. Vui lòng thử lại.');
+                console.error('[ERROR] Catch error:', error);
+                alert('❌ Có lỗi xảy ra: ' + error.message);
             });
         }
+
+        // Test khi trang load xong
+        console.log('[DEBUG] Order details page loaded');
+        console.log('[DEBUG] Current status:', '@Model.Status');
     </script>
 }
+
+<!-- Modal: Nhập lý do từ chối đơn hàng -->
+<div class="modal fade" id="cancelReasonModal" tabindex="-1" aria-labelledby="cancelReasonModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="cancelReasonModalLabel">
+                    <i class="bi bi-x-circle"></i> Từ chối đơn hàng
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Lưu ý:</strong> Hành động này sẽ từ chối đơn hàng và hoàn tiền cho khách hàng.
+                </div>
+                <div class="mb-3">
+                    <label for="cancelReason" class="form-label">
+                        <strong>Lý do từ chối: <span class="text-danger">*</span></strong>
+                    </label>
+                    <textarea 
+                        class="form-control" 
+                        id="cancelReason" 
+                        rows="4" 
+                        placeholder="Vui lòng nhập lý do từ chối đơn hàng (tối thiểu 10 ký tự)..."
+                        maxlength="500"
+                        oninput="updateCharCount()"
+                        required></textarea>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> Lý do này sẽ được gửi cho khách hàng.
+                        </small>
+                        <small class="text-muted">
+                            <span id="charCount">0</span>/500 ký tự
+                        </small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x"></i> Hủy
+                </button>
+                <button type="button" class="btn btn-danger" onclick="submitCancelReason()">
+                    <i class="bi bi-check-circle"></i> Xác nhận từ chối
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @functions {
     string GetStatusText(string status)

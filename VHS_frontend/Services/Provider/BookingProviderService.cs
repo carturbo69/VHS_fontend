@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using VHS_frontend.Areas.Provider.Models.Booking;
+using VHS_frontend.Areas.Provider.Models.Dashboard;
 
 namespace VHS_frontend.Services.Provider
 {
@@ -84,25 +85,46 @@ namespace VHS_frontend.Services.Provider
         {
             try
             {
+                Console.WriteLine($"[BookingService] GetBookingDetailAsync called with BookingId: {bookingId}");
+                
                 SetAuthorizationHeader();
 
-                var response = await _httpClient.GetAsync($"/api/provider/bookings/{bookingId}");
+                var url = $"/api/provider/bookings/{bookingId}";
+                Console.WriteLine($"[BookingService] GET {_httpClient.BaseAddress}{url}");
+                
+                var response = await _httpClient.GetAsync(url);
+                Console.WriteLine($"[BookingService] Response status: {response.StatusCode}");
                 
                 if (response.IsSuccessStatusCode)
                 {
                     var responseContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Response length: {responseContent?.Length ?? 0} characters");
+                    
                     var result = JsonSerializer.Deserialize<BookingDetailDTO>(responseContent, new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
                     });
+                    
+                    Console.WriteLine($"[BookingService] Deserialized: {(result != null ? "SUCCESS" : "NULL")}");
+                    if (result != null)
+                    {
+                        Console.WriteLine($"[BookingService] Booking: {result.BookingCode}, Status: {result.Status}");
+                    }
+                    
                     return result;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Error response: {errorContent}");
                 }
 
                 return null;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting booking detail: {ex.Message}");
+                Console.WriteLine($"[ERROR] GetBookingDetailAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
                 return null;
             }
         }
@@ -111,17 +133,34 @@ namespace VHS_frontend.Services.Provider
         {
             try
             {
+                Console.WriteLine($"[BookingService] UpdateBookingStatusAsync called");
+                Console.WriteLine($"[BookingService] DTO: BookingId={dto.BookingId}, NewStatus={dto.NewStatus}");
+                
                 SetAuthorizationHeader();
 
                 var json = JsonSerializer.Serialize(dto);
+                Console.WriteLine($"[BookingService] Request JSON: {json}");
+                
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await _httpClient.PutAsync("/api/provider/bookings/update-status", content);
+                var url = "/api/provider/bookings/update-status";
+                
+                Console.WriteLine($"[BookingService] PUT {_httpClient.BaseAddress}{url}");
+                var response = await _httpClient.PutAsync(url, content);
+                
+                Console.WriteLine($"[BookingService] Response status: {response.StatusCode}");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Error response: {errorContent}");
+                }
+                
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error updating booking status: {ex.Message}");
+                Console.WriteLine($"[ERROR] UpdateBookingStatusAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
                 return false;
             }
         }
@@ -130,18 +169,179 @@ namespace VHS_frontend.Services.Provider
         {
             try
             {
+                Console.WriteLine($"[BookingService] AssignStaffAsync called");
+                Console.WriteLine($"[BookingService] DTO: BookingId={dto.BookingId}, StaffId={dto.StaffId}");
+                
                 SetAuthorizationHeader();
 
                 var json = JsonSerializer.Serialize(dto);
+                Console.WriteLine($"[BookingService] Request JSON: {json}");
+                
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                var response = await _httpClient.PutAsync("/api/provider/bookings/assign-staff", content);
+                var url = "/api/provider/bookings/assign-staff";
+                
+                Console.WriteLine($"[BookingService] PUT {_httpClient.BaseAddress}{url}");
+                var response = await _httpClient.PutAsync(url, content);
+                
+                Console.WriteLine($"[BookingService] Response status: {response.StatusCode}");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Error response: {errorContent}");
+                }
+                
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error assigning staff: {ex.Message}");
+                Console.WriteLine($"[ERROR] AssignStaffAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
                 return false;
+            }
+        }
+
+        public async Task<MonthlyRevenueViewModel?> GetMonthlyRevenueAsync(Guid providerId, int? year = null)
+        {
+            try
+            {
+                int targetYear = year ?? DateTime.Now.Year;
+                Console.WriteLine($"[BookingService] GetMonthlyRevenueAsync called with ProviderId: {providerId}, Year: {targetYear}");
+                
+                SetAuthorizationHeader();
+
+                var url = $"/api/provider/bookings/monthly-revenue/{providerId}?year={targetYear}";
+                Console.WriteLine($"[BookingService] GET {_httpClient.BaseAddress}{url}");
+                
+                var response = await _httpClient.GetAsync(url);
+                Console.WriteLine($"[BookingService] Response status: {response.StatusCode}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Response: {responseContent}");
+                    
+                    var result = JsonSerializer.Deserialize<MonthlyRevenueViewModel>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    Console.WriteLine($"[BookingService] Monthly revenue fetched successfully for year {targetYear}");
+                    return result;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Error response: {errorContent}");
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] GetMonthlyRevenueAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+                return null;
+            }
+        }
+
+        public async Task<RevenueReportViewModel?> GetRevenueReportAsync(Guid providerId, RevenueReportFilterViewModel filter)
+        {
+            try
+            {
+                Console.WriteLine($"[BookingService] GetRevenueReportAsync called with ProviderId: {providerId}");
+                
+                SetAuthorizationHeader();
+
+                var requestDto = new
+                {
+                    ProviderId = providerId,
+                    FromDate = filter.FromDate,
+                    ToDate = filter.ToDate,
+                    Month = filter.Month,
+                    Year = filter.Year
+                };
+
+                var json = JsonSerializer.Serialize(requestDto);
+                Console.WriteLine($"[BookingService] Request JSON: {json}");
+                
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var url = "/api/provider/bookings/revenue-report";
+                
+                Console.WriteLine($"[BookingService] POST {_httpClient.BaseAddress}{url}");
+                var response = await _httpClient.PostAsync(url, content);
+                
+                Console.WriteLine($"[BookingService] Response status: {response.StatusCode}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Response received");
+                    
+                    var result = JsonSerializer.Deserialize<RevenueReportViewModel>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    Console.WriteLine($"[BookingService] Revenue report fetched successfully");
+                    return result;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Error response: {errorContent}");
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] GetRevenueReportAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+                return null;
+            }
+        }
+
+        public async Task<BookingStatisticsDTO?> GetProviderStatisticsAsync(Guid providerId)
+        {
+            try
+            {
+                Console.WriteLine($"[BookingService] GetProviderStatisticsAsync called with ProviderId: {providerId}");
+                
+                SetAuthorizationHeader();
+
+                var url = $"/api/provider/bookings/statistics/{providerId}";
+                Console.WriteLine($"[BookingService] GET {_httpClient.BaseAddress}{url}");
+                
+                var response = await _httpClient.GetAsync(url);
+                Console.WriteLine($"[BookingService] Response status: {response.StatusCode}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Statistics response received");
+                    
+                    var result = JsonSerializer.Deserialize<BookingStatisticsDTO>(responseContent, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    
+                    Console.WriteLine($"[BookingService] Statistics fetched successfully");
+                    return result;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Error response: {errorContent}");
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] GetProviderStatisticsAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+                return null;
             }
         }
     }

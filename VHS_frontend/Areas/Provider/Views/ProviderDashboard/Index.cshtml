@@ -67,24 +67,73 @@
         <!-- Monthly Revenue -->
         <div class="col-lg-8">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="bi bi-graph-up me-2"></i>
-                        Doanh thu tháng này
+                        Doanh thu theo tháng
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="revenue-display">
-                        <h2 class="text-primary mb-0">@Model.MonthlyRevenue.ToString("N0") VND</h2>
-                        <p class="text-success mb-3">
-                            <i class="bi bi-arrow-up"></i> +15.2% so với tháng trước
-                        </p>
+                    @{
+                        var totalYearRevenue = Model.MonthlyStats.January + Model.MonthlyStats.February + 
+                                               Model.MonthlyStats.March + Model.MonthlyStats.April + 
+                                               Model.MonthlyStats.May + Model.MonthlyStats.June + 
+                                               Model.MonthlyStats.July + Model.MonthlyStats.August + 
+                                               Model.MonthlyStats.September + Model.MonthlyStats.October + 
+                                               Model.MonthlyStats.November + Model.MonthlyStats.December;
+                    }
+                    
+                    <!-- Revenue Summary -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="revenue-summary p-3 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <div class="revenue-icon me-3">
+                                        <i class="bi bi-cash-coin text-primary" style="font-size: 2.5rem;"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-muted mb-1 small">
+                                            <i class="bi bi-calendar3"></i> Tháng @DateTime.Now.Month/@DateTime.Now.Year
+                                        </p>
+                                        <h2 class="text-primary mb-0 fw-bold">@Model.MonthlyRevenue.ToString("N0") VNĐ</h2>
+                                        <small class="text-muted">Doanh thu tháng này</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="revenue-summary p-3 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <div class="revenue-icon me-3">
+                                        <i class="bi bi-graph-up-arrow text-success" style="font-size: 2.5rem;"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-muted mb-1 small">
+                                            <i class="bi bi-calendar-range"></i> Năm @DateTime.Now.Year
+                                        </p>
+                                        <h2 class="text-success mb-0 fw-bold">@totalYearRevenue.ToString("N0") VNĐ</h2>
+                                        <small class="text-muted">Tổng doanh thu năm</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Simple Chart Placeholder -->
-                    <div class="chart-placeholder">
-                        <canvas id="revenueChart" width="400" height="200"></canvas>
-                    </div>
+                    <!-- Chart Container -->
+                    @if (totalYearRevenue == 0)
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-graph-up text-muted" style="font-size: 4rem;"></i>
+                            <h5 class="text-muted mt-3">Chưa có dữ liệu doanh thu</h5>
+                            <p class="text-muted">Biểu đồ sẽ hiển thị khi bạn có đơn hàng hoàn thành</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="height: 300px;">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -99,25 +148,36 @@
                     </h5>
                 </div>
                 <div class="card-body p-0">
-                    <div class="recent-orders">
-                        @foreach (var order in Model.RecentOrders)
-                        {
-                            <div class="order-item">
-                                <div class="order-info">
-                                    <h6 class="mb-1">@order.OrderId</h6>
-                                    <p class="text-muted small mb-1">@order.CustomerName</p>
-                                    <p class="text-muted small mb-2">@order.ServiceName</p>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span class="badge bg-@(GetStatusColor(order.Status))">@order.Status</span>
-                                        <span class="fw-bold">@order.Amount.ToString("N0") VND</span>
+                    @if (Model.RecentOrders.Any())
+                    {
+                        <div class="recent-orders">
+                            @foreach (var order in Model.RecentOrders)
+                            {
+                                <div class="order-item">
+                                    <div class="order-info">
+                                        <h6 class="mb-1">@order.OrderId</h6>
+                                        <p class="text-muted small mb-1">@order.CustomerName</p>
+                                        <p class="text-muted small mb-2">@order.ServiceName</p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="badge bg-@(GetStatusColor(order.Status))">@order.Status</span>
+                                            <span class="fw-bold">@order.Amount.ToString("N0") VNĐ</span>
+                                        </div>
+                                    </div>
+                                    <div class="order-time">
+                                        <small class="text-muted">@order.OrderDate.ToString("dd/MM HH:mm")</small>
                                     </div>
                                 </div>
-                                <div class="order-time">
-                                    <small class="text-muted">@order.OrderDate.ToString("dd/MM HH:mm")</small>
-                                </div>
-                            </div>
-                        }
-                    </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-receipt text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3 mb-0">Chưa có đơn hàng nào</p>
+                            <small class="text-muted">Đơn hàng mới sẽ hiển thị ở đây</small>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -136,27 +196,27 @@
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-lg-3 col-md-6">
-                            <a href="#" class="quick-action-btn">
+                            <a href="@Url.Action("Create", "ServiceManagement", new { area = "Provider" })" class="quick-action-btn">
                                 <i class="bi bi-plus-circle"></i>
                                 <span>Thêm dịch vụ mới</span>
                             </a>
                         </div>
                         <div class="col-lg-3 col-md-6">
-                            <a href="#" class="quick-action-btn">
+                            <a href="@Url.Action("Index", "StaffManagement", new { area = "Provider" })" class="quick-action-btn">
                                 <i class="bi bi-people"></i>
                                 <span>Quản lý nhân viên</span>
                             </a>
                         </div>
                         <div class="col-lg-3 col-md-6">
-                            <a href="#" class="quick-action-btn">
+                            <a href="@Url.Action("Index", "Order", new { area = "Provider" })" class="quick-action-btn">
                                 <i class="bi bi-calendar-plus"></i>
-                                <span>Đặt lịch làm việc</span>
+                                <span>Quản lý đặt lịch</span>
                             </a>
                         </div>
                         <div class="col-lg-3 col-md-6">
-                            <a href="#" class="quick-action-btn">
-                                <i class="bi bi-chat-dots"></i>
-                                <span>Xem phản hồi</span>
+                            <a href="@Url.Action("Index", "RevenueReport", new { area = "Provider" })" class="quick-action-btn">
+                                <i class="bi bi-bar-chart"></i>
+                                <span>Báo cáo doanh thu</span>
                             </a>
                         </div>
                     </div>
@@ -171,17 +231,159 @@
 }
 
 @section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Simple revenue chart using Chart.js (you can replace with your preferred charting library)
         document.addEventListener('DOMContentLoaded', function() {
             const ctx = document.getElementById('revenueChart');
+            
+            // Chỉ khởi tạo chart nếu canvas element tồn tại (nghĩa là có dữ liệu)
             if (ctx) {
-                // This is a placeholder - you would implement actual chart here
-                ctx.style.display = 'flex';
-                ctx.style.alignItems = 'center';
-                ctx.style.justifyContent = 'center';
-                ctx.style.color = 'var(--muted-fg)';
-                ctx.innerHTML = '<div class="text-center"><i class="bi bi-bar-chart fs-1 mb-2"></i><br><small>Biểu đồ doanh thu<br>(Tích hợp thư viện chart)</small></div>';
+                console.log('Initializing revenue chart with data...');
+                
+                // Dữ liệu doanh thu từ server
+                const revenueData = [
+                    @Model.MonthlyStats.January,
+                    @Model.MonthlyStats.February,
+                    @Model.MonthlyStats.March,
+                    @Model.MonthlyStats.April,
+                    @Model.MonthlyStats.May,
+                    @Model.MonthlyStats.June,
+                    @Model.MonthlyStats.July,
+                    @Model.MonthlyStats.August,
+                    @Model.MonthlyStats.September,
+                    @Model.MonthlyStats.October,
+                    @Model.MonthlyStats.November,
+                    @Model.MonthlyStats.December
+                ];
+                
+                console.log('Revenue data:', revenueData);
+                
+                const monthlyData = {
+                    labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 
+                             'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
+                    datasets: [{
+                        label: 'Doanh thu (VNĐ)',
+                        data: revenueData,
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
+                        pointHoverBorderWidth: 3
+                    }]
+                };
+
+                const config = {
+                    type: 'line',
+                    data: monthlyData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    font: {
+                                        size: 13,
+                                        weight: '600'
+                                    },
+                                    padding: 15,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle'
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                titleFont: {
+                                    size: 15,
+                                    weight: 'bold'
+                                },
+                                bodyFont: {
+                                    size: 13
+                                },
+                                padding: 12,
+                                cornerRadius: 8,
+                                displayColors: true,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('vi-VN').format(context.parsed.y) + ' VNĐ';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 12,
+                                        weight: '500'
+                                    },
+                                    color: '#6b7280'
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)',
+                                    lineWidth: 1
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 12,
+                                        weight: '500'
+                                    },
+                                    color: '#374151',
+                                    padding: 8,
+                                    callback: function(value) {
+                                        if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + 'tr';
+                                        } else if (value >= 1000) {
+                                            return (value / 1000).toFixed(0) + 'k';
+                                        }
+                                        return new Intl.NumberFormat('vi-VN').format(value);
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Doanh thu (VNĐ)',
+                                    font: {
+                                        size: 13,
+                                        weight: 'bold'
+                                    },
+                                    color: '#1f2937',
+                                    padding: 8
+                                }
+                            }
+                        }
+                    }
+                };
+
+                const chart = new Chart(ctx, config);
+                console.log('Chart initialized successfully');
+            } else {
+                console.log('No revenue chart canvas found - no data to display');
             }
         });
     </script>

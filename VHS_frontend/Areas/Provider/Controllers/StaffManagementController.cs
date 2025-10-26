@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Cors;
 using VHS_frontend.Areas.Provider.Models.Staff;
 using VHS_frontend.Services.Provider;
 using System.Net.Http;
+using System.Text.Json;
 
 namespace VHS_frontend.Areas.Provider.Controllers
 {
@@ -464,6 +465,58 @@ namespace VHS_frontend.Areas.Provider.Controllers
             {
                 Console.WriteLine($"💥 Exception in UnlockStaff: {ex.Message}");
                 return Json(new { error = ex.Message });
+            }
+        }
+
+        // ✨ MỚI: Xem chi tiết nhân viên và lịch làm việc tuần
+        [HttpGet]
+        [Route("Provider/StaffManagement/Details/{id}")]
+        public async Task<IActionResult> Details(string id, [FromQuery] DateTime? weekStart)
+        {
+            try
+            {
+                var token = HttpContext.Session.GetString("JWToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    return RedirectToAction("Login", "Account", new { area = "" });
+                }
+
+                // Lấy thông tin staff
+                var staff = await _staffManagementService.GetStaffByIdAsync(id, token);
+                if (staff == null)
+                {
+                    TempData["Error"] = "Không tìm thấy nhân viên";
+                    return RedirectToAction("Index");
+                }
+
+                // Lấy lịch tuần (mặc định tuần này nếu không truyền weekStart)
+                var start = weekStart ?? DateTime.Now.Date.AddDays(-(int)DateTime.Now.DayOfWeek);
+                
+                // Call API để lấy schedule
+                var scheduleResponse = await _staffManagementService.GetWeeklyScheduleAsync(id, start, token);
+                
+                StaffScheduleResponse? scheduleData = null;
+                if (scheduleResponse.IsSuccessStatusCode)
+                {
+                    var content = await scheduleResponse.Content.ReadAsStringAsync();
+                    scheduleData = JsonSerializer.Deserialize<StaffScheduleResponse>(content, new JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true 
+                    });
+                }
+
+                ViewBag.Staff = staff;
+                ViewBag.WeekStart = start;
+                ViewBag.WeekEnd = start.AddDays(7);
+                ViewBag.Schedule = scheduleData?.Schedule ?? new List<StaffScheduleDTO>();
+                
+                return View();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Details: {ex.Message}");
+                TempData["Error"] = "Không thể tải thông tin nhân viên: " + ex.Message;
+                return RedirectToAction("Index");
             }
         }
     }

@@ -23,6 +23,7 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
         public string Address { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public string? CancelReason { get; set; }  // ✨ Lý do hủy đơn
 
         // Options
         public List<BookingOptionDetailDTO> Options { get; set; } = new();

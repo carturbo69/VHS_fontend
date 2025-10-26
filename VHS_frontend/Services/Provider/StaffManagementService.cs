@@ -98,5 +98,19 @@ namespace VHS_frontend.Services.Provider
             SetAuthHeader(token);
             return await _httpClient.PostAsync($"/api/staff/{staffId}/unlock", null, ct);
         }
+
+        // ✨ MỚI: Lấy lịch làm việc tuần của staff
+        public async Task<HttpResponseMessage> GetWeeklyScheduleAsync(
+            string staffId, 
+            DateTime weekStart, 
+            string? token = null, 
+            CancellationToken ct = default)
+        {
+            SetAuthHeader(token);
+            var weekStartStr = weekStart.ToString("yyyy-MM-dd");
+            return await _httpClient.GetAsync(
+                $"/api/provider/staff/{staffId}/schedule?weekStart={weekStartStr}", 
+                ct);
+        }
     }
 }
