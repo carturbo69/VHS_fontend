@@ -81,11 +81,6 @@ builder.Services.AddHttpClient<ProviderProfileService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
-// HttpClient cho Provider Review Service
-builder.Services.AddHttpClient<ProviderReviewService>(client =>
-{
-    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
-});
 
 // HttpClient cho Service Management Service
 builder.Services.AddHttpClient<ServiceManagementService>(client =>
