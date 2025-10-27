@@ -44,11 +44,9 @@ namespace VHS_frontend.Areas.Provider.Models.Feedback
         public int OneStarCount { get; set; }
     }
 
-    public class ProviderReply
+    public class ProviderReplyRequestDto
     {
-        public Guid Id { get; set; }
+        public Guid ReviewId { get; set; }
         public string Content { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public string ProviderName { get; set; } = string.Empty;
     }
 }
