@@ -60,6 +60,47 @@ namespace VHS_frontend.Services.Provider
                 : new ProviderFeedbackViewModel();
         }
 
+        /// <summary>
+        /// Provider gửi phản hồi cho một review.
+        /// Gọi: POST /api/reviews/provider/{accountId}/reply  (body: { reviewId, content })
+        /// Trả về true nếu success=true.
+        /// </summary>
+        public async Task<bool> SendReplyAsync(
+            Guid accountId,
+            ProviderReplyRequestDto dto,
+            string? jwtToken,
+            CancellationToken ct = default)
+        {
+            if (dto == null || dto.ReviewId == Guid.Empty || string.IsNullOrWhiteSpace(dto.Content))
+                throw new ArgumentException("Dữ liệu phản hồi không hợp lệ.");
+
+            SetAuthHeader(jwtToken);
+
+            using var res = await _httpClient.PostAsJsonAsync(
+                $"/api/reviews/provider/{accountId}/reply",
+                dto,
+                ct);
+
+            // Nếu không 2xx: đọc body để log lỗi rõ ràng
+            if (!res.IsSuccessStatusCode)
+            {
+                var body = await res.Content.ReadAsStringAsync(ct);
+                var msg = $"Lỗi gọi API ({(int)res.StatusCode} {res.ReasonPhrase}). Body: {body}";
+                throw new HttpRequestException(msg);
+            }
+
+            await using var stream = await res.Content.ReadAsStreamAsync(ct);
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var envelope = await JsonSerializer.DeserializeAsync<ApiEnvelope<object>>(stream, options, ct);
+
+            return envelope?.Success == true;
+        }
+
         // ====== Envelope theo API { success, data, message } ======
         private sealed class ApiEnvelope<T>
         {

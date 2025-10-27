@@ -320,9 +320,18 @@
     </style>
 }
 
+<!-- Anti-forgery token (để JS lấy ra và gắn vào header) -->
+<form id="afTokenForm" style="display:none">
+    @Html.AntiForgeryToken()
+</form>
+
+
 @section Scripts {
     <script>
-               document.addEventListener('DOMContentLoaded', function () {
+        // URL form-post tới action Reply (area Provider)
+        const REPLY_URL = '@Url.Action("Reply", "ProviderFeedback", new { area = "Provider" })';
+
+        document.addEventListener('DOMContentLoaded', function () {
             // Tự mở nhóm đầu tiên có feedback; nếu không có thì mở nhóm đầu tiên
             const collapses = Array.from(document.querySelectorAll('.collapse'));
             let target = collapses.find(c => c.getAttribute('data-has-feedback') === 'True'
@@ -355,7 +364,7 @@
             });
         });
 
-        // ====== Reply UI (demo UI, chưa gọi API thật) ======
+        // ====== Reply UI ======
         function showReplyForm(reviewId, btnEl) {
             const form = document.getElementById(`reply-form-${reviewId}`);
             const btnWrap = btnEl.closest('.reply-button');
@@ -373,22 +382,99 @@
             form.querySelector('.reply-textarea').value = '';
         }
 
-        function submitReply(reviewId, btnEl) {
+        // GỌI ACTION Reply (form-post + AntiForgery)
+        async function submitReply(reviewId, btnEl) {
             const txt = document.querySelector(`#reply-form-${reviewId} .reply-textarea`);
             const content = (txt?.value || '').trim();
             if (!content) { alert('Vui lòng nhập nội dung trả lời!'); return; }
 
-            // TODO: gọi API reply thật (chưa có spec ở backend)
+            // Lấy AntiForgery token đã render trong #afTokenForm
+            const token = document.querySelector('#afTokenForm input[name="__RequestVerificationToken"]')?.value;
+            if (!token) {
+                showToast('Thiếu anti-forgery token.', 'danger');
+                return;
+            }
+
             btnEl.disabled = true;
             const oldHtml = btnEl.innerHTML;
             btnEl.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang gửi...';
 
-            setTimeout(() => {
-                showToast('(Demo) Đã gửi trả lời!', 'success');
+            try {
+                // Dùng x-www-form-urlencoded để match [FromForm]
+                const form = new URLSearchParams();
+                form.append('ReviewId', reviewId);
+                form.append('Content', content);
+
+                const res = await fetch(REPLY_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'RequestVerificationToken': token,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: form.toString()
+                });
+
+                // Backend redirect về Index khi success/fail (do là action MVC).
+                // Để tránh reload, ta xử lý theo JSON nếu có; nếu không có JSON thì fallback reload.
+                const text = await res.text();
+                let payload = null;
+                try { payload = JSON.parse(text); } catch { /* không phải JSON => là HTML redirect */ }
+
+                if (!res.ok) {
+                    const msg = payload?.message || `Lỗi gọi API (${res.status} ${res.statusText}).`;
+                    throw new Error(msg);
+                }
+
+                // Nếu controller trả JSON (khi bạn dùng ReplyAjax) thì đọc success.
+                // Với action Reply hiện tại (RedirectToAction), ta coi là thành công và tự update UI.
+                if (payload && payload.success === false) {
+                    throw new Error(payload.message || 'Gửi phản hồi thất bại.');
+                }
+
+                // Thành công: update UI tại chỗ (không cần reload)
+                showToast('Đã gửi phản hồi.', 'success');
+                applyReplyToDom(reviewId, content);
                 cancelReply(reviewId, btnEl);
+            } catch (err) {
+                console.error(err);
+                showToast(err.message || 'Gửi phản hồi thất bại.', 'danger');
+            } finally {
                 btnEl.disabled = false;
                 btnEl.innerHTML = oldHtml;
-            }, 800);
+            }
+        }
+
+        function applyReplyToDom(reviewId, content) {
+            const containerEl = document.getElementById(`reply-form-${reviewId}`)?.closest('.feedback-content');
+            if (!containerEl) return;
+
+            // Ẩn nút "Trả lời"
+            const replyBtnWrap = containerEl.querySelector('.reply-button');
+            if (replyBtnWrap) replyBtnWrap.style.display = 'none';
+
+            // Nếu đã có block provider-reply thì chỉ cần cập nhật nội dung
+            let replyBlock = containerEl.querySelector('.provider-reply');
+            if (!replyBlock) {
+                replyBlock = document.createElement('div');
+                replyBlock.className = 'provider-reply';
+                replyBlock.innerHTML = `
+                    <div class="reply-header">
+                        <div class="reply-avatar"><i class="bi bi-building"></i></div>
+                        <div class="reply-info">
+                            <span class="reply-author">Bạn</span>
+                            <span class="reply-date"></span>
+                        </div>
+                    </div>
+                    <div class="reply-content"><p></p></div>`;
+                containerEl.appendChild(replyBlock);
+            }
+
+            const dateSpan = replyBlock.querySelector('.reply-date');
+            if (dateSpan) dateSpan.textContent = new Date().toLocaleString('vi-VN');
+
+            const p = replyBlock.querySelector('.reply-content > p');
+            if (p) p.textContent = content;
         }
 
         function showToast(message, type = 'info') {
@@ -478,6 +564,7 @@
         });
     </script>
 }
+
 
 @functions {
     bool IsUrl(string? v) =>
