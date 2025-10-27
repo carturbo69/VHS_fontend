@@ -20,11 +20,10 @@
         };
     }
     
-    // Timezone helper - convert UTC to Vietnam time
-    DateTime ToVietnamTime(DateTime utcTime)
+    // Database đã lưu theo giờ Việt Nam, không cần convert nữa
+    DateTime ToVietnamTime(DateTime vietnamTime)
     {
-        var vietnamZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-        return TimeZoneInfo.ConvertTimeFromUtc(utcTime, vietnamZone);
+        return vietnamTime;
     }
 }
 
@@ -120,7 +119,7 @@ a.chat-btn > #chatIcon {
                     Đặt lịch <span class="count">@Model.Data.Count(n => n.NotificationType == "Booking")</span>
                 </button>
                 <button class="filter-tab" data-filter="payment" onclick="filterNotifications('payment')">
-                    Thanh toán <span class="count">@Model.Data.Count(n => n.NotificationType == "Payment")</span>
+                    Thanh toán <span class="count">@Model.Data.Count(n => n.NotificationType.Contains("Payment", StringComparison.OrdinalIgnoreCase) || n.NotificationType.Contains("PAYMENT", StringComparison.OrdinalIgnoreCase))</span>
                 </button>
             </div>
         </div>
@@ -136,20 +135,24 @@ a.chat-btn > #chatIcon {
                          @if (!notification.IsRead) { <text>onclick="markAsReadInline('@notification.NotificationId', this)"</text> }>
                         
                         <div class="notification-icon">
-                            @switch (notification.NotificationType.ToLower())
-                            {
-                                case "booking":
-                                    <i class="icon-calendar"></i>
-                                    break;
-                                case "payment":
+                            @{
+                                var notifType = notification.NotificationType.ToLower();
+                                if (notifType.Contains("payment"))
+                                {
                                     <i class="icon-credit-card"></i>
-                                    break;
-                                case "system":
+                                }
+                                else if (notifType.Contains("booking"))
+                                {
+                                    <i class="icon-calendar"></i>
+                                }
+                                else if (notifType == "system")
+                                {
                                     <i class="icon-settings"></i>
-                                    break;
-                                default:
+                                }
+                                else
+                                {
                                     <i class="icon-bell"></i>
-                                    break;
+                                }
                             }
                         </div>
                         
@@ -782,7 +785,7 @@ a.chat-btn > #chatIcon {
                         shouldShow = item.dataset.type === 'booking';
                         break;
                     case 'payment':
-                        shouldShow = item.dataset.type === 'payment';
+                        shouldShow = item.dataset.type.includes('payment');
                         break;
                     default:
                         shouldShow = true;
@@ -840,7 +843,7 @@ a.chat-btn > #chatIcon {
                             count = document.querySelectorAll('.notification-item[data-type="booking"]').length;
                             break;
                         case 'payment':
-                            count = document.querySelectorAll('.notification-item[data-type="payment"]').length;
+                            count = Array.from(document.querySelectorAll('.notification-item')).filter(item => item.dataset.type.includes('payment')).length;
                             break;
                     }
                     
