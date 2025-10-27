@@ -3,6 +3,7 @@
 
 @{
     ViewData["Title"] = "Chat";
+    ViewData["HideFooter"] = true; // Ẩn footer ở trang chat
     var me = Model.CurrentAccount?.AccountId ?? Guid.Empty;
 
     // Lấy participant còn lại của cuộc trò chuyện đang chọn (để hiện tên/avatar ở header)
@@ -16,8 +17,7 @@
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 }
 
-<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-<link rel="stylesheet" href="~/css/chat-customer.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/chat-customer.css?v=@DateTime.Now.Ticks" />
 
 <div class="container-fluid chat-wrapper">
     <div class="row h-100 g-0">
@@ -77,14 +77,10 @@
                      loading="lazy" decoding="async" referrerpolicy="no-referrer"
                      onerror="this.onerror=null;this.src='@fallbackImg';" />
 
-                <div class="me-3">
+                <div class="chat-header-content">
                     <div class="fw-semibold">
                         @(otherInSelected?.Account?.AccountName ?? "Chọn một cuộc trò chuyện")
                     </div>
-                </div>
-
-                <div class="ms-auto small text-muted">
-                    @selected?.LastMessageAt?.ToString("dd/MM/yyyy HH:mm")
                 </div>
             </div>
 
@@ -156,34 +152,32 @@
 
                     <input type="hidden" name="conversationId" value="@Model.SelectedConversationId" />
 
-                    @* Khung xem trước ảnh đính kèm *@
-                    <div id="attachPreview" class="d-none mt-2">
-                        <div class="d-inline-flex align-items-center gap-2 border rounded p-2 bg-light">
-                            <img id="attachThumb"
-                                 src=""
-                                 alt="Xem trước"
-                                 style="width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;"
-                                 onerror="this.onerror=null;this.src='@fallbackImg';" />
-                            <div class="small text-muted" id="attachName"></div>
-                            <button type="button" id="removeAttachBtn" class="btn btn-sm btn-outline-secondary">
-                                Bỏ ảnh
-                            </button>
+                    @* Khung xem trước ảnh đính kèm - multiple images *@
+                    <div id="attachPreview" class="d-none">
+                        <div id="imageGrid" class="image-grid">
+                            @* Images will be added here dynamically *@
                         </div>
+                        
+                        @* Nút + để thêm ảnh *@
+                        <button type="button" id="addMoreBtn" class="add-more-btn" title="Thêm ảnh">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
                     </div>
 
-                    <div class="d-flex gap-2 align-items-start">
+                    <div class="msg-input-row">
                         <input type="text"
                                name="body"
                                class="form-control"
                                placeholder="Nhập tin nhắn…"
                                autocomplete="off" />
 
-                        @* Input file ẩn *@
+                        @* Input file ẩn - multiple *@
                         <input type="file"
                                id="fileInput"
                                name="image"
                                class="d-none"
-                               accept="image/*" />
+                               accept="image/*"
+                               multiple />
 
                         @* Nút mở thư mục chọn ảnh *@
                         <button type="button"
@@ -194,7 +188,7 @@
                         </button>
 
                         <button type="submit" class="btn btn-primary">
-                            Gửi
+                            <i class="bi bi-send-fill"></i>
                         </button>
                     </div>
                 </form>
@@ -211,58 +205,96 @@
           if (el) el.scrollTop = el.scrollHeight;
         })();
 
-        // Chọn ảnh + xem trước
+        // Quản lý nhiều ảnh
         (function () {
             var pickBtn = document.getElementById('pickFileBtn');
             var fileInput = document.getElementById('fileInput');
             var previewWrap = document.getElementById('attachPreview');
-            var imgEl = document.getElementById('attachThumb');
-            var nameEl = document.getElementById('attachName');
-            var removeBtn = document.getElementById('removeAttachBtn');
-            var objectUrl = null;
+            var imageGrid = document.getElementById('imageGrid');
+            var addMoreBtn = document.getElementById('addMoreBtn');
+            var selectedFiles = [];
+            var dataTransfer = new DataTransfer();
 
             if (!pickBtn || !fileInput) return;
+
+            function updatePreview() {
+                imageGrid.innerHTML = '';
+                
+                if (selectedFiles.length === 0) {
+                    previewWrap.classList.add('d-none');
+                    return;
+                }
+
+                previewWrap.classList.remove('d-none');
+                
+                selectedFiles.forEach(function(fileData, index) {
+                    var imgContainer = document.createElement('div');
+                    imgContainer.className = 'image-thumb-container';
+                    
+                    var img = document.createElement('img');
+                    img.src = fileData.url;
+                    img.alt = fileData.file.name;
+                    img.className = 'image-thumb';
+                    
+                    var removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'remove-thumb-btn';
+                    removeBtn.innerHTML = '×';
+                    removeBtn.title = 'Xóa ảnh';
+                    removeBtn.onclick = function() {
+                        removeImage(index);
+                    };
+                    
+                    imgContainer.appendChild(img);
+                    imgContainer.appendChild(removeBtn);
+                    imageGrid.appendChild(imgContainer);
+                });
+            }
+
+            function removeImage(index) {
+                if (selectedFiles[index]) {
+                    URL.revokeObjectURL(selectedFiles[index].url);
+                }
+                selectedFiles.splice(index, 1);
+                
+                // Update DataTransfer
+                dataTransfer = new DataTransfer();
+                selectedFiles.forEach(function(fileData) {
+                    dataTransfer.items.add(fileData.file);
+                });
+                fileInput.files = dataTransfer.files;
+                
+                updatePreview();
+            }
 
             pickBtn.addEventListener('click', function () {
                 fileInput.click();
             });
 
-            fileInput.addEventListener('change', function () {
-                // Clear preview cũ
-                if (objectUrl) {
-                    URL.revokeObjectURL(objectUrl);
-                    objectUrl = null;
-                }
-
-                if (fileInput.files && fileInput.files.length > 0) {
-                    var f = fileInput.files[0];
-
-                    // Bảo vệ: chỉ chấp nhận ảnh
-                    if (!f.type || !f.type.startsWith('image/')) {
-                        alert('Vui lòng chọn file ảnh.');
-                        fileInput.value = '';
-                        previewWrap.classList.add('d-none');
-                        return;
-                    }
-
-                    objectUrl = URL.createObjectURL(f);
-                    imgEl.src = objectUrl;
-                    nameEl.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
-                    previewWrap.classList.remove('d-none');
-                } else {
-                    previewWrap.classList.add('d-none');
-                }
+            addMoreBtn.addEventListener('click', function () {
+                fileInput.click();
             });
 
-            removeBtn?.addEventListener('click', function () {
-                if (objectUrl) {
-                    URL.revokeObjectURL(objectUrl);
-                    objectUrl = null;
+            fileInput.addEventListener('change', function () {
+                if (!fileInput.files || fileInput.files.length === 0) return;
+
+                for (var i = 0; i < fileInput.files.length; i++) {
+                    var file = fileInput.files[i];
+                    
+                    if (!file.type || !file.type.startsWith('image/')) {
+                        continue;
+                    }
+
+                    var url = URL.createObjectURL(file);
+                    selectedFiles.push({
+                        file: file,
+                        url: url
+                    });
+                    dataTransfer.items.add(file);
                 }
-                fileInput.value = '';
-                imgEl.src = '';
-                nameEl.textContent = '';
-                previewWrap.classList.add('d-none');
+
+                fileInput.files = dataTransfer.files;
+                updatePreview();
             });
         })();
     </script>
