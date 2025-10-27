@@ -2,6 +2,30 @@
 @{
     ViewData["Title"] = "Thông báo";
     Layout = "~/Views/Shared/_Layout.cshtml";
+    
+    // Helper function to convert NotificationType to Vietnamese
+    string GetNotificationTypeVN(string type)
+    {
+        return type switch
+        {
+            "PAYMENT_SUCCESS" => "Thanh toán thành công",
+            "NEW_BOOKING" => "Đơn hàng mới",
+            "BOOKING_CONFIRMED" => "Xác nhận đơn hàng",
+            "BOOKING_CANCELLED" => "Hủy đơn hàng",
+            "BOOKING_COMPLETED" => "Hoàn thành đơn hàng",
+            "Payment" => "Thanh toán",
+            "Booking" => "Đặt lịch",
+            "System" => "Hệ thống",
+            _ => type
+        };
+    }
+    
+    // Timezone helper - convert UTC to Vietnam time
+    DateTime ToVietnamTime(DateTime utcTime)
+    {
+        var vietnamZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+        return TimeZoneInfo.ConvertTimeFromUtc(utcTime, vietnamZone);
+    }
 }
 
 <style>
@@ -132,9 +156,9 @@ a.chat-btn > #chatIcon {
                         <div class="notification-content">
                             <div class="content-text">@notification.Content</div>
                             <div class="notification-meta">
-                                <span class="time">@notification.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                <span class="time">@ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm")</span>
                                 <span class="type-badge type-@notification.NotificationType.ToLower()">
-                                    @notification.NotificationType
+                                    @GetNotificationTypeVN(notification.NotificationType)
                                 </span>
                             </div>
                         </div>

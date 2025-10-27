@@ -1,4 +1,29 @@
 @model VHS_frontend.Areas.Customer.Models.Notification.NotificationListResponse
+@{
+    // Helper function to convert NotificationType to Vietnamese
+    string GetNotificationTypeVN(string type)
+    {
+        return type switch
+        {
+            "PAYMENT_SUCCESS" => "Thanh toán thành công",
+            "NEW_BOOKING" => "Đơn hàng mới",
+            "BOOKING_CONFIRMED" => "Xác nhận đơn hàng",
+            "BOOKING_CANCELLED" => "Hủy đơn hàng",
+            "BOOKING_COMPLETED" => "Hoàn thành đơn hàng",
+            "Payment" => "Thanh toán",
+            "Booking" => "Đặt lịch",
+            "System" => "Hệ thống",
+            _ => type
+        };
+    }
+    
+    // Timezone helper - convert UTC to Vietnam time
+    DateTime ToVietnamTime(DateTime utcTime)
+    {
+        var vietnamZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+        return TimeZoneInfo.ConvertTimeFromUtc(utcTime, vietnamZone);
+    }
+}
 
 <div class="notification-dropdown" id="notificationDropdown">
     <div class="dropdown-header">
@@ -18,15 +43,23 @@
                 @foreach (var notification in Model.Data.Take(5))
                 {
                     <div class="notification-item @(notification.IsRead ? "read" : "unread")" 
-                         data-notification-id="@notification.NotificationId">
+                         data-notification-id="@notification.NotificationId"
+                         style="cursor: pointer;"
+                         @if (!notification.IsRead) { <text>onclick="markAsReadFromDropdown('@notification.NotificationId')"</text> }
+                         @if (notification.IsRead) { <text>onclick="window.location.href='/Customer/Notification/Index'"</text> }>
                         
                         <div class="item-icon">
                             @switch (notification.NotificationType.ToLower())
                             {
                                 case "booking":
+                                case "new_booking":
+                                case "booking_confirmed":
+                                case "booking_cancelled":
+                                case "booking_completed":
                                     <i class="icon-calendar"></i>
                                     break;
                                 case "payment":
+                                case "payment_success":
                                     <i class="icon-credit-card"></i>
                                     break;
                                 case "system":
@@ -40,7 +73,7 @@
                         
                         <div class="item-content">
                             <div class="content-text">@notification.Content</div>
-                            <div class="item-time">@notification.CreatedAt.ToString("dd/MM HH:mm")</div>
+                            <div class="item-time">@ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm")</div>
                         </div>
                         
                         @if (!notification.IsRead)
