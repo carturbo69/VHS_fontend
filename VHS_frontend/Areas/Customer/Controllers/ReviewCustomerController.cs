@@ -2,115 +2,152 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using VHS_frontend.Areas.Customer.Models.ReviewDTOs;
+using VHS_frontend.Services.Customer;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
     [Area("Customer")]
     public class ReviewCustomerController : Controller
     {
-        // Dữ liệu demo
-        private static readonly List<ReviewListItemDto> _reviews = new()
+
+        private readonly ReviewServiceCustomer _reviewServiceCustomer;
+
+        public ReviewCustomerController(ReviewServiceCustomer reviewServiceCustomer)
         {
-            new ReviewListItemDto
+            _reviewServiceCustomer = reviewServiceCustomer;
+        }
+
+
+        // Lấy AccountId từ Claims hoặc Session (bạn đã có sẵn hàm này)
+        private Guid GetAccountId()
+        {
+            var idStr = User.FindFirstValue("AccountID") ?? HttpContext.Session.GetString("AccountID");
+            return Guid.TryParse(idStr, out var id) ? id : Guid.Empty;
+        }
+
+        // Lấy JWT để gọi API (tuỳ app bạn lưu ở đâu)
+        private string? GetJwtToken()
+        {
+            // Thử cookie trước
+            var token = Request.Cookies["JWToken"];
+            if (!string.IsNullOrWhiteSpace(token)) return token;
+
+            // Rồi tới session
+            token = HttpContext.Session.GetString("JWToken");
+            return token;
+        }
+
+        [HttpPost] // <-- bỏ ("Create")
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(CreateReviewDTOs model)
+        {
+            if (!ModelState.IsValid)
             {
-                ReviewId = Guid.NewGuid(),
-                ServiceId = Guid.NewGuid(),
-                UserId = Guid.NewGuid(),
-                FullName = "hoaianh2003",
-                ServiceThumbnailUrl = "/images/sample1.png",
-                Rating = 5,
-                Comment = "mùi hương: ok",
-                Reply = "Shop xin cảm ơn đánh giá của bạn...",
-                ServiceTitle = "Dung Dịch Vệ Sinh Intimate...",
-                UserAvatarUrl = "/images/sample1.png",
-                CreatedAt = DateTime.Now.AddDays(-3),
-                LikeCount = 0,
-                ReviewImageUrls = new List<string>
-                {
-                    "/images/reviews/r1-1.jpg",
-                    "/images/reviews/r1-2.jpg",
-                    "/images/reviews/r1-3.jpg",
-                },
-            },
-            new ReviewListItemDto
-            {
-                ReviewId = Guid.NewGuid(),
-                ServiceId = Guid.NewGuid(),
-                UserId = Guid.NewGuid(),
-                FullName = "hoaianh2003",
-                ServiceThumbnailUrl = "/images/sample1.png",
-                Rating = 4,
-                Comment = "Đóng gói chắc chắn, giao nhanh.",
-                Reply = null,
-                ServiceTitle = "Dịch vụ vệ sinh máy lạnh tận nơi",
-                UserAvatarUrl = "/images/sample1.png",
-                CreatedAt = DateTime.Now.AddMonths(-1),
-                LikeCount = 2,
-                ReviewImageUrls = new List<string> { "/images/reviews/r3-1.jpg" },
+                TempData["ToastError"] = "Vui lòng chọn ít nhất 1 sao và điền thông tin hợp lệ.";
+                return RedirectToAction("HistoryBookingService", "BookingService", new { area = "Customer" });
             }
-        };
+
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                TempData["ToastError"] = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            var jwt = GetJwtToken();
+            var ok = await _reviewServiceCustomer.CreateReviewAsync(accountId, model, jwt);
+
+            if (!ok)
+            {
+                TempData["ToastError"] = "Tạo đánh giá thất bại. Kiểm tra lại dữ liệu hoặc trạng thái booking.";
+                return RedirectToAction("HistoryBookingService", "BookingService", new { area = "Customer" });
+            }
+
+            TempData["ToastSuccess"] = "Đánh giá thành công!";
+
+            // Fallback nếu ServiceId chưa có (tránh nhảy về Cart/Index)
+            if (model.ServiceId == Guid.Empty)
+                return RedirectToAction("HistoryBookingService", "BookingService", new { area = "Customer" });
+
+            Console.WriteLine($"[MVC] ImageFiles.Count = {model.ImageFiles?.Count ?? 0}");
+            foreach (var f in model.ImageFiles ?? Enumerable.Empty<IFormFile>())
+                Console.WriteLine($"[MVC] {f.FileName} {f.Length} bytes");
+
+
+            return RedirectToAction("ListHistoryBooking", "BookingService", new { area = "Customer", id = model.ServiceId });
+        }
+
 
         // GET: /Customer/ReviewCustomer
-        public IActionResult Index()
+        [HttpGet]
+        public async Task<IActionResult> Index(CancellationToken ct)
         {
-            return View(_reviews);
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                TempData["ToastError"] = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            var jwt = GetJwtToken();
+            var (success, data, message) = await _reviewServiceCustomer.GetMyReviewsAsync(accountId, jwt, ct);
+
+            if (!success)
+            {
+                TempData["ToastError"] = string.IsNullOrWhiteSpace(message)
+                    ? "Không lấy được danh sách đánh giá."
+                    : message;
+                // Trả về view với list rỗng để UI vẫn render bình thường
+                return View(new List<ReviewListItemDto>());
+            }
+
+            // data đã có URL tuyệt đối cho avatar/thumbnail/ảnh review -> render thẳng
+            return View(data);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Edit(EditReviewDto dto)
+        public async Task<IActionResult> Edit(EditReviewDto model, CancellationToken ct)
         {
-            // Nếu review đã có reply => không cho vào flow Edit nữa
-            var reviewForCheck = _reviews.FirstOrDefault(r => r.ReviewId == dto.ReviewId);
-            if (reviewForCheck == null)
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
             {
-                TempData["Toast"] = "Không tìm thấy đánh giá.";
-                return RedirectToAction(nameof(Index));
-            }
-            if (!string.IsNullOrWhiteSpace(reviewForCheck.Reply))
-            {
-                TempData["Toast"] = "Đánh giá đã có phản hồi, không thể sửa.";
-                return RedirectToAction(nameof(Index));
+                TempData["ToastError"] = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
-            // Nếu model invalid => trả về View + auto open như cũ
+            // Model invalid -> trả lại Index + tự mở modal với dữ liệu user vừa nhập
             if (!ModelState.IsValid)
             {
-                ViewBag.OpenModalId = dto.ReviewId;
+                var jwt = GetJwtToken();
+                var (ok, data, msg) = await _reviewServiceCustomer.GetMyReviewsAsync(accountId, jwt, ct);
+
+                // Cho JS biết review nào cần mở và dữ liệu nào cần prefill
+                ViewBag.OpenModalId = model.ReviewId;
                 ViewBag.OpenModalDto = new
                 {
-                    ReviewId = dto.ReviewId,
-                    Rating = dto.Rating,
-                    Comment = dto.Comment ?? string.Empty,
-                    RemoveImages = dto.RemoveImages ?? new List<string>()
+                    ReviewId = model.ReviewId,
+                    Rating = model.Rating,
+                    Comment = model.Comment ?? string.Empty,
+                    RemoveImages = model.RemoveImages ?? new List<string>() // để JS click sẵn các ảnh bị xoá
                 };
-                return View("Index", _reviews);
+
+                if (!ok)
+                    TempData["ToastError"] = string.IsNullOrWhiteSpace(msg) ? "Không lấy được danh sách đánh giá." : msg;
+
+                return View("Index", data ?? new List<ReviewListItemDto>());
             }
 
-            // Từ đây trở đi chắc chắn review chưa có Reply
-            var review = reviewForCheck;
+            // Model hợp lệ -> gọi API Edit
+            var jwtToken = GetJwtToken();
+            var success = await _reviewServiceCustomer.EditReviewAsync(accountId, model, jwtToken, ct);
 
-            review.Rating = Math.Clamp(dto.Rating, 1, 5);
-            review.Comment = dto.Comment ?? string.Empty;
-
-            if (dto.RemoveImages?.Any() == true)
+            if (!success)
             {
-                review.ReviewImageUrls = review.ReviewImageUrls
-                    .Where(u => !dto.RemoveImages.Contains(u, StringComparer.OrdinalIgnoreCase))
-                    .ToList();
-            }
-
-            if (dto.NewImages != null && dto.NewImages.Count > 0)
-            {
-                foreach (var file in dto.NewImages)
-                {
-                    if (file?.Length > 0)
-                    {
-                        var fakeUrl = "/uploads/" + file.FileName;
-                        review.ReviewImageUrls.Add(fakeUrl);
-                    }
-                }
+                TempData["ToastError"] = "Cập nhật đánh giá thất bại.";
+                return RedirectToAction(nameof(Index));
             }
 
             TempData["Toast"] = "Cập nhật đánh giá thành công!";
@@ -118,25 +155,29 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
 
+
+        // ================== DELETE ==================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Delete(Guid id)
+        public async Task<IActionResult> Delete(Guid reviewId, CancellationToken ct)
         {
-            var review = _reviews.FirstOrDefault(r => r.ReviewId == id);
-            if (review == null)
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
             {
-                TempData["Toast"] = "Không tìm thấy đánh giá.";
+                TempData["ToastError"] = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            var jwt = GetJwtToken();
+            var ok = await _reviewServiceCustomer.DeleteReviewAsync(accountId, reviewId, jwt, ct);
+
+            if (!ok)
+            {
+                TempData["ToastError"] = "Xoá đánh giá thất bại.";
                 return RedirectToAction(nameof(Index));
             }
 
-            if (!string.IsNullOrWhiteSpace(review.Reply))
-            {
-                TempData["Toast"] = "Đánh giá đã có phản hồi, không thể xoá.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            _reviews.Remove(review);
-            TempData["Toast"] = "Đã xóa đánh giá.";
+            TempData["ToastSuccess"] = "Đã xoá đánh giá.";
             return RedirectToAction(nameof(Index));
         }
 
