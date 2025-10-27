@@ -12,7 +12,7 @@
 
         public string? Comment { get; set; }
 
-        public string? Images { get; set; }
+        public List<string> Images { get; set; } = new();
 
         public string? Reply { get; set; }
 

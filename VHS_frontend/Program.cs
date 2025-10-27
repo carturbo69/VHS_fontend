@@ -13,6 +13,16 @@ var backendBase = builder.Configuration["Apis:Backend"];
 if (string.IsNullOrWhiteSpace(backendBase))
     throw new InvalidOperationException("Missing configuration: Apis:Backend");
 
+builder.Services.AddHttpClient<ReviewServiceCustomer>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+builder.Services.AddHttpClient<ProviderFeedbackService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
 builder.Services.AddHttpClient<IServiceCustomerService, ServiceCustomerService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154

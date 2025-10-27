@@ -304,11 +304,9 @@
                         if (v < 1) v = 1; else if (v > 5) v = 5;
                         return v;
                     };
-                    Func<string?, bool> HasMedia = s =>
-                    {
-                        var arr = SplitImgs(s);
-                        return arr.Any(x => !string.IsNullOrWhiteSpace(x));
-                    };
+
+                    Func<List<string>, bool> HasMedia = imgs =>
+                    imgs != null && imgs.Any(x => !string.IsNullOrWhiteSpace(x));
 
                     var allReviews = Model.Reviews ?? new List<ReadReviewDTOs>();
                     int n1 = allReviews.Count(x => Bucket(x.Rating) == 1);
@@ -428,7 +426,10 @@
                             {
                                 foreach (var rv in pageReviews)
                                 {
-                                    var photos = SplitImgs(rv.Images).Select(x => Url.Content(x)).ToArray();
+                                    var photos = (rv.Images ?? new List<string>())
+                                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                                    .Select(x => Url.Content(x))
+                                    .ToArray();
                                     var fullStars = Math.Max(1, Math.Min(5, rv.Rating ?? 0));
 
                                     <article class="review-item">

@@ -1,88 +1,98 @@
-﻿@model VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTOs
+﻿@model VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTO
 @{
     ViewData["Title"] = "Chi tiết đơn dịch vụ";
 
-    var status = (Model.Status ?? "").Trim();
-    var step = status.ToLowerInvariant();
+    // Chỉ 4 trạng thái chính + Cancelled (để hiện banner), KHÔNG có "All"
+    var statusViMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Pending"] = "Chờ xác nhận",
+        ["Confirmed"] = "Xác Nhận",
+        ["InProgress"] = "Bắt Đầu Làm Việc",
+        ["Completed"] = "Hoàn thành",
+        ["Cancelled"] = "Đã hủy"
+    };
 
-    // 4 trạng thái chính
-    var IsPending = step == "chờ xác nhận";
-    var IsConfirmed = step == "xác nhận";
-    var IsWorking = step == "bắt đầu làm việc";
-    var IsCompleted = step == "hoàn thành";
+    // Ưu tiên NormalizedStatus; nếu trống mặc định "Pending"
+    var statusCode = string.IsNullOrWhiteSpace(Model?.NormalizedStatus) ? "Pending" : Model.NormalizedStatus;
+    var statusVi = statusViMap.TryGetValue(statusCode, out var vi) ? vi : statusCode;
 
-    // Trang này chỉ dùng cho 4 trạng thái trên
+    var IsPending = statusCode.Equals("Pending", StringComparison.OrdinalIgnoreCase);
+    var IsConfirmed = statusCode.Equals("Confirmed", StringComparison.OrdinalIgnoreCase);
+    var IsWorking = statusCode.Equals("InProgress", StringComparison.OrdinalIgnoreCase);
+    var IsCompleted = statusCode.Equals("Completed", StringComparison.OrdinalIgnoreCase);
+    var IsCancelled = statusCode.Equals("Cancelled", StringComparison.OrdinalIgnoreCase);
+
+    var IsReviewed = Model?.HasReview == true; // NEW
+
+
+    // Steps chỉ áp dụng cho 4 trạng thái chính
     var IsFourStates = IsPending || IsConfirmed || IsWorking || IsCompleted;
 
-    Func<string, string> Active = key => step == key ? "active" : "";
     Func<decimal, string> currency = v => v.ToString("N0") + "đ";
-
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 
-    Func<string, string> StatusHeadline = s => (s ?? "").Trim().ToLowerInvariant() switch
+    string StatusHeadline(string code) => (code ?? "").Trim() switch
     {
-        "chờ xác nhận" => "Đang chờ xác nhận",
-        "xác nhận" => "Đã xác nhận",
-        "bắt đầu làm việc" => "Đang thực hiện",
-        "hoàn thành" => "Đã hoàn thành",
-        _ => s ?? "—"
+        "Pending" => "Đang chờ xác nhận",
+        "Confirmed" => "Đã xác nhận",
+        "InProgress" => "Đang thực hiện",
+        "Completed" => "Đã hoàn thành",
+        "Cancelled" => "Đơn đã hủy",
+        _ => "—"
     };
 
-    // Tính số tiền còn phải trả
-    var grandTotal = Model.Total; // = Subtotal + ShippingFee - VoucherDiscount
-    var paid = Model.PaidAmount;
+    var grandTotal = Model?.Total ?? 0m;
+    var paid = Model?.PaidAmount ?? 0m;
     var due = Math.Max(0, grandTotal - paid);
 
-    // Giá gạch (nếu có đưa từ controller)
-    decimal? originalPrice = ViewBag.OriginalPrice as decimal?;
+    Func<string, DateTimeOffset?> timeOf = code => Model?.Timeline?
+        .Where(e => string.Equals(e.Code, code, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(e => e.Time)
+        .Select(e => (DateTimeOffset?)e.Time)
+        .FirstOrDefault();
 
-    Func<string, DateTime?> timeOf = code => Model?.Timeline?
-       .Where(e => string.Equals(e.Code, code, StringComparison.OrdinalIgnoreCase))
-       .OrderByDescending(e => e.Time)
-       .Select(e => (DateTime?)e.Time)
-       .FirstOrDefault();
+    Func<DateTimeOffset?, string> fmt = t => t.HasValue ? t.Value.ToString("HH:mm dd-MM") : "—";
 
-    Func<DateTime?, string> fmt = t => t.HasValue ? t.Value.ToString("HH:mm dd-MM") : "—";
-
-    // Thứ tự các bước
+    // Thứ tự cho 4 trạng thái
     var order = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
     {
-        ["chờ xác nhận"] = 0,
-        ["xác nhận"] = 1,
-        ["bắt đầu làm việc"] = 2,
-        ["hoàn thành"] = 3
+        ["Pending"] = 0,
+        ["Confirmed"] = 1,
+        ["InProgress"] = 2,
+        ["Completed"] = 3
     };
-    var currentIndex = order.TryGetValue(step, out var idx) ? idx : -1;
+    var currentIndex = order.TryGetValue(statusCode, out var idx) ? idx : -1;
 
-    // done: đã qua; active: đang ở; upcoming: để trống
     Func<string, string> StepClass = key =>
     {
         if (!order.TryGetValue(key, out var k)) return "";
+        if (currentIndex < 0) return "";   // ví dụ Cancelled thì không active/done step
         if (k < currentIndex) return "done";
         if (k == currentIndex) return "active";
-        return ""; // upcoming
+        return "";
     };
 
-    // Thời gian hiển thị chỉ để xem: ưu tiên ViewBag.BookingTime, fallback theo mốc START_WORK
-    DateTime? bookingTime = ViewBag.BookingTime as DateTime?;
-    bookingTime ??= timeOf("START_WORK");
+    DateTimeOffset? bookingTime = ViewBag.BookingTime as DateTimeOffset?;
+    bookingTime ??= timeOf("InProgress");
 }
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
 <link rel="stylesheet" href="~/css/history-booking-detail.css" asp-append-version="true" />
 
-
 <div class="container my-3">
-
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center flex-wrap">
         <div>
-            <div class="fw-semibold">MÃ ĐƠN HÀNG: @(Model.BookingCode ?? "—")</div>
-            <div class="text-danger fw-bold">@StatusHeadline(status)</div>
+            <div class="fw-semibold">MÃ ĐƠN HÀNG: @(string.IsNullOrWhiteSpace(Model?.BookingCode) ? "—" : Model.BookingCode)</div>
+            <div class="text-danger fw-bold">@StatusHeadline(statusCode)</div>
+            @if (IsCancelled)
+            {
+                <div class="small text-muted">Đơn đã bị hủy. Vui lòng xem lý do hủy ở bên dưới nếu có.</div>
+            }
         </div>
 
-        <!-- Nút hành động: chỉ cho 4 trạng thái -->
+        <!-- Nút hành động -->
         <div class="d-flex gap-2">
             @if (IsCompleted)
             {
@@ -90,8 +100,19 @@
                 <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportService" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-secondary">
                     Báo cáo / Hoàn tiền
                 </a>
-                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reviewModal-@Model.BookingId">Đánh giá</button>
+
+                @if (!IsReviewed)  // chỉ hiện khi CHƯA review
+                {
+                    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reviewModal-@Model.BookingId">
+                        Đánh giá
+                    </button>
+                }
+                else
+                {
+                    <span class="btn btn-outline-success disabled">Đã đánh giá</span>
+                }
             }
+
             else if (IsPending)
             {
                 <button class="btn btn-outline-secondary">Liên hệ Shop</button>
@@ -102,6 +123,11 @@
                 <button class="btn btn-primary">Xem vận đơn</button>
                 <button class="btn btn-outline-secondary">Liên hệ Shipper</button>
             }
+            else if (IsCancelled)
+            {
+                <button class="btn btn-outline-secondary">Lý do hủy</button>
+                <button class="btn btn-danger">Mua Lại</button>
+            }
         </div>
     </div>
 
@@ -109,36 +135,57 @@
     @if (IsFourStates)
     {
         <div class="progress-steps">
-            <div class="step @StepClass("chờ xác nhận")">
+            <div class="step @StepClass("Pending")">
                 <div class="icon"><i class="bi bi-receipt"></i></div>
                 <div class="label">Chờ xác nhận</div>
                 <div class="meta">
-                    <span><span class="label">Cập nhật:</span> @fmt(timeOf("CREATED"))</span>
-                    <span><span class="label">Đã thanh toán:</span> @Model.PaidAmount.ToString("N0") đ</span>
+                    <span><span class="label">Cập nhật:</span> @fmt(timeOf("Pending"))</span>
+                    <span><span class="label">Đã thanh toán:</span> @((Model?.PaidAmount ?? 0m).ToString("N0")) đ</span>
                 </div>
             </div>
 
-            <div class="step @StepClass("xác nhận")">
+            @{
+                var stepStaffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
+                var stepStaffImg = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
+            }
+
+            <div class="step @StepClass("Confirmed")">
                 <div class="icon"><i class="bi bi-check2-circle"></i></div>
                 <div class="label">Xác Nhận</div>
+
                 <div class="meta">
                     <span><span class="label">Cập nhật:</span> @fmt(timeOf("CONFIRMED"))</span>
-                    <span>
-                        <span class="label">Nhân viên:</span>
-                        @(string.IsNullOrWhiteSpace(Model?.StaffName) ? "Chưa phân công" : Model.StaffName)
-                    </span>
+
+                    @if (!string.IsNullOrWhiteSpace(stepStaffName))
+                    {
+                        <span class="d-inline-flex align-items-center gap-2">
+                            <img src="@stepStaffImg"
+                                 alt="Ảnh @stepStaffName"
+                                 width="20" height="20"
+                                 style="object-fit:cover;border-radius:50%;border:1px solid #eee"
+                                 loading="lazy"
+                                 decoding="async"
+                                 onerror="this.onerror=null;this.src='@fallbackImg';" />
+                            <span><span class="label">Nhân viên:</span> @stepStaffName</span>
+                        </span>
+                    }
+                    else
+                    {
+                        <span><span class="label">Nhân viên:</span> Chưa phân công</span>
+                    }
                 </div>
             </div>
 
-            <div class="step @StepClass("bắt đầu làm việc")">
+
+            <div class="step @StepClass("InProgress")">
                 <div class="icon"><i class="bi bi-hammer"></i></div>
                 <div class="label">Bắt Đầu Làm Việc</div>
                 <div class="meta">
-                    <span><span class="label">Cập nhật:</span> @fmt(timeOf("START_WORK"))</span>
+                    <span><span class="label">Cập nhật:</span> @fmt(timeOf("InProgress"))</span>
                 </div>
             </div>
 
-            <div class="step @StepClass("hoàn thành")">
+            <div class="step @StepClass("Completed")">
                 <div class="icon"><i class="bi bi-star"></i></div>
                 <div class="label">Hoàn thành</div>
                 <div class="meta">
@@ -146,7 +193,6 @@
                 </div>
             </div>
         </div>
-
     }
 
     <!-- Address + Timeline -->
@@ -154,11 +200,11 @@
         <div class="col-lg-6">
             <div class="card-block p-3 h-100">
                 <div class="h6">Địa Chỉ Đặt Dịch Vụ</div>
-                <div class="fw-semibold">@(!string.IsNullOrWhiteSpace(Model.RecipientFullName) ? Model.RecipientFullName : "—")</div>
-                <div>@(!string.IsNullOrWhiteSpace(Model.RecipientPhone) ? Model.RecipientPhone : "—")</div>
-                <div>@(!string.IsNullOrWhiteSpace(Model.AddressLine) ? Model.AddressLine : "—")</div>
+                <div class="fw-semibold">@(!string.IsNullOrWhiteSpace(Model?.RecipientFullName) ? Model.RecipientFullName : "—")</div>
+                <div>@(!string.IsNullOrWhiteSpace(Model?.RecipientPhone) ? Model.RecipientPhone : "—")</div>
+                <div>@(!string.IsNullOrWhiteSpace(Model?.AddressLine) ? Model.AddressLine : "—")</div>
                 <hr />
-                @if (!string.IsNullOrWhiteSpace(Model.ShippingTrackingCode))
+                @if (!string.IsNullOrWhiteSpace(Model?.ShippingTrackingCode))
                 {
                     <div class="small text-muted">Mã theo dõi: @Model.ShippingTrackingCode</div>
                 }
@@ -169,32 +215,30 @@
             <div class="card-block p-3 h-100">
                 <div class="h6">Tiến trình dịch vụ</div>
                 <div class="timeline">
-                    @foreach (var e in (Model.Timeline ?? new List<VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.TrackingEventDTO>()).OrderBy(t => t.Time))
+                    @foreach (var e in (Model?.Timeline ?? new List<VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTO.TrackingEventDTO>()).OrderBy(t => t.Time))
                     {
                         var code = (e.Code ?? "").Trim().ToUpperInvariant();
-                        var onlyShowProofFor = code == "START_WORK" || code == "COMPLETED"; // chỉ 2 trạng thái này có ảnh
+                        var onlyShowProofFor = code == "CONFIRMED" || code == "INPROGRESS" || code == "COMPLETED";
+                        var showStaffFor = code == "CONFIRMED" || code == "INPROGRESS" || code == "COMPLETED";
 
-                        // Staff
-                        var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model.StaffName;
-                        var staffImage = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model.StaffImage;
+                        var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
+                        var staffImage = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
 
                         <div class="tl-item">
                             <div class="fw-semibold">@e.Title</div>
-                            <div class="text-muted small">@e.Time:dd-MM-yyyy HH:mm</div>
+                            <div class="text-muted small">@(e.Time.ToString("dd-MM-yyyy HH:mm"))</div>
 
-                            @* “Chờ xác nhận” hiển thị tiền đã thanh toán *@
-                            @if (code == "CREATED" && Model.PaidAmount > 0)
+                            @if (code == "CREATED" && (Model?.PaidAmount ?? 0m) > 0)
                             {
-                                <div class="small text-success">Đã thanh toán: <b>@currency(Model.PaidAmount)</b></div>
+                                <div class="small text-success">Đã thanh toán: <b>@currency(Model!.PaidAmount)</b></div>
                             }
 
-                            @* Nhân viên ở START_WORK/COMPLETED *@
-                            @if ((code == "START_WORK" || code == "COMPLETED") && !string.IsNullOrWhiteSpace(staffName))
+                            @if (showStaffFor && !string.IsNullOrWhiteSpace(staffName))
                             {
                                 <div class="staff">
                                     <img src="@staffImage"
                                          alt="Ảnh @staffName"
-                                         class="zoomable" @* <-- cho phép phóng to *@
+                                         class="zoomable"
                                          loading="lazy"
                                          decoding="async"
                                          onerror="this.onerror=null;this.src='@fallbackImg';" />
@@ -236,30 +280,29 @@
                             }
                         </div>
                     }
+
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Service block -->
+
     <div class="card-block p-3 mt-3">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-            <!-- info bên trái -->
             <div class="d-flex align-items-center gap-2">
                 <img src="/images/shop-badge.svg" width="24" height="24" alt="shop"
                      loading="lazy" decoding="async"
                      onerror="this.onerror=null;this.src='@fallbackImg';" />
                 <div class="fw-semibold">
-                    @(!string.IsNullOrWhiteSpace(Model.ProviderName) ? Model.ProviderName : "—")
+                    @(!string.IsNullOrWhiteSpace(Model?.ProviderName) ? Model.ProviderName : "—")
                 </div>
                 <span class="ms-2 badge text-bg-light">
-                    Nhân viên: @(Model.StaffName ?? "—")
+                    Nhân viên: @(string.IsNullOrWhiteSpace(Model?.StaffName) ? "—" : Model!.StaffName)
                 </span>
             </div>
 
-            <!-- actions bên phải -->
             <div class="d-flex align-items-center gap-2 shop-actions">
-                @* Chat với nhà cung cấp *@
                 <a class="btn btn-ghost btn-sm"
                    asp-area="Customer"
                    asp-controller="Chat"
@@ -267,8 +310,6 @@
                    asp-route-providerId="@Model.ProviderId">
                     <i class="bi bi-chat-dots me-1"></i> Chat
                 </a>
-
-                @* Xem trang shop *@
                 <a class="btn btn-primary btn-sm"
                    asp-area="Customer"
                    asp-controller="Shop"
@@ -281,9 +322,9 @@
 
         <div class="d-flex gap-3">
             @{
-                var serviceImg = !string.IsNullOrWhiteSpace(Model.Service?.Image) ? Model.Service.Image : fallbackImg;
-                var basePrice = Model.Service?.UnitPrice ?? 0m;
-                var optionPrice = Model.Options?.Sum(o => o.Price) ?? 0m;
+                var serviceImg = !string.IsNullOrWhiteSpace(Model?.Service?.Image) ? Model.Service.Image : fallbackImg;
+                var basePrice = Model?.Service?.UnitPrice ?? 0m;
+                var optionPrice = Model?.Options?.Sum(o => o.Price) ?? 0m;
                 var total = basePrice + optionPrice;
             }
             <img src="@serviceImg"
@@ -294,12 +335,12 @@
                  style="width:96px;height:96px;object-fit:cover;border:1px solid #eee;border-radius:6px" />
 
             <div class="flex-grow-1">
-                <div class="fw-semibold">@Model.Service?.Title</div>
-                <div class="text-muted">x@(Model.Service?.Quantity ?? 0)</div>
-                @if (Model.Options?.Any() == true)
+                <div class="fw-semibold">@Model?.Service?.Title</div>
+                <div class="text-muted">x@(Model?.Service?.Quantity ?? 0)</div>
+                @if (Model?.Options?.Any() == true)
                 {
                     <div class="mt-1">
-                        @foreach (var op in Model.Options)
+                        @foreach (var op in Model!.Options)
                         {
                             <span class="option-badge" title="@op.Description">
                                 @op.OptionName • @op.Price.ToString("N0") @op.UnitType
@@ -324,9 +365,7 @@
 
         <!-- Giờ thực hiện (readonly) -->
         <div class="booking-time readonly mb-2">
-            <div class="booking-label">
-                Giờ thực đặc hiện dịch vụ
-            </div>
+            <div class="booking-label">Giờ thực hiện dịch vụ</div>
             <div class="booking-chip">
                 <i class="bi bi-clock"></i>
                 @(bookingTime.HasValue? bookingTime.Value.ToString("HH:mm dd-MM-yyyy") : "—")
@@ -349,15 +388,13 @@
         <small class="text-muted d-block mt-1">
             (Thông tin hiển thị để tham khảo. Bạn đã đồng ý điều khoản khi đặt đơn.)
         </small>
-
     </div>
 
     <!-- Prices -->
     <div class="card-block p-3 mt-3">
-        <div class="price-row"><span>Tổng tiền hàng</span><span>@currency(Model.Subtotal)</span></div>
-        <div class="price-row"><span>Phí vận chuyển</span><span>@currency(Model.ShippingFee)</span></div>
-        <div class="price-row"><span>Voucher</span><span>-@currency(Model.VoucherDiscount)</span></div>
-        <div class="price-row"><span>Phương thức thanh toán</span><span>@(Model.PaymentMethod ?? "—")</span></div>
+        <div class="price-row"><span>Tổng tiền hàng</span><span>@currency(Model?.Subtotal ?? 0m)</span></div>
+        <div class="price-row"><span>Voucher</span><span>-@currency(Model?.VoucherDiscount ?? 0m)</span></div>
+        <div class="price-row"><span>Phương thức thanh toán</span><span>@(string.IsNullOrWhiteSpace(Model?.PaymentMethod) ? "—" : Model.PaymentMethod)</span></div>
         <div class="price-row">
             <span class="fw-semibold">Thành tiền</span>
             <span class="price-strong fs-4">@currency(grandTotal)</span>
@@ -366,7 +403,7 @@
         @if (due > 0)
         {
             <div class="mt-2 small text-warning">
-                Đã thanh toán: <b>@currency(paid)</b>. Vui lòng thanh toán còn lại <b>@currency(due)</b> khi nhận hàng.
+                Đã thanh toán: <b>@currency(paid)</b>. Vui lòng thanh toán còn lại <b>@currency(due)</b> khi hoàn thành công việc.
             </div>
         }
         else
@@ -378,8 +415,7 @@
     </div>
 </div>
 
-<!-- ===== Modals cho trang Detail ===== -->
-<!-- Modal Điều khoản -->
+<!-- ===== Modals ===== -->
 <div class="modal fade" id="tosModal" tabindex="-1" aria-labelledby="tosModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -397,34 +433,49 @@
     </div>
 </div>
 
-
-<!-- Modal Đánh Giá -->
+@if (IsCompleted && !IsReviewed)
+{
 <div class="modal fade" id="reviewModal-@Model.BookingId" tabindex="-1" aria-labelledby="reviewModalLabel-@Model.BookingId" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
-            <form asp-action="Create" asp-controller="Review" method="post" enctype="multipart/form-data">
+            <!-- POST đúng area/controller/action + antiforgery + enctype -->
+            <form asp-area="Customer"
+                  asp-controller="ReviewCustomer"
+                  asp-action="Create"
+                  method="post"
+                  enctype="multipart/form-data"
+                  onsubmit="
+              const inp = this.querySelector('input[name=ImageFiles]');
+              console.log('[VIEW] files before submit =', inp?.files?.length || 0);
+            ">
+                @Html.AntiForgeryToken()
+
                 <div class="modal-header">
-                    <h5 class="modal-title">Đánh Giá Sản Phẩm</h5>
+                    <h5 class="modal-title">Đánh Giá Dịch Vụ</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
+
                 <div class="modal-body">
-                    <input type="hidden" name="OrderId" value="@Model.BookingId" />
+                    <!-- KHỚP tên DTO -->
+                    <input type="hidden" name="BookingId" value="@Model.BookingId" />
+                    <input type="hidden" name="ServiceId" value="@(Model?.Service?.ServiceId ?? Guid.Empty)" />
+
                     <div class="d-flex align-items-center gap-3 mb-3">
                         @{
-                            var detailServiceImg = !string.IsNullOrWhiteSpace(Model.Service?.Image) ? Model.Service.Image : fallbackImg;
+                            var detailServiceImg = !string.IsNullOrWhiteSpace(Model?.Service?.Image) ? Model.Service.Image : fallbackImg;
                         }
-                        <img src="@(detailServiceImg)" width="60" height="60" style="object-fit:cover;border-radius:4px;border:1px solid #eee"
+                        <img src="@(detailServiceImg)" width="60" height="60"
+                             style="object-fit:cover;border-radius:4px;border:1px solid #eee"
                              class="zoomable"
                              onerror="this.onerror=null;this.src='@fallbackImg';" />
                         <div>
-                            <div class="fw-bold">@Model.Service?.Title</div>
-                            <small class="text-muted">@Model.ProviderName</small>
+                            <div class="fw-bold">@Model?.Service?.Title</div>
+                            <small class="text-muted">@Model?.ProviderName</small>
                         </div>
                     </div>
 
-                    <!-- Rating -->
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Chất lượng sản phẩm:</label>
+                        <label class="form-label fw-bold">Chất lượng dịch vụ:</label>
                         <div class="rating" data-target="rating-@Model.BookingId">
                             @for (int i = 1; i <= 5; i++)
                             {
@@ -434,13 +485,11 @@
                         <input type="hidden" name="Rating" id="rating-@Model.BookingId" value="0" />
                     </div>
 
-                    <!-- Nội dung -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">Nội dung đánh giá:</label>
                         <textarea name="Comment" class="form-control" rows="3" placeholder="Hãy chia sẻ trải nghiệm của bạn..."></textarea>
                     </div>
 
-                    <!-- Uploader ảnh -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">Hình ảnh (tối đa 5 ảnh):</label>
                         <div class="d-flex gap-2 mb-2">
@@ -448,11 +497,23 @@
                                 <i class="bi bi-camera"></i> Thêm Hình ảnh
                             </button>
                         </div>
-                        <input id="file-@Model.BookingId" name="Images" type="file" class="d-none" accept="image/*" multiple
-                               onchange="uploaderAddFiles('uploader-@Model.BookingId', this.files, 5, this)" />
-                        <div id="uploader-@Model.BookingId" class="uploader" data-input="file-@Model.BookingId" data-max="5"></div>
+
+                        <!-- KHỚP tên DTO: ImageFiles -->
+                        <input id="file-@Model.BookingId"
+                               name="ImageFiles"
+                               type="file"
+                               class="d-none"
+                               accept="image/*"
+                               multiple
+                               onchange="uploaderAddFiles('uploader-@Model.BookingId', this.files, 5)" />
+
+                        <div id="uploader-@Model.BookingId"
+                             class="uploader"
+                             data-input="file-@Model.BookingId"
+                             data-max="5"></div>
                     </div>
                 </div>
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
                     <button type="submit" class="btn btn-danger">Gửi đánh giá</button>
@@ -461,8 +522,8 @@
         </div>
     </div>
 </div>
+}
 
-<!-- Modal Hủy Đơn -->
 <div class="modal fade" id="cancelModal-@Model.BookingId" tabindex="-1" aria-labelledby="cancelModalLabel-@Model.BookingId" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -507,24 +568,6 @@
     </div>
 </div>
 
-<!-- Modal Xem Ảnh Phóng To (dùng chung) -->
-<div class="modal fade" id="imgPreviewModal" tabindex="-1" aria-hidden="true">
-    <!-- Fullscreen để phóng to hơn -->
-    <div class="modal-dialog modal-fullscreen modal-dialog-centered">
-        <div class="modal-content bg-black">
-            <div class="modal-body p-0">
-                <img class="modal-img" src="" alt="">
-            </div>
-            <div class="position-absolute top-0 end-0 p-2">
-                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal" aria-label="Close">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 @section Scripts {
@@ -548,122 +591,151 @@
                 });
             });
 
-            // === Lightbox ảnh: click vào .zoomable để phóng to trong modal ===
+            // Lightbox ảnh
             const imgModalEl = document.getElementById('imgPreviewModal');
             const imgEl = imgModalEl.querySelector('.modal-img');
             const bsImgModal = new bootstrap.Modal(imgModalEl);
-
             document.body.addEventListener('click', function (e) {
                 const t = e.target;
                 if (t && t.tagName === 'IMG' && t.classList.contains('zoomable')) {
                     const src = t.getAttribute('data-full') || t.getAttribute('src') || t.dataset.src;
                     const alt = t.getAttribute('alt') || '';
-                    if (src) {
-                        imgEl.src = src;
-                        imgEl.alt = alt;
-                        bsImgModal.show();
-                    }
+                    if (src) { imgEl.src = src; imgEl.alt = alt; bsImgModal.show(); }
                 }
             });
-
-            // Reset ảnh khi đóng modal để giải phóng bộ nhớ
-            imgModalEl.addEventListener('hidden.bs.modal', function () {
-                imgEl.src = '';
-                imgEl.alt = '';
-            });
+            imgModalEl.addEventListener('hidden.bs.modal', function () { imgEl.src = ''; imgEl.alt = ''; });
         });
 
-        // === Uploader ảnh (dùng DataTransfer) ===
+          // ===== Uploader ảnh (bản chắc chắn) =====
         const uploaderState = new Map();
-        function getDT(id) { if (!uploaderState.has(id)) uploaderState.set(id, new DataTransfer()); return uploaderState.get(id); }
-        function openPicker(inputId) { const el = document.getElementById(inputId); if (el) el.click(); }
-        function uploaderAddFiles(id, files, max, inputEl) {
-            const dt = getDT(id);
-            const allowed = Math.max(0, max - dt.files.length);
-            Array.from(files).slice(0, allowed).forEach(f => dt.items.add(f));
-            inputEl.files = dt.files;
-            renderUploader(id);
-            inputEl.value = '';
-        }
-        function uploaderRemove(id, idx) {
-            const dt = getDT(id);
-            const tmp = new DataTransfer();
-            Array.from(dt.files).forEach((f, i) => { if (i !== idx) tmp.items.add(f); });
-            uploaderState.set(id, tmp);
-            const input = document.getElementById(document.getElementById(id).dataset.input);
-            input.files = tmp.files;
-            renderUploader(id);
-        }
-        function renderUploader(id) {
-            const wrap = document.getElementById(id);
-            if (!wrap) return;
-            const max = parseInt(wrap.dataset.max || '5', 10);
-            const inputId = wrap.dataset.input;
-            const dt = getDT(id);
-            wrap.innerHTML = '';
 
-            Array.from(dt.files).forEach((f, i) => {
-                const box = document.createElement('div');
-                box.className = 'thumb';
-                const img = document.createElement('img');
-                img.className = 'zoomable'; // cho phép phóng to preview
-                const r = new FileReader();
-                r.onload = e => img.src = e.target.result;
-                r.readAsDataURL(f);
-                const rm = document.createElement('button');
-                rm.type = 'button'; rm.className = 'remove'; rm.textContent = '×';
-                rm.onclick = () => uploaderRemove(id, i);
-                box.appendChild(img); box.appendChild(rm);
-                wrap.appendChild(box);
-            });
+        function getDT(wrapperId) {
+          if (!uploaderState.has(wrapperId)) uploaderState.set(wrapperId, new DataTransfer());
+          return uploaderState.get(wrapperId);
+        }
 
-            const rest = max - dt.files.length;
-            if (rest > 0) {
-                const add = document.createElement('div');
-                add.className = 'slot slot-add';
-                add.onclick = () => openPicker(inputId);
-                const icon = document.createElement('i'); icon.className = 'bi bi-camera';
-                const counter = document.createElement('span'); counter.className = 'counter'; counter.textContent = `${dt.files.length}/${max}`;
-                add.appendChild(icon); add.appendChild(counter);
-                wrap.appendChild(add);
-                for (let i = 1; i < rest; i++) {
-                    const empty = document.createElement('div'); empty.className = 'slot';
-                    wrap.appendChild(empty);
-                }
+        function openPicker(inputId) {
+          const inp = document.getElementById(inputId);
+          if (inp) inp.click(); // hidden bằng CSS vẫn ok
+        }
+
+        // gọi từ input[type=file].onchange
+        function uploaderAddFiles(wrapperId, files, max) {
+          const wrap = document.getElementById(wrapperId);
+          if (!wrap) return;
+
+          const inputId = wrap.dataset.input;                  // id của input thật
+          const realInput = document.getElementById(inputId);  // input sẽ submit cùng form
+          if (!realInput) return;
+
+          const dt = getDT(wrapperId);
+          const remain = Math.max(0, max - dt.files.length);
+          Array.from(files).slice(0, remain).forEach(f => dt.items.add(f));
+
+          // Luôn đồng bộ về input thật
+          realInput.files = dt.files;
+
+          renderUploader(wrapperId);
+        }
+
+        function uploaderRemove(wrapperId, idx) {
+          const wrap = document.getElementById(wrapperId);
+          if (!wrap) return;
+
+          const inputId = wrap.dataset.input;
+          const realInput = document.getElementById(inputId);
+          if (!realInput) return;
+
+          const dt = getDT(wrapperId);
+          const next = new DataTransfer();
+          Array.from(dt.files).forEach((f, i) => { if (i !== idx) next.items.add(f); });
+          uploaderState.set(wrapperId, next);
+
+          realInput.files = next.files;
+          renderUploader(wrapperId);
+        }
+
+        function renderUploader(wrapperId) {
+          const wrap = document.getElementById(wrapperId);
+          if (!wrap) return;
+
+          const max = parseInt(wrap.dataset.max || '5', 10);
+          const inputId = wrap.dataset.input;
+          const dt = getDT(wrapperId);
+
+          wrap.innerHTML = '';
+
+          Array.from(dt.files).forEach((f, i) => {
+            const box = document.createElement('div');
+            box.className = 'thumb';
+            const img = document.createElement('img');
+            img.className = 'zoomable';
+            const fr = new FileReader();
+            fr.onload = e => img.src = e.target.result;
+            fr.readAsDataURL(f);
+
+            const rm = document.createElement('button');
+            rm.type = 'button';
+            rm.className = 'remove';
+            rm.innerText = '×';
+            rm.onclick = () => uploaderRemove(wrapperId, i);
+
+            box.appendChild(img);
+            box.appendChild(rm);
+            wrap.appendChild(box);
+          });
+
+          const rest = max - dt.files.length;
+          if (rest > 0) {
+            const add = document.createElement('div');
+            add.className = 'slot slot-add';
+            add.onclick = () => openPicker(inputId);
+
+            const icon = document.createElement('i');
+            icon.className = 'bi bi-camera';
+            const counter = document.createElement('span');
+            counter.className = 'counter';
+            counter.textContent = `${dt.files.length}/${max}`;
+
+            add.appendChild(icon);
+            add.appendChild(counter);
+            wrap.appendChild(add);
+
+            for (let i = 1; i < rest; i++) {
+              const empty = document.createElement('div');
+              empty.className = 'slot';
+              wrap.appendChild(empty);
             }
+          }
         }
+
+        // init preview
         document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('.uploader').forEach(w => renderUploader(w.id));
+          document.querySelectorAll('.uploader').forEach(w => renderUploader(w.id));
         });
 
-                async function openTosModal(providerId){
-          const bodyEl = document.getElementById('tosModalBody');
-          bodyEl.innerHTML = '<div class="muted">Đang tải điều khoản...</div>';
-
-          try {
-            const url = '@Url.Action("GetTermsByProvider", "BookingService", new { area = "Customer" })' + '?providerId=' + providerId;
-            const res = await fetch(url, { method: 'GET', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-            if (res.ok) {
-              const html = await res.text();
-              bodyEl.innerHTML = html;
-            } else {
-              bodyEl.innerHTML = '<div style="color:#c00">Không tải được điều khoản từ máy chủ.</div>';
-            }
-          } catch (err) {
-            bodyEl.innerHTML = '<div style="color:#c00">Không tải được điều khoản. Vui lòng thử lại.</div>';
-          }
-
-          const modalEl = document.getElementById('tosModal');
-          const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-          modal.show();
-        }
-
-        function closeTosModal(){
-          const modalEl = document.getElementById('tosModal');
-          const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-          modal.hide();
-          const bodyEl = document.getElementById('tosModalBody');
-          if (bodyEl) bodyEl.innerHTML = '';
-        }
+        // Log trước khi submit để tự kiểm chứng
+        document.addEventListener('submit', function (e) {
+          const form = e.target.closest('form');
+          if (!form) return;
+          const inp = form.querySelector('input[name=ImageFiles]');
+          if (inp) console.log('[VIEW] files before submit =', inp.files?.length || 0);
+        }, true);
     </script>
 }
+
+<!-- Modal xem ảnh fullscreen -->
+<div class="modal fade" id="imgPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen modal-dialog-centered">
+        <div class="modal-content bg-black">
+            <div class="modal-body p-0">
+                <img class="modal-img" src="" alt="">
+            </div>
+            <div class="position-absolute top-0 end-0 p-2">
+                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
