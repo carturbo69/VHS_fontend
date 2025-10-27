@@ -170,7 +170,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (NotLoggedIn())
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             await CancelPendingFromIdsOrSessionAsync(null, ct);
@@ -185,7 +185,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (NotLoggedIn())
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             await CancelPendingFromIdsOrSessionAsync(null, ct);
