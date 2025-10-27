@@ -36,6 +36,11 @@
         // Options gắn với booking
         public List<OptionDTO> Options { get; set; } = new();
 
+        // NEW: số tiền voucher áp dụng cho booking này (nếu có). Backend nên trả, mặc định 0.
+        public decimal VoucherDiscount { get; set; } = 0m;
+
+        public bool HasReview { get; set; } = false;
+
         // (tuỳ chọn) Tổng chi phí = giá service + tổng giá option
         public decimal TotalPrice => ServicePrice + (Options?.Sum(o => o.Price) ?? 0m);
 

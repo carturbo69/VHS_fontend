@@ -2,40 +2,50 @@
 @using System.Linq
 @using System.Text.Json
 @using System.Collections.Generic
+@using System.Text.Encodings.Web
 
 @{
     ViewData["Title"] = "Đánh giá của tôi";
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
     var fallbackAvatar = Url.Content("~/images/VeSinh.jpg");
 
-    // Mã đánh giá cần auto-open modal (sau khi ModelState invalid)
+    // Dùng để auto-open modal và prefill lại dữ liệu khi form Edit invalid
     var openId = (ViewBag.OpenModalId ?? TempData["OpenModalId"])?.ToString();
     var openDto = ViewBag.OpenModalDto;
+
+    // options để serialize JSON không bị escape quá mức (giữ URL gọn)
+    var jsonOptions = new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 }
 
-<!-- Bootstrap CSS (nếu layout của bạn CHƯA có) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<!-- Bootstrap Icons (vì có dùng .bi) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-<!-- CSS chủ đạo của trang -->
 <link rel="stylesheet" href="~/css/review-customer.css" asp-append-version="true" />
 
 <div class="rv-container">
     <div class="rv-header">
         <h1 class="rv-title">Đánh giá của tôi</h1>
-        @if (Model != null && Model.Any())
+        @if (Model?.Any() == true)
         {
             <p class="rv-subtitle">@Model.Count() đánh giá</p>
         }
     </div>
 
-    @* Toast đơn giản từ TempData (tuỳ chọn) *@
+    @if (TempData["ToastSuccess"] is string toastOk && !string.IsNullOrWhiteSpace(toastOk))
+    {
+        <div class="alert alert-success mt-2" role="alert">@toastOk</div>
+    }
+
+
     @if (TempData["Toast"] is string toastMsg && !string.IsNullOrWhiteSpace(toastMsg))
     {
         <div class="alert alert-info mt-2" role="alert">@toastMsg</div>
     }
+    @if (TempData["ToastError"] is string toastErr && !string.IsNullOrWhiteSpace(toastErr))
+    {
+        <div class="alert alert-danger mt-2" role="alert">@toastErr</div>
+    }
 
-    @if (Model != null && Model.Any())
+    @if (Model?.Any() == true)
     {
         foreach (var r in Model)
         {
@@ -51,77 +61,79 @@
 
             var likeCount = r?.LikeCount ?? 0;
             var rating = Math.Clamp((int)(r?.Rating ?? 0), 0, 5);
-
             var hasReply = !string.IsNullOrWhiteSpace(r?.Reply);
-        <div class="rv-item">
-            <article class="rv-card" aria-label="Đánh giá của @fullName">
-                <!-- User Info -->
-                <header class="rv-user">
-                    <img class="rv-avatar" src="@avatar" onerror="this.src='@fallbackAvatar'" alt="Ảnh đại diện của @fullName" />
-                    <div class="rv-user-info">
-                        <div class="rv-username">@fullName</div>
-                        <div class="rv-rating-row" aria-label="@rating trên 5 sao">
-                            <span class="rv-stars" aria-hidden="true">
-                                @(new string('★', rating))@(new string('☆', 5 - rating))
-                            </span>
-                            <span class="rv-rating-text">@($"{rating:0}.0") sao</span>
-                        </div>
-                        <div class="rv-meta">
-                            @r?.CreatedAt?.ToString("dd/MM/yyyy HH:mm")
-                            @if (likeCount > 0) { <span class="rv-dot">•</span><span class="rv-likes"><i class="bi bi-hand-thumbs-up"></i> @likeCount</span> }
-                        </div>
-                    </div>
-                </header>
 
-                <!-- Comment -->
-                @if (!string.IsNullOrWhiteSpace(r?.Comment))
-                {
-                    <p class="rv-comment">@r!.Comment</p>
-                }
+            var canEdit = r?.CanEdit ?? (string.IsNullOrWhiteSpace(r?.Reply)); // fallback nếu API cũ
+            var canDelete = r?.CanDelete ?? (string.IsNullOrWhiteSpace(r?.Reply)); // fallback nếu API cũ
+            var editCount = r?.EditCount ?? 0;
 
-                <!-- Gallery -->
-                @if (toShow.Any())
-                {
-                    <div class="rv-gallery" data-gallery='@Html.Raw(JsonSerializer.Serialize(imgs))'>
-                        @for (int i = 0; i < toShow.Count; i++)
-                        {
-                            var url = toShow[i];
-                            var isLast = (i == toShow.Count - 1);
-                            <button type="button"
-                                    class="rv-g-thumb"
-                                    data-index="@i"
-                                    aria-label="Xem ảnh @(i + 1)"
-                                    onclick="rvOpenFromThumb(this)">
-                                <img src="@url" onerror="this.src='@fallbackImg'" alt="Ảnh @(i + 1) của đánh giá" />
-                                @if (isLast && extra > 0)
+            <div class="rv-item">
+                <article class="rv-card" aria-label="Đánh giá của @fullName">
+                    <header class="rv-user">
+                        <img class="rv-avatar" src="@avatar" onerror="this.src='@fallbackAvatar'" alt="Ảnh đại diện của @fullName" />
+                        <div class="rv-user-info">
+                            <div class="rv-username">@fullName</div>
+                            <div class="rv-rating-row" aria-label="@rating trên 5 sao">
+                                <span class="rv-stars" aria-hidden="true">
+                                    @(new string('★', rating))@(new string('☆', 5 - rating))
+                                </span>
+                                <span class="rv-rating-text">@($"{rating:0}.0") sao</span>
+                            </div>
+                            <div class="rv-meta">
+                                @r?.CreatedAt?.ToString("dd/MM/yyyy HH:mm")
+                                @if (likeCount > 0)
                                 {
-                                    <div class="rv-g-more" aria-label="Còn @extra ảnh">+@extra</div>
-                                }
-                            </button>
-                        }
+                                    <span class="rv-dot">•</span>
+                                    <span class="rv-likes"><i class="bi bi-hand-thumbs-up"></i> @likeCount</span>
+         }
+                            </div>
+                        </div>
+                    </header>
+
+                    @if (!string.IsNullOrWhiteSpace(r?.Comment))
+                    {
+                        <p class="rv-comment">@r!.Comment</p>
+                    }
+
+                    @if (toShow.Any())
+                    {
+                        <div class="rv-gallery" data-gallery='@Html.Raw(JsonSerializer.Serialize(imgs, jsonOptions))'>
+                            @for (int i = 0; i < toShow.Count; i++)
+                            {
+                                var url = toShow[i];
+                                var isLast = (i == toShow.Count - 1);
+                                <button type="button"
+                                        class="rv-g-thumb"
+                                        data-index="@i"
+                                        aria-label="Xem ảnh @(i + 1)"
+                                        onclick="rvOpenFromThumb(this)">
+                                    <img src="@url" onerror="this.src='@fallbackImg'" alt="Ảnh @(i + 1) của đánh giá" />
+                                    @if (isLast && extra > 0)
+                                    {
+                                        <div class="rv-g-more" aria-label="Còn @extra ảnh">+@extra</div>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    @if (hasReply)
+                    {
+                        <section class="rv-reply" aria-label="Phản hồi từ Người bán">
+                            <span class="rv-reply-label">💬 Phản hồi từ Người bán</span>
+                            <div class="rv-reply-body">@r!.Reply</div>
+                        </section>
+                    }
+                </article>
+
+                <footer class="rv-product-section">
+                    <img class="rv-thumb" src="@serviceThumb" onerror="this.src='@fallbackImg'" alt="Ảnh dịch vụ" />
+                    <div class="rv-prod-info">
+                        <p class="rv-prod-title">@r?.ServiceTitle</p>
                     </div>
-                }
-
-                <!-- Reply -->
-                @if (hasReply)
-                {
-                    <section class="rv-reply" aria-label="Phản hồi từ Người bán">
-                        <span class="rv-reply-label">💬 Phản hồi từ Người bán</span>
-                        <div class="rv-reply-body">@r!.Reply</div>
-                    </section>
-                }
-            </article>
-
-            <!-- Product Section -->
-            <footer class="rv-product-section">
-                <img class="rv-thumb" src="@serviceThumb" onerror="this.src='@fallbackImg'" alt="Ảnh dịch vụ" />
-                <div class="rv-prod-info">
-                    <p class="rv-prod-title">@r?.ServiceTitle</p>
-                </div>
 
                     <div class="rv-actions">
                         @{
-                            // chỉ khai báo một lần
                             var _hasReply = !string.IsNullOrWhiteSpace(r?.Reply);
                             var reviewPayload = new
                             {
@@ -141,26 +153,29 @@
                                 data-bs-toggle="modal"
                                 data-bs-target="#editReviewModal"
                                 data-review-id="@r!.ReviewId"
-                                data-review='@Html.Raw(JsonSerializer.Serialize(reviewPayload))'
-                                @(_hasReply ? "disabled aria-disabled=\"true\"" : null)
-                                title="@(_hasReply ? "Đánh giá đã có phản hồi, không thể sửa" : "Sửa đánh giá")">
+                                data-review='@Html.Raw(JsonSerializer.Serialize(reviewPayload, jsonOptions))'
+                                @(canEdit ? null : "disabled aria-disabled=\"true\"")
+                                title="@(canEdit ? "Sửa đánh giá" : "Đã có phản hồi hoặc đã sửa 1 lần")">
                             ✏️ Sửa
                         </button>
-
-                        <form asp-area="Customer" asp-controller="ReviewCustomer" asp-action="Delete" asp-route-id="@r!.ReviewId" method="post" class="rv-inline-form">
+                        <form asp-area="Customer"
+                              asp-controller="ReviewCustomer"
+                              asp-action="Delete"
+                              asp-route-reviewId="@r!.ReviewId"
+                              method="post"
+                              class="rv-inline-form">
                             @Html.AntiForgeryToken()
                             <button type="submit"
                                     class="rv-btn delete"
-                                    @(_hasReply ? "disabled aria-disabled=\"true\"" : null)
-                                    title="@(_hasReply ? "Đánh giá đã có phản hồi, không thể xoá" : "Xoá đánh giá")"
+                                    @(canDelete ? null : "disabled aria-disabled=\"true\"")
+                                    title="@(canDelete ? "Xoá đánh giá" : "Đánh giá đã có phản hồi, không thể xoá")"
                                     onclick="return confirm('Xóa đánh giá này?');">
                                 🗑️ Xóa
                             </button>
                         </form>
                     </div>
-
-            </footer>
-        </div>
+                </footer>
+            </div>
         }
     }
     else
@@ -174,378 +189,347 @@
 
 <!-- Shared Modal Sửa Đánh Giá -->
 <div class="modal fade" id="editReviewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Sửa đánh giá</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-      </div>
-
-      <form asp-area="Customer" asp-controller="ReviewCustomer" asp-action="Edit" method="post" enctype="multipart/form-data" novalidate>
-        @Html.AntiForgeryToken()
-        <input type="hidden" name="ReviewId" value="" />
-
-        <div class="modal-body">
-          <!-- Thông tin dịch vụ -->
-          <div class="rv-edit-head">
-            <img class="service-thumb" src="@fallbackImg" onerror="this.src='@fallbackImg'" alt="Ảnh dịch vụ" />
-            <div>
-              <div class="fw-semibold service-title"></div>
-              <div class="text-muted small service-created"></div>
-            </div>
-          </div>
-
-          <!-- Điểm sao -->
-          <div class="mb-3">
-            <label class="form-label">Điểm đánh giá (1–5)</label>
-
-            <!-- Giá trị submit về server -->
-            <input id="rv-edit-rating" type="hidden" name="Rating" value="1" required />
-
-            <!-- Nhóm radio bằng nút sao -->
-            <div class="rv-stars-input" role="radiogroup" aria-label="Chọn số sao (1 đến 5)">
-              <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="1" aria-label="1 sao">★</button>
-              <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="2" aria-label="2 sao">★</button>
-              <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="3" aria-label="3 sao">★</button>
-              <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="4" aria-label="4 sao">★</button>
-              <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="5" aria-label="5 sao">★</button>
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Sửa đánh giá</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
 
-            <div class="form-text">Nhấn vào sao hoặc dùng phím mũi tên để chọn.</div>
-          </div>
+            <form asp-area="Customer" asp-controller="ReviewCustomer" asp-action="Edit" method="post" enctype="multipart/form-data" novalidate>
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="ReviewId" value="" />
 
-          <!-- Nội dung -->
-          <div class="mb-3">
-            <label class="form-label" for="rv-edit-comment">Nội dung</label>
-            <textarea id="rv-edit-comment" class="form-control" name="Comment" maxlength="2000" rows="4" placeholder="Chia sẻ trải nghiệm của bạn"></textarea>
-          </div>
+                <div class="modal-body">
+                    <div class="rv-edit-head">
+                        <img class="service-thumb" src="@fallbackImg" onerror="this.src='@fallbackImg'" alt="Ảnh dịch vụ" />
+                        <div>
+                            <div class="fw-semibold service-title"></div>
+                            <div class="text-muted small service-created"></div>
+                        </div>
+                    </div>
 
-          <!-- Ảnh đính kèm (tối đa 5) -->
-          <div class="mb-3">
-            <label class="form-label">Ảnh đính kèm (tối đa 5)</label>
-            <div id="imageSlots" class="rv-slot-grid"></div>
-            <div class="form-text">Nhấn dấu <strong>×</strong> để xoá ảnh; nhấn <strong>+ Thêm ảnh</strong> để chọn ảnh mới. Không bắt buộc đủ 5 ảnh.</div>
-          </div>
+                    <div class="mb-3">
+                        <label class="form-label">Điểm đánh giá (1–5)</label>
+                        <input id="rv-edit-rating" type="hidden" name="Rating" value="1" required />
+                        <div class="rv-stars-input" role="radiogroup" aria-label="Chọn số sao (1 đến 5)">
+                            <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="1" aria-label="1 sao">★</button>
+                            <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="2" aria-label="2 sao">★</button>
+                            <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="3" aria-label="3 sao">★</button>
+                            <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="4" aria-label="4 sao">★</button>
+                            <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="5" aria-label="5 sao">★</button>
+                        </div>
+                        <div class="form-text">Nhấn vào sao hoặc dùng phím mũi tên để chọn.</div>
+                    </div>
 
-          @if (!ViewData.ModelState.IsValid)
-          {
-              <div class="alert alert-danger" role="alert">
-                  Vui lòng kiểm tra lại thông tin bạn đã nhập.
-              </div>
-          }
+                    <div class="mb-3">
+                        <label class="form-label" for="rv-edit-comment">Nội dung</label>
+                        <textarea id="rv-edit-comment" class="form-control" name="Comment" maxlength="2000" rows="4" placeholder="Chia sẻ trải nghiệm của bạn"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Ảnh đính kèm (tối đa 5)</label>
+                        <div id="imageSlots" class="rv-slot-grid"></div>
+                        <div class="form-text">Nhấn dấu <strong>×</strong> để xoá ảnh; nhấn <strong>+ Thêm ảnh</strong> để chọn ảnh mới.</div>
+                    </div>
+
+                    <div asp-validation-summary="All" class="text-danger"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                </div>
+            </form>
         </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
-          <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
-        </div>
-      </form>
     </div>
-  </div>
 </div>
 
-<!-- Viewer ảnh tự viết (không dùng Bootstrap modal) -->
+<!-- Viewer ảnh -->
 <div id="rvModal" class="rv-modal" role="dialog" aria-modal="true" aria-label="Xem ảnh đánh giá" hidden>
-  <button class="rv-close" type="button" aria-label="Đóng" onclick="rvClose()">✕</button>
-  <button class="rv-prev" type="button" onclick="rvPrev()" aria-label="Ảnh trước">‹</button>
-  <img id="rvModalImg" src="/placeholder.svg" alt="Ảnh đánh giá phóng to" />
-  <button class="rv-next" type="button" onclick="rvNext()" aria-label="Ảnh tiếp theo">›</button>
+    <button class="rv-close" type="button" aria-label="Đóng" onclick="rvClose()">✕</button>
+    <button class="rv-prev" type="button" onclick="rvPrev()" aria-label="Ảnh trước">‹</button>
+    <img id="rvModalImg" src="/placeholder.svg" alt="Ảnh đánh giá phóng to" />
+    <button class="rv-next" type="button" onclick="rvNext()" aria-label="Ảnh tiếp theo">›</button>
 </div>
 
-<!-- Bootstrap JS (nếu layout CHƯA có) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 @section Scripts {
-<script>
-/* ====== Star picker ====== */
-function paintStars(modalEl, value){
-  const stars = modalEl.querySelectorAll('.rv-stars-input .rv-star');
-  const val = Math.max(1, Math.min(5, parseInt(value || '1', 10)));
-  stars.forEach((b, idx) => {
-    const on = idx < val;
-    b.classList.toggle('is-on', on);
-    b.setAttribute('aria-checked', (idx === val - 1) ? 'true' : 'false');
-    b.tabIndex = (idx === val - 1) ? 0 : -1;
-  });
-}
+    <script>
+        function paintStars(modalEl, value){
+          const stars = modalEl.querySelectorAll('.rv-stars-input .rv-star');
+          const val = Math.max(1, Math.min(5, parseInt(value || '1', 10)));
+          stars.forEach((b, idx) => {
+            const on = idx < val;
+            b.classList.toggle('is-on', on);
+            b.setAttribute('aria-checked', (idx === val - 1) ? 'true' : 'false');
+            b.tabIndex = (idx === val - 1) ? 0 : -1;
+          });
+        }
 
-function initStarInput(modalEl){
-  const hidden = modalEl.querySelector('#rv-edit-rating');
-  const group  = modalEl.querySelector('.rv-stars-input');
-  if(!hidden || !group) return;
+        function initStarInput(modalEl){
+          const hidden = modalEl.querySelector('#rv-edit-rating');
+          const group  = modalEl.querySelector('.rv-stars-input');
+          if(!hidden || !group) return;
 
-  // cleanup listener cũ (khi mở modal nhiều lần)
-  const old = group.querySelectorAll('.rv-star');
-  old.forEach(s=>{
-    const clone = s.cloneNode(true);
-    s.replaceWith(clone);
-  });
+          const old = group.querySelectorAll('.rv-star');
+          old.forEach(s=>{
+            const clone = s.cloneNode(true);
+            s.replaceWith(clone);
+          });
 
-  const stars = group.querySelectorAll('.rv-star');
+          const stars = group.querySelectorAll('.rv-star');
 
-  stars.forEach(btn => {
-    btn.addEventListener('click', () => {
-      hidden.value = btn.dataset.val;
-      paintStars(modalEl, hidden.value);
-    });
+          stars.forEach(btn => {
+            btn.addEventListener('click', () => {
+              hidden.value = btn.dataset.val;
+              paintStars(modalEl, hidden.value);
+            });
 
-    btn.addEventListener('mouseenter', () => paintStars(modalEl, btn.dataset.val));
-    btn.addEventListener('mouseleave', () => paintStars(modalEl, hidden.value));
+            btn.addEventListener('mouseenter', () => paintStars(modalEl, btn.dataset.val));
+            btn.addEventListener('mouseleave', () => paintStars(modalEl, hidden.value));
 
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        hidden.value = Math.min(5, parseInt(hidden.value || '1', 10) + 1);
-        paintStars(modalEl, hidden.value);
-        const target = group.querySelector(`.rv-star[data-val="${hidden.value}"]`);
-        target && target.focus();
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        hidden.value = Math.max(1, parseInt(hidden.value || '1', 10) - 1);
-        paintStars(modalEl, hidden.value);
-        const target = group.querySelector(`.rv-star[data-val="${hidden.value}"]`);
-        target && target.focus();
-      } else if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        paintStars(modalEl, hidden.value);
-      }
-    });
-  });
+            btn.addEventListener('keydown', (e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                hidden.value = Math.min(5, parseInt(hidden.value || '1', 10) + 1);
+                paintStars(modalEl, hidden.value);
+                const target = group.querySelector(`.rv-star[data-val="${hidden.value}"]`);
+                target && target.focus();
+              } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                hidden.value = Math.max(1, parseInt(hidden.value || '1', 10) - 1);
+                paintStars(modalEl, hidden.value);
+                const target = group.querySelector(`.rv-star[data-val="${hidden.value}"]`);
+                target && target.focus();
+              } else if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                paintStars(modalEl, hidden.value);
+              }
+            });
+          });
 
-  // vẽ lần đầu theo hidden input
-  paintStars(modalEl, hidden.value);
-}
+          paintStars(modalEl, hidden.value);
+        }
 
-/** ====== Tạo/refresh 5 ô ảnh trong modal ====== */
-function buildImageSlots(modalEl, data){
-  const container = modalEl.querySelector('#imageSlots');
-  if(!container) return;
+        function buildImageSlots(modalEl, data){
+          const container = modalEl.querySelector('#imageSlots');
+          if(!container) return;
 
-  container.innerHTML = '';
+          container.innerHTML = '';
+          const existing = Array.isArray(data?.ReviewImageUrls) ? data.ReviewImageUrls.filter(Boolean) : [];
+          const current = existing.slice(0, 5);
 
-  const existing = Array.isArray(data?.ReviewImageUrls) ? data.ReviewImageUrls.filter(Boolean) : [];
-  const current = existing.slice(0, 5);
+          const createExistingSlot = (url) => {
+            const slot = document.createElement('div');
+            slot.className = 'rv-slot';
 
-  const createExistingSlot = (url) => {
-    const slot = document.createElement('div');
-    slot.className = 'rv-slot';
+            const hiddenExist = document.createElement('input');
+            hiddenExist.type = 'hidden';
+            hiddenExist.name = 'ExistingImages'; // chỉ để client logic, backend không dùng
+            hiddenExist.value = url;
 
-    const hiddenExist = document.createElement('input');
-    hiddenExist.type = 'hidden';
-    hiddenExist.name = 'ExistingImages';
-    hiddenExist.value = url;
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = 'Ảnh hiện có';
+            img.onerror = () => { img.src = '@fallbackImg'; };
 
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = 'Ảnh hiện có';
-    img.onerror = () => { img.src = '@fallbackImg'; };
+            const x = document.createElement('button');
+            x.type = 'button';
+            x.className = 'rv-xbtn';
+            x.setAttribute('aria-label', 'Xoá ảnh này');
+            x.textContent = '×';
 
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.className = 'rv-xbtn';
-    x.setAttribute('aria-label', 'Xoá ảnh này');
-    x.textContent = '×';
+            x.addEventListener('click', () => {
+              const rm = document.createElement('input');
+              rm.type = 'hidden';
+              rm.name = 'RemoveImages';   // backend bind vào List<string> RemoveImages
+              rm.value = url;
+              modalEl.querySelector('form').appendChild(rm);
+              slot.remove();
+              fillAddSlots(container, modalEl);
+            });
 
-    x.addEventListener('click', () => {
-      const rm = document.createElement('input');
-      rm.type = 'hidden';
-      rm.name = 'RemoveImages';
-      rm.value = url;
-      modalEl.querySelector('form').appendChild(rm);
-      slot.remove();
-      fillAddSlots(container, modalEl);
-    });
+            slot.appendChild(hiddenExist);
+            slot.appendChild(img);
+            slot.appendChild(x);
+            return slot;
+          };
 
-    slot.appendChild(hiddenExist);
-    slot.appendChild(img);
-    slot.appendChild(x);
-    return slot;
-  };
+          const createAddSlotForHelper = (modalEl) => {
+            const slot = document.createElement('div');
+            slot.className = 'rv-slot rv-slot-add';
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.name = 'NewImages'; // backend bind List<IFormFile> NewImages
+            input.accept = 'image/*';
+            input.style.display = 'none';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'rv-addbtn';
+            btn.innerHTML = '<span class="plus">＋</span><span>Thêm ảnh</span>';
+            btn.addEventListener('click', () => input.click());
+            input.addEventListener('change', () => {
+              if (!input.files || !input.files[0]) return;
+              const file = input.files[0];
+              const reader = new FileReader();
+              reader.onload = e => {
+                slot.classList.remove('rv-slot-add');
+                slot.innerHTML = '';
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.alt = 'Ảnh mới';
+                const x = document.createElement('button');
+                x.type = 'button';
+                x.className = 'rv-xbtn';
+                x.setAttribute('aria-label', 'Bỏ ảnh này');
+                x.textContent = '×';
+                x.addEventListener('click', () => {
+                  slot.remove();
+                  fillAddSlots(container, modalEl);
+                });
+                slot.appendChild(input);
+                slot.appendChild(img);
+                slot.appendChild(x);
+                fillAddSlots(container, modalEl);
+              };
+              reader.readAsDataURL(file);
+            });
+            slot.appendChild(input);
+            slot.appendChild(btn);
+            return slot;
+          };
 
-  const createAddSlotForHelper = (modalEl) => {
-    const slot = document.createElement('div');
-    slot.className = 'rv-slot rv-slot-add';
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.name = 'NewImages';
-    input.accept = 'image/*';
-    input.style.display = 'none';
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'rv-addbtn';
-    btn.innerHTML = '<span class="plus">＋</span><span>Thêm ảnh</span>';
-    btn.addEventListener('click', () => input.click());
-    input.addEventListener('change', () => {
-      if (!input.files || !input.files[0]) return;
-      const file = input.files[0];
-      const reader = new FileReader();
-      reader.onload = e => {
-        slot.classList.remove('rv-slot-add');
-        slot.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.alt = 'Ảnh mới';
-        const x = document.createElement('button');
-        x.type = 'button';
-        x.className = 'rv-xbtn';
-        x.setAttribute('aria-label', 'Bỏ ảnh này');
-        x.textContent = '×';
-        x.addEventListener('click', () => {
-          slot.remove();
+          current.forEach(url => container.appendChild(createExistingSlot(url)));
           fillAddSlots(container, modalEl);
+
+          if (window.__serverOpenDto && Array.isArray(window.__serverOpenDto.RemoveImages)) {
+            const toRemove = new Set(window.__serverOpenDto.RemoveImages);
+            container.querySelectorAll('input[name="ExistingImages"]').forEach(h => {
+              if (toRemove.has(h.value)) {
+                h.parentElement.querySelector('.rv-xbtn')?.click();
+              }
+            });
+          }
+
+          function fillAddSlots(container, modalEl){
+            const max = 5;
+            const currentCount = container.querySelectorAll('.rv-slot').length;
+            for (let i = currentCount; i < max; i++){
+              container.appendChild(createAddSlotForHelper(modalEl));
+            }
+          }
+        }
+
+        function populateEditModalWithData(data) {
+          if (!data) return;
+          const modalEl = document.getElementById('editReviewModal');
+          if (!modalEl) return;
+
+          const reviewIdInput   = modalEl.querySelector('input[name="ReviewId"]');
+          const ratingInput     = modalEl.querySelector('input[name="Rating"]');
+          const commentTextarea = modalEl.querySelector('textarea[name="Comment"]');
+          const serviceTitleEl  = modalEl.querySelector('.service-title');
+          const serviceThumbEl  = modalEl.querySelector('.service-thumb');
+          const serviceCreatedEl= modalEl.querySelector('.service-created');
+
+          if (reviewIdInput)   reviewIdInput.value = data.ReviewId ?? '';
+          if (ratingInput)     ratingInput.value = (data.Rating != null) ? data.Rating : 1;
+          if (commentTextarea) commentTextarea.value = data.Comment ?? '';
+          if (serviceTitleEl)  serviceTitleEl.textContent = data.ServiceTitle ?? '';
+          if (serviceThumbEl)  serviceThumbEl.src = data.ServiceThumbnailUrl || '@fallbackImg';
+          if (serviceCreatedEl) {
+            serviceCreatedEl.textContent = data.CreatedAt
+              ? ('Đã đánh giá lúc ' + (new Date(data.CreatedAt)).toLocaleString('vi-VN'))
+              : '';
+          }
+
+          initStarInput(modalEl);
+          paintStars(modalEl, ratingInput?.value || 1);
+
+          buildImageSlots(modalEl, data);
+        }
+
+        function hasVendorReply(data){
+          return !!(data && data.Reply && String(data.Reply).trim().length > 0);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+          const modalEl = document.getElementById('editReviewModal');
+
+          if (modalEl && window.bootstrap) {
+            modalEl.addEventListener('show.bs.modal', function (e) {
+              const triggerBtn = e.relatedTarget;
+              let data = null;
+              if (triggerBtn?.dataset?.review) {
+                try { data = JSON.parse(triggerBtn.dataset.review); } catch { data = null; }
+              }
+              if (window.__serverOpenDto) { data = Object.assign({}, data || {}, window.__serverOpenDto); }
+
+              if (hasVendorReply(data)) {
+                e.preventDefault();
+                return;
+              }
+
+              populateEditModalWithData(data);
+            });
+          }
+
+          // giá trị do server bơm vào khi cần auto open modal sau lỗi
+          const openId = '@(openId ?? "")';
+          window.__serverOpenDto = @Html.Raw(openDto == null ? "null" : JsonSerializer.Serialize(openDto, openDto.GetType(), jsonOptions));
+
+          if (openId) {
+            const triggerBtn = document.querySelector('[data-review-id="'+ openId +'"]');
+            let data = null;
+            if (triggerBtn?.dataset?.review) {
+              try { data = JSON.parse(triggerBtn.dataset.review); } catch { data = null; }
+            }
+            if (window.__serverOpenDto) data = Object.assign({}, data || {}, window.__serverOpenDto);
+
+            if (!hasVendorReply(data)) {
+              populateEditModalWithData(data);
+              if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            }
+          }
         });
-        slot.appendChild(input);
-        slot.appendChild(img);
-        slot.appendChild(x);
-        fillAddSlots(container, modalEl);
-      };
-      reader.readAsDataURL(file);
-    });
-    slot.appendChild(input);
-    slot.appendChild(btn);
-    return slot;
-  };
 
-  current.forEach(url => container.appendChild(createExistingSlot(url)));
-  fillAddSlots(container, modalEl);
+        let rvCurrent = 0, rvList = [];
+        const rvModal = () => document.getElementById('rvModal');
+        const rvImg   = () => document.getElementById('rvModalImg');
 
-  if (window.__serverOpenDto && Array.isArray(window.__serverOpenDto.RemoveImages)) {
-    const toRemove = new Set(window.__serverOpenDto.RemoveImages);
-    container.querySelectorAll('input[name="ExistingImages"]').forEach(h => {
-      if (toRemove.has(h.value)) {
-        h.parentElement.querySelector('.rv-xbtn')?.click();
-      }
-    });
-  }
-
-  function fillAddSlots(container, modalEl){
-    const max = 5;
-    const currentCount = container.querySelectorAll('.rv-slot').length;
-    for (let i = currentCount; i < max; i++){
-      container.appendChild(createAddSlotForHelper(modalEl));
-    }
-  }
-}
-
-/** ====== Populate edit modal ====== */
-function populateEditModalWithData(data) {
-  if (!data) return;
-  const modalEl = document.getElementById('editReviewModal');
-  if (!modalEl) return;
-
-  const reviewIdInput   = modalEl.querySelector('input[name="ReviewId"]');
-  const ratingInput     = modalEl.querySelector('input[name="Rating"]'); // hidden
-  const commentTextarea = modalEl.querySelector('textarea[name="Comment"]');
-  const serviceTitleEl  = modalEl.querySelector('.service-title');
-  const serviceThumbEl  = modalEl.querySelector('.service-thumb');
-  const serviceCreatedEl= modalEl.querySelector('.service-created');
-
-  if (reviewIdInput)   reviewIdInput.value = data.ReviewId ?? '';
-  if (ratingInput)     ratingInput.value = (data.Rating != null) ? data.Rating : 1;
-  if (commentTextarea) commentTextarea.value = data.Comment ?? '';
-  if (serviceTitleEl)  serviceTitleEl.textContent = data.ServiceTitle ?? '';
-  if (serviceThumbEl)  serviceThumbEl.src = data.ServiceThumbnailUrl || '@fallbackImg';
-  if (serviceCreatedEl) {
-    serviceCreatedEl.textContent = data.CreatedAt
-      ? ('Đã đánh giá lúc ' + (new Date(data.CreatedAt)).toLocaleString('vi-VN'))
-      : '';
-  }
-
-  // Khởi tạo sao + vẽ theo giá trị
-  initStarInput(modalEl);
-  paintStars(modalEl, ratingInput?.value || 1);
-
-  // Tạo 5 ô ảnh (existing + add)
-  buildImageSlots(modalEl, data);
-}
-
-/* ====== Guard: có Reply thì không cho mở modal Sửa ====== */
-function hasVendorReply(data){
-  return !!(data && data.Reply && String(data.Reply).trim().length > 0);
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-  const modalEl = document.getElementById('editReviewModal');
-
-  if (modalEl && window.bootstrap) {
-    modalEl.addEventListener('show.bs.modal', function (e) {
-      const triggerBtn = e.relatedTarget;
-      let data = null;
-      if (triggerBtn?.dataset?.review) {
-        try { data = JSON.parse(triggerBtn.dataset.review); } catch { data = null; }
-      }
-      if (window.__serverOpenDto) { data = Object.assign({}, data || {}, window.__serverOpenDto); }
-
-      // ✅ Chặn mở nếu có Reply
-      if (hasVendorReply(data)) {
-        e.preventDefault();
-        // Có thể hiển thị toast/alert nếu muốn
-        // alert('Đánh giá đã có phản hồi, không thể sửa.');
-        return;
-      }
-
-      populateEditModalWithData(data);
-    });
-  }
-
-  // Server-injected values for auto-open
-  const openId = '@openId';
-  window.__serverOpenDto = @Html.Raw(openDto == null ? "null" : JsonSerializer.Serialize(openDto, openDto.GetType()));
-
-  if (openId) {
-    const triggerBtn = document.querySelector('[data-review-id="'+ openId +'"]');
-    let data = null;
-    if (triggerBtn?.dataset?.review) {
-      try { data = JSON.parse(triggerBtn.dataset.review); } catch { data = null; }
-    }
-    if (window.__serverOpenDto) data = Object.assign({}, data || {}, window.__serverOpenDto);
-
-    if (!hasVendorReply(data)) {
-      populateEditModalWithData(data);
-      if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).show();
-    } else {
-      // Tuỳ chọn: thông báo
-      // alert('Đánh giá đã có phản hồi, không thể sửa.');
-    }
-  }
-});
-
-/** ====== Simple image viewer (ngoài modal edit) ====== */
-let rvCurrent = 0, rvList = [];
-const rvModal = () => document.getElementById('rvModal');
-const rvImg   = () => document.getElementById('rvModalImg');
-
-function rvOpenFromThumb(btn) {
-  const wrap = btn.closest('.rv-gallery');
-  if (!wrap) return;
-  try { rvList = JSON.parse(wrap.getAttribute('data-gallery')) || []; } catch { rvList = []; }
-  const idx = parseInt(btn.getAttribute('data-index') || '0', 10);
-  rvOpen(idx);
-}
-function rvOpen(index) {
-  if (!Array.isArray(rvList) || rvList.length === 0) return;
-  rvCurrent = Math.max(0, Math.min(index, rvList.length - 1));
-  rvImg().src = rvList[rvCurrent] || '/placeholder.svg';
-  rvModal().hidden = false;
-  document.body.classList.add('rv-no-scroll');
-  document.addEventListener('keydown', onKey);
-}
-function rvClose() {
-  rvModal().hidden = true;
-  document.body.classList.remove('rv-no-scroll');
-  document.removeEventListener('keydown', onKey);
-}
-function rvPrev() { rvOpen((rvCurrent - 1 + rvList.length) % rvList.length); }
-function rvNext() { rvOpen((rvCurrent + 1) % rvList.length); }
-function onKey(e){
-  if (rvModal().hidden) return;
-  if (e.key === 'Escape') rvClose();
-  else if (e.key === 'ArrowLeft') rvPrev();
-  else if (e.key === 'ArrowRight') rvNext();
-}
-window.rvOpenFromThumb = rvOpenFromThumb;
-window.rvClose = rvClose;
-window.rvPrev  = rvPrev;
-window.rvNext  = rvNext;
-</script>
+        function rvOpenFromThumb(btn) {
+          const wrap = btn.closest('.rv-gallery');
+          if (!wrap) return;
+          try { rvList = JSON.parse(wrap.getAttribute('data-gallery')) || []; } catch { rvList = []; }
+          const idx = parseInt(btn.getAttribute('data-index') || '0', 10);
+          rvOpen(idx);
+        }
+        function rvOpen(index) {
+          if (!Array.isArray(rvList) || rvList.length === 0) return;
+          rvCurrent = Math.max(0, Math.min(index, rvList.length - 1));
+          rvImg().src = rvList[rvCurrent] || '/placeholder.svg';
+          rvModal().hidden = false;
+          document.body.classList.add('rv-no-scroll');
+          document.addEventListener('keydown', onKey);
+        }
+        function rvClose() {
+          rvModal().hidden = true;
+          document.body.classList.remove('rv-no-scroll');
+          document.removeEventListener('keydown', onKey);
+        }
+        function rvPrev() { rvOpen((rvCurrent - 1 + rvList.length) % rvList.length); }
+        function rvNext() { rvOpen((rvCurrent + 1) % rvList.length); }
+        function onKey(e){
+          if (rvModal().hidden) return;
+          if (e.key === 'Escape') rvClose();
+          else if (e.key === 'ArrowLeft') rvPrev();
+          else if (e.key === 'ArrowRight') rvNext();
+        }
+        window.rvOpenFromThumb = rvOpenFromThumb;
+        window.rvClose = rvClose;
+        window.rvPrev  = rvPrev;
+        window.rvNext  = rvNext;
+    </script>
 }

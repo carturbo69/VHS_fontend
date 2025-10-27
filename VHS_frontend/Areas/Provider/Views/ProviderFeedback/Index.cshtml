@@ -2,6 +2,9 @@
 @{
     Layout = "~/Areas/Provider/Views/_ProviderLayout.cshtml";
     ViewData["Title"] = "Phản hồi khách hàng";
+
+    // Đếm dịch vụ có ít nhất 1 feedback
+    var servicesRated = Model?.ServiceFeedbacks?.Count(s => (s?.TotalFeedbacks ?? 0) > 0) ?? 0;
 }
 
 <div class="feedback-container">
@@ -15,47 +18,36 @@
     <div class="row g-4 mb-4">
         <div class="col-lg-3 col-md-6">
             <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="bi bi-star-fill"></i>
-                </div>
+                <div class="stat-icon"><i class="bi bi-star-fill"></i></div>
                 <div class="stat-content">
                     <h3>@Model.OverallStats.AverageRating.ToString("F1")</h3>
                     <p>Đánh giá trung bình</p>
                 </div>
             </div>
         </div>
-
         <div class="col-lg-3 col-md-6">
             <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="bi bi-chat-dots"></i>
-                </div>
+                <div class="stat-icon"><i class="bi bi-chat-dots"></i></div>
                 <div class="stat-content">
                     <h3>@Model.OverallStats.TotalFeedbacks</h3>
                     <p>Tổng phản hồi</p>
                 </div>
             </div>
         </div>
-
         <div class="col-lg-3 col-md-6">
             <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="bi bi-emoji-smile"></i>
-                </div>
+                <div class="stat-icon"><i class="bi bi-emoji-smile"></i></div>
                 <div class="stat-content">
                     <h3>@Model.OverallStats.FiveStarCount</h3>
                     <p>Đánh giá 5 sao</p>
                 </div>
             </div>
         </div>
-
         <div class="col-lg-3 col-md-6">
             <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="bi bi-award"></i>
-                </div>
+                <div class="stat-icon"><i class="bi bi-award"></i></div>
                 <div class="stat-content">
-                    <h3>@Model.ServiceFeedbacks.Count</h3>
+                    <h3>@servicesRated</h3>
                     <p>Dịch vụ được đánh giá</p>
                 </div>
             </div>
@@ -67,10 +59,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-bar-chart me-2"></i>
-                        Phân bố đánh giá
-                    </h5>
+                    <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Phân bố đánh giá</h5>
                 </div>
                 <div class="card-body">
                     <div class="rating-distribution">
@@ -115,12 +104,25 @@
     <div class="service-feedbacks">
         @foreach (var serviceGroup in Model.ServiceFeedbacks)
         {
+            var hasFeedback = (serviceGroup.TotalFeedbacks > 0) && (serviceGroup.Feedbacks != null) && serviceGroup.Feedbacks.Count > 0;
+
             <div class="service-feedback-group mb-4">
                 <div class="card">
                     <div class="card-header service-header">
                         <div class="service-info">
                             <div class="service-icon">
-                                <i class="bi @serviceGroup.ServiceIcon"></i>
+                                @* Nếu là URL ảnh -> img, ngược lại coi là class icon *@
+                                @if (IsUrl(serviceGroup.ServiceIcon))
+                                {
+                                    <img src="@serviceGroup.ServiceIcon"
+                                         alt="@serviceGroup.ServiceName"
+                                         class="service-icon-img"
+                                         onerror="this.style.display='none';" />
+                                }
+                                else
+                                {
+                                    <i class="bi @(string.IsNullOrWhiteSpace(serviceGroup.ServiceIcon) ? "bi-image" : serviceGroup.ServiceIcon)"></i>
+                                }
                             </div>
                             <div class="service-details">
                                 <h5 class="service-name">@serviceGroup.ServiceName</h5>
@@ -147,107 +149,124 @@
                                 </div>
                             </div>
                         </div>
-                        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#service-@serviceGroup.ServiceId">
+                        <button class="btn btn-outline-primary btn-sm" type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#service-@serviceGroup.ServiceId">
                             <i class="bi bi-chevron-down"></i>
                         </button>
                     </div>
 
-                    <div class="collapse" id="service-@serviceGroup.ServiceId">
+                    <div class="collapse" id="service-@serviceGroup.ServiceId" data-has-feedback="@(hasFeedback)">
                         <div class="card-body p-0">
-                            <div class="feedbacks-list">
-                                @foreach (var feedback in serviceGroup.Feedbacks)
-                                {
-                                    <div class="feedback-item">
-                                        <div class="feedback-avatar">
-                                            <div class="avatar-circle">
-                                                @feedback.CustomerAvatar
+                            @if (!hasFeedback)
+                            {
+                                <div class="p-4 text-muted fst-italic">
+                                    Chưa có đánh giá nào cho dịch vụ này.
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="feedbacks-list">
+                                    @foreach (var feedback in serviceGroup.Feedbacks)
+                                    {
+                                        <div class="feedback-item">
+                                            <div class="feedback-avatar">
+                                                @if (!string.IsNullOrWhiteSpace(feedback.CustomerAvatar))
+                                                {
+                                                    <img class="avatar-circle-img" src="@feedback.CustomerAvatar"
+                                                         alt="@feedback.CustomerName"
+                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                                    <div class="avatar-circle" style="display:none;">
+                                                        @GetInitials(feedback.CustomerName)
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="avatar-circle">@GetInitials(feedback.CustomerName)</div>
+                                                }
                                             </div>
-                                        </div>
-                                        <div class="feedback-content">
-                                            <div class="feedback-header">
-                                                <h6 class="customer-name">@feedback.CustomerName</h6>
-                                                <div class="feedback-rating">
-                                                    @for (int i = 1; i <= 5; i++)
-                                                    {
-                                                        <i class="bi bi-star-fill @(i <= feedback.Rating ? "filled" : "empty")"></i>
-                                                    }
-                                                </div>
-                                                <div class="feedback-meta">
-                                                    <span class="feedback-date">@feedback.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
-                                                    @if (feedback.IsVerified)
-                                                    {
-                                                        <span class="verified-badge">
-                                                            <i class="bi bi-check-circle-fill"></i>
-                                                            Đã xác thực
-                                                        </span>
-                                                    }
-                                                </div>
-                                            </div>
-                                            <div class="feedback-comment">
-                                                <p>@feedback.Comment</p>
-                                            </div>
-                                            
-                                            @if (feedback.Images.Any())
-                                            {
-                                                <div class="feedback-images">
-                                                    <div class="image-gallery">
-                                                        @foreach (var image in feedback.Images)
+
+                                            <div class="feedback-content">
+                                                <div class="feedback-header">
+                                                    <h6 class="customer-name">@feedback.CustomerName</h6>
+                                                    <div class="feedback-rating">
+                                                        @for (int i = 1; i <= 5; i++)
                                                         {
-                                                            <div class="image-item" onclick="openImageModal(@feedback.Id, @image.Id, '@image.Url', '@image.Alt')">
-                                                                <img src="@image.ThumbnailUrl" alt="@image.Alt" class="gallery-thumbnail" loading="lazy">
-                                                                <div class="image-overlay">
-                                                                    <i class="bi bi-zoom-in"></i>
-                                                                </div>
-                                                            </div>
+                                                            <i class="bi bi-star-fill @(i <= feedback.Rating ? "filled" : "empty")"></i>
+                                                        }
+                                                    </div>
+                                                    <div class="feedback-meta">
+                                                        <span class="feedback-date">@feedback.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                                        @if (feedback.IsVerified)
+                                                        {
+                                                            <span class="verified-badge">
+                                                                <i class="bi bi-check-circle-fill"></i> Đã xác thực
+                                                            </span>
                                                         }
                                                     </div>
                                                 </div>
-                                            }
-                                            
-                                            @if (feedback.Reply != null)
-                                            {
-                                                <div class="provider-reply">
-                                                    <div class="reply-header">
-                                                        <div class="reply-avatar">
-                                                            <i class="bi bi-building"></i>
-                                                        </div>
-                                                        <div class="reply-info">
-                                                            <span class="reply-author">@feedback.Reply.ProviderName</span>
-                                                            <span class="reply-date">@feedback.Reply.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="reply-content">
-                                                        <p>@feedback.Reply.Content</p>
-                                                    </div>
+
+                                                <div class="feedback-comment">
+                                                    <p>@feedback.Comment</p>
                                                 </div>
-                                            }
-                                            else
-                                            {
-                                                <div class="reply-form" id="reply-form-@feedback.Id" style="display: none;">
-                                                    <div class="reply-input-group">
-                                                        <textarea class="form-control reply-textarea" placeholder="Trả lời khách hàng..." rows="3"></textarea>
-                                                        <div class="reply-actions">
-                                                            <button class="btn btn-outline-secondary btn-sm" onclick="cancelReply(@feedback.Id)">
-                                                                <i class="bi bi-x"></i> Hủy
-                                                            </button>
-                                                            <button class="btn btn-primary btn-sm" onclick="submitReply(@feedback.Id)">
-                                                                <i class="bi bi-send"></i> Gửi
-                                                            </button>
+
+                                                @if (feedback.Images != null && feedback.Images.Any())
+                                                {
+                                                    <div class="feedback-images">
+                                                        <div class="image-gallery">
+                                                            @foreach (var imgUrl in feedback.Images)
+                                                            {
+                                                                <div class="image-item" data-full="@imgUrl" onclick="openImageModal('@feedback.ReviewId','@imgUrl')">
+                                                                    <img src="@imgUrl" alt="feedback-image" class="gallery-thumbnail" loading="lazy" />
+                                                                    <div class="image-overlay"><i class="bi bi-zoom-in"></i></div>
+                                                                </div>
+                                                            }
                                                         </div>
                                                     </div>
-                                                </div>
-                                                <div class="reply-button">
-                                                    <button class="btn btn-outline-primary btn-sm" onclick="showReplyForm(@feedback.Id)">
-                                                        <i class="bi bi-reply"></i> Trả lời
-                                                    </button>
-                                                </div>
-                                            }
+                                                }
+
+                                                @if (!string.IsNullOrWhiteSpace(feedback.Reply))
+                                                {
+                                                    <div class="provider-reply">
+                                                        <div class="reply-header">
+                                                            <div class="reply-avatar"><i class="bi bi-building"></i></div>
+                                                            <div class="reply-info">
+                                                                <span class="reply-author">Bạn</span>
+                                                                <span class="reply-date">@feedback.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="reply-content"><p>@feedback.Reply</p></div>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="reply-form" id="reply-form-@feedback.ReviewId" style="display: none;">
+                                                        <div class="reply-input-group">
+                                                            <textarea class="form-control reply-textarea" placeholder="Trả lời khách hàng..." rows="3"></textarea>
+                                                            <div class="reply-actions">
+                                                                <button class="btn btn-outline-secondary btn-sm" onclick="cancelReply('@feedback.ReviewId', this)">
+                                                                    <i class="bi bi-x"></i> Hủy
+                                                                </button>
+                                                                <button class="btn btn-primary btn-sm" onclick="submitReply('@feedback.ReviewId', this)">
+                                                                    <i class="bi bi-send"></i> Gửi
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="reply-button">
+                                                        <button class="btn btn-outline-primary btn-sm" onclick="showReplyForm('@feedback.ReviewId', this)">
+                                                            <i class="bi bi-reply"></i> Trả lời
+                                                        </button>
+                                                    </div>
+                                                }
+                                            </div>
                                         </div>
-                                    </div>
-                                }
-                            </div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
+
                 </div>
             </div>
         }
@@ -259,7 +278,7 @@
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="imageModalLabel">Hình ảnh feedback </h5>
+                <h5 class="modal-title" id="imageModalLabel">Hình ảnh feedback</h5>
                 <div class="image-counter">
                     <span id="currentImageIndex">1</span> / <span id="totalImages">1</span>
                 </div>
@@ -289,254 +308,196 @@
 </div>
 
 @section Styles {
-<link rel="stylesheet" href="~/css/provider-feedback.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/provider-feedback.css" asp-append-version="true" />
+    <style>
+        /* Gợi ý css nhỏ cho icon ảnh */
+        .service-icon-img {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 8px
+        }
+    </style>
 }
 
 @section Scripts {
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Auto expand first service feedback group
-        const firstCollapse = document.querySelector('.collapse');
-        if (firstCollapse) {
-            firstCollapse.classList.add('show');
-        }
-        
-        // Update chevron icons on collapse toggle
-        document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(button => {
-            button.addEventListener('click', function() {
-                const target = document.querySelector(this.getAttribute('data-bs-target'));
-                const chevron = this.querySelector('i');
-                
-                setTimeout(() => {
-                    if (target.classList.contains('show')) {
-                        chevron.classList.remove('bi-chevron-down');
-                        chevron.classList.add('bi-chevron-up');
-                    } else {
-                        chevron.classList.remove('bi-chevron-up');
-                        chevron.classList.add('bi-chevron-down');
-                    }
-                }, 100);
+    <script>
+               document.addEventListener('DOMContentLoaded', function () {
+            // Tự mở nhóm đầu tiên có feedback; nếu không có thì mở nhóm đầu tiên
+            const collapses = Array.from(document.querySelectorAll('.collapse'));
+            let target = collapses.find(c => c.getAttribute('data-has-feedback') === 'True'
+                                          || c.getAttribute('data-has-feedback') === 'true');
+            if (!target && collapses.length > 0) target = collapses[0];
+            if (target) {
+                target.classList.add('show');
+
+                // Đồng bộ chevron ngay khi mở ban đầu
+                const btn = document.querySelector(`[data-bs-target="#${target.id}"]`);
+                const chev = btn?.querySelector('i');
+                if (chev && chev.classList.contains('bi-chevron-down')) {
+                    chev.classList.replace('bi-chevron-down', 'bi-chevron-up');
+                }
+            }
+
+            // Toggle chevron khi click
+            document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const target = document.querySelector(this.getAttribute('data-bs-target'));
+                    const chevron = this.querySelector('i');
+                    setTimeout(() => {
+                        if (target.classList.contains('show')) {
+                            chevron.classList.replace('bi-chevron-down', 'bi-chevron-up');
+                        } else {
+                            chevron.classList.replace('bi-chevron-up', 'bi-chevron-down');
+                        }
+                    }, 100);
+                });
             });
         });
-    });
 
-    // Reply functions
-    function showReplyForm(feedbackId) {
-        const form = document.getElementById(`reply-form-${feedbackId}`);
-        const button = event.target.closest('.reply-button');
-        
-        form.style.display = 'block';
-        button.style.display = 'none';
-        
-        // Focus on textarea
-        const textarea = form.querySelector('.reply-textarea');
-        textarea.focus();
-    }
-
-    function cancelReply(feedbackId) {
-        const form = document.getElementById(`reply-form-${feedbackId}`);
-        const button = form.parentElement.querySelector('.reply-button');
-        
-        form.style.display = 'none';
-        button.style.display = 'block';
-        
-        // Clear textarea
-        form.querySelector('.reply-textarea').value = '';
-    }
-
-    function submitReply(feedbackId) {
-        const textarea = document.querySelector(`#reply-form-${feedbackId} .reply-textarea`);
-        const content = textarea.value.trim();
-        
-        if (!content) {
-            alert('Vui lòng nhập nội dung trả lời!');
-            return;
+        // ====== Reply UI (demo UI, chưa gọi API thật) ======
+        function showReplyForm(reviewId, btnEl) {
+            const form = document.getElementById(`reply-form-${reviewId}`);
+            const btnWrap = btnEl.closest('.reply-button');
+            form.style.display = 'block';
+            if (btnWrap) btnWrap.style.display = 'none';
+            form.querySelector('.reply-textarea').focus();
         }
-        
-        // Simulate API call
-        const button = event.target;
-        const originalText = button.innerHTML;
-        button.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang gửi...';
-        button.disabled = true;
-        
-        setTimeout(() => {
-            // Simulate success
-            const form = document.getElementById(`reply-form-${feedbackId}`);
-            const replyContainer = form.parentElement;
-            
-            // Create reply element
-            const replyHtml = `
-                <div class="provider-reply">
-                    <div class="reply-header">
-                        <div class="reply-avatar">
-                            <i class="bi bi-building"></i>
-                        </div>
-                        <div class="reply-info">
-                            <span class="reply-author">VHS Provider</span>
-                            <span class="reply-date">${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'})}</span>
-                        </div>
-                    </div>
-                    <div class="reply-content">
-                        <p>${content}</p>
-                    </div>
-                </div>
-            `;
-            
-            // Replace form with reply
-            form.outerHTML = replyHtml;
-            
-            // Show success message
-            showToast('Trả lời đã được gửi thành công!', 'success');
-        }, 1500);
-    }
 
-    function showToast(message, type = 'info') {
-        // Create toast element
-        const toast = document.createElement('div');
-        toast.className = `toast align-items-center text-white bg-${type} border-0`;
-        toast.setAttribute('role', 'alert');
-        toast.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        `;
-        
-        // Add to page
-        let toastContainer = document.querySelector('.toast-container');
-        if (!toastContainer) {
-            toastContainer = document.createElement('div');
-            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-            document.body.appendChild(toastContainer);
+        function cancelReply(reviewId, btnEl) {
+            const form = document.getElementById(`reply-form-${reviewId}`);
+            const container = form.parentElement;
+            const btnWrap = container.querySelector('.reply-button');
+            form.style.display = 'none';
+            if (btnWrap) btnWrap.style.display = 'block';
+            form.querySelector('.reply-textarea').value = '';
         }
-        
-        toastContainer.appendChild(toast);
-        
-        // Show toast
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-        
-        // Remove after hide
-        toast.addEventListener('hidden.bs.toast', () => {
-            toast.remove();
+
+        function submitReply(reviewId, btnEl) {
+            const txt = document.querySelector(`#reply-form-${reviewId} .reply-textarea`);
+            const content = (txt?.value || '').trim();
+            if (!content) { alert('Vui lòng nhập nội dung trả lời!'); return; }
+
+            // TODO: gọi API reply thật (chưa có spec ở backend)
+            btnEl.disabled = true;
+            const oldHtml = btnEl.innerHTML;
+            btnEl.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang gửi...';
+
+            setTimeout(() => {
+                showToast('(Demo) Đã gửi trả lời!', 'success');
+                cancelReply(reviewId, btnEl);
+                btnEl.disabled = false;
+                btnEl.innerHTML = oldHtml;
+            }, 800);
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `<div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>`;
+            let container = document.querySelector('.toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'toast-container position-fixed top-0 end-0 p-3';
+                document.body.appendChild(container);
+            }
+            container.appendChild(toast);
+            new bootstrap.Toast(toast).show();
+            toast.addEventListener('hidden.bs.toast', () => toast.remove());
+        }
+
+        // ====== Image modal ======
+        let currentImages = [];
+        let currentImageIndex = 0;
+
+        function openImageModal(reviewId, imageUrl) {
+            currentImages = [];
+            const form = document.getElementById(`reply-form-${reviewId}`);
+            const feedbackItem = form ? form.closest('.feedback-item') : null;
+            const scope = feedbackItem || document;
+            scope.querySelectorAll('.image-gallery .image-item').forEach(it => {
+                const url = it.getAttribute('data-full');
+                if (url) currentImages.push(url);
+            });
+
+            currentImageIndex = currentImages.indexOf(imageUrl);
+            if (currentImageIndex < 0) currentImageIndex = 0;
+
+            updateModalContent();
+            new bootstrap.Modal(document.getElementById('imageModal')).show();
+        }
+
+        function updateModalContent() {
+            if (!currentImages.length) return;
+            const modalImage = document.getElementById('modalImage');
+            const downloadLink = document.getElementById('downloadImage');
+            const currentIndexSpan = document.getElementById('currentImageIndex');
+            const totalImagesSpan = document.getElementById('totalImages');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+
+            const url = currentImages[currentImageIndex];
+            modalImage.style.opacity = '0.5';
+            modalImage.onload = () => modalImage.style.opacity = '1';
+            modalImage.src = url;
+            modalImage.alt = 'feedback-image';
+            downloadLink.href = url;
+
+            currentIndexSpan.textContent = (currentImageIndex + 1).toString();
+            totalImagesSpan.textContent = currentImages.length.toString();
+
+            const multi = currentImages.length > 1;
+            prevBtn.style.display = multi ? 'block' : 'none';
+            nextBtn.style.display = multi ? 'block' : 'none';
+        }
+
+        function previousImage() {
+            if (currentImages.length <= 1) return;
+            currentImageIndex = (currentImageIndex - 1 + currentImages.length) % currentImages.length;
+            updateModalContent();
+        }
+
+        function nextImage() {
+            if (currentImages.length <= 1) return;
+            currentImageIndex = (currentImageIndex + 1) % currentImages.length;
+            updateModalContent();
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function (e) {
+            const modal = document.getElementById('imageModal');
+            if (modal.classList.contains('show')) {
+                if (e.key === 'ArrowLeft') { e.preventDefault(); previousImage(); }
+                else if (e.key === 'ArrowRight') { e.preventDefault(); nextImage(); }
+                else if (e.key === 'Escape') { e.preventDefault(); bootstrap.Modal.getInstance(modal).hide(); }
+            }
         });
-    }
-
-    // Image modal functions
-    let currentFeedbackId = null;
-    let currentImageIndex = 0;
-    let currentImages = [];
-
-    function openImageModal(feedbackId, imageId, imageUrl, imageAlt) {
-        currentFeedbackId = feedbackId;
-        
-        // Find all images for this feedback
-        currentImages = [];
-        const feedbackElement = document.querySelector(`[onclick*="openImageModal(${feedbackId},"]`);
-        if (feedbackElement) {
-            const gallery = feedbackElement.closest('.image-gallery');
-            if (gallery) {
-                const imageItems = gallery.querySelectorAll('.image-item');
-                imageItems.forEach((item, index) => {
-                    const img = item.querySelector('img');
-                    const onclick = item.getAttribute('onclick');
-                    const matches = onclick.match(/openImageModal\((\d+), (\d+), '([^']+)', '([^']+)'\)/);
-                    if (matches) {
-                        currentImages.push({
-                            id: parseInt(matches[2]),
-                            url: matches[3],
-                            alt: matches[4],
-                            thumbnail: img.src
-                        });
-                    }
-                });
-            }
-        }
-        
-        // Find current image index
-        currentImageIndex = currentImages.findIndex(img => img.id === imageId);
-        if (currentImageIndex === -1) currentImageIndex = 0;
-        
-        updateModalContent();
-        
-        const modal = document.getElementById('imageModal');
-        const bsModal = new bootstrap.Modal(modal);
-        bsModal.show();
-    }
-
-    function updateModalContent() {
-        const modalImage = document.getElementById('modalImage');
-        const downloadLink = document.getElementById('downloadImage');
-        const currentIndexSpan = document.getElementById('currentImageIndex');
-        const totalImagesSpan = document.getElementById('totalImages');
-        const prevBtn = document.getElementById('prevBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        
-        if (currentImages.length === 0) return;
-        
-        const currentImage = currentImages[currentImageIndex];
-        
-        modalImage.src = currentImage.url;
-        modalImage.alt = currentImage.alt;
-        downloadLink.href = currentImage.url;
-        downloadLink.download = currentImage.alt || 'feedback-image.jpg';
-        
-        currentIndexSpan.textContent = currentImageIndex + 1;
-        totalImagesSpan.textContent = currentImages.length;
-        
-        // Update navigation buttons
-        prevBtn.style.display = currentImages.length > 1 ? 'block' : 'none';
-        nextBtn.style.display = currentImages.length > 1 ? 'block' : 'none';
-        
-        // Add loading effect
-        modalImage.style.opacity = '0.5';
-        modalImage.onload = () => {
-            modalImage.style.opacity = '1';
-        };
-    }
-
-    function previousImage() {
-        if (currentImages.length <= 1) return;
-        
-        currentImageIndex = (currentImageIndex - 1 + currentImages.length) % currentImages.length;
-        updateModalContent();
-    }
-
-    function nextImage() {
-        if (currentImages.length <= 1) return;
-        
-        currentImageIndex = (currentImageIndex + 1) % currentImages.length;
-        updateModalContent();
-    }
-
-    // Keyboard navigation
-    document.addEventListener('keydown', function(e) {
-        const modal = document.getElementById('imageModal');
-        if (modal.classList.contains('show')) {
-            if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                previousImage();
-            } else if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                nextImage();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                bootstrap.Modal.getInstance(modal).hide();
-            }
-        }
-    });
-</script>
+    </script>
 }
 
 @functions {
-    string GetRatingColor(double rating)
+    bool IsUrl(string? v) =>
+        !string.IsNullOrWhiteSpace(v) &&
+        (v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+         v.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+
+    string GetRatingColor(double rating) => rating switch
     {
-        return rating switch
-        {
-            >= 4.5 => "success",
-            >= 3.5 => "warning",
-            >= 2.5 => "info",
-            _ => "danger"
-        };
+        >= 4.5 => "success",
+        >= 3.5 => "warning",
+        >= 2.5 => "info",
+        _ => "danger"
+    };
+
+    string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "U";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0].Substring(0, Math.Min(2, parts[0].Length)).ToUpperInvariant();
+        return (parts[0][0].ToString() + parts[^1][0].ToString()).ToUpperInvariant();
     }
 }

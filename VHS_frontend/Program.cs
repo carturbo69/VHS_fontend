@@ -4,6 +4,7 @@ using VHS_frontend.Services.Admin;
 using VHS_frontend.Services.Customer;
 using VHS_frontend.Services.Customer.Implementations;
 using VHS_frontend.Services.Customer.Interfaces;
+using VHS_frontend.Services.Provider;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,16 @@ var builder = WebApplication.CreateBuilder(args);
 var backendBase = builder.Configuration["Apis:Backend"];
 if (string.IsNullOrWhiteSpace(backendBase))
     throw new InvalidOperationException("Missing configuration: Apis:Backend");
+
+builder.Services.AddHttpClient<ReviewServiceCustomer>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+builder.Services.AddHttpClient<ProviderFeedbackService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 
 builder.Services.AddHttpClient<IServiceCustomerService, ServiceCustomerService>(client =>
 {

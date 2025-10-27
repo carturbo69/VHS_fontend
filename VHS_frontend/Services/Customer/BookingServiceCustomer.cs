@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net;
+using System.Net.Http.Headers;
 
 using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 using static System.Net.WebRequestMethods;
@@ -142,6 +143,70 @@ namespace VHS_frontend.Services.Customer
                 throw new HttpRequestException(string.IsNullOrWhiteSpace(msg) ? "BadRequest" : msg);
             }
             resp.EnsureSuccessStatusCode();
+        }
+
+        // VHS_frontend/Services/Customer/BookingServiceCustomer.cs
+
+        public async Task<ListHistoryBookingServiceDTOs?> GetHistoryByAccountAsync(
+            Guid accountId,
+            string? jwtToken = null,
+            CancellationToken cancellationToken = default)
+        {
+            SetAuthHeader(jwtToken);
+
+            var url = $"api/Bookings/by-account/{accountId}";
+            using var resp = await _httpClient.GetAsync(url, cancellationToken);
+
+            // 404 -> coi như không có dữ liệu
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return new ListHistoryBookingServiceDTOs { Items = new() };
+
+            resp.EnsureSuccessStatusCode();
+            var dto = await resp.Content.ReadFromJsonAsync<ListHistoryBookingServiceDTOs>(cancellationToken: cancellationToken);
+            return dto ?? new ListHistoryBookingServiceDTOs { Items = new() };
+        }
+
+        /// <summary>
+        /// ✅ NEW: Lấy chi tiết lịch sử của 1 booking theo AccountId và BookingId.
+        /// </summary>
+        public async Task<HistoryBookingDetailDTO?> GetHistoryDetailAsync(
+        Guid accountId,
+        Guid bookingId,
+        string? jwtToken = null,
+        CancellationToken cancellationToken = default)
+        {
+            SetAuthHeader(jwtToken);
+
+
+            var url = $"api/Bookings/by-account/{accountId}/bookings/{bookingId}";
+            using var resp = await _httpClient.GetAsync(url, cancellationToken);
+
+
+            if (resp.StatusCode == HttpStatusCode.NotFound)
+                return null;
+
+
+            resp.EnsureSuccessStatusCode();
+            return await resp.Content.ReadFromJsonAsync<HistoryBookingDetailDTO>(cancellationToken: cancellationToken);
+        }
+
+
+        /// <summary>
+        /// ✅ NEW (Demo): Lấy thông tin yêu cầu huỷ/hoàn tiền cho màn hình CanceledDetail.
+        /// Vì backend chưa có API chính thức cho phần này, hàm này trả về dữ liệu DEMO.
+        /// Nếu sau này có API (ví dụ GET api/Bookings/cancel-requests/{bookingId}), chỉ cần thay thân hàm.
+        /// </summary>
+        public Task<CancelBookingRequestDTO> GetCancelInfoDemoAsync(Guid bookingId)
+        {
+            var demo = new CancelBookingRequestDTO
+            {
+                BookingId = bookingId,
+                Reason = "Tôi muốn cập nhật địa chỉ/sđt nhận hàng",
+                BankName = "Vietcombank",
+                AccountHolderName = "NGUYEN VAN A",
+                BankAccountNumber = "0123456789"
+            };
+            return Task.FromResult(demo);
         }
 
     }

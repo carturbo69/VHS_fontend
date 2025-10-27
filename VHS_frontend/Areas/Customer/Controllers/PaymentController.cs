@@ -107,7 +107,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (NotLoggedIn())
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             if (bookingIds == null || bookingIds.Count == 0)
@@ -175,7 +175,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (NotLoggedIn())
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             if (bookingIds == null || bookingIds.Count == 0)
@@ -261,7 +261,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (NotLoggedIn())
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             var isSuccess = string.Equals(result, "success", StringComparison.OrdinalIgnoreCase)
@@ -342,7 +342,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (NotLoggedIn())
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             var isSuccess = string.Equals(result, "success", StringComparison.OrdinalIgnoreCase)
@@ -467,7 +467,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (NotLoggedIn())
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             await CancelPendingFromIdsOrSessionAsync(null, ct);
@@ -482,7 +482,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (NotLoggedIn())
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             await CancelPendingFromIdsOrSessionAsync(null, ct);
