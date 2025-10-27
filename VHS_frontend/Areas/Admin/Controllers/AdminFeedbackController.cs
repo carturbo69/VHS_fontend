@@ -14,28 +14,33 @@ namespace VHS_frontend.Areas.Admin.Controllers
             _feedbackService = feedbackService;
         }
 
-        public async Task<IActionResult> Index()
+        // Helper: kiểm tra quyền admin + gắn bearer nếu có
+        private bool PrepareAuth()
         {
             var accountId = HttpContext.Session.GetString("AccountID");
             var role = HttpContext.Session.GetString("Role");
 
-            // Kiểm tra Session đăng nhập và quyền
             if (string.IsNullOrEmpty(accountId) ||
                 !string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase))
             {
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return false;
             }
 
-            ViewBag.Username = HttpContext.Session.GetString("Username") ?? "Admin";
-
-            // Gắn token xác thực
             var token = HttpContext.Session.GetString("JWToken");
             if (!string.IsNullOrWhiteSpace(token))
                 _feedbackService.SetBearerToken(token);
 
+            ViewBag.Username = HttpContext.Session.GetString("Username") ?? "Admin";
+            return true;
+        }
+
+        public async Task<IActionResult> Index()
+        {
+            if (!PrepareAuth())
+                return RedirectToAction("Login", "Account", new { area = "" });
+
             try
             {
-                // ✅ Gọi API thực tế từ ReviewsController
                 var feedbacks = await _feedbackService.GetAllAsync();
                 return View(feedbacks);
             }
@@ -47,17 +52,17 @@ namespace VHS_frontend.Areas.Admin.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(Guid id)
         {
+            if (!PrepareAuth())
+                return RedirectToAction("Login", "Account", new { area = "" });
+
             try
             {
-                var token = HttpContext.Session.GetString("JWToken");
-                if (!string.IsNullOrWhiteSpace(token))
-                    _feedbackService.SetBearerToken(token);
-
                 var success = await _feedbackService.DeleteAsync(id);
                 TempData[success ? "Success" : "Error"] =
-                    success ? "Xóa feedback thành công!" : "Không thể xóa feedback!";
+                    success ? "Xóa (mềm) feedback thành công!" : "Không thể xóa feedback!";
             }
             catch (Exception ex)
             {
@@ -68,14 +73,14 @@ namespace VHS_frontend.Areas.Admin.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Hide(Guid id)
         {
+            if (!PrepareAuth())
+                return RedirectToAction("Login", "Account", new { area = "" });
+
             try
             {
-                var token = HttpContext.Session.GetString("JWToken");
-                if (!string.IsNullOrWhiteSpace(token))
-                    _feedbackService.SetBearerToken(token);
-
                 var success = await _feedbackService.HideAsync(id);
                 TempData[success ? "Success" : "Error"] =
                     success ? "Ẩn feedback thành công!" : "Không thể ẩn feedback!";
@@ -83,6 +88,27 @@ namespace VHS_frontend.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 TempData["Error"] = "Lỗi khi ẩn feedback: " + ex.Message;
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Show(Guid id)
+        {
+            if (!PrepareAuth())
+                return RedirectToAction("Login", "Account", new { area = "" });
+
+            try
+            {
+                var success = await _feedbackService.ShowAsync(id);
+                TempData[success ? "Success" : "Error"] =
+                    success ? "Hiện feedback thành công!" : "Không thể hiện feedback!";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = "Lỗi khi hiện feedback: " + ex.Message;
             }
 
             return RedirectToAction("Index");
