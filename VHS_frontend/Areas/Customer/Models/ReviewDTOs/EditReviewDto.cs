@@ -12,12 +12,8 @@ namespace VHS_frontend.Areas.Customer.Models.ReviewDTOs
 
         [Range(1, 5)]
         public int Rating { get; set; }
-
-        [MaxLength(2000)]
         public string? Comment { get; set; }
-
-        public List<string> ExistingImages { get; set; } = new();
-        public List<string> RemoveImages { get; set; } = new();
-        public IFormFileCollection? NewImages { get; set; }
+        public List<IFormFile>? NewImages { get; set; }
+        public List<string>? RemoveImages { get; set; }
     }
 }

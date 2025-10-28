@@ -8,9 +8,9 @@ namespace VHS_frontend.Areas.Provider.Models.Feedback
 
     public class ServiceFeedbackGroup
     {
-        public int ServiceId { get; set; }
+        public Guid ServiceId { get; set; }               // Guid ?? kh?p BE
         public string ServiceName { get; set; } = string.Empty;
-        public string ServiceIcon { get; set; } = string.Empty;
+        public string ServiceIcon { get; set; } = string.Empty; // URL tuy?t ??i t? API
         public double AverageRating { get; set; }
         public int TotalFeedbacks { get; set; }
         public List<CustomerFeedback> Feedbacks { get; set; } = new();
@@ -18,31 +18,19 @@ namespace VHS_frontend.Areas.Provider.Models.Feedback
 
     public class CustomerFeedback
     {
-        public int Id { get; set; }
+        public Guid ReviewId { get; set; }                // Guid ?? kh?p BE
         public string CustomerName { get; set; } = string.Empty;
-        public string CustomerAvatar { get; set; } = string.Empty;
+        public string CustomerAvatar { get; set; } = string.Empty; // URL tuy?t ??i t? API
         public int Rating { get; set; }
         public string Comment { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public bool IsVerified { get; set; }
-        public List<FeedbackImage> Images { get; set; } = new();
-        public ProviderReply? Reply { get; set; }
-    }
 
-    public class FeedbackImage
-    {
-        public int Id { get; set; }
-        public string Url { get; set; } = string.Empty;
-        public string Alt { get; set; } = string.Empty;
-        public string ThumbnailUrl { get; set; } = string.Empty;
-    }
+        // BE tr? List<string> url ?nh => gi? nguyên ?? kh?i ph?i map
+        public List<string> Images { get; set; } = new();
 
-    public class ProviderReply
-    {
-        public int Id { get; set; }
-        public string Content { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public string ProviderName { get; set; } = string.Empty;
+        // BE tr? reply là string? => gi? nguyên ?? kh?i ph?i map
+        public string? Reply { get; set; }
     }
 
     public class FeedbackStats
@@ -54,5 +42,11 @@ namespace VHS_frontend.Areas.Provider.Models.Feedback
         public int ThreeStarCount { get; set; }
         public int TwoStarCount { get; set; }
         public int OneStarCount { get; set; }
+    }
+
+    public class ProviderReplyRequestDto
+    {
+        public Guid ReviewId { get; set; }
+        public string Content { get; set; } = string.Empty;
     }
 }
