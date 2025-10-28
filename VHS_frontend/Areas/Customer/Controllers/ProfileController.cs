@@ -180,6 +180,53 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         /// <summary>
+        /// API: Update profile from modal
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> UpdateProfile([FromForm] EditProfileViewModel model)
+        {
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                return Json(new { success = false, message = "Bạn cần đăng nhập." });
+            }
+
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                
+                var editDto = new EditProfileDTO
+                {
+                    AccountName = model.AccountName,
+                    Email = model.Email,  // Keep current email, actual change via ChangeEmail action
+                    FullName = model.FullName,
+                    PhoneNumber = model.PhoneNumber,
+                    Address = model.Address
+                    // Images is updated separately via UploadImage
+                };
+
+                var result = await _profileService.UpdateProfileAsync(editDto, jwtToken);
+                
+                if (result.Success)
+                {
+                    return Json(new { success = true, message = "Cập nhật thông tin thành công!" });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Message ?? "Có lỗi xảy ra khi cập nhật." });
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Json(new { success = false, message = $"Phiên đăng nhập đã hết hạn: {ex.Message}" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Lỗi: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
         /// Hiển thị form đổi mật khẩu
         /// </summary>
         [HttpGet]
@@ -204,35 +251,47 @@ namespace VHS_frontend.Areas.Customer.Controllers
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
+                System.Diagnostics.Debug.WriteLine("[ProfileController] RequestPasswordChangeOTP: No accountId found");
                 return Json(new { success = false, message = "Bạn cần đăng nhập để đổi mật khẩu." });
             }
 
             try
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] RequestPasswordChangeOTP: JWT Token exists: {!string.IsNullOrEmpty(jwtToken)}");
+                
+                if (string.IsNullOrEmpty(jwtToken))
+                {
+                    return Json(new { success = false, message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
+                }
+
                 var result = await _profileService.RequestPasswordChangeOTPAsync(jwtToken);
-                return Json(result);
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] RequestPasswordChangeOTP result: Success={result.Success}, Message={result.Message}");
+                
+                return Json(new { success = result.Success, message = result.Message });
             }
             catch (UnauthorizedAccessException ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] RequestPasswordChangeOTP UnauthorizedAccessException: {ex.Message}");
                 return Json(new { success = false, message = $"Phiên đăng nhập đã hết hạn: {ex.Message}" });
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] RequestPasswordChangeOTP Exception: {ex.Message}");
                 return Json(new { success = false, message = $"Lỗi khi gửi OTP: {ex.Message}" });
             }
         }
 
         /// <summary>
-        /// Xử lý đổi mật khẩu
+        /// Xử lý đổi mật khẩu (View version - deprecated, use API version below)
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+        public async Task<IActionResult> ChangePasswordView(ChangePasswordViewModel model)
         {
             if (!ModelState.IsValid)
             {
-                return View(model);
+                return View("ChangePassword", model);
             }
 
             var accountId = GetAccountId();
@@ -246,7 +305,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 
-                // Change password với OTP đã nhận
                 var changeDto = new ChangePasswordDTO
                 {
                     CurrentPassword = model.CurrentPassword,
@@ -265,7 +323,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 else
                 {
                     TempData["ToastError"] = result.Message ?? "Có lỗi xảy ra khi đổi mật khẩu.";
-                    return View(model);
+                    return View("ChangePassword", model);
                 }
             }
             catch (UnauthorizedAccessException ex)
@@ -276,7 +334,52 @@ namespace VHS_frontend.Areas.Customer.Controllers
             catch (Exception ex)
             {
                 TempData["ToastError"] = $"Lỗi khi đổi mật khẩu: {ex.Message}";
-                return View(model);
+                return View("ChangePassword", model);
+            }
+        }
+
+        /// <summary>
+        /// API: Change password from modal
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> ChangePassword([FromForm] ChangePasswordViewModel model)
+        {
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                return Json(new { success = false, message = "Bạn cần đăng nhập." });
+            }
+
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                
+                var changeDto = new ChangePasswordDTO
+                {
+                    CurrentPassword = model.CurrentPassword,
+                    NewPassword = model.NewPassword,
+                    ConfirmPassword = model.ConfirmPassword,
+                    OTP = model.OTP
+                };
+
+                var result = await _profileService.ChangePasswordAsync(changeDto, jwtToken);
+                
+                if (result.Success)
+                {
+                    return Json(new { success = true, message = "Đổi mật khẩu thành công!" });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Message ?? "Có lỗi xảy ra khi đổi mật khẩu." });
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Json(new { success = false, message = $"Phiên đăng nhập đã hết hạn: {ex.Message}" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Lỗi: {ex.Message}" });
             }
         }
 
@@ -305,35 +408,47 @@ namespace VHS_frontend.Areas.Customer.Controllers
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
+                System.Diagnostics.Debug.WriteLine("[ProfileController] RequestEmailChangeOTP: No accountId found");
                 return Json(new { success = false, message = "Bạn cần đăng nhập để đổi email." });
             }
 
             try
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] RequestEmailChangeOTP: JWT Token exists: {!string.IsNullOrEmpty(jwtToken)}");
+                
+                if (string.IsNullOrEmpty(jwtToken))
+                {
+                    return Json(new { success = false, message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
+                }
+
                 var result = await _profileService.RequestEmailChangeOTPAsync(jwtToken);
-                return Json(result);
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] RequestEmailChangeOTP result: Success={result.Success}, Message={result.Message}");
+                
+                return Json(new { success = result.Success, message = result.Message });
             }
             catch (UnauthorizedAccessException ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] RequestEmailChangeOTP UnauthorizedAccessException: {ex.Message}");
                 return Json(new { success = false, message = $"Phiên đăng nhập đã hết hạn: {ex.Message}" });
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] RequestEmailChangeOTP Exception: {ex.Message}");
                 return Json(new { success = false, message = $"Lỗi khi gửi OTP: {ex.Message}" });
             }
         }
 
         /// <summary>
-        /// Xử lý đổi email
+        /// Xử lý đổi email (View version - deprecated, use API version below)
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ChangeEmail(ChangeEmailViewModel model)
+        public async Task<IActionResult> ChangeEmailView(ChangeEmailViewModel model)
         {
             if (!ModelState.IsValid)
             {
-                return View(model);
+                return View("ChangeEmail", model);
             }
 
             var accountId = GetAccountId();
@@ -347,11 +462,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 
-                // Change email với OTP đã nhận
                 var changeDto = new ChangeEmailDTO
                 {
                     NewEmail = model.NewEmail,
-                    OtpCode = model.OTP  // Map OTP from ViewModel to OtpCode in DTO
+                    OtpCode = model.OTP
                 };
 
                 var result = await _profileService.ChangeEmailAsync(changeDto, jwtToken);
@@ -364,7 +478,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 else
                 {
                     TempData["ToastError"] = result.Message ?? "Có lỗi xảy ra khi đổi email.";
-                    return View(model);
+                    return View("ChangeEmail", model);
                 }
             }
             catch (UnauthorizedAccessException ex)
@@ -375,7 +489,50 @@ namespace VHS_frontend.Areas.Customer.Controllers
             catch (Exception ex)
             {
                 TempData["ToastError"] = $"Lỗi khi đổi email: {ex.Message}";
-                return View(model);
+                return View("ChangeEmail", model);
+            }
+        }
+
+        /// <summary>
+        /// API: Change email from modal
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> ChangeEmail([FromForm] ChangeEmailViewModel model)
+        {
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                return Json(new { success = false, message = "Bạn cần đăng nhập." });
+            }
+
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                
+                var changeDto = new ChangeEmailDTO
+                {
+                    NewEmail = model.NewEmail,
+                    OtpCode = model.OTP  // Map OTP from ViewModel to OtpCode in DTO
+                };
+
+                var result = await _profileService.ChangeEmailAsync(changeDto, jwtToken);
+                
+                if (result.Success)
+                {
+                    return Json(new { success = true, message = "Đổi email thành công!" });
+                }
+                else
+                {
+                    return Json(new { success = false, message = result.Message ?? "Có lỗi xảy ra khi đổi email." });
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Json(new { success = false, message = $"Phiên đăng nhập đã hết hạn: {ex.Message}" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Lỗi: {ex.Message}" });
             }
         }
 

@@ -108,26 +108,50 @@ namespace VHS_frontend.Services.Customer
         /// <summary>
         /// Request OTP để đổi mật khẩu
         /// </summary>
-        public async Task<ProfileResponseDTO> RequestPasswordChangeOTPAsync(string? jwtToken)
+        public async Task<OTPResponseDTO> RequestPasswordChangeOTPAsync(string? jwtToken)
         {
             SetAuthHeader(jwtToken);
 
             try
             {
+                System.Diagnostics.Debug.WriteLine("[ProfileServiceCustomer] Calling request-password-change-otp...");
                 var response = await _httpClient.PostAsync("api/profile/request-password-change-otp", null);
+                
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] Response status: {response.StatusCode}");
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     throw new UnauthorizedAccessException("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
 
-                response.EnsureSuccessStatusCode();
+                var jsonString = await response.Content.ReadAsStringAsync();
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] Response body: {jsonString}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    // Try to parse error message from response
+                    try
+                    {
+                        var errorResponse = JsonSerializer.Deserialize<OTPResponseDTO>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        return errorResponse ?? new OTPResponseDTO { Success = false, Message = $"Lỗi từ server: {response.StatusCode}" };
+                    }
+                    catch
+                    {
+                        return new OTPResponseDTO { Success = false, Message = $"Lỗi từ server: {response.StatusCode} - {jsonString}" };
+                    }
+                }
 
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                return await response.Content.ReadFromJsonAsync<ProfileResponseDTO>(options) 
-                       ?? new ProfileResponseDTO { Success = false, Message = "Không thể parse response" };
+                var result = JsonSerializer.Deserialize<OTPResponseDTO>(jsonString, options);
+                return result ?? new OTPResponseDTO { Success = false, Message = "Không thể parse response" };
             }
             catch (HttpRequestException ex)
             {
-                return new ProfileResponseDTO { Success = false, Message = $"Lỗi khi gọi API: {ex.Message}" };
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] HttpRequestException: {ex.Message}");
+                return new OTPResponseDTO { Success = false, Message = $"Lỗi khi gọi API: {ex.Message}" };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] Exception: {ex.Message}");
+                return new OTPResponseDTO { Success = false, Message = $"Lỗi: {ex.Message}" };
             }
         }
 
@@ -160,26 +184,50 @@ namespace VHS_frontend.Services.Customer
         /// <summary>
         /// Request OTP để đổi email
         /// </summary>
-        public async Task<ProfileResponseDTO> RequestEmailChangeOTPAsync(string? jwtToken)
+        public async Task<OTPResponseDTO> RequestEmailChangeOTPAsync(string? jwtToken)
         {
             SetAuthHeader(jwtToken);
 
             try
             {
+                System.Diagnostics.Debug.WriteLine("[ProfileServiceCustomer] Calling request-email-change-otp...");
                 var response = await _httpClient.PostAsync("api/profile/request-email-change-otp", null);
+                
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] Response status: {response.StatusCode}");
                 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     throw new UnauthorizedAccessException("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
 
-                response.EnsureSuccessStatusCode();
+                var jsonString = await response.Content.ReadAsStringAsync();
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] Response body: {jsonString}");
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    // Try to parse error message from response
+                    try
+                    {
+                        var errorResponse = JsonSerializer.Deserialize<OTPResponseDTO>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        return errorResponse ?? new OTPResponseDTO { Success = false, Message = $"Lỗi từ server: {response.StatusCode}" };
+                    }
+                    catch
+                    {
+                        return new OTPResponseDTO { Success = false, Message = $"Lỗi từ server: {response.StatusCode} - {jsonString}" };
+                    }
+                }
 
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                return await response.Content.ReadFromJsonAsync<ProfileResponseDTO>(options) 
-                       ?? new ProfileResponseDTO { Success = false, Message = "Không thể parse response" };
+                var result = JsonSerializer.Deserialize<OTPResponseDTO>(jsonString, options);
+                return result ?? new OTPResponseDTO { Success = false, Message = "Không thể parse response" };
             }
             catch (HttpRequestException ex)
             {
-                return new ProfileResponseDTO { Success = false, Message = $"Lỗi khi gọi API: {ex.Message}" };
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] HttpRequestException: {ex.Message}");
+                return new OTPResponseDTO { Success = false, Message = $"Lỗi khi gọi API: {ex.Message}" };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] Exception: {ex.Message}");
+                return new OTPResponseDTO { Success = false, Message = $"Lỗi: {ex.Message}" };
             }
         }
 

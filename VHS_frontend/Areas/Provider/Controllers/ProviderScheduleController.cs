@@ -154,6 +154,42 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> CreateSchedule([FromBody] CreateScheduleViewModel model)
+        {
+            var jwt = GetJwtToken();
+            if (string.IsNullOrEmpty(jwt))
+            {
+                return Json(new { success = false, message = "Unauthorized" });
+            }
+
+            var dto = new
+            {
+                dayOfWeek = model.DayOfWeek,
+                startTime = model.StartTime,
+                endTime = model.EndTime,
+                bookingLimit = model.BookingLimit
+            };
+
+            Console.WriteLine($"Creating Schedule - DayOfWeek: {dto.dayOfWeek}, StartTime: {dto.startTime}, EndTime: {dto.endTime}");
+
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{GetApiBaseUrl()}/api/ProviderSchedule/schedules");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", jwt);
+            request.Content = new StringContent(JsonSerializer.Serialize(dto), System.Text.Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(request);
+            var json = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"CreateSchedule Response: {response.StatusCode} - {json}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = json });
+            }
+
+            return Json(new { success = true, data = json });
+        }
+
+        [HttpPost]
         public async Task<IActionResult> CreateWeeklySchedule([FromBody] CreateWeeklyScheduleViewModel model)
         {
             var jwt = GetJwtToken();
@@ -213,12 +249,12 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 return Json(new { success = false, message = "Unauthorized" });
             }
 
-            // Convert TimeOnly to string for backend
+            // Pass data to backend
             var dto = new
             {
                 date = model.Date,
-                startTime = model.StartTime.HasValue ? model.StartTime.Value.ToString("HH:mm") : (string?)null,
-                endTime = model.EndTime.HasValue ? model.EndTime.Value.ToString("HH:mm") : (string?)null,
+                startTime = model.StartTime,
+                endTime = model.EndTime,
                 reason = model.Reason
             };
 

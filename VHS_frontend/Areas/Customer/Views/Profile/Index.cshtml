@@ -1,3 +1,4 @@
+
 @model VHS_frontend.Areas.Customer.Models.Profile.ProfileViewModel
 @{
     ViewData["Title"] = "Thông tin cá nhân";
@@ -7,8 +8,6 @@
 @section Styles {
     <link rel="stylesheet" href="~/css/profile.css" asp-append-version="true" />
 }
-
-@await Html.PartialAsync("_ProfileNavigation")
 
 <div class="profile-container">
     <!-- Header Section -->
@@ -220,265 +219,7 @@
     </div>
 </div>
 
-@section Scripts {
-    <script>
-        // Image upload functionality
-        function openImageUpload() {
-            const modal = new bootstrap.Modal(document.getElementById('imageUploadModal'));
-            modal.show();
-        }
-
-        // Preview image before upload
-        document.getElementById('profileImage').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('previewImg').src = e.target.result;
-                    document.getElementById('imagePreview').style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Upload profile image
-        async function uploadProfileImage() {
-            const fileInput = document.getElementById('profileImage');
-            const file = fileInput.files[0];
-            
-            if (!file) {
-                showToast('Vui lòng chọn ảnh để tải lên', 'error');
-                return;
-            }
-
-            // Validate file size (5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('Kích thước file không được vượt quá 5MB', 'error');
-                return;
-            }
-
-            // Validate file type
-            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
-            if (!allowedTypes.includes(file.type)) {
-                showToast('Chỉ chấp nhận file ảnh JPG, PNG, GIF, BMP, WEBP', 'error');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('image', file);
-
-            const uploadBtn = document.querySelector('#imageUploadModal .btn-primary');
-            const spinner = document.getElementById('uploadSpinner');
-            const icon = document.getElementById('uploadIcon');
-
-            // Show loading state
-            uploadBtn.disabled = true;
-            spinner.classList.remove('d-none');
-            icon.classList.add('d-none');
-
-            try {
-                const response = await fetch('@Url.Action("UploadImage")', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                    }
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showToast('Tải ảnh lên thành công!', 'success');
-                    document.getElementById('profileAvatar').src = result.imageUrl;
-                    bootstrap.Modal.getInstance(document.getElementById('imageUploadModal')).hide();
-                    
-                    // Reset form
-                    document.getElementById('imageUploadForm').reset();
-                    document.getElementById('imagePreview').style.display = 'none';
-                } else {
-                    showToast(result.message || 'Có lỗi xảy ra khi tải ảnh lên', 'error');
-                }
-            } catch (error) {
-                showToast('Có lỗi xảy ra khi tải ảnh lên', 'error');
-            } finally {
-                // Hide loading state
-                uploadBtn.disabled = false;
-                spinner.classList.add('d-none');
-                icon.classList.remove('d-none');
-            }
-        }
-
-        // Delete profile image
-        async function deleteProfileImage() {
-            if (!confirm('Bạn có chắc chắn muốn xóa ảnh đại diện?')) {
-                return;
-            }
-
-            try {
-                const response = await fetch('@Url.Action("DeleteImage")', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                    }
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showToast('Xóa ảnh thành công!', 'success');
-                    document.getElementById('profileAvatar').src = '/images/default-avatar.png';
-                } else {
-                    showToast(result.message || 'Có lỗi xảy ra khi xóa ảnh', 'error');
-                }
-            } catch (error) {
-                showToast('Có lỗi xảy ra khi xóa ảnh', 'error');
-            }
-        }
-
-        // Toast notification function
-        function showToast(message, type = 'info') {
-            // Implementation depends on your toast system
-            console.log(`${type.toUpperCase()}: ${message}`);
-        }
-
-        // Handle Edit Profile form
-        document.getElementById('editProfileForm')?.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            
-            try {
-                const response = await fetch('@Url.Action("UpdateProfile")', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                    }
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    showToast('Cập nhật thông tin thành công!', 'success');
-                    bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
-                    location.reload();
-                } else {
-                    showToast(result.message || 'Có lỗi xảy ra', 'error');
-                }
-            } catch (error) {
-                showToast('Có lỗi xảy ra khi cập nhật thông tin', 'error');
-            }
-        });
-
-        // Handle Change Password form
-        document.getElementById('changePasswordForm')?.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            
-            // Get OTP first
-            const btnRequestOTP = document.getElementById('btnRequestOTP');
-            if (btnRequestOTP && !btnRequestOTP.disabled) {
-                showToast('Vui lòng gửi mã OTP trước!', 'error');
-                return;
-            }
-            
-            try {
-                const response = await fetch('@Url.Action("ChangePassword")', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                    }
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    showToast('Đổi mật khẩu thành công!', 'success');
-                    bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
-                    this.reset();
-                } else {
-                    showToast(result.message || 'Có lỗi xảy ra', 'error');
-                }
-            } catch (error) {
-                showToast('Có lỗi xảy ra khi đổi mật khẩu', 'error');
-            }
-        });
-
-        // Handle Request OTP for password
-        document.getElementById('btnRequestOTP')?.addEventListener('click', async function() {
-            try {
-                const response = await fetch('@Url.Action("RequestPasswordChangeOTP")', {
-                    method: 'POST',
-                    headers: {
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                    }
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    showToast('Mã OTP đã được gửi đến email của bạn', 'success');
-                    this.disabled = true;
-                    // TODO: Start countdown timer
-                } else {
-                    showToast(result.message || 'Có lỗi xảy ra', 'error');
-                }
-            } catch (error) {
-                showToast('Có lỗi xảy ra khi gửi OTP', 'error');
-            }
-        });
-
-        // Handle Change Email form
-        document.getElementById('changeEmailForm')?.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            
-            try {
-                const response = await fetch('@Url.Action("ChangeEmail")', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                    }
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    showToast('Đổi email thành công!', 'success');
-                    bootstrap.Modal.getInstance(document.getElementById('changeEmailModal')).hide();
-                    this.reset();
-                    location.reload();
-                } else {
-                    showToast(result.message || 'Có lỗi xảy ra', 'error');
-                }
-            } catch (error) {
-                showToast('Có lỗi xảy ra khi đổi email', 'error');
-            }
-        });
-
-        // Handle Request OTP for email
-        document.getElementById('btnRequestEmailOTP')?.addEventListener('click', async function() {
-            try {
-                const response = await fetch('@Url.Action("RequestEmailChangeOTP")', {
-                    method: 'POST',
-                    headers: {
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                    }
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    showToast('Mã OTP đã được gửi đến email của bạn', 'success');
-                    this.disabled = true;
-                    // TODO: Start countdown timer
-                } else {
-                    showToast(result.message || 'Có lỗi xảy ra', 'error');
-                }
-            } catch (error) {
-                showToast('Có lỗi xảy ra khi gửi OTP', 'error');
-            }
-        });
-    </script>
-}
-
+<!-- Modals -->
 <!-- Edit Profile Modal -->
 <div class="modal fade" id="editProfileModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -529,107 +270,388 @@
     </div>
 </div>
 
-<!-- Change Password Modal -->
-<div class="modal fade" id="changePasswordModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-shield-lock me-2"></i>Đổi mật khẩu
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="changePasswordForm">
-                @Html.AntiForgeryToken()
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Chúng tôi sẽ gửi mã OTP đến email của bạn để xác minh.
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Mật khẩu hiện tại</label>
-                        <input type="password" class="form-control" name="CurrentPassword" required />
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Mật khẩu mới</label>
-                        <input type="password" class="form-control" name="NewPassword" 
-                               pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
-                               title="Phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số" required />
-                        <small class="text-muted">Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường và số</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Xác nhận mật khẩu mới</label>
-                        <input type="password" class="form-control" name="ConfirmPassword" required />
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label mb-0">Mã OTP</label>
-                            <button type="button" class="btn btn-link btn-sm p-0" id="btnRequestOTP">
-                                <i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP
-                            </button>
+    <!-- Change Password Modal -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-shield-lock me-2"></i>Đổi mật khẩu
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="changePasswordForm">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Chúng tôi sẽ gửi mã OTP đến email của bạn để xác minh.
                         </div>
-                        <input type="text" class="form-control" name="OTP" maxlength="6" 
-                               pattern="\d{6}" placeholder="Nhập 6 chữ số" required />
-                        <small class="text-muted" id="otpTimer"></small>
+
+                        <div class="mb-3">
+                            <label class="form-label">Mật khẩu hiện tại</label>
+                            <input type="password" class="form-control" name="CurrentPassword" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Mật khẩu mới</label>
+                            <input type="password" class="form-control" name="NewPassword" 
+                                   pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
+                                   title="Phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số" required />
+                            <small class="text-muted">Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường và số</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Xác nhận mật khẩu mới</label>
+                            <input type="password" class="form-control" name="ConfirmPassword" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">Mã OTP</label>
+                                <button type="button" class="btn btn-link btn-sm p-0" id="btnRequestOTP">
+                                    <i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP
+                                </button>
+                            </div>
+                            <input type="text" class="form-control" name="OTP" maxlength="6" 
+                                   pattern="\d{6}" placeholder="Nhập 6 chữ số" required />
+                            <small class="text-muted" id="otpTimer"></small>
+                        </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-lg me-2"></i>Đổi mật khẩu
-                    </button>
-                </div>
-            </form>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>Đổi mật khẩu
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Change Email Modal -->
-<div class="modal fade" id="changeEmailModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-envelope me-2"></i>Đổi email
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="changeEmailForm">
-                @Html.AntiForgeryToken()
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Chúng tôi sẽ gửi mã OTP đến email hiện tại <strong>(@Model.Email)</strong> để xác minh.
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Email mới</label>
-                        <input type="email" class="form-control" name="NewEmail" required />
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label mb-0">Mã OTP</label>
-                            <button type="button" class="btn btn-link btn-sm p-0" id="btnRequestEmailOTP">
-                                <i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP
-                            </button>
+    <!-- Change Email Modal -->
+    <div class="modal fade" id="changeEmailModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-envelope me-2"></i>Đổi email
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="changeEmailForm">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Chúng tôi sẽ gửi mã OTP đến email hiện tại <strong>(@Model.Email)</strong> để xác minh.
                         </div>
-                        <input type="text" class="form-control" name="OtpCode" maxlength="6" 
-                               pattern="\d{6}" placeholder="Nhập 6 chữ số" required />
-                        <small class="text-muted" id="emailOtpTimer"></small>
+
+                        <div class="mb-3">
+                            <label class="form-label">Email mới</label>
+                            <input type="email" class="form-control" name="NewEmail" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">Mã OTP</label>
+                                <button type="button" class="btn btn-link btn-sm p-0" id="btnRequestEmailOTP">
+                                    <i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP
+                                </button>
+                            </div>
+                            <input type="text" class="form-control" name="OtpCode" maxlength="6" 
+                                   pattern="\d{6}" placeholder="Nhập 6 chữ số" required />
+                            <small class="text-muted" id="emailOtpTimer"></small>
+                        </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-lg me-2"></i>Đổi email
-                    </button>
-                </div>
-            </form>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-2"></i>Đổi email
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            console.log('Profile page script loaded');
+            
+            // Make functions global
+            window.openImageUpload = function() {
+                console.log('Opening image upload modal');
+                const modalElement = document.getElementById('imageUploadModal');
+                if (modalElement && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                } else {
+                    console.error('Bootstrap Modal not available');
+                }
+            };
+
+            window.deleteProfileImage = async function() {
+                if (!confirm('Bạn có chắc chắn muốn xóa ảnh đại diện?')) return;
+                
+                try {
+                    const response = await fetch('@Url.Action("DeleteImage")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('Xóa ảnh thành công!');
+                        document.getElementById('profileAvatar').src = '/images/default-avatar.png';
+                    } else {
+                        alert(result.message || 'Có lỗi xảy ra khi xóa ảnh');
+                    }
+                } catch (error) {
+                    alert('Có lỗi xảy ra khi xóa ảnh');
+                }
+            };
+
+            window.uploadProfileImage = async function() {
+                const fileInput = document.getElementById('profileImage');
+                const file = fileInput.files[0];
+                
+                if (!file) {
+                    alert('Vui lòng chọn ảnh để tải lên');
+                    return;
+                }
+
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Kích thước file không được vượt quá 5MB');
+                    return;
+                }
+
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    alert('Chỉ chấp nhận file ảnh JPG, PNG, GIF, BMP, WEBP');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('image', file);
+                
+                try {
+                    const response = await fetch('@Url.Action("UploadImage")', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('Tải ảnh lên thành công!');
+                        // Thêm backend URL nếu imageUrl là đường dẫn tương đối
+                        let fullImageUrl = result.imageUrl;
+                        if (fullImageUrl && !fullImageUrl.startsWith('http://') && !fullImageUrl.startsWith('https://')) {
+                            fullImageUrl = 'http://localhost:5154' + fullImageUrl;
+                        }
+                        document.getElementById('profileAvatar').src = fullImageUrl;
+                        bootstrap.Modal.getInstance(document.getElementById('imageUploadModal')).hide();
+                        document.getElementById('imageUploadForm').reset();
+                        document.getElementById('imagePreview').style.display = 'none';
+                    } else {
+                        alert(result.message || 'Có lỗi xảy ra khi tải ảnh lên');
+                    }
+                } catch (error) {
+                    alert('Có lỗi xảy ra khi tải ảnh lên');
+                }
+            };
+
+            // Preview image
+            const profileImageInput = document.getElementById('profileImage');
+            if (profileImageInput) {
+                profileImageInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            document.getElementById('previewImg').src = e.target.result;
+                            document.getElementById('imagePreview').style.display = 'block';
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
+            // Modal form handlers
+            const editForm = document.getElementById('editProfileForm');
+            if (editForm) {
+                editForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    try {
+                        const response = await fetch('@Url.Action("UpdateProfile")', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            alert('Cập nhật thông tin thành công!');
+                            bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
+                            location.reload();
+                        } else {
+                            alert(result.message || 'Có lỗi xảy ra');
+                        }
+                    } catch (error) {
+                        alert('Có lỗi xảy ra khi cập nhật thông tin');
+                    }
+                });
+            }
+
+            // Request OTP for password change
+            const btnRequestOTP = document.getElementById('btnRequestOTP');
+            if (btnRequestOTP) {
+                btnRequestOTP.addEventListener('click', async function() {
+                    console.log('Requesting password change OTP...');
+                    this.disabled = true;
+                    this.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Đang gửi...';
+                    
+                    try {
+                        const response = await fetch('@Url.Action("RequestPasswordChangeOTP")', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        const result = await response.json();
+                        if (result.success) {
+                            alert('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email.');
+                            this.innerHTML = '<i class="bi bi-check-circle me-1"></i>Đã gửi';
+                            // Countdown timer
+                            let countdown = 60;
+                            const timer = setInterval(() => {
+                                countdown--;
+                                if (countdown > 0) {
+                                    this.innerHTML = `<i class="bi bi-clock me-1"></i>Gửi lại (${countdown}s)`;
+                                } else {
+                                    clearInterval(timer);
+                                    this.disabled = false;
+                                    this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
+                                }
+                            }, 1000);
+                        } else {
+                            alert(result.message || 'Có lỗi xảy ra khi gửi OTP');
+                            this.disabled = false;
+                            this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
+                        }
+                    } catch (error) {
+                        console.error('Error requesting OTP:', error);
+                        alert('Có lỗi xảy ra khi gửi OTP');
+                        this.disabled = false;
+                        this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
+                    }
+                });
+            }
+
+            const changePasswordForm = document.getElementById('changePasswordForm');
+            if (changePasswordForm) {
+                changePasswordForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    try {
+                        const response = await fetch('@Url.Action("ChangePassword")', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            alert('Đổi mật khẩu thành công!');
+                            bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
+                            this.reset();
+                        } else {
+                            alert(result.message || 'Có lỗi xảy ra');
+                        }
+                    } catch (error) {
+                        alert('Có lỗi xảy ra khi đổi mật khẩu');
+                    }
+                });
+            }
+
+            // Request OTP for email change
+            const btnRequestEmailOTP = document.getElementById('btnRequestEmailOTP');
+            if (btnRequestEmailOTP) {
+                btnRequestEmailOTP.addEventListener('click', async function() {
+                    console.log('Requesting email change OTP...');
+                    this.disabled = true;
+                    this.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Đang gửi...';
+                    
+                    try {
+                        const response = await fetch('@Url.Action("RequestEmailChangeOTP")', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        const result = await response.json();
+                        if (result.success) {
+                            alert('Mã OTP đã được gửi đến email hiện tại của bạn. Vui lòng kiểm tra email.');
+                            this.innerHTML = '<i class="bi bi-check-circle me-1"></i>Đã gửi';
+                            // Countdown timer
+                            let countdown = 60;
+                            const timer = setInterval(() => {
+                                countdown--;
+                                if (countdown > 0) {
+                                    this.innerHTML = `<i class="bi bi-clock me-1"></i>Gửi lại (${countdown}s)`;
+                                } else {
+                                    clearInterval(timer);
+                                    this.disabled = false;
+                                    this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
+                                }
+                            }, 1000);
+                        } else {
+                            alert(result.message || 'Có lỗi xảy ra khi gửi OTP');
+                            this.disabled = false;
+                            this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
+                        }
+                    } catch (error) {
+                        console.error('Error requesting email OTP:', error);
+                        alert('Có lỗi xảy ra khi gửi OTP');
+                        this.disabled = false;
+                        this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
+                    }
+                });
+            }
+
+            const changeEmailForm = document.getElementById('changeEmailForm');
+            if (changeEmailForm) {
+                changeEmailForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    try {
+                        const response = await fetch('@Url.Action("ChangeEmail")', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            alert('Đổi email thành công!');
+                            bootstrap.Modal.getInstance(document.getElementById('changeEmailModal')).hide();
+                            location.reload();
+                        } else {
+                            alert(result.message || 'Có lỗi xảy ra');
+                        }
+                    } catch (error) {
+                        alert('Có lỗi xảy ra khi đổi email');
+                    }
+                });
+            }
+
+            console.log('All handlers attached');
+        });
+    </script>
+}

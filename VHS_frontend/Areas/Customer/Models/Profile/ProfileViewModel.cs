@@ -45,7 +45,19 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
         /// </summary>
         public string GetProfileImageUrl()
         {
-            return !string.IsNullOrEmpty(Images) ? Images : "/images/default-avatar.png";
+            if (string.IsNullOrEmpty(Images))
+            {
+                return "/images/default-avatar.png";
+            }
+            
+            // Nếu Images đã là URL đầy đủ (http/https) thì trả về luôn
+            if (Images.StartsWith("http://") || Images.StartsWith("https://"))
+            {
+                return Images;
+            }
+            
+            // Nếu Images là đường dẫn tương đối, thêm backend URL
+            return $"http://localhost:5154{Images}";
         }
 
         /// <summary>
