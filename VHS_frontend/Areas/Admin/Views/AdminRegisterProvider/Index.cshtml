@@ -7,22 +7,40 @@
 
     var status = (string)(ViewBag.Status ?? "All"); // mặc định Tất cả
     var total = Model.Count;
-    var pending = Model.Count(x => string.Equals(x.Status, "Pending", StringComparison.OrdinalIgnoreCase));
-    var approved = Model.Count(x => string.Equals(x.Status, "Approved", StringComparison.OrdinalIgnoreCase));
-    var rejected = Model.Count(x => string.Equals(x.Status, "Rejected", StringComparison.OrdinalIgnoreCase));
+    var pending = Model.Count(x => 
+        string.Equals(x.Status, "Pending", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(x.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase));
+    var approved = Model.Count(x => 
+        string.Equals(x.Status, "Approved", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(x.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(x.Status, "Đã phê duyệt", StringComparison.OrdinalIgnoreCase));
+    var rejected = Model.Count(x => 
+        string.Equals(x.Status, "Rejected", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(x.Status, "Đã từ chối", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(x.Status, "Bị từ chối", StringComparison.OrdinalIgnoreCase));
 
     string StatusBadgeClass(string s) => s?.ToLower() switch
     {
         "pending" => "st-badge pending",
+        "đang chờ duyệt" => "st-badge pending",
         "approved" => "st-badge ok",
-        "rejected" => "st-badge rej", // đỏ (đã style ở css bên dưới)
+        "đã duyệt" => "st-badge ok",
+        "đã phê duyệt" => "st-badge ok",
+        "rejected" => "st-badge rej",
+        "đã từ chối" => "st-badge rej",
+        "bị từ chối" => "st-badge rej",
         _ => "st-badge"
     };
     string StatusVi(string s) => s?.ToLower() switch
     {
         "pending" => "Chờ phê duyệt",
+        "đang chờ duyệt" => "Chờ phê duyệt",
         "approved" => "Đã phê duyệt",
+        "đã duyệt" => "Đã phê duyệt",
+        "đã phê duyệt" => "Đã phê duyệt",
         "rejected" => "Bị từ chối",
+        "đã từ chối" => "Bị từ chối",
+        "bị từ chối" => "Bị từ chối",
         _ => s
     };
     string Short(string? t, int max = 90)
@@ -53,16 +71,15 @@
 
     <!-- Toolbar -->
     <div class="arp__toolbar">
-        <form method="get" class="filters">
+        <div class="filters">
             <label class="lbl">Trạng thái</label>
-            <select name="status" class="form-select" onchange="this.form.submit()">
-                <option value="All">Tất cả</option>
-                <option value="Pending">Chờ phê duyệt</option>
-                <option value="Approved">Đã phê duyệt</option>
-                <option value="Rejected">Bị từ chối</option>
+            <select id="statusFilter" class="form-select">
+                <option value="all">Tất cả</option>
+                <option value="đang chờ duyệt">Chờ phê duyệt</option>
+                <option value="đã duyệt">Đã phê duyệt</option>
+                <option value="đã từ chối">Bị từ chối</option>
             </select>
-        </form>
-
+        </div>
 
         <div class="search">
             <i class="bi bi-search"></i>
@@ -87,7 +104,7 @@
             {
                 var badgeCls = StatusBadgeClass(p.Status);
                 var statusVi = StatusVi(p.Status);
-                <tr class="prow">
+                <tr class="prow" data-status="@p.Status.ToLower()">
                     <td class="pname text-truncate">@p.ProviderName</td>
                     <td class="paccount text-truncate">@p.AccountName</td>
                     <td class="td-desc" title="@p.Description">@Short(p.Description, 70)</td>
@@ -112,21 +129,44 @@
 
 @section Scripts {
     <script>
-        //Fillter
-              (function () {
-          var sel = document.querySelector('select[name="status"]');
-          if (sel) sel.value = '@status'; // "@status" render ra chuỗi, không đụng Tag Helper
-        })();
+        let currentStatusFilter = 'all';
+        let currentSearchQuery = '';
 
-        // Search client-side
-        document.getElementById('txtSearch').addEventListener('input', function () {
-            const q = this.value.toLowerCase().trim();
+        // Filter table by status and search
+        function filterTable() {
             document.querySelectorAll('#tblProviders tbody tr.prow').forEach(tr => {
+                const rowStatus = tr.dataset.status || '';
                 const name = tr.querySelector('.pname')?.textContent?.toLowerCase() ?? '';
                 const account = tr.querySelector('.paccount')?.textContent?.toLowerCase() ?? '';
                 const phone = tr.querySelector('.pphone')?.textContent?.toLowerCase() ?? '';
-                tr.style.display = (name.includes(q) || account.includes(q) || phone.includes(q)) ? '' : 'none';
+                
+                // Check status filter
+                const statusMatch = currentStatusFilter === 'all' || 
+                                  rowStatus === currentStatusFilter ||
+                                  (currentStatusFilter === 'đã duyệt' && (rowStatus === 'đã duyệt' || rowStatus === 'đã phê duyệt')) ||
+                                  (currentStatusFilter === 'đã từ chối' && (rowStatus === 'đã từ chối' || rowStatus === 'bị từ chối'));
+                
+                // Check search filter
+                const searchMatch = !currentSearchQuery || 
+                                  name.includes(currentSearchQuery) || 
+                                  account.includes(currentSearchQuery) || 
+                                  phone.includes(currentSearchQuery);
+                
+                // Show/hide row
+                tr.style.display = (statusMatch && searchMatch) ? '' : 'none';
             });
+        }
+
+        // Status filter change event
+        document.getElementById('statusFilter').addEventListener('change', function() {
+            currentStatusFilter = this.value.toLowerCase();
+            filterTable();
+        });
+
+        // Search input event
+        document.getElementById('txtSearch').addEventListener('input', function () {
+            currentSearchQuery = this.value.toLowerCase().trim();
+            filterTable();
         });
     </script>
 }
