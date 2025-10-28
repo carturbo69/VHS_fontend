@@ -15,6 +15,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
     {
         private readonly CartServiceCustomer _cartService;
         private readonly BookingServiceCustomer _bookingServiceCustomer;
+        private readonly UserAddressService _userAddressService;
 
         // Session keys để giữ lựa chọn trong flow checkout
         private const string SS_SELECTED_IDS = "CHECKOUT_SELECTED_IDS";
@@ -26,10 +27,11 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
         private const string SS_CHECKOUT_DIRECT = "CHECKOUT_DIRECT_JSON";
 
-        public BookingServiceController(CartServiceCustomer cartService, BookingServiceCustomer bookingServiceCustomer)
+        public BookingServiceController(CartServiceCustomer cartService, BookingServiceCustomer bookingServiceCustomer, UserAddressService userAddressService)
         {
             _cartService = cartService;
             _bookingServiceCustomer = bookingServiceCustomer;
+            _userAddressService = userAddressService;
         }
 
         // Helper: lấy AccountId từ claim/session
@@ -995,23 +997,33 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
         private async Task<(List<UserAddressDto> list, Guid? defaultId)> LoadUserAddressesAsync(Guid accountId, string? jwt)
         {
-            // TODO: gọi AddressService thật ở đây
-            var list = new List<UserAddressDto>();
+            // Gọi API UserAddress từ database
+            if (string.IsNullOrWhiteSpace(jwt))
+            {
+                // Không có JWT - trả về rỗng
+                return (new List<UserAddressDto>(), null);
+            }
 
-            // Fallback dùng địa chỉ mẫu khi chưa có service
+            try
+            {
+                // Gọi API thật từ backend
+                var list = await _userAddressService.GetUserAddressesAsync(jwt);
 
-            if (list.Count == 0)
-                list = BookingViewModel.AddressSample();
+                // Lấy id đã chọn từ session (nếu có)
+                Guid? selected = null;
+                var selFromSession = HttpContext.Session.GetString(SS_SELECTED_ADDR);
+                if (Guid.TryParse(selFromSession, out var selId) && list.Any(a => a.AddressId == selId))
+                    selected = selId;
+                else
+                    selected = list.FirstOrDefault()?.AddressId;
 
-            // Lấy id đã chọn từ session (nếu có)
-            Guid? selected = null;
-            var selFromSession = HttpContext.Session.GetString(SS_SELECTED_ADDR);
-            if (Guid.TryParse(selFromSession, out var selId) && list.Any(a => a.AddressId == selId))
-                selected = selId;
-            else
-                selected = list.FirstOrDefault()?.AddressId;
-
-            return (list, selected);
+                return (list, selected);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading addresses from API: {ex.Message}");
+                return (new List<UserAddressDto>(), null);
+            }
         }
 
 

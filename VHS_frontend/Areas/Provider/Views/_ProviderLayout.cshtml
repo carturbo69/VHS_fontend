@@ -63,6 +63,12 @@
                 <i class="bi bi-people"></i><span>Quản lí nhân viên</span>
             </a>
 
+            <a asp-area="Provider" asp-controller="ProviderSchedule" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderSchedule" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderSchedule" ? "page" : null)">
+                <i class="bi bi-calendar-week"></i><span>Lịch làm việc</span>
+            </a>
+
             <a asp-area="Provider" asp-controller="ProviderFeedback" asp-action="Index"
                class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderFeedback" ? "active" : "")"
                aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderFeedback" ? "page" : null)">
@@ -225,6 +231,11 @@
           async function loadUnreadCount() {
             try {
               const res = await fetch(`${proxyBase}/unread-count`);
+              if (!res.ok) {
+                // Service not available, hide notification badge
+                notifBadge.style.display = 'none';
+                return;
+              }
               const dto = await res.json();
               if (dto.count > 0) {
                 notifBadge.textContent = dto.count;
@@ -232,7 +243,10 @@
               } else {
                 notifBadge.style.display = 'none';
               }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+              // Silently fail - notification service not available
+              notifBadge.style.display = 'none';
+            }
           }
 
           async function loadNotifications() {

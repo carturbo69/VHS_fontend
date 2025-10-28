@@ -191,6 +191,34 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         /// <summary>
+        /// Request OTP để đổi mật khẩu
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> RequestPasswordChangeOTP()
+        {
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                return Json(new { success = false, message = "Bạn cần đăng nhập để đổi mật khẩu." });
+            }
+
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                var result = await _profileService.RequestPasswordChangeOTPAsync(jwtToken);
+                return Json(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Json(new { success = false, message = $"Phiên đăng nhập đã hết hạn: {ex.Message}" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Lỗi khi gửi OTP: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
         /// Xử lý đổi mật khẩu
         /// </summary>
         [HttpPost]
@@ -213,15 +241,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 
-                // Bước 1: Request OTP
-                var otpResult = await _profileService.RequestPasswordChangeOTPAsync(jwtToken);
-                if (!otpResult.Success)
-                {
-                    TempData["ToastError"] = otpResult.Message ?? "Không thể gửi OTP.";
-                    return View(model);
-                }
-
-                // Bước 2: Change password với OTP
+                // Change password với OTP đã nhận
                 var changeDto = new ChangePasswordDTO
                 {
                     CurrentPassword = model.CurrentPassword,
@@ -272,6 +292,34 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         /// <summary>
+        /// Request OTP để đổi email
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> RequestEmailChangeOTP()
+        {
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                return Json(new { success = false, message = "Bạn cần đăng nhập để đổi email." });
+            }
+
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                var result = await _profileService.RequestEmailChangeOTPAsync(jwtToken);
+                return Json(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Json(new { success = false, message = $"Phiên đăng nhập đã hết hạn: {ex.Message}" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Lỗi khi gửi OTP: {ex.Message}" });
+            }
+        }
+
+        /// <summary>
         /// Xử lý đổi email
         /// </summary>
         [HttpPost]
@@ -294,19 +342,11 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 
-                // Bước 1: Request OTP
-                var otpResult = await _profileService.RequestEmailChangeOTPAsync(jwtToken);
-                if (!otpResult.Success)
-                {
-                    TempData["ToastError"] = otpResult.Message ?? "Không thể gửi OTP.";
-                    return View(model);
-                }
-
-                // Bước 2: Change email với OTP
+                // Change email với OTP đã nhận
                 var changeDto = new ChangeEmailDTO
                 {
                     NewEmail = model.NewEmail,
-                    OtpCode = model.OTP
+                    OtpCode = model.OTP  // Map OTP from ViewModel to OtpCode in DTO
                 };
 
                 var result = await _profileService.ChangeEmailAsync(changeDto, jwtToken);
