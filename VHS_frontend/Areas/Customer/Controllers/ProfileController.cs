@@ -31,10 +31,15 @@ namespace VHS_frontend.Areas.Customer.Controllers
             try
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] Getting profile with token: {jwtToken?.Substring(0, 20)}...");
+                
                 var profile = await _profileService.GetProfileAsync(jwtToken);
+                
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] Profile result: {(profile == null ? "NULL" : profile.AccountName)}");
                 
                 if (profile == null)
                 {
+                    System.Diagnostics.Debug.WriteLine("[ProfileController] Profile is NULL - Redirecting to Home");
                     TempData["ToastError"] = "Không thể tải thông tin profile.";
                     return RedirectToAction("Index", "Home", new { area = "" });
                 }

@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="~/css/profile.css" asp-append-version="true" />
 }
 
-@await Html.PartialAsync("_Breadcrumb")
 @await Html.PartialAsync("_ProfileNavigation")
 
 <div class="profile-container">
@@ -90,9 +89,9 @@
         <div class="detail-card">
             <div class="card-header">
                 <h3><i class="bi bi-person"></i> Thông tin cá nhân</h3>
-                <a asp-action="Edit" class="btn btn-outline-primary btn-sm">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProfileModal">
                     <i class="bi bi-pencil"></i> Chỉnh sửa
-                </a>
+                </button>
             </div>
             <div class="card-body">
                 <div class="info-row">
@@ -132,9 +131,9 @@
                             <p>Đổi mật khẩu để bảo mật tài khoản</p>
                         </div>
                     </div>
-                    <a asp-action="ChangePassword" class="btn btn-outline-warning btn-sm">
+                    <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                         <i class="bi bi-pencil"></i> Đổi mật khẩu
-                    </a>
+                    </button>
                 </div>
                 <div class="security-item">
                     <div class="security-info">
@@ -144,9 +143,9 @@
                             <p>Đổi email đăng nhập</p>
                         </div>
                     </div>
-                    <a asp-action="ChangeEmail" class="btn btn-outline-info btn-sm">
+                    <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#changeEmailModal">
                         <i class="bi bi-pencil"></i> Đổi email
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
@@ -187,6 +186,7 @@
             </div>
         </div>
     </div>
+</div>
 
 <!-- Image Upload Modal -->
 <div class="modal fade" id="imageUploadModal" tabindex="-1" aria-hidden="true">
@@ -341,8 +341,193 @@
             // Implementation depends on your toast system
             console.log(`${type.toUpperCase()}: ${message}`);
         }
+
+        // Handle Edit Profile form
+        document.getElementById('editProfileForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch('@Url.Action("UpdateProfile")', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Cập nhật thông tin thành công!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
+                    location.reload();
+                } else {
+                    showToast(result.message || 'Có lỗi xảy ra', 'error');
+                }
+            } catch (error) {
+                showToast('Có lỗi xảy ra khi cập nhật thông tin', 'error');
+            }
+        });
+
+        // Handle Change Password form
+        document.getElementById('changePasswordForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            // Get OTP first
+            const btnRequestOTP = document.getElementById('btnRequestOTP');
+            if (btnRequestOTP && !btnRequestOTP.disabled) {
+                showToast('Vui lòng gửi mã OTP trước!', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('@Url.Action("ChangePassword")', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Đổi mật khẩu thành công!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
+                    this.reset();
+                } else {
+                    showToast(result.message || 'Có lỗi xảy ra', 'error');
+                }
+            } catch (error) {
+                showToast('Có lỗi xảy ra khi đổi mật khẩu', 'error');
+            }
+        });
+
+        // Handle Request OTP for password
+        document.getElementById('btnRequestOTP')?.addEventListener('click', async function() {
+            try {
+                const response = await fetch('@Url.Action("RequestPasswordChangeOTP")', {
+                    method: 'POST',
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Mã OTP đã được gửi đến email của bạn', 'success');
+                    this.disabled = true;
+                    // TODO: Start countdown timer
+                } else {
+                    showToast(result.message || 'Có lỗi xảy ra', 'error');
+                }
+            } catch (error) {
+                showToast('Có lỗi xảy ra khi gửi OTP', 'error');
+            }
+        });
+
+        // Handle Change Email form
+        document.getElementById('changeEmailForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            try {
+                const response = await fetch('@Url.Action("ChangeEmail")', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Đổi email thành công!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('changeEmailModal')).hide();
+                    this.reset();
+                    location.reload();
+                } else {
+                    showToast(result.message || 'Có lỗi xảy ra', 'error');
+                }
+            } catch (error) {
+                showToast('Có lỗi xảy ra khi đổi email', 'error');
+            }
+        });
+
+        // Handle Request OTP for email
+        document.getElementById('btnRequestEmailOTP')?.addEventListener('click', async function() {
+            try {
+                const response = await fetch('@Url.Action("RequestEmailChangeOTP")', {
+                    method: 'POST',
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showToast('Mã OTP đã được gửi đến email của bạn', 'success');
+                    this.disabled = true;
+                    // TODO: Start countdown timer
+                } else {
+                    showToast(result.message || 'Có lỗi xảy ra', 'error');
+                }
+            } catch (error) {
+                showToast('Có lỗi xảy ra khi gửi OTP', 'error');
+            }
+        });
     </script>
 }
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="editProfileModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square me-2"></i>Chỉnh sửa thông tin cá nhân
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editProfileForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tên đăng nhập</label>
+                        <input type="text" class="form-control" name="AccountName" value="@Model.AccountName" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="Email" value="@Model.Email" readonly />
+                        <small class="text-muted">Email không thể thay đổi ở đây. Sử dụng "Đổi email" để thay đổi.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Họ và tên</label>
+                        <input type="text" class="form-control" name="FullName" value="@Model.FullName" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Số điện thoại</label>
+                        <input type="tel" class="form-control" name="PhoneNumber" value="@Model.PhoneNumber" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Địa chỉ</label>
+                        <textarea class="form-control" name="Address" rows="3">@Model.Address</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-2"></i>Lưu thay đổi
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Change Password Modal -->
 <div class="modal fade" id="changePasswordModal" tabindex="-1">

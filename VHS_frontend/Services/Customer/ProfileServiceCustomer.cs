@@ -46,12 +46,29 @@ namespace VHS_frontend.Services.Customer
                 response.EnsureSuccessStatusCode();
 
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var profileResponse = await response.Content.ReadFromJsonAsync<ProfileResponseDTO>(options);
                 
-                if (profileResponse?.Success == true && profileResponse.Data != null)
+                // Log JSON response for debugging
+                var jsonString = await response.Content.ReadAsStringAsync();
+                System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] JSON Response: {jsonString}");
+                
+                // Try parse as direct ViewProfileDTO first
+                try
                 {
-                    var json = JsonSerializer.Serialize(profileResponse.Data);
-                    return JsonSerializer.Deserialize<ViewProfileDTO>(json, options);
+                    var profile = JsonSerializer.Deserialize<ViewProfileDTO>(jsonString, options);
+                    System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] Parsed as direct ViewProfileDTO: {profile?.AccountName}");
+                    return profile;
+                }
+                catch
+                {
+                    // Try parse as ProfileResponseDTO wrapper
+                    var profileResponse = JsonSerializer.Deserialize<ProfileResponseDTO>(jsonString, options);
+                    System.Diagnostics.Debug.WriteLine($"[ProfileServiceCustomer] Success: {profileResponse?.Success}, Data: {profileResponse?.Data}");
+                    
+                    if (profileResponse?.Success == true && profileResponse.Data != null)
+                    {
+                        var json = JsonSerializer.Serialize(profileResponse.Data);
+                        return JsonSerializer.Deserialize<ViewProfileDTO>(json, options);
+                    }
                 }
 
                 return null;

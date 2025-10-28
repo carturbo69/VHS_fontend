@@ -32,15 +32,31 @@ namespace VHS_frontend.Services.Customer
                 response.EnsureSuccessStatusCode();
 
                 var jsonString = await response.Content.ReadAsStringAsync();
+                
+                // Debug: Log JSON response
+                System.Diagnostics.Debug.WriteLine($"[ProfileService] JSON Response: {jsonString}");
+                
                 var profile = JsonSerializer.Deserialize<ViewProfileDTO>(jsonString, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
+                // Debug: Check if profile is null
+                if (profile == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("[ProfileService] Deserialized profile is NULL!");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ProfileService] Profile loaded: {profile.AccountName}, Email: {profile.Email}");
+                }
+
                 return profile;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ProfileService] Exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[ProfileService] StackTrace: {ex.StackTrace}");
                 return null;
             }
         }
