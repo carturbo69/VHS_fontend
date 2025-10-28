@@ -125,7 +125,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (accountId == Guid.Empty)
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             // ====== Lấy VoucherId từ session nếu không có trên query ======
@@ -532,7 +532,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (accountId == Guid.Empty)
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Auth", new { area = "" });
+                return RedirectToAction("Login", "Account", new { area = "" });
             }
 
             try
