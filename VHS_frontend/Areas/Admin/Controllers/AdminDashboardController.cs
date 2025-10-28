@@ -101,7 +101,9 @@ namespace VHS_frontend.Areas.Admin.Controllers
             // Tính toán dữ liệu thật
             var activeCustomers = customers.Count;
             var activeProviders = providers.Count;
-            var pendingRegistrations = registerProviders.Count(r => r.Status == "Pending");
+            var pendingRegistrations = registerProviders.Count(r => 
+                string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase));
             var activeVouchers = vouchers.Count;
             
             // Tạo Model với dữ liệu thật
@@ -164,12 +166,20 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // Recent Activities - Dữ liệu thật
                 RecentActivities = registerProviders.Take(3).Select((r, index) => new RecentActivity
                 {
-                    Title = r.Status == "Pending" ? "Đăng ký mới chờ duyệt" : 
-                            r.Status == "Approved" ? "Đăng ký đã được duyệt" : "Đăng ký bị từ chối",
+                    Title = string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
+                            string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                            ? "Đăng ký mới chờ duyệt" : 
+                            string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) || 
+                            string.Equals(r.Status, "Approved", StringComparison.OrdinalIgnoreCase)
+                            ? "Đăng ký đã được duyệt" : "Đăng ký bị từ chối",
                     Description = $"{r.ProviderName} - {r.Description}",
                     CreatedAt = r.CreatedAt ?? DateTime.Now,
-                    ActivityType = r.Status == "Pending" ? "warning" : 
-                                  r.Status == "Approved" ? "success" : "info"
+                    ActivityType = string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
+                                   string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                                   ? "warning" : 
+                                   string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) || 
+                                   string.Equals(r.Status, "Approved", StringComparison.OrdinalIgnoreCase)
+                                   ? "success" : "info"
                 }).ToList(),
                 
                 // Provider Registrations - Dữ liệu thật
@@ -179,7 +189,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     CompanyName = r.ProviderName,
                     ServiceDescription = r.Description ?? "Không có mô tả",
                     CreatedAt = r.CreatedAt ?? DateTime.Now,
-                    Status = r.Status.ToLower()
+                    Status = NormalizeStatus(r.Status)
                 }).ToList()
             };
             
@@ -273,6 +283,33 @@ namespace VHS_frontend.Areas.Admin.Controllers
             // Mục tiêu: 50 provider = 100%
             const int targetProviders = 50;
             return Math.Min((double)currentProviders / targetProviders * 100, 100);
+        }
+        
+        /// <summary>
+        /// Chuẩn hóa status từ tiếng Việt hoặc tiếng Anh về lowercase tiếng Anh
+        /// </summary>
+        private string NormalizeStatus(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+                return "pending";
+            
+            // Chuẩn hóa status về tiếng Anh lowercase
+            if (string.Equals(status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase))
+                return "pending";
+            
+            if (string.Equals(status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Đã phê duyệt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Approved", StringComparison.OrdinalIgnoreCase))
+                return "approved";
+            
+            if (string.Equals(status, "Đã từ chối", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Bị từ chối", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Rejected", StringComparison.OrdinalIgnoreCase))
+                return "rejected";
+            
+            // Fallback: chuyển về lowercase
+            return status.ToLower();
         }
     }
 }
