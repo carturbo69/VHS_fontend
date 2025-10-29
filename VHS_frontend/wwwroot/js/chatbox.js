@@ -249,16 +249,20 @@ console.log('=== chatbox.js LOADED ===');
                 console.log('[Chatbox] Response data:', data);
                 hideTypingIndicator();
                 
-                // Display AI response
-                if (data.content) {
-                    displayMessage(data.content, 'AI', new Date());
-                } else if (data.messageContent) {
-                    displayMessage(data.messageContent, 'AI', new Date());
+                // Display AI response (check both uppercase and lowercase field names)
+                const messageContent = data.Content || data.content || data.MessageContent || data.messageContent;
+                
+                if (messageContent) {
+                    displayMessage(messageContent, 'AI', new Date());
+                } else {
+                    displayMessage('Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.', 'AI', new Date());
+                    console.warn('[Chatbox] No message content found in response:', data);
                 }
 
                 // Show quick actions if available
-                if (data.quickActions && data.quickActions.length > 0) {
-                    showQuickActions(data.quickActions);
+                const quickActions = data.QuickActions || data.quickActions;
+                if (quickActions && quickActions.length > 0) {
+                    showQuickActions(quickActions);
                 }
             } else {
                 const errorText = await response.text();
@@ -306,16 +310,49 @@ console.log('=== chatbox.js LOADED ===');
         
         const time = formatTime(timestamp);
         
+        // Format content for AI messages (handle markdown-like formatting)
+        let formattedContent = content;
+        if (senderType === 'AI') {
+            formattedContent = formatAIMessage(content);
+        } else {
+            formattedContent = escapeHtml(content);
+        }
+        
         messageDiv.innerHTML = `
             <div class="chatbox-avatar">${senderType === 'User' ? '👤' : '🤖'}</div>
             <div class="chatbox-message-content">
-                <p class="chatbox-message-text">${escapeHtml(content)}</p>
+                <div class="chatbox-message-text">${formattedContent}</div>
                 <div class="chatbox-message-time">${time}</div>
             </div>
         `;
 
         elements.messages.appendChild(messageDiv);
         scrollToBottom();
+    }
+
+    // Format AI message with markdown-like syntax
+    function formatAIMessage(text) {
+        let formatted = escapeHtml(text);
+        
+        // Convert line breaks to <br>
+        formatted = formatted.replace(/\n/g, '<br>');
+        
+        // Convert bullet points (• or -) to styled lists
+        formatted = formatted.replace(/^[•\-]\s+(.+)$/gm, '<div class="ai-bullet">• $1</div>');
+        
+        // Convert numbered lists
+        formatted = formatted.replace(/^(\d+)\.\s+(.+)$/gm, '<div class="ai-numbered"><span class="ai-number">$1.</span> $2</div>');
+        
+        // Convert headers (##)
+        formatted = formatted.replace(/^##\s+(.+)$/gm, '<div class="ai-heading">$1</div>');
+        
+        // Convert bold text (**text**)
+        formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        
+        // Convert code blocks (`code`)
+        formatted = formatted.replace(/`(.+?)`/g, '<code class="ai-code">$1</code>');
+        
+        return formatted;
     }
 
     // Show typing indicator
@@ -348,16 +385,65 @@ console.log('=== chatbox.js LOADED ===');
     // Show quick actions
     function showQuickActions(actions) {
         elements.quickActions.innerHTML = '';
+        
+        if (!actions || actions.length === 0) return;
+        
         actions.forEach(action => {
             const btn = document.createElement('button');
             btn.className = 'chatbox-quick-btn';
-            btn.textContent = action.label;
+            
+            // Add icon based on action type
+            const icon = getActionIcon(action.Action || action.action);
+            btn.innerHTML = `${icon} <span>${action.Title || action.title || action.label}</span>`;
+            
             btn.addEventListener('click', () => {
-                elements.input.value = action.label;
-                sendMessage();
+                handleQuickAction(action);
             });
             elements.quickActions.appendChild(btn);
         });
+    }
+
+    // Get icon for action type
+    function getActionIcon(actionType) {
+        const icons = {
+            'view_services': '🔍',
+            'find_services': '🔍',
+            'view_pricing': '💰',
+            'view_vouchers': '🎟️',
+            'book_service': '📅',
+            'book_appointment': '📅',
+            'ask_more': '💬',
+            'contact_support': '📞'
+        };
+        return icons[actionType] || '▶️';
+    }
+
+    // Handle quick action click
+    function handleQuickAction(action) {
+        const actionType = action.Action || action.action;
+        const actionTitle = action.Title || action.title || action.label;
+        
+        // Map actions to actual URLs or messages
+        switch(actionType) {
+            case 'view_services':
+            case 'find_services':
+                window.location.href = '/Customer/ServiceCustomer/ServiceCustomer';
+                break;
+            case 'view_pricing':
+                elements.input.value = 'Cho tôi xem bảng giá các dịch vụ';
+                sendMessage();
+                break;
+            case 'view_vouchers':
+                window.location.href = '/Customer/Voucher/Voucher';
+                break;
+            case 'book_service':
+            case 'book_appointment':
+                window.location.href = '/Customer/ServiceCustomer/ServiceCustomer';
+                break;
+            default:
+                elements.input.value = actionTitle;
+                sendMessage();
+        }
     }
 
     // Scroll to bottom

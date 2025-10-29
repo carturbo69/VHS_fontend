@@ -96,12 +96,25 @@
         <div class="d-flex gap-2">
             @if (IsCompleted)
             {
-                <button class="btn btn-danger">Mua Lại</button>
-                <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportService" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-secondary">
-                    Báo cáo / Hoàn tiền
-                </a>
+                var hasReport = ViewBag.HasReport == true;
+                var reportId = ViewBag.ReportId as Guid?;
 
-                @if (!IsReviewed)  // chỉ hiện khi CHƯA review
+                <button class="btn btn-danger">Mua Lại</button>
+                
+                if (hasReport && reportId.HasValue)
+                {
+                    <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportDetail" asp-route-reportId="@reportId.Value" class="btn btn-outline-primary">
+                        <i class="bi bi-file-earmark-text"></i> Xem chi tiết báo cáo
+                    </a>
+                }
+                else
+                {
+                    <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportService" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-secondary">
+                        <i class="bi bi-exclamation-triangle"></i> Báo cáo / Hoàn tiền
+                    </a>
+                }
+
+                if (!IsReviewed)  // chỉ hiện khi CHƯA review
                 {
                     <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reviewModal-@Model.BookingId">
                         Đánh giá

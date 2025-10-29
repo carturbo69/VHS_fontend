@@ -1,7 +1,17 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @model VHS_frontend.Areas.Admin.Models.Complaint.ComplaintDetailsDTO
 @{
     ViewData["Title"] = "Chi tiết Khiếu nại";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+    
+    // Get backend URL for images
+    var backendUrl = Configuration["Apis:Backend"] ?? "http://localhost:5154";
+    string GetFullImageUrl(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath)) return "/images/placeholder.png";
+        if (relativePath.StartsWith("http://") || relativePath.StartsWith("https://")) return relativePath;
+        return backendUrl + relativePath;
+    }
 }
 
 @section Styles {
@@ -199,9 +209,11 @@
                     <div class="attachments-grid">
                         @foreach (var attachment in Model.AttachmentUrls)
                         {
+                            var fullImageUrl = GetFullImageUrl(attachment);
                             <div class="attachment-item">
-                                <img src="@attachment" alt="Attachment" onerror="this.parentElement.innerHTML='<i class=\'bi bi-file-earmark\'></i><span>File</span>'" />
-                                <a href="@attachment" target="_blank" class="attachment-link">
+                                <img src="@fullImageUrl" alt="Attachment" 
+                                     onerror="this.onerror=null;this.src='/images/placeholder.png';" />
+                                <a href="@fullImageUrl" target="_blank" rel="noopener" class="attachment-link">
                                     <i class="bi bi-box-arrow-up-right"></i>
                                     Mở
                                 </a>
