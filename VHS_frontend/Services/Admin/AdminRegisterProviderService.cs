@@ -104,5 +104,19 @@ namespace VHS_frontend.Services.Admin
                 ct);
             return res.IsSuccessStatusCode;
         }
+
+        public async Task<bool> DeleteCertificateAsync(Guid certificateId, CancellationToken ct = default)
+        {
+            AttachAuth();
+            var res = await _http.DeleteAsync($"/api/admin/certificates/{certificateId}", ct);
+            return res.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> RemoveTagFromCertificateAsync(Guid certificateId, Guid tagId, CancellationToken ct = default)
+        {
+            AttachAuth();
+            var res = await _http.DeleteAsync($"/api/admin/certificates/{certificateId}/tags/{tagId}", ct);
+            return res.IsSuccessStatusCode;
+        }
     }
 }

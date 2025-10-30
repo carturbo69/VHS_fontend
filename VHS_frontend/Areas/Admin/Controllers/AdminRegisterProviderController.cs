@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using VHS_frontend.Areas.Admin.Models.Tag;
 using VHS_frontend.Services.Admin;
 
 namespace VHS_frontend.Areas.Admin.Controllers
@@ -9,13 +10,16 @@ namespace VHS_frontend.Areas.Admin.Controllers
     {
         private readonly AdminRegisterProviderService _svc;
         private readonly CategoryAdminService _catSvc;
+        private readonly TagAdminService _tagSvc;
 
         public AdminRegisterProviderController(
             AdminRegisterProviderService svc,
-            CategoryAdminService catSvc)
+            CategoryAdminService catSvc,
+            TagAdminService tagSvc)
         {
             _svc = svc;
             _catSvc = catSvc;
+            _tagSvc = tagSvc;
         }
 
         private void AttachBearerIfAny()
@@ -92,6 +96,10 @@ namespace VHS_frontend.Areas.Admin.Controllers
             var cats = await _catSvc.GetAllAsync(includeDeleted: false, ct);
             ViewBag.CatMap = cats.ToDictionary(x => x.CategoryId, x => x.Name);
 
+            // Map TagId -> Name (load tất cả tags)
+            var tags = await _tagSvc.GetAllAsync(includeDeleted: false, ct);
+            ViewBag.TagMap = (tags ?? new List<TagDTO>()).ToDictionary(x => x.TagId, x => x.Name);
+
             return View(dto);
         }
 
@@ -115,6 +123,54 @@ namespace VHS_frontend.Areas.Admin.Controllers
             var ok = await _svc.RejectAsync(id, reason, ct);
             TempData["AdminMsg"] = ok ? "Đã từ chối hồ sơ." : "Từ chối thất bại.";
             return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        [HttpDelete]
+        [Route("Admin/AdminRegisterProvider/DeleteCertificate/{id}")]
+        public async Task<IActionResult> DeleteCertificate(Guid id, CancellationToken ct = default)
+        {
+            AttachBearerIfAny();
+
+            try
+            {
+                var ok = await _svc.DeleteCertificateAsync(id, ct);
+                if (ok)
+                {
+                    return Ok(new { message = "Đã xóa chứng chỉ thành công" });
+                }
+                else
+                {
+                    return BadRequest("Không thể xóa chứng chỉ");
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi: {ex.Message}");
+            }
+        }
+
+        [HttpDelete]
+        [Route("Admin/AdminRegisterProvider/RemoveTag/{id}/{tagId}")]
+        public async Task<IActionResult> RemoveTag(Guid id, Guid tagId, CancellationToken ct = default)
+        {
+            AttachBearerIfAny();
+
+            try
+            {
+                var ok = await _svc.RemoveTagFromCertificateAsync(id, tagId, ct);
+                if (ok)
+                {
+                    return Ok(new { message = "Đã bỏ dịch vụ thành công" });
+                }
+                else
+                {
+                    return BadRequest("Không thể bỏ dịch vụ");
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi: {ex.Message}");
+            }
         }
     }
 }
