@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Client;
 using System.Globalization;
 using System.Security.Claims;
 using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
@@ -652,166 +653,52 @@ namespace VHS_frontend.Areas.Customer.Controllers
             return RedirectToAction("Checkout", "Booking");
         }
 
-      // Areas/Customer/Controllers/BookingServiceController.cs
+        // Areas/Customer/Controllers/BookingServiceController.cs
 
 
-[HttpGet]
-        public IActionResult ListHistoryBooking()
+        [HttpGet]
+        public async Task<IActionResult> ListHistoryBooking(CancellationToken ct)
         {
-            // Tabs trạng thái theo đúng thứ tự trong ảnh
-            var statuses = new[]
-            {
-        "Chờ xác nhận",
-        "Xác Nhận",
-        "Bắt Đầu Làm Việc",
-        "Hoàn thành",
-        "Đã hủy",
-        "Báo Cáo/Hoàn tiền",
-        "Tất cả"
-    };
+            var statusOrder = new[] { "Pending", "Confirmed", "InProgress", "Completed", "Cancelled", "All" };
 
-            var items = new List<BookingServiceItemDTO>
-    {
-        // Chờ xác nhận
-        new()
-        {
-            BookingId = Guid.NewGuid(),
-            BookingTime = DateTime.Now.AddHours(-6),
-            Status = "Chờ xác nhận",
-            Address = "12 Lý Thái Tổ, Q.10, TP.HCM",
-            ProviderId = Guid.NewGuid(),
-            ProviderName = "Intimate Ziaja Store",
-            ServiceId = Guid.NewGuid(),
-            ServiceTitle = "Dung Dịch Vệ Sinh Intimate With Lactic Acid ZIAJA 200ml",
-            ServicePrice = 209000, ServiceUnitType = "đ",
-            ServiceImages = "/images/sample1.png",
-            Options = new List<OptionDTO>
+            var statusViMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                new() { OptionId = Guid.NewGuid(), OptionName = "Gói đóng gói an toàn", Description = "Bọc chống sốc + thùng carton", Price = 10000, UnitType = "đ" },
-                new() { OptionId = Guid.NewGuid(), OptionName = "Giao nhanh 2H",       Description = "Ưu tiên điều phối nhanh",     Price = 15000, UnitType = "đ" },
+                ["Pending"] = "Chờ xác nhận",
+                ["Confirmed"] = "Xác Nhận",
+                ["InProgress"] = "Bắt Đầu Làm Việc",
+                ["Completed"] = "Hoàn thành",
+                ["Cancelled"] = "Đã hủy",
+                ["All"] = "Tất cả"
+            };
+
+            Guid accountId;
+            if (Request.Query.TryGetValue("accountId", out var q) && Guid.TryParse(q.ToString(), out var fromQuery))
+                accountId = fromQuery;
+            else
+                accountId = GetAccountId();
+
+            if (accountId == Guid.Empty)
+                return Unauthorized("Không tìm thấy accountId. Vui lòng đăng nhập hoặc truyền accountId qua query.");
+
+            var jwt = HttpContext.Session.GetString("JWToken");
+
+            ListHistoryBookingServiceDTOs vm;
+            try
+            {
+                vm = await _bookingServiceCustomer.GetHistoryByAccountAsync(accountId, jwt, ct)
+                     ?? new ListHistoryBookingServiceDTOs { Items = new() };
             }
-        },
-        new()
-        {
-            BookingId = Guid.NewGuid(),
-            BookingTime = DateTime.Now.AddHours(-10),
-            Status = "Chờ xác nhận",
-            Address = "23 Hoàng Diệu, Q.4, TP.HCM",
-            ProviderId = Guid.NewGuid(),
-            ProviderName = "Green House",
-            ServiceId = Guid.NewGuid(),
-            ServiceTitle = "Vệ sinh máy lạnh treo tường",
-            ServicePrice = 150000, ServiceUnitType = "đ",
-            ServiceImages = "/images/ac.png",
-            Options = new List<OptionDTO>
+            catch (HttpRequestException ex)
             {
-                new() { OptionId = Guid.NewGuid(), OptionName = "Vệ sinh dàn nóng", Description = "Bổ sung dàn nóng", Price = 50000, UnitType = "đ" },
-                new() { OptionId = Guid.NewGuid(), OptionName = "Bảo hành 7 ngày",  Description = "Quay lại xử lý",  Price = 20000, UnitType = "đ" },
+                TempData["ToastError"] = "Không tải được dữ liệu lịch sử đơn. " + ex.Message;
+                vm = new ListHistoryBookingServiceDTOs { Items = new() };
             }
-        },
 
-        // Xác Nhận
-        new()
-        {
-            BookingId = Guid.NewGuid(),
-            BookingTime = DateTime.Now.AddHours(-5),
-            Status = "Xác Nhận",
-            Address = "456 Lê Duẩn, Q.1, TP.HCM",
-            ProviderId = Guid.NewGuid(),
-            ProviderName = "Xuân Vũ Audio",
-            ServiceId = Guid.NewGuid(),
-            ServiceTitle = "Cáp thay thế tai nghe Moxpad X3 có mic",
-            ServicePrice = 180000, ServiceUnitType = "đ",
-            ServiceImages = "/images/sample2.png",
-            Options = new List<OptionDTO>
-            {
-                new() { OptionId = Guid.NewGuid(), OptionName = "Bảo hành 12 tháng", Description = "1 đổi 1 trong 30 ngày", Price = 30000, UnitType = "đ" },
-            }
-        },
-
-        // Bắt Đầu Làm Việc
-        new()
-        {
-            BookingId = Guid.NewGuid(),
-            BookingTime = DateTime.Now.AddDays(-1),
-            Status = "Bắt Đầu Làm Việc",
-            Address = "99 Nguyễn Thị Minh Khai, Q.1, TP.HCM",
-            ProviderId = Guid.NewGuid(),
-            ProviderName = "HouseCare",
-            ServiceId = Guid.NewGuid(),
-            ServiceTitle = "Vệ sinh sofa vải 3 chỗ",
-            ServicePrice = 350000, ServiceUnitType = "đ",
-            ServiceImages = "/images/sofa.png",
-            Options = new List<OptionDTO>
-            {
-                new() { OptionId = Guid.NewGuid(), OptionName = "Khử khuẩn Nano Bạc", Description = "An toàn cho da", Price = 40000, UnitType = "đ" },
-                new() { OptionId = Guid.NewGuid(), OptionName = "Khử mùi Enzyme",     Description = "Loại bỏ mùi hôi", Price = 30000, UnitType = "đ" },
-            }
-        },
-
-        // Hoàn thành
-        new()
-        {
-            BookingId = Guid.NewGuid(),
-            BookingTime = DateTime.Now.AddDays(-5),
-            Status = "Hoàn thành",
-            Address = "789 Trần Hưng Đạo, Q.3, TP.HCM",
-            ProviderId = Guid.NewGuid(),
-            ProviderName = "Intimate Ziaja Store",
-            ServiceId = Guid.NewGuid(),
-            ServiceTitle = "Dung Dịch Vệ Sinh Intimate ZIAJA 200ml",
-            ServicePrice = 209000, ServiceUnitType = "đ",
-            ServiceImages = "/images/sample1.png",
-            Options = new List<OptionDTO>
-            {
-                new() { OptionId = Guid.NewGuid(), OptionName = "Gói quà", Description = "Túi quà + thiệp", Price = 12000, UnitType = "đ" },
-            }
-        },
-
-        // Đã hủy
-        new()
-        {
-            BookingId = Guid.NewGuid(),
-            BookingTime = DateTime.Now.AddDays(-3),
-            Status = "Đã hủy",
-            Address = "22 Ung Văn Khiêm, Bình Thạnh, TP.HCM",
-            ProviderId = Guid.NewGuid(),
-            ProviderName = "CleanUp",
-            ServiceId = Guid.NewGuid(),
-            ServiceTitle = "Vệ sinh nhà theo giờ (2h)",
-            ServicePrice = 240000, ServiceUnitType = "đ",
-            ServiceImages = "/images/clean.png",
-            Options = new List<OptionDTO>
-            {
-                new() { OptionId = Guid.NewGuid(), OptionName = "Thêm 30 phút", Description = "Gia hạn thời gian", Price = 60000, UnitType = "đ" },
-            }
-        },
-
-        // Báo Cáo/Hoàn tiền
-        new()
-        {
-            BookingId = Guid.NewGuid(),
-            BookingTime = DateTime.Now.AddDays(-4),
-            Status = "Báo Cáo/Hoàn tiền",
-            Address = "01 Võ Văn Ngân, TP.Thủ Đức",
-            ProviderId = Guid.NewGuid(),
-            ProviderName = "TechCare",
-            ServiceId = Guid.NewGuid(),
-            ServiceTitle = "Sửa chữa – Vệ sinh laptop cơ bản",
-            ServicePrice = 300000, ServiceUnitType = "đ",
-            ServiceImages = "/images/laptop.png",
-            Options = new List<OptionDTO>
-            {
-                new() { OptionId = Guid.NewGuid(), OptionName = "Thay keo tản nhiệt", Description = "Keo cao cấp", Price = 80000, UnitType = "đ" },
-                new() { OptionId = Guid.NewGuid(), OptionName = "Vệ sinh quạt",        Description = "Tháo vệ sinh kỹ", Price = 30000, UnitType = "đ" },
-            }
-        },
-    };
-
-            var vm = new ListHistoryBookingServiceDTOs { Items = items };
-            ViewBag.StatusTabs = statuses;
-            return View(vm); // View: Areas/Customer/Views/BookingService/ListHistoryBooking.cshtml
+            ViewBag.StatusOrder = statusOrder;
+            ViewBag.StatusViMap = statusViMap;
+            return View(vm);
         }
+
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -832,10 +719,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
 
-                // TODO: Gọi API backend để hủy đơn + gửi thông tin hoàn tiền:
-                // await _bookingService.CancelAsync(jwtToken, model);
-
-                // Demo: giả lập thành công
                 await Task.CompletedTask;
 
                 TempData["ToastSuccess"] = "Hủy đơn thành công. Yêu cầu hoàn tiền sẽ được xử lý trong thời gian sớm nhất.";
@@ -908,40 +791,41 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
         }
 
-        // BookingServiceController
+        //// BookingServiceController
 
-        // Có thể đặt ở đầu class (field static) để tái sử dụng
-        private static readonly Dictionary<Guid, TermOfServiceDto> _demoTos = new()
-        {
-            [Guid.Parse("11111111-1111-1111-1111-111111111111")] = new TermOfServiceDto
-            {
-                ProviderId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                ProviderName = "Intimate Ziaja Store",
-                Url = "https://example.com/ziaja-terms",
-                Description = @"
-            <ul>
-                <li>Đổi trả trong 7 ngày đối với hàng chưa mở niêm phong.</li>
-                <li>Sản phẩm mỹ phẩm tuân thủ quy định của Bộ Y Tế; bảo hành theo chính sách hãng.</li>
-                <li>Giao nhanh nội thành TP.HCM 2–4 giờ (trong giờ làm việc).</li>
-                <li>Vui lòng xem đầy đủ chính sách và ngoại lệ tại liên kết bên dưới.</li>
-            </ul>",
-                CreatedAt = DateTime.UtcNow
-            },
-            [Guid.Parse("22222222-2222-2222-2222-222222222222")] = new TermOfServiceDto
-            {
-                ProviderId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
-                ProviderName = "(GIFT) Quà Tặng Ziaja",
-                Url = "https://example.com/gift-terms",
-                Description = @"
-            <ul>
-                <li>Quà tặng không áp dụng bảo hành; chỉ đổi trong 3 ngày nếu lỗi sản xuất.</li>
-                <li>Không hỗ trợ đổi vì lý do thẩm mỹ/chủ quan sau khi đã sử dụng.</li>
-                <li>Voucher tặng kèm có thời hạn theo ghi chú trên voucher, không quy đổi tiền mặt.</li>
-                <li>Chi tiết điều kiện sử dụng vui lòng xem tại liên kết bên dưới.</li>
-            </ul>",
-                CreatedAt = DateTime.UtcNow
-            }
-        };
+        //// Có thể đặt ở đầu class (field static) để tái sử dụng
+        //private static readonly Dictionary<Guid, TermOfServiceDto> _demoTos = new()
+        //{
+        //    [Guid.Parse("11111111-1111-1111-1111-111111111111")] = new TermOfServiceDto
+        //    {
+        //        ProviderId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+        //        ProviderName = "Intimate Ziaja Store",
+        //        Url = "https://example.com/ziaja-terms",
+        //        Description = @"
+        //    <ul>
+        //        <li>Đổi trả trong 7 ngày đối với hàng chưa mở niêm phong.</li>
+        //        <li>Sản phẩm mỹ phẩm tuân thủ quy định của Bộ Y Tế; bảo hành theo chính sách hãng.</li>
+        //        <li>Giao nhanh nội thành TP.HCM 2–4 giờ (trong giờ làm việc).</li>
+        //        <li>Vui lòng xem đầy đủ chính sách và ngoại lệ tại liên kết bên dưới.</li>
+        //    </ul>",
+        //        CreatedAt = DateTime.UtcNow
+        //    },
+        //    [Guid.Parse("22222222-2222-2222-2222-222222222222")] = new TermOfServiceDto
+        //    {
+        //        ProviderId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+        //        ProviderName = "(GIFT) Quà Tặng Ziaja",
+        //        Url = "https://example.com/gift-terms",
+        //        Description = @"
+        //    <ul>
+        //        <li>Quà tặng không áp dụng bảo hành; chỉ đổi trong 3 ngày nếu lỗi sản xuất.</li>
+        //        <li>Không hỗ trợ đổi vì lý do thẩm mỹ/chủ quan sau khi đã sử dụng.</li>
+        //        <li>Voucher tặng kèm có thời hạn theo ghi chú trên voucher, không quy đổi tiền mặt.</li>
+        //        <li>Chi tiết điều kiện sử dụng vui lòng xem tại liên kết bên dưới.</li>
+        //    </ul>",
+        //        CreatedAt = DateTime.UtcNow
+        //    }
+        //};
+
 
         [HttpGet]
         public async Task<IActionResult> GetTermsByProvider(Guid providerId)
@@ -950,12 +834,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
 
-                // gọi service thật
                 var tos = await _bookingServiceCustomer.GetTermOfServiceByProviderIdAsync(providerId, jwtToken);
 
                 if (tos == null)
                 {
-                    // Backend trả 404 => hiển thị mặc định
                     tos = new VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.TermOfServiceDto
                     {
                         ProviderId = providerId,
@@ -991,51 +873,61 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
 
-        //// GET: /Customer/BookingService/HistoryBookingDetail/{id}
-        //[HttpGet]
-        //public IActionResult HistoryBookingDetail(Guid id)
-        //{
-        //    // Lấy dữ liệu mẫu có sẵn
-        //    var vm = VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTOs.Sample();
-
-        //    // Gán lại BookingId theo id được click (cho “MÃ ĐƠN HÀNG”/route nhất quán)
-        //    vm.BookingId = id;
-
-        //    return View("HistoryBookingDetail", vm);
-        //}
-
-        // GET: /Customer/BookingService/HistoryBookingDetail/{id}?status=...
         [HttpGet]
-        public IActionResult HistoryBookingDetail(Guid id, string? status)
+        public async Task<IActionResult> HistoryBookingDetail(Guid id, string? status)
         {
-            // Tạo VM mẫu theo tab/status được click
-            var vm = VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTOs
-                        .CreateByStatus(status ?? "Tất cả", id);
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty) return Unauthorized();
+
+            var fourStates = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { "Pending", "Confirmed", "InProgress", "Completed" };
+
+            ViewBag.StatusViMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Pending"] = "Chờ xác nhận",
+                ["Confirmed"] = "Xác Nhận",
+                ["InProgress"] = "Bắt Đầu Làm Việc",
+                ["Completed"] = "Hoàn thành",
+                ["Cancelled"] = "Đã hủy"
+            };
+
+            var vm = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, id);
+            if (vm == null) return NotFound();
+
+            var currentStatus = vm.NormalizedStatus;
+
+            if (!string.IsNullOrWhiteSpace(status) && fourStates.Contains(status.Trim()))
+                currentStatus = status.Trim();
+
+            ViewBag.CurrentStatus = currentStatus;
+            ViewBag.FourStates = fourStates; 
 
             return View("HistoryBookingDetail", vm);
         }
 
-        public IActionResult CanceledDetail(Guid id)
+
+
+        public async Task<IActionResult> CanceledDetail(Guid id, CancellationToken ct)
         {
-            // Lấy đơn đã hủy (demo dùng sample)
-            var vm = HistoryBookingDetailDTOs.Sample_Canceled();
-            vm.BookingId = id;
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+                return Unauthorized();
 
-            // Thông tin hủy/hoàn tiền đã gửi lúc CancelBooking (demo)
-            ViewBag.Cancel = new CancelBookingRequestDTO
-            {
-                BookingId = id,
-                Reason = "Tôi muốn cập nhật địa chỉ/sđt nhận hàng",
-                BankName = "Vietcombank",
-                AccountHolderName = "NGUYEN VAN A",
-                BankAccountNumber = "0123456789"
-            };
+            // Lấy thông tin booking đã hủy từ service
+            var vm = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, id);
+            if (vm == null)
+                return NotFound();
 
-            return View(vm); // Views/BookingService/CanceledDetail.cshtml
+            // Lấy thông tin lý do hủy/hoàn tiền thật từ DB hoặc service
+            var cancelInfo = await _bookingServiceCustomer.GetCancelInfoDemoAsync(id);
+            if (cancelInfo == null)
+                cancelInfo = new CancelBookingRequestDTO(); // tránh null reference
+
+            ViewBag.Cancel = cancelInfo;
+            return View(vm); // truyền vm xuống View
         }
 
 
-        // Xem chi báo cáo hoàn tiền
         public IActionResult ReportDetail(Guid bookingId)
         {
             // TODO: Lấy ComplaintDTO thực tế từ DB
@@ -1109,15 +1001,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 // ✅ Chỉ dùng chuỗi snapshot để post về server khi PlaceOrder
                 AddressText = addr?.ToDisplayString() ?? string.Empty,
 
-                //VoucherCode = voucherCode,
-                // Nếu không dùng ở view này thì bỏ hẳn block PaymentMethods:
-                // PaymentMethods = new List<PaymentMethod>
-                // {
-                //     new() { Code = "COD",           DisplayName = "Thanh toán khi nhận hàng" },
-                //     new() { Code = "BANK_TRANSFER", DisplayName = "Chuyển khoản ngân hàng" },
-                // },
-
-                // Để null để không auto-chọn gì cả
                 SelectedPaymentCode = null
             };
 
