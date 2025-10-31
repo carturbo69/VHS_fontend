@@ -1,0 +1,129 @@
+@model List<VHS_frontend.Areas.Admin.Models.Payment.ProviderWithdrawalDTO>
+
+<div class="withdrawals-content">
+    <div class="section-header">
+        <h2>Đã xử lý rút tiền</h2>
+        <p>Danh sách các yêu cầu rút tiền đã được xử lý (đã phê duyệt hoặc từ chối)</p>
+    </div>
+
+    @if (Model != null && Model.Any())
+    {
+        <div class="withdrawals-list">
+            @foreach (var withdrawal in Model)
+            {
+                <div class="withdrawal-card">
+                    <div class="withdrawal-header">
+                        <div class="withdrawal-id">
+                            <span class="badge">#@withdrawal.WithdrawalId.ToString().Substring(0, 8)</span>
+                        </div>
+                        <div class="withdrawal-status">
+                            @{
+                                var statusText = withdrawal.Status == "Completed" ? "Đã phê duyệt" : 
+                                                 withdrawal.Status == "Rejected" ? "Đã từ chối" : 
+                                                 withdrawal.Status;
+                                var statusClass = withdrawal.Status == "Completed" ? "status-completed" : 
+                                                  withdrawal.Status == "Rejected" ? "status-canceled" : 
+                                                  "status-pending";
+                                var statusIcon = withdrawal.Status == "Completed" ? "bi-check-circle" : 
+                                                 withdrawal.Status == "Rejected" ? "bi-x-circle" : 
+                                                 "bi-clock";
+                            }
+                            <span class="status-badge @statusClass">
+                                <i class="bi @statusIcon"></i>
+                                @statusText
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="withdrawal-content">
+                        <div class="withdrawal-info-row">
+                            <div class="info-item">
+                                <i class="bi bi-building"></i>
+                                <div>
+                                    <strong>Nhà cung cấp:</strong>
+                                    <div>@withdrawal.ProviderName</div>
+                                    <small>@withdrawal.ProviderEmail</small>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <i class="bi bi-cash-stack"></i>
+                                <div>
+                                    <strong>Số tiền:</strong>
+                                    <div class="amount @(withdrawal.Status == "Completed" ? "highlight" : "")">
+                                        @withdrawal.Amount.ToString("N0") VNĐ
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="withdrawal-info-row">
+                            <div class="info-item">
+                                <i class="bi bi-bank"></i>
+                                <div>
+                                    <strong>Ngân hàng:</strong>
+                                    <div>@withdrawal.BankName</div>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <i class="bi bi-credit-card"></i>
+                                <div>
+                                    <strong>Số tài khoản:</strong>
+                                    <div>@withdrawal.BankAccount</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="withdrawal-info-row">
+                            <div class="info-item">
+                                <i class="bi bi-calendar3"></i>
+                                <div>
+                                    <strong>Ngày yêu cầu:</strong>
+                                    <div>@withdrawal.RequestDate.ToString("dd/MM/yyyy HH:mm")</div>
+                                </div>
+                            </div>
+                            @if (withdrawal.ProcessedDate.HasValue)
+                            {
+                                <div class="info-item">
+                                    <i class="bi bi-clock"></i>
+                                    <div>
+                                        <strong>Ngày xử lý:</strong>
+                                        <div>@withdrawal.ProcessedDate.Value.ToString("dd/MM/yyyy HH:mm")</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(withdrawal.Note))
+                        {
+                            <div class="withdrawal-note">
+                                <i class="bi bi-sticky"></i>
+                                <strong>Ghi chú từ provider:</strong>
+                                <p>@withdrawal.Note</p>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(withdrawal.AdminNote))
+                        {
+                            <div class="withdrawal-note mt-2 p-2 bg-light rounded">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Ghi chú từ admin:</strong>
+                                <p>@withdrawal.AdminNote</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="bi bi-clock-history"></i>
+            </div>
+            <h3>Chưa có yêu cầu rút tiền nào đã được xử lý</h3>
+            <p>Danh sách các yêu cầu rút tiền đã được phê duyệt hoặc từ chối sẽ hiển thị ở đây.</p>
+        </div>
+    }
+</div>
+

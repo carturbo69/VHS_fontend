@@ -684,6 +684,41 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     CancelReason = model.Reason
                 };
                 // Giả định _bookingServiceCustomer đã cập nhật API call phù hợp BE
+                // Kiểm tra lại status trước khi submit (để tránh submit nhầm)
+                // Sử dụng cả NormalizedStatus và Status gốc để xử lý cả tiếng Anh và tiếng Việt
+                var bookingDetail = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, model.BookingId);
+                if (bookingDetail != null)
+                {
+                    var rawStatus = (bookingDetail.Status ?? "").Trim();
+                    var normalizedStatus = bookingDetail.NormalizedStatus;
+                    
+                    // Kiểm tra xem có phải Pending không (cả tiếng Anh và các biến thể tiếng Việt)
+                    var isPending = normalizedStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
+                                    rawStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
+                                    rawStatus.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase) ||
+                                    rawStatus.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase) ||
+                                    rawStatus.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase);
+
+                    if (!isPending)
+                    {
+                        // Lấy status tiếng Việt để hiển thị
+                        var statusVi = bookingDetail.StatusVi;
+                        if (string.IsNullOrWhiteSpace(statusVi) || statusVi == "—")
+                        {
+                            statusVi = bookingDetail.NormalizedStatus switch
+                            {
+                                "Confirmed" => "Đã xác nhận",
+                                "InProgress" => "Đang thực hiện",
+                                "Completed" => "Đã hoàn thành",
+                                "Cancelled" => "Đã hủy",
+                                _ => rawStatus // Hiển thị status gốc nếu không map được
+                            };
+                        }
+                        TempData["ToastError"] = $"Không thể hủy đơn này. Chỉ có thể hủy đơn ở trạng thái 'Chờ xác nhận'. Đơn hiện tại đang ở trạng thái: {statusVi}.";
+                        return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
+                    }
+                }
+
                 var result = await _bookingServiceCustomer.CancelBookingWithRefundFullAsync(createRefundReq, jwtToken);
                 if (result?.Success == true)
                 {
@@ -691,14 +726,35 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 }
                 else
                 {
-                    TempData["ToastError"] = result?.Message ?? "Không thể hủy đơn. Vui lòng thử lại.";
+                    // Parse message từ backend để hiển thị rõ ràng hơn
+                    var errorMsg = result?.Message ?? "Không thể hủy đơn. Vui lòng thử lại.";
+                    if (errorMsg.Contains("Only pending bookings can be cancelled"))
+                    {
+                        errorMsg = "Chỉ có thể hủy đơn ở trạng thái 'Chờ xác nhận'. Vui lòng kiểm tra lại trạng thái đơn hàng.";
+                    }
+                    TempData["ToastError"] = errorMsg;
+                    return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
                 }
                 return RedirectToAction(nameof(ListHistoryBooking));
+            }
+            catch (HttpRequestException ex)
+            {
+                // Parse error message từ backend
+                var errorMsg = ex.Message;
+                if (errorMsg.Contains("Only pending bookings can be cancelled"))
+                {
+                    errorMsg = "Chỉ có thể hủy đơn ở trạng thái 'Chờ xác nhận'. Đơn hàng của bạn có thể đã được xác nhận hoặc đang ở trạng thái khác.";
+                    TempData["ToastError"] = errorMsg;
+                    // Redirect về chi tiết đơn để user thấy trạng thái hiện tại
+                    return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
+                }
+                TempData["ToastError"] = $"Không thể hủy đơn: {errorMsg}";
+                return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
             }
             catch (Exception ex)
             {
                 TempData["ToastError"] = $"Không thể hủy đơn: {ex.Message}";
-                return RedirectToAction(nameof(ListHistoryBooking));
+                return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
             }
         }
 

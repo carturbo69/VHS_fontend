@@ -37,6 +37,9 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 List<UnconfirmedBookingRefundDTO>? unconfirmedBookings = null;
                 List<PendingProviderPaymentDTO>? pendingProviderPayments = null;
                 List<ProviderWithdrawalDTO>? pendingWithdrawals = null;
+                List<UnconfirmedBookingRefundDTO>? approvedRefunds = null;
+                List<PendingProviderPaymentDTO>? approvedProviderPayments = null;
+                List<ProviderWithdrawalDTO>? processedWithdrawals = null;
 
                 // Load dashboard data
                 if (tab == null || tab == "dashboard")
@@ -44,10 +47,16 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     dashboard = await _paymentService.GetDashboardAsync();
                 }
 
-                // Load unconfirmed bookings for refund
+                // Load unconfirmed bookings for refund (pending)
                 if (tab == "refunds")
                 {
                     unconfirmedBookings = await _paymentService.GetUnconfirmedBookingsForRefundAsync() ?? new List<UnconfirmedBookingRefundDTO>();
+                }
+
+                // Load approved refunds (completed)
+                if (tab == "approved-refunds")
+                {
+                    approvedRefunds = await _paymentService.GetApprovedRefundsAsync() ?? new List<UnconfirmedBookingRefundDTO>();
                 }
 
                 // Load pending provider payments
@@ -56,10 +65,22 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     pendingProviderPayments = await _paymentService.GetPendingProviderPaymentsAsync() ?? new List<PendingProviderPaymentDTO>();
                 }
 
+                // Load approved provider payments (completed)
+                if (tab == "approved-provider-payments")
+                {
+                    approvedProviderPayments = await _paymentService.GetApprovedProviderPaymentsAsync() ?? new List<PendingProviderPaymentDTO>();
+                }
+
                 // Load pending withdrawals
                 if (tab == "withdrawals")
                 {
                     pendingWithdrawals = await _paymentService.GetPendingWithdrawalsAsync() ?? new List<ProviderWithdrawalDTO>();
+                }
+
+                // Load processed withdrawals (completed/rejected)
+                if (tab == "processed-withdrawals")
+                {
+                    processedWithdrawals = await _paymentService.GetProcessedWithdrawalsAsync() ?? new List<ProviderWithdrawalDTO>();
                 }
 
                 var model = new PaymentManagementViewModel
@@ -67,7 +88,10 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     Dashboard = dashboard,
                     UnconfirmedBookings = unconfirmedBookings ?? new List<UnconfirmedBookingRefundDTO>(),
                     PendingProviderPayments = pendingProviderPayments ?? new List<PendingProviderPaymentDTO>(),
-                    PendingWithdrawals = pendingWithdrawals ?? new List<ProviderWithdrawalDTO>()
+                    PendingWithdrawals = pendingWithdrawals ?? new List<ProviderWithdrawalDTO>(),
+                    ApprovedRefunds = approvedRefunds ?? new List<UnconfirmedBookingRefundDTO>(),
+                    ApprovedProviderPayments = approvedProviderPayments ?? new List<PendingProviderPaymentDTO>(),
+                    ProcessedWithdrawals = processedWithdrawals ?? new List<ProviderWithdrawalDTO>()
                 };
 
                 return View(model);
@@ -161,9 +185,16 @@ namespace VHS_frontend.Areas.Admin.Controllers
     public class PaymentManagementViewModel
     {
         public PaymentDashboardDTO? Dashboard { get; set; }
+        
+        // Pending items
         public List<UnconfirmedBookingRefundDTO> UnconfirmedBookings { get; set; } = new();
         public List<PendingProviderPaymentDTO> PendingProviderPayments { get; set; } = new();
         public List<ProviderWithdrawalDTO> PendingWithdrawals { get; set; } = new();
+        
+        // Processed items (for viewing history)
+        public List<UnconfirmedBookingRefundDTO> ApprovedRefunds { get; set; } = new();
+        public List<PendingProviderPaymentDTO> ApprovedProviderPayments { get; set; } = new();
+        public List<ProviderWithdrawalDTO> ProcessedWithdrawals { get; set; } = new();
     }
 }
 

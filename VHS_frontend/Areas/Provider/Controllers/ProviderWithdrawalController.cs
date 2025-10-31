@@ -51,7 +51,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> RequestWithdrawal(ProviderWithdrawalRequestDTO request)
+        public async Task<IActionResult> RequestWithdrawal([FromBody] ProviderWithdrawalRequestDTO request)
         {
             var accountId = HttpContext.Session.GetString("AccountID");
             var role = HttpContext.Session.GetString("Role");

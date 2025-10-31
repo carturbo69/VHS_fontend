@@ -154,6 +154,53 @@ namespace VHS_frontend.Services.Admin
             return response?.Success ?? false;
         }
 
+        // Approved/Processed Items (for viewing history)
+
+        /// <summary>
+        /// Get approved/completed refunds
+        /// </summary>
+        public async Task<List<UnconfirmedBookingRefundDTO>?> GetApprovedRefundsAsync(CancellationToken ct = default)
+        {
+            AttachAuth();
+            var res = await _http.GetAsync("/api/PaymentManagement/refunds/approved", ct);
+            await HandleErrorAsync(res, ct);
+            
+            var json = await res.Content.ReadAsStringAsync(ct);
+            var response = JsonSerializer.Deserialize<ApiResponse<List<UnconfirmedBookingRefundDTO>>>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return response?.Data;
+        }
+
+        /// <summary>
+        /// Get approved provider payments
+        /// </summary>
+        public async Task<List<PendingProviderPaymentDTO>?> GetApprovedProviderPaymentsAsync(CancellationToken ct = default)
+        {
+            AttachAuth();
+            var res = await _http.GetAsync("/api/PaymentManagement/provider-payments/approved", ct);
+            await HandleErrorAsync(res, ct);
+            
+            var json = await res.Content.ReadAsStringAsync(ct);
+            var response = JsonSerializer.Deserialize<ApiResponse<List<PendingProviderPaymentDTO>>>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return response?.Data;
+        }
+
+        /// <summary>
+        /// Get processed withdrawals (Completed/Rejected)
+        /// </summary>
+        public async Task<List<ProviderWithdrawalDTO>?> GetProcessedWithdrawalsAsync(CancellationToken ct = default)
+        {
+            AttachAuth();
+            var res = await _http.GetAsync("/api/PaymentManagement/withdrawals/processed", ct);
+            await HandleErrorAsync(res, ct);
+            
+            var json = await res.Content.ReadAsStringAsync(ct);
+            var response = JsonSerializer.Deserialize<ApiResponse<List<ProviderWithdrawalDTO>>>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return response?.Data;
+        }
+
         // Helper class for API responses
         private class ApiResponse<T>
         {
@@ -163,5 +210,7 @@ namespace VHS_frontend.Services.Admin
         }
     }
 }
+
+
 
 

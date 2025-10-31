@@ -49,6 +49,15 @@
                 <span class="badge">@Model.Dashboard.PendingRefunds</span>
             }
         </a>
+        <a href="@Url.Action("Index", new { tab = "approved-refunds" })" 
+           class="tab-link @(currentTab == "approved-refunds" ? "active" : "")">
+            <i class="bi bi-check-circle"></i>
+            <span>Đã hoàn tiền</span>
+            @if (Model.ApprovedRefunds.Count > 0)
+            {
+                <span class="badge badge-success">@Model.ApprovedRefunds.Count</span>
+            }
+        </a>
         <a href="@Url.Action("Index", new { tab = "provider-payments" })" 
            class="tab-link @(currentTab == "provider-payments" ? "active" : "")">
             <i class="bi bi-cash-coin"></i>
@@ -58,6 +67,15 @@
                 <span class="badge">@Model.Dashboard.PendingPayouts</span>
             }
         </a>
+        <a href="@Url.Action("Index", new { tab = "approved-provider-payments" })" 
+           class="tab-link @(currentTab == "approved-provider-payments" ? "active" : "")">
+            <i class="bi bi-check-circle"></i>
+            <span>Đã phê duyệt</span>
+            @if (Model.ApprovedProviderPayments.Count > 0)
+            {
+                <span class="badge badge-success">@Model.ApprovedProviderPayments.Count</span>
+            }
+        </a>
         <a href="@Url.Action("Index", new { tab = "withdrawals" })" 
            class="tab-link @(currentTab == "withdrawals" ? "active" : "")">
             <i class="bi bi-bank"></i>
@@ -65,6 +83,15 @@
             @if (Model.PendingWithdrawals.Count > 0)
             {
                 <span class="badge">@Model.PendingWithdrawals.Count</span>
+            }
+        </a>
+        <a href="@Url.Action("Index", new { tab = "processed-withdrawals" })" 
+           class="tab-link @(currentTab == "processed-withdrawals" ? "active" : "")">
+            <i class="bi bi-clock-history"></i>
+            <span>Đã xử lý</span>
+            @if (Model.ProcessedWithdrawals.Count > 0)
+            {
+                <span class="badge badge-info">@Model.ProcessedWithdrawals.Count</span>
             }
         </a>
     </div>
@@ -79,27 +106,103 @@
         {
             @await Html.PartialAsync("_RefundsPartial", Model.UnconfirmedBookings)
         }
+        else if (currentTab == "approved-refunds")
+        {
+            @await Html.PartialAsync("_ApprovedRefundsPartial", Model.ApprovedRefunds)
+        }
         else if (currentTab == "provider-payments")
         {
             @await Html.PartialAsync("_ProviderPaymentsPartial", Model.PendingProviderPayments)
+        }
+        else if (currentTab == "approved-provider-payments")
+        {
+            @await Html.PartialAsync("_ApprovedProviderPaymentsPartial", Model.ApprovedProviderPayments)
         }
         else if (currentTab == "withdrawals")
         {
             @await Html.PartialAsync("_WithdrawalsPartial", Model.PendingWithdrawals)
         }
+        else if (currentTab == "processed-withdrawals")
+        {
+            @await Html.PartialAsync("_ProcessedWithdrawalsPartial", Model.ProcessedWithdrawals)
+        }
+    </div>
+</div>
+
+<!-- Modal for Admin Notes -->
+<div class="modal fade" id="adminNoteModal" tabindex="-1" aria-labelledby="adminNoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="adminNoteModalLabel">@(ViewBag.SiteName ?? "localhost:7161") cho biết</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="adminNoteInput" class="form-label">Nhập ghi chú cho việc <span id="modalActionText"></span> (tùy chọn):</label>
+                <input type="text" class="form-control" id="adminNoteInput" placeholder="Nhập ghi chú...">
+                <input type="hidden" id="modalContext" value="">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="modalOkBtn">OK</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+            </div>
+        </div>
     </div>
 </div>
 
 @section Scripts {
     <script>
+        let currentModalContext = null;
+        const adminNoteModal = new bootstrap.Modal(document.getElementById('adminNoteModal'));
+
         // Approve Refund
         function approveRefund(bookingId) {
-            const adminNote = prompt('Nhập ghi chú (tùy chọn):') || '';
-            
-            if (adminNote === '' && !confirm('Bạn có chắc chắn muốn hoàn tiền mà không có ghi chú?')) {
-                return;
-            }
+            currentModalContext = { type: 'approveRefund', bookingId: bookingId };
+            document.getElementById('modalActionText').textContent = 'hoàn tiền';
+            document.getElementById('adminNoteInput').value = '';
+            document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
+            adminNoteModal.show();
+        }
 
+        // Approve Provider Payment
+        function approveProviderPayment(bookingId) {
+            currentModalContext = { type: 'approveProviderPayment', bookingId: bookingId };
+            document.getElementById('modalActionText').textContent = 'phê duyệt thanh toán';
+            document.getElementById('adminNoteInput').value = '';
+            document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
+            adminNoteModal.show();
+        }
+
+        // Approve/Reject Withdrawal
+        function handleWithdrawal(withdrawalId, action) {
+            const actionText = action === 'Approve' ? 'phê duyệt' : 'từ chối';
+            currentModalContext = { type: 'handleWithdrawal', withdrawalId: withdrawalId, action: action };
+            document.getElementById('modalActionText').textContent = actionText;
+            document.getElementById('adminNoteInput').value = '';
+            document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
+            adminNoteModal.show();
+        }
+
+        // Handle OK button click
+        document.getElementById('modalOkBtn').addEventListener('click', function() {
+            const adminNote = document.getElementById('adminNoteInput').value.trim();
+            const contextStr = document.getElementById('modalContext').value;
+            if (!contextStr) return;
+            
+            const context = JSON.parse(contextStr);
+            adminNoteModal.hide();
+
+            // Execute action based on context
+            if (context.type === 'approveRefund') {
+                executeApproveRefund(context.bookingId, adminNote);
+            } else if (context.type === 'approveProviderPayment') {
+                executeApproveProviderPayment(context.bookingId, adminNote);
+            } else if (context.type === 'handleWithdrawal') {
+                executeHandleWithdrawal(context.withdrawalId, context.action, adminNote);
+            }
+        });
+
+        function executeApproveRefund(bookingId, adminNote) {
             fetch('@Url.Action("ApproveRefund")', {
                 method: 'POST',
                 headers: {
@@ -123,14 +226,7 @@
             });
         }
 
-        // Approve Provider Payment
-        function approveProviderPayment(bookingId) {
-            const adminNote = prompt('Nhập ghi chú (tùy chọn):') || '';
-            
-            if (adminNote === '' && !confirm('Bạn có chắc chắn muốn phê duyệt thanh toán mà không có ghi chú?')) {
-                return;
-            }
-
+        function executeApproveProviderPayment(bookingId, adminNote) {
             fetch('@Url.Action("ApproveProviderPayment")', {
                 method: 'POST',
                 headers: {
@@ -154,15 +250,7 @@
             });
         }
 
-        // Approve/Reject Withdrawal
-        function handleWithdrawal(withdrawalId, action) {
-            const actionText = action === 'Approve' ? 'phê duyệt' : 'từ chối';
-            const adminNote = prompt(`Nhập ghi chú cho việc ${actionText} (tùy chọn):`) || '';
-            
-            if (adminNote === '' && !confirm(`Bạn có chắc chắn muốn ${actionText} yêu cầu rút tiền mà không có ghi chú?`)) {
-                return;
-            }
-
+        function executeHandleWithdrawal(withdrawalId, action, adminNote) {
             fetch('@Url.Action("ApproveWithdrawal")', {
                 method: 'POST',
                 headers: {
@@ -187,5 +275,7 @@
         }
     </script>
 }
+
+
 
 

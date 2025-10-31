@@ -292,6 +292,26 @@
     }
 </div>
 
+<!-- Modal xác nhận rút tiền -->
+<div class="modal fade" id="withdrawalConfirmModal" tabindex="-1" aria-labelledby="withdrawalConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="withdrawalConfirmModalLabel">@(ViewBag.SiteName ?? "localhost:7161") cho biết</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="withdrawalConfirmNoteInput" class="form-label">Nhập ghi chú cho việc gửi yêu cầu rút tiền (tùy chọn):</label>
+                <input type="text" class="form-control" id="withdrawalConfirmNoteInput" placeholder="Nhập ghi chú...">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="withdrawalConfirmOkBtn">OK</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -304,30 +324,55 @@
             formEl.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 const formData = new FormData(this);
+                
+                // Parse amount
                 let rawAmount = formData.get('Amount');
-                if (typeof rawAmount === 'string') rawAmount = rawAmount.replace(/,/g, '.');
+                if (rawAmount === null || rawAmount === undefined) {
+                    alert('Vui lòng nhập số tiền');
+                    return;
+                }
+                if (typeof rawAmount === 'string') {
+                    rawAmount = rawAmount.replace(/,/g, '.').trim();
+                }
+                const amountValue = parseFloat(rawAmount);
+                if (isNaN(amountValue) || amountValue <= 0) {
+                    alert('Số tiền phải là số và lớn hơn 0');
+                    return;
+                }
+                
+                // Parse bank account
+                const bankAccountValue = formData.get('BankAccount');
+                const bankAccount = (bankAccountValue != null ? String(bankAccountValue).trim() : '');
+                if (!bankAccount || bankAccount === '' || bankAccount === 'null' || bankAccount === 'undefined') {
+                    alert('Vui lòng nhập số tài khoản ngân hàng');
+                    return;
+                }
+                
+                // Parse bank name
+                const bankNameValue = formData.get('BankName');
+                const bankName = (bankNameValue != null ? String(bankNameValue).trim() : '');
+                if (!bankName || bankName === '' || bankName === 'null' || bankName === 'undefined') {
+                    alert('Vui lòng nhập tên ngân hàng');
+                    return;
+                }
+                
+                // Parse optional fields
+                const qrCodeValue = formData.get('QrCode');
+                const qrCode = (qrCodeValue != null && qrCodeValue !== '') ? String(qrCodeValue).trim() : null;
+                
+                const noteValue = formData.get('Note');
+                const note = (noteValue != null && noteValue !== '') ? String(noteValue).trim() : null;
+                
                 const data = {
-                    Amount: parseFloat(rawAmount),
-                    BankAccount: (formData.get('BankAccount')+"").trim(),
-                    BankName: (formData.get('BankName')+"").trim(),
-                    QrCode: formData.get('QrCode')?.trim() || null,
-                    Note: formData.get('Note')?.trim() || null
+                    Amount: amountValue,
+                    BankAccount: bankAccount,
+                    BankName: bankName,
+                    QrCode: qrCode,
+                    Note: note
                 };
                 console.log('Data gửi BE:', data); // <== LOG DEBUG FE
 
-                // Kiem tra truoc FE cho UX dep
-                if (!data.BankAccount || data.BankAccount === '0') {
-                    alert('Vui lòng nhập số tài khoản ngân hàng hợp lệ (không phải 0)');
-                    return;
-                }
-                if (!data.BankName) {
-                    alert('Vui lòng nhập tên ngân hàng!');
-                    return;
-                }
-                if (isNaN(data.Amount) || data.Amount <= 0) {
-                    alert('Số tiền phải lớn hơn 0');
-                    return;
-                }
+                // Validation đã được thực hiện ở trên, chỉ kiểm tra amount với maxAmount
 
                 const maxAmount = @(Model.Balance?.AvailableBalance ?? 0);
                 if (data.Amount > maxAmount) {
@@ -335,9 +380,26 @@
                     return;
                 }
 
-                if (!confirm('Bạn có chắc chắn muốn gửi yêu cầu rút tiền?')) return;
+                // Store form data for later submission
+                window.pendingWithdrawalData = data;
+                window.pendingForm = this;
+                
+                // Show confirmation modal
+                document.getElementById('withdrawalConfirmNoteInput').value = '';
+                const confirmModal = new bootstrap.Modal(document.getElementById('withdrawalConfirmModal'));
+                confirmModal.show();
+            });
 
-                const submitBtn = this.querySelector('.btn-submit');
+            // Handle OK button in confirmation modal
+            document.getElementById('withdrawalConfirmOkBtn').addEventListener('click', async function() {
+                const data = window.pendingWithdrawalData;
+                const form = window.pendingForm;
+                if (!data || !form) return;
+
+                const confirmModal = bootstrap.Modal.getInstance(document.getElementById('withdrawalConfirmModal'));
+                confirmModal.hide();
+
+                const submitBtn = form.querySelector('.btn-submit');
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xử lý...';
 
@@ -346,17 +408,16 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'RequestVerificationToken': formData.get('__RequestVerificationToken')
+                            'RequestVerificationToken': form.querySelector('input[name="__RequestVerificationToken"]').value
                         },
                         body: JSON.stringify(data)
                     });
                     const result = await response.json();
-                    console.log('BE trả về:', result); // <== LOG DEBUG FE nhan response
+                    console.log('BE trả về:', result);
                     if (result.success) {
                         alert(result.message);
                         location.reload();
                     } else {
-                        // Nếu có mảng lỗi, hiển thị tất cả lỗi cho user
                         if (result.errors && Array.isArray(result.errors)) {
                             alert(result.errors.join('\n'));
                         } else if (result.message) {
@@ -373,6 +434,10 @@
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = '<i class="bi bi-send"></i> Gửi yêu cầu rút tiền';
                 }
+                
+                // Clear pending data
+                window.pendingWithdrawalData = null;
+                window.pendingForm = null;
             });
         });
     </script>
