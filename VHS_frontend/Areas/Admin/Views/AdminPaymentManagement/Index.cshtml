@@ -1,0 +1,191 @@
+@model VHS_frontend.Areas.Admin.Controllers.PaymentManagementViewModel
+@{
+    ViewData["Title"] = "Quản lý Thanh toán";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+    var currentTab = ViewBag.Tab as string ?? "dashboard";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-payment.css" asp-append-version="true" />
+}
+
+<div class="admin-payment-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <div class="title-with-icon">
+                    <div class="title-icon">
+                        <i class="bi bi-credit-card-2-front"></i>
+                    </div>
+                    <div class="title-content">
+                        <h1>Quản lý Thanh toán</h1>
+                        <p>Quản lý hoàn tiền, phê duyệt thanh toán và rút tiền</p>
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-refresh" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    Làm mới
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="payment-tabs">
+        <a href="@Url.Action("Index", new { tab = "dashboard" })" 
+           class="tab-link @(currentTab == "dashboard" ? "active" : "")">
+            <i class="bi bi-speedometer2"></i>
+            <span>Tổng quan</span>
+        </a>
+        <a href="@Url.Action("Index", new { tab = "refunds" })" 
+           class="tab-link @(currentTab == "refunds" ? "active" : "")">
+            <i class="bi bi-arrow-counterclockwise"></i>
+            <span>Hoàn tiền</span>
+            @if (Model.Dashboard?.PendingRefunds > 0)
+            {
+                <span class="badge">@Model.Dashboard.PendingRefunds</span>
+            }
+        </a>
+        <a href="@Url.Action("Index", new { tab = "provider-payments" })" 
+           class="tab-link @(currentTab == "provider-payments" ? "active" : "")">
+            <i class="bi bi-cash-coin"></i>
+            <span>Phê duyệt thanh toán</span>
+            @if (Model.Dashboard?.PendingPayouts > 0)
+            {
+                <span class="badge">@Model.Dashboard.PendingPayouts</span>
+            }
+        </a>
+        <a href="@Url.Action("Index", new { tab = "withdrawals" })" 
+           class="tab-link @(currentTab == "withdrawals" ? "active" : "")">
+            <i class="bi bi-bank"></i>
+            <span>Yêu cầu rút tiền</span>
+            @if (Model.PendingWithdrawals.Count > 0)
+            {
+                <span class="badge">@Model.PendingWithdrawals.Count</span>
+            }
+        </a>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        @if (currentTab == "dashboard")
+        {
+            @await Html.PartialAsync("_DashboardPartial", Model.Dashboard)
+        }
+        else if (currentTab == "refunds")
+        {
+            @await Html.PartialAsync("_RefundsPartial", Model.UnconfirmedBookings)
+        }
+        else if (currentTab == "provider-payments")
+        {
+            @await Html.PartialAsync("_ProviderPaymentsPartial", Model.PendingProviderPayments)
+        }
+        else if (currentTab == "withdrawals")
+        {
+            @await Html.PartialAsync("_WithdrawalsPartial", Model.PendingWithdrawals)
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Approve Refund
+        function approveRefund(bookingId) {
+            const adminNote = prompt('Nhập ghi chú (tùy chọn):') || '';
+            
+            if (adminNote === '' && !confirm('Bạn có chắc chắn muốn hoàn tiền mà không có ghi chú?')) {
+                return;
+            }
+
+            fetch('@Url.Action("ApproveRefund")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({ bookingId, adminNote })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Hoàn tiền thành công!');
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Đã có lỗi xảy ra');
+            });
+        }
+
+        // Approve Provider Payment
+        function approveProviderPayment(bookingId) {
+            const adminNote = prompt('Nhập ghi chú (tùy chọn):') || '';
+            
+            if (adminNote === '' && !confirm('Bạn có chắc chắn muốn phê duyệt thanh toán mà không có ghi chú?')) {
+                return;
+            }
+
+            fetch('@Url.Action("ApproveProviderPayment")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({ bookingId, adminNote })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Phê duyệt thanh toán thành công!');
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Đã có lỗi xảy ra');
+            });
+        }
+
+        // Approve/Reject Withdrawal
+        function handleWithdrawal(withdrawalId, action) {
+            const actionText = action === 'Approve' ? 'phê duyệt' : 'từ chối';
+            const adminNote = prompt(`Nhập ghi chú cho việc ${actionText} (tùy chọn):`) || '';
+            
+            if (adminNote === '' && !confirm(`Bạn có chắc chắn muốn ${actionText} yêu cầu rút tiền mà không có ghi chú?`)) {
+                return;
+            }
+
+            fetch('@Url.Action("ApproveWithdrawal")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({ withdrawalId, action, adminNote })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Đã có lỗi xảy ra');
+            });
+        }
+    </script>
+}
+
+

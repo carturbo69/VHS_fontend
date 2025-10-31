@@ -656,7 +656,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 model.BookingId == Guid.Empty ||
                 string.IsNullOrWhiteSpace(model.Reason) ||
                 string.IsNullOrWhiteSpace(model.BankName) ||
-                string.IsNullOrWhiteSpace(model.AccountHolderName) ||
                 string.IsNullOrWhiteSpace(model.BankAccountNumber))
             {
                 TempData["ToastError"] = "Vui lòng nhập đầy đủ thông tin hủy đơn.";
@@ -666,15 +665,34 @@ namespace VHS_frontend.Areas.Customer.Controllers
             try
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
-
-                await Task.CompletedTask;
-
-                TempData["ToastSuccess"] = "Hủy đơn thành công. Yêu cầu hoàn tiền sẽ được xử lý trong thời gian sớm nhất.";
-                return RedirectToAction(nameof(ListHistoryBooking));
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                TempData["ToastError"] = $"Bạn cần đăng nhập lại: {ex.Message}";
+                if (string.IsNullOrWhiteSpace(jwtToken))
+                {
+                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                    return RedirectToAction("Login", "Account", new { area = "" });
+                }
+                var accountId = GetAccountId();
+                if (accountId == Guid.Empty)
+                {
+                    TempData["ToastError"] = "Không tìm thấy thông tin tài khoản.";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+                var createRefundReq = new {
+                    BookingId = model.BookingId,
+                    BankAccount = model.BankAccountNumber,
+                    BankName = model.BankName,
+                    AccountHolderName = model.AccountHolderName,
+                    CancelReason = model.Reason
+                };
+                // Giả định _bookingServiceCustomer đã cập nhật API call phù hợp BE
+                var result = await _bookingServiceCustomer.CancelBookingWithRefundFullAsync(createRefundReq, jwtToken);
+                if (result?.Success == true)
+                {
+                    TempData["ToastSuccess"] = "Hủy đơn thành công. Yêu cầu hoàn tiền sẽ được xử lý trong thời gian sớm nhất.";
+                }
+                else
+                {
+                    TempData["ToastError"] = result?.Message ?? "Không thể hủy đơn. Vui lòng thử lại.";
+                }
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
             catch (Exception ex)
