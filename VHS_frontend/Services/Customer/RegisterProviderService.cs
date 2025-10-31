@@ -71,21 +71,24 @@ namespace VHS_frontend.Services.Customer
             var phoneNumber = Get("PhoneNumber").Trim();
             var description = Get("Description");
 
-            content.Add(new StringContent(providerName), "PROVIDERNAME");
+            // ✅ Send PascalCase to match Backend expectations
+            content.Add(new StringContent(providerName), "ProviderName");
             if (!string.IsNullOrWhiteSpace(phoneNumber))
-                content.Add(new StringContent(phoneNumber), "PHONENUMBER");
-            content.Add(new StringContent(description), "DESCRIPTION");
+                content.Add(new StringContent(phoneNumber), "PhoneNumber");
+            content.Add(new StringContent(description), "Description");
 
             // Terms & Insurance (gộp)
-            content.Add(new StringContent(Get("TermsInsurance.Title").Trim()), "TERMSINSURANCE.TITLE");
-            content.Add(new StringContent(Get("TermsInsurance.Description").Trim()), "TERMSINSURANCE.DESCRIPTION");
+            var termsTitle = Get("TermsInsurance.Title");
+            var termsDesc = Get("TermsInsurance.Description");
+            content.Add(new StringContent(string.IsNullOrWhiteSpace(termsTitle) ? "Điều khoản" : termsTitle.Trim()), "TermsInsurance.Title");
+            content.Add(new StringContent(termsDesc?.Trim() ?? string.Empty), "TermsInsurance.Description");
 
             // Avatar (1 ảnh)
             if (request.Form.Files["ProfileImage"] is IFormFile avatar && avatar.Length > 0)
             {
                 var fc = new StreamContent(avatar.OpenReadStream());
                 fc.Headers.ContentType = new MediaTypeHeaderValue(avatar.ContentType);
-                content.Add(fc, "PROFILEIMAGE", avatar.FileName);
+                content.Add(fc, "ProfileImage", avatar.FileName);
             }
 
             // Certificates (nhiều block; mỗi block nhiều ảnh)
@@ -105,25 +108,43 @@ namespace VHS_frontend.Services.Customer
             {
                 var cat = Get($"Certificates[{i}].CategoryId");
                 if (!string.IsNullOrEmpty(cat))
-                    content.Add(new StringContent(cat), $"CERTIFICATES[{i}].CATEGORYID");
+                    content.Add(new StringContent(cat), $"Certificates[{i}].CategoryId");
 
-                var cdesc = Get($"Certificates[{i}].Description");
-                content.Add(new StringContent(cdesc), $"CERTIFICATES[{i}].DESCRIPTION");
+                // ✅ TagIds - send multiple values with SAME KEY (no index) for ASP.NET Core to bind as List
+                var tagIdsKey = $"Certificates[{i}].TagIds";
+                var tagIds = request.Form[tagIdsKey].Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+                foreach (var tagId in tagIds)
+                {
+                    content.Add(new StringContent(tagId), $"Certificates[{i}].TagIds");
+                }
 
+                // ✅ KHÔNG GỬI Description - field này không dùng nữa
+                // Backend sẽ set Description = null hoặc empty
+
+                // ✅ BusinessLicenses files
                 var files = request.Form.Files.GetFiles($"Certificates[{i}].BusinessLicenses");
                 foreach (var f in files)
                 {
                     if (f.Length == 0) continue;
                     var sc = new StreamContent(f.OpenReadStream());
                     sc.Headers.ContentType = new MediaTypeHeaderValue(f.ContentType);
-                    content.Add(sc, $"CERTIFICATES[{i}].BUSINESSLICENSES", f.FileName);
+                    content.Add(sc, $"Certificates[{i}].BusinessLicenses", f.FileName);
                 }
             }
 
-            var res = await _http.PostAsync("/api/register-provider", content, ct);
+            // Send to real endpoint
+            var endpoint = "/api/register-provider";
+            
+            Console.WriteLine($"=== SENDING REQUEST TO BACKEND ===");
+            Console.WriteLine($"BaseAddress: {_http.BaseAddress}");
+            Console.WriteLine($"Endpoint: {endpoint}");
+            Console.WriteLine($"Full URL: {_http.BaseAddress}{endpoint}");
+            
+            var res = await _http.PostAsync(endpoint, content, ct);
             var payload = await res.Content.ReadAsStringAsync(ct);
 
             // Log chi tiết để debug
+            Console.WriteLine($"=== BACKEND RESPONSE ===");
             Console.WriteLine($"API Response Status: {res.StatusCode}");
             Console.WriteLine($"API Response Body: {payload}");
 

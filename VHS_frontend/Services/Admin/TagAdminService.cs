@@ -10,6 +10,10 @@ namespace VHS_frontend.Services.Admin
 
         public TagAdminService(HttpClient http) => _http = http;
 
+        // Get all tags (without category filter)
+        public Task<List<TagDTO>?> GetAllAsync(bool includeDeleted = false, CancellationToken ct = default)
+            => _http.GetFromJsonAsync<List<TagDTO>>($"/api/tag?includeDeleted={includeDeleted.ToString().ToLower()}", _json, ct);
+
         public Task<List<TagDTO>?> GetByCategoryAsync(Guid categoryId, bool includeDeleted = false, CancellationToken ct = default)
             => _http.GetFromJsonAsync<List<TagDTO>>($"/api/tag?categoryId={categoryId}&includeDeleted={includeDeleted.ToString().ToLower()}", _json, ct);
 

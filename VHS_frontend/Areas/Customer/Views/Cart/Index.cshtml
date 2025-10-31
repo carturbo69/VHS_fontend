@@ -83,10 +83,6 @@
         <div class="cart-card">
             <header class="cart-header">
                 <h2 class="cart-title">Giỏ hàng của bạn</h2>
-                @if (!isEmpty)
-                {
-                    <span class="cart-count">@list.Count item(s)</span>
-                }
             </header>
 
             @if (isEmpty)
@@ -189,6 +185,10 @@
                                             </button>
 
                                             <div class="opt-panel" id="@($"opt_{key}")" role="dialog" aria-modal="false" hidden>
+                                                <div class="opt-panel-header">
+                                                    <h3>Tuỳ chọn dịch vụ</h3>
+                                                    <button type="button" class="opt-panel-close" data-close="#@($"opt_{key}")" aria-label="Đóng">✕</button>
+                                                </div>
                                                 <div class="opt-section">
                                                     <div class="opt-title">Đã chọn</div>
 
@@ -323,13 +323,16 @@
                 <!-- Voucher + thanh toán dính dưới -->
                 <div class="checkout-dock">
                     <div class="voucher-row">
-                        <div class="left">
-                            <span class="voucher-badge">🏷️ Voucher</span>
-                            <span class="muted">Chọn/nhập mã để áp dụng</span>
+                        <div>
+                            <div class="left">
+                                <span class="voucher-badge">🏷️ Voucher</span>
+                                <span class="muted">Chọn/nhập mã để áp dụng</span>
+                            </div>
+                            <button class="btn-ghost opt-btn" type="button" data-opt="voucher" aria-expanded="false">
+                                Chọn voucher
+                            </button>
                         </div>
-                        <button class="btn-ghost opt-btn" type="button" data-opt="voucher" aria-expanded="false">
-                            Chọn voucher
-                        </button>
+                        <!-- Voucher breakdown sẽ được inject vào đây bởi JavaScript -->
                     </div>
                     <!-- input ẩn để submit mã -->
                     @* <input type="hidden" name="voucherCode" id="voucherCode" /> *@
@@ -338,7 +341,7 @@
                     <div id="opt_voucher" class="opt-panel" hidden aria-label="Danh sách voucher">
                         <div class="opt-head">
                             <h3>Voucher của bạn</h3>
-                            <button class="btn-ghost" type="button" data-close="#opt_voucher">Đóng</button>
+                            <button class="btn-ghost btn-close" type="button" data-close="#opt_voucher">✕</button>
                         </div>
 
                         <div class="opt-body">
@@ -480,23 +483,26 @@
               const sel = items.filter(i => i.checked);
               const subtotal = sel.reduce((s,i)=> s + parseFloat(i.dataset.linetotal||'0'), 0);
 
-              // tạo breakdown nếu chưa có
+              // tạo breakdown nếu chưa có - GẮN VÀO VOUCHER ROW THAY VÌ CO-TOTAL
               let breakdown = document.getElementById('voucherBreakdown');
               if(!breakdown){
-                const coTotal = document.querySelector('.co-total');
-                if(!coTotal) return; // chưa có chỗ gắn → bỏ qua lượt này
+                const voucherRow = document.querySelector('.voucher-row');
+                if(!voucherRow) return; // chưa có chỗ gắn → bỏ qua lượt này
                 const wrap = document.createElement('div');
                 wrap.id = 'voucherBreakdown';
-                wrap.className = 'muted tiny';
+                wrap.className = 'voucher-applied-info';
                 wrap.hidden = true;
                 wrap.style.display = 'none';
                 wrap.innerHTML = `
-                  <div class="vb-info" id="voucherAppliedInfo"></div>
+                  <div class="vb-info">
+                    <span style="margin-right: 8px;">✅</span>
+                    <span id="voucherAppliedInfo"></span>
+                  </div>
                   <div class="vb-right">
                     <strong id="voucherDiscount">-0₫</strong>
-                    <button id="btnRemoveVoucher" type="button" class="btn-ghost btn-xs">Bỏ voucher</button>
+                    <button id="btnRemoveVoucher" type="button" class="btn-ghost btn-xs">✕ Bỏ voucher</button>
                   </div>`;
-                coTotal.appendChild(wrap);
+                voucherRow.appendChild(wrap);
                 // bind lần đầu
                 wrap.querySelector('#btnRemoveVoucher').addEventListener('click', removeVoucher);
                 breakdown = wrap;
@@ -536,6 +542,7 @@
             function normalizeVoucher(o){
               if(!o) return null;
               return {
+                VoucherId: pick(o,'VoucherId','voucherId') ?? '',
                 Code: pick(o,'Code','code') ?? '',
                 Description: pick(o,'Description','description') ?? '',
                 DiscountPercent: Number(pick(o,'DiscountPercent','discountPercent') || 0),
@@ -555,8 +562,17 @@
 
             function setVoucher(v){
               CURRENT_VOUCHER = normalizeVoucher(v);
-                      if (voucherCodeHid) {
-           voucherCodeHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.Code || '') : '';}
+              
+              // ✅ Lưu cả VoucherId và Code vào hidden inputs
+              const voucherIdHid = document.querySelector('#checkoutForm #voucherId');
+              if (voucherCodeHid) {
+                voucherCodeHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.Code || '') : '';
+              }
+              if (voucherIdHid) {
+                voucherIdHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.VoucherId || '') : '';
+              }
+
+              // ❌ KHÔNG lưu voucher vào localStorage - user phải chọn lại mỗi lần vào trang
 
               // reset input gõ tay nếu bỏ voucher
               if(!CURRENT_VOUCHER && voucherInputEl) voucherInputEl.value = '';
@@ -578,6 +594,12 @@
 
             function removeVoucher(){
               setVoucher(null);
+              
+              // ✅ Dọn sạch cả voucherId và voucherCode
+              const voucherIdHid = document.querySelector('#checkoutForm #voucherId');
+              if (voucherCodeHid) voucherCodeHid.value = '';
+              if (voucherIdHid) voucherIdHid.value = '';
+              
               // dọn UI đề phòng CSS đè
               const breakdownEl = document.getElementById('voucherBreakdown');
               const voucherDiscountEl = document.getElementById('voucherDiscount');
@@ -671,11 +693,17 @@
               btnApplyTyped.addEventListener('click', ()=>{
                 const code = (voucherInputEl?.value || '').trim();
                 if(!code) return;
-                // set tạm để server validate khi submit
-                setVoucher({ code, discountPercent: 0, discountMaxAmount: 0 });
-                 if (voucherCodeHid) voucherCodeHid.value = code;
+                // ⚠️ Khi nhập tay, chưa có VoucherId → chỉ set code, để server validate sau
+                // Không dùng setVoucher() vì nó sẽ normalize và ghi VoucherId = ''
+                CURRENT_VOUCHER = { Code: code, DiscountPercent: 0, DiscountMaxAmount: 0 };
+                if (voucherCodeHid) voucherCodeHid.value = code;
+                // KHÔNG set voucherId vì chưa biết (để trống cho server tự tìm)
+                const voucherIdHid = document.querySelector('#checkoutForm #voucherId');
+                if (voucherIdHid) voucherIdHid.value = '';
+                
                 const closer = document.querySelector('[data-close="#opt_voucher"]');
                 if(closer) closer.click();
+                recalc(); // cập nhật UI
               });
             }
 
@@ -748,8 +776,14 @@
               // Gán vào input của form Checkout
               document.getElementById('selectedKeysCsv').value = keys.join(',');
 
-              // Nếu bạn muốn gửi kèm mã voucher (đang lưu ở #voucherCode), có thể map sang voucherId hoặc thêm 1 input khác:
-              // document.getElementById('voucherId').value = document.getElementById('voucherCode')?.value || '';
+              // ✅ Debug: Log giá trị voucher trước khi submit
+              const voucherIdInput = document.getElementById('voucherId');
+              const voucherCodeInput = document.getElementById('voucherCode');
+              console.log('🎫 Submitting to BookingService:');
+              console.log('  - selectedKeysCsv:', keys.join(','));
+              console.log('  - voucherId:', voucherIdInput?.value || '(empty)');
+              console.log('  - voucherCode:', voucherCodeInput?.value || '(empty)');
+              console.log('  - CURRENT_VOUCHER:', CURRENT_VOUCHER);
 
               // Submit form Checkout (không phải #cartForm)
               document.getElementById('checkoutForm').submit();
@@ -887,6 +921,8 @@
             }
             window.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
             window.addEventListener('resize', scheduleReposition);
+
+            // ❌ KHÔNG khôi phục voucher từ localStorage - user phải chọn lại mỗi lần vào trang
 
             // init
             recalc();

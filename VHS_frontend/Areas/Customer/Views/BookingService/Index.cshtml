@@ -67,6 +67,19 @@
 <link rel="stylesheet" href="~/css/booking-service.css" asp-append-version="true" />
 
 <section class="checkout-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-wrapper">
+            <h1 class="page-title">Thanh Toán Dịch Vụ</h1>
+            <p class="page-subtitle">Xác nhận thông tin và hoàn tất đặt dịch vụ của bạn</p>
+        </div>
+        <div class="page-breadcrumb">
+            <a href="@Url.Action("Index", "Cart", new { area = "Customer" })">Giỏ hàng</a>
+            <span class="separator">›</span>
+            <span class="current">Thanh toán</span>
+        </div>
+    </div>
+
     <!-- Địa chỉ nhận hàng -->
     <div class="address-card">
         <div class="addr-title">
@@ -106,9 +119,13 @@
                             <!-- Cột 1: Ảnh -->
                             <img class="thumb" src="@it.Image" alt="@it.ServiceName" />
 
-                            <!-- Cột 2: Tên dịch vụ -->
+                            <!-- Cột 2: Tên dịch vụ + Đơn giá -->
                             <div>
                                 <div><strong>@it.ServiceName</strong></div>
+                                <div class="service-price-info">
+                                    <span class="price-label">Đơn giá:</span>
+                                    <span class="price-value">@Money(it.UnitPrice)</span>
+                                </div>
                             </div>
 
                             <!-- Cột 3: Tuỳ chọn hiển thị sẵn -->
@@ -149,12 +166,6 @@
                                     }
                                 </div>
                             </div>
-
-                            <!-- Cột 4: Đơn giá -->
-                            <div class="price">@Money(it.UnitPrice)</div>
-
-                            <!-- Cột 6: Thành tiền -->
-                            <div class="line-total">@Money(it.LineTotal)</div>
                         </div>
 
                         <!-- ✅ CHÈN MỚI: gửi đúng danh sách OptionIds đang hiển thị cho item này -->
@@ -314,6 +325,10 @@
         <!-- Tóm tắt -->
         <div>
             <div class="summary-box">
+                <div class="summary-header">
+                    <h3>Tóm tắt đơn hàng</h3>
+                </div>
+                
                 <form id="@placeOrderFormId" asp-area="Customer" asp-controller="BookingService" asp-action="PlaceOrder" method="post">
                     @Html.AntiForgeryToken()
 
@@ -346,10 +361,9 @@
                         <div id="voucherAppliedInfo"></div>
                     </div>
 
-                    <div style="margin-top:12px">
-
-                        <button class="btn" type="button" onclick="cancelCheckout()">Hủy</button>
-                        <button class="btn-place" type="submit">Đặt hàng</button>
+                    <div class="summary-actions">
+                        <button class="btn-cancel" type="button" onclick="cancelCheckout()">Hủy</button>
+                        <button class="btn-place" type="submit">Đặt dịch vụ</button>
                     </div>
                 </form>
             </div>
@@ -567,9 +581,6 @@
         </div>
         <div id="tosModalBody" style="margin-top:12px; max-height:65vh; overflow:auto">
             <!-- Nội dung nạp qua AJAX -->
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
-            <button type="button" class="btn" onclick="closeTosModal()">Đã hiểu</button>
         </div>
     </div>
 </div>
@@ -1108,13 +1119,42 @@
           panel?.addEventListener('click', (e)=>{ if(e.target === panel) closePanel(); });
 
           // Khởi tạo từ server (nếu đã có VoucherId trong model)
-          (function initFromServer(){
+          (async function initFromServer(){
             const firstId = (voucherIdInput?.value || '').trim();
             const percent   = Number('@Model.VoucherPercent'.toString().replace(',', '.'));
             const maxAmount = Number('@Model.VoucherMaxAmount'.toString().replace(',', '.'));
-                  if(firstId){
-          CURRENT_VOUCHER = { VoucherId: firstId, DiscountPercent: percent||0, DiscountMaxAmount: maxAmount||0 };
-        }
+            
+            if(firstId){
+              // ✅ Fetch đầy đủ thông tin voucher từ server để có Code
+              try {
+                const vouchers = await fetchVouchers();
+                const found = vouchers.find(v => {
+                  const vid = pick(v, 'VoucherId', 'voucherId', 'Id', 'id');
+                  return vid && vid.toString().toLowerCase() === firstId.toLowerCase();
+                });
+                
+                if (found) {
+                  CURRENT_VOUCHER = normalizeVoucher(found);
+                } else {
+                  // Fallback nếu không tìm thấy trong danh sách
+                  CURRENT_VOUCHER = { 
+                    VoucherId: firstId, 
+                    DiscountPercent: percent||0, 
+                    DiscountMaxAmount: maxAmount||0,
+                    Code: '' // để updateVoucherUI không bị lỗi
+                  };
+                }
+              } catch (e) {
+                console.error('Failed to load voucher details:', e);
+                // Fallback
+                CURRENT_VOUCHER = { 
+                  VoucherId: firstId, 
+                  DiscountPercent: percent||0, 
+                  DiscountMaxAmount: maxAmount||0,
+                  Code: ''
+                };
+              }
+            }
 
             updateVoucherUI();
             if (CURRENT_VOUCHER) refreshTotalsLocal();

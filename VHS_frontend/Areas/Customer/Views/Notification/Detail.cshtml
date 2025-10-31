@@ -2,6 +2,29 @@
 @{
     ViewData["Title"] = "Chi tiết thông báo";
     Layout = "~/Views/Shared/_Layout.cshtml";
+    
+    // Helper function to convert NotificationType to Vietnamese
+    string GetNotificationTypeVN(string type)
+    {
+        return type switch
+        {
+            "PAYMENT_SUCCESS" => "Thanh toán thành công",
+            "NEW_BOOKING" => "Đơn hàng mới",
+            "BOOKING_CONFIRMED" => "Xác nhận đơn hàng",
+            "BOOKING_CANCELLED" => "Hủy đơn hàng",
+            "BOOKING_COMPLETED" => "Hoàn thành đơn hàng",
+            "Payment" => "Thanh toán",
+            "Booking" => "Đặt lịch",
+            "System" => "Hệ thống",
+            _ => type
+        };
+    }
+    
+    // Database đã lưu theo giờ Việt Nam, không cần convert nữa
+    DateTime ToVietnamTime(DateTime vietnamTime)
+    {
+        return vietnamTime;
+    }
 }
 
 <div class="notification-detail-page">
@@ -17,20 +40,24 @@
         <div class="notification-detail-card">
             <div class="detail-header-info">
                 <div class="notification-icon-large">
-                    @switch (Model.NotificationType.ToLower())
-                    {
-                        case "booking":
-                            <i class="icon-calendar"></i>
-                            break;
-                        case "payment":
+                    @{
+                        var notifType = Model.NotificationType.ToLower();
+                        if (notifType.Contains("payment"))
+                        {
                             <i class="icon-credit-card"></i>
-                            break;
-                        case "system":
+                        }
+                        else if (notifType.Contains("booking"))
+                        {
+                            <i class="icon-calendar"></i>
+                        }
+                        else if (notifType == "system")
+                        {
                             <i class="icon-settings"></i>
-                            break;
-                        default:
+                        }
+                        else
+                        {
                             <i class="icon-bell"></i>
-                            break;
+                        }
                     }
                 </div>
                 
@@ -38,9 +65,9 @@
                     <h2 class="notification-title">@Model.Content</h2>
                     <div class="notification-meta">
                         <span class="type-badge type-@Model.NotificationType.ToLower()">
-                            @Model.NotificationType
+                            @GetNotificationTypeVN(Model.NotificationType)
                         </span>
-                        <span class="time">@Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                        <span class="time">@ToVietnamTime(Model.CreatedAt).ToString("dd/MM/yyyy HH:mm")</span>
                         @if (!Model.IsRead)
                         {
                             <span class="status-badge unread">Chưa đọc</span>
