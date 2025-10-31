@@ -70,6 +70,14 @@ builder.Services.AddHttpClient<AdminFeedbackService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+builder.Services.AddHttpClient<AdminComplaintService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+builder.Services.AddHttpClient<AdminBookingService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 builder.Services.AddHttpClient<NotificationService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
@@ -78,23 +86,40 @@ builder.Services.AddHttpClient<AdminNotificationService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
-builder.Services.AddHttpClient<VHS_frontend.Services.Provider.ProviderNotificationService>(client =>
+builder.Services.AddHttpClient<PaymentManagementService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
-builder.Services.AddHttpClient<AdminBookingService>(client =>
+builder.Services.AddHttpClient<ProviderWithdrawalService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
-// ServiceShopService
-builder.Services.AddHttpClient<ServiceShopService>(client =>
+builder.Services.AddHttpClient<ProfileServiceCustomer>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+builder.Services.AddHttpClient<UserAddressService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+builder.Services.AddHttpClient<ReportService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+// Chatbox Service
+builder.Services.AddHttpClient<ChatboxService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });
+// ServiceShopService
+builder.Services.AddScoped<ServiceShopService>();
 
-// Connect VNPay API
 builder.Services.AddScoped<IVnPayService, VnPayService>();
+builder.Services.AddScoped<VnPayService>();
 builder.Services.AddScoped<MoMoService>();
 
 // HttpClient cho AuthService

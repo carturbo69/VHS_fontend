@@ -1,0 +1,163 @@
+@model VHS_frontend.Areas.Customer.Models.Profile.ChangeEmailViewModel
+@{
+    ViewData["Title"] = "Đổi email";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/profile.css" asp-append-version="true" />
+}
+
+@await Html.PartialAsync("_ProfileNavigation")
+
+<div class="profile-edit-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-content">
+            <h1><i class="bi bi-envelope"></i> Đổi email</h1>
+            <p>Cập nhật email đăng nhập của bạn</p>
+        </div>
+        <div class="header-actions">
+            <a asp-action="Index" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Quay lại
+            </a>
+        </div>
+    </div>
+
+    <div class="edit-form-container">
+        <form asp-action="ChangeEmail" method="post" class="profile-edit-form">
+            @Html.AntiForgeryToken()
+            
+            <!-- Security Notice -->
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Cảnh báo:</strong> Sau khi đổi email, bạn sẽ cần sử dụng email mới để đăng nhập vào hệ thống.
+            </div>
+
+            <!-- Email Section -->
+            <div class="form-section">
+                <h3><i class="bi bi-envelope-at"></i> Thông tin email mới</h3>
+                <div class="form-group">
+                    <label asp-for="NewEmail" class="form-label required"></label>
+                    <input asp-for="NewEmail" type="email" class="form-control" placeholder="Nhập email mới">
+                    <span asp-validation-for="NewEmail" class="text-danger"></span>
+                    <div class="form-text">
+                        <i class="bi bi-info-circle"></i>
+                        Email mới sẽ được sử dụng để đăng nhập và nhận thông báo từ hệ thống
+                    </div>
+                </div>
+            </div>
+
+            <!-- OTP Section -->
+            <div class="form-section">
+                <h3><i class="bi bi-shield-check"></i> Xác thực OTP</h3>
+                <div class="otp-section">
+                    <div class="otp-info">
+                        <i class="bi bi-envelope"></i>
+                        <div>
+                            <p>Mã OTP sẽ được gửi đến email hiện tại của bạn</p>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="requestOTP()" id="requestOTPBtn">
+                                <i class="bi bi-send"></i> Gửi mã OTP
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label asp-for="OTP" class="form-label required"></label>
+                        <input asp-for="OTP" class="form-control otp-input" placeholder="Nhập mã OTP 6 số" maxlength="6">
+                        <span asp-validation-for="OTP" class="text-danger"></span>
+                        <div class="otp-timer" id="otpTimer" style="display: none;">
+                            <small class="text-muted">Có thể gửi lại sau <span id="countdown">60</span> giây</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
+                    <i class="bi bi-x-circle"></i> Hủy
+                </button>
+                <button type="submit" class="btn btn-info">
+                    <i class="bi bi-envelope-check"></i> Đổi email
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let otpCooldown = 0;
+        let otpTimerInterval = null;
+
+        // Request OTP
+        async function requestOTP() {
+            const btn = document.getElementById('requestOTPBtn');
+            const timer = document.getElementById('otpTimer');
+            const countdown = document.getElementById('countdown');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang gửi...';
+
+            try {
+                const response = await fetch('@Url.Action("RequestEmailChangeOTP")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Mã OTP đã được gửi đến email hiện tại của bạn', 'success');
+                    
+                    // Start cooldown timer
+                    otpCooldown = 60;
+                    timer.style.display = 'block';
+                    startOTPTimer();
+                } else {
+                    showToast(result.message || 'Có lỗi xảy ra khi gửi OTP', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-send"></i> Gửi mã OTP';
+                }
+            } catch (error) {
+                showToast('Có lỗi xảy ra khi gửi OTP', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send"></i> Gửi mã OTP';
+            }
+        }
+
+        // Start OTP timer
+        function startOTPTimer() {
+            otpTimerInterval = setInterval(() => {
+                otpCooldown--;
+                document.getElementById('countdown').textContent = otpCooldown;
+                
+                if (otpCooldown <= 0) {
+                    clearInterval(otpTimerInterval);
+                    document.getElementById('otpTimer').style.display = 'none';
+                    document.getElementById('requestOTPBtn').disabled = false;
+                    document.getElementById('requestOTPBtn').innerHTML = '<i class="bi bi-send"></i> Gửi mã OTP';
+                }
+            }, 1000);
+        }
+
+        // Auto-request OTP when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto request OTP for better UX
+            setTimeout(() => {
+                if (otpCooldown === 0) {
+                    requestOTP();
+                }
+            }, 1000);
+        });
+
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            // Implementation depends on your toast system
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+    </script>
+}
