@@ -659,7 +659,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         [HttpGet]
         public async Task<IActionResult> ListHistoryBooking(CancellationToken ct)
         {
-            var statusOrder = new[] { "Pending", "Confirmed", "InProgress", "Completed", "Cancelled", "All" };
+            var statusOrder = new[] { "All", "Pending", "Confirmed", "InProgress", "Completed", "Cancelled" };
 
             var statusViMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
