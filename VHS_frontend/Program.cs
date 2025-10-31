@@ -78,11 +78,23 @@ builder.Services.AddHttpClient<AdminNotificationService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+builder.Services.AddHttpClient<VHS_frontend.Services.Provider.ProviderNotificationService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+builder.Services.AddHttpClient<AdminBookingService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 
 // ServiceShopService
-builder.Services.AddScoped<ServiceShopService>();
+builder.Services.AddHttpClient<ServiceShopService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
 
-builder.Services.AddScoped<VnPayService>();
+// Connect VNPay API
+builder.Services.AddScoped<IVnPayService, VnPayService>();
 builder.Services.AddScoped<MoMoService>();
 
 // HttpClient cho AuthService

@@ -108,6 +108,7 @@ namespace VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
         public Guid ToSid { get; set; }
         public Guid ProviderId { get; set; }
         public string? ProviderName { get; set; }
+        public string? Title { get; set; }
         public string? Url { get; set; }
         public string? Description { get; set; }
         public DateTime? CreatedAt { get; set; }

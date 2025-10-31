@@ -7,6 +7,8 @@ using VHS_frontend.Areas.Customer.Models.CartItemDTOs;
 using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
 using VHS_frontend.Areas.Customer.Models.VoucherDTOs;
 using VHS_frontend.Services.Customer;
+using VHS_frontend.Services.Customer.Interfaces;
+using VHS_frontend.Models.Payment;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
@@ -16,6 +18,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
     {
         private readonly CartServiceCustomer _cartService;
         private readonly BookingServiceCustomer _bookingServiceCustomer;
+        private readonly IVnPayService _vnPayService;
 
         // Session keys để giữ lựa chọn trong flow checkout
         private const string SS_SELECTED_IDS = "CHECKOUT_SELECTED_IDS";
@@ -27,10 +30,14 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
         private const string SS_CHECKOUT_DIRECT = "CHECKOUT_DIRECT_JSON";
 
-        public BookingServiceController(CartServiceCustomer cartService, BookingServiceCustomer bookingServiceCustomer)
+        public BookingServiceController(
+            CartServiceCustomer cartService, 
+            BookingServiceCustomer bookingServiceCustomer,
+            IVnPayService vnPayService)
         {
             _cartService = cartService;
             _bookingServiceCustomer = bookingServiceCustomer;
+            _vnPayService = vnPayService;
         }
 
         // Helper: lấy AccountId từ claim/session
@@ -91,12 +98,18 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         /// <summary>
-        /// Trang Checkout. Chỉ nhận VoucherId (không dùng code).
+        /// Trang Checkout. Nhận VoucherId hoặc VoucherCode.
         /// Hỗ trợ cả luồng "Mua ngay" (SS_CHECKOUT_DIRECT) không đi qua giỏ.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId, bool refresh = false)
+        public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId, string? voucherCode, bool refresh = false)
         {
+            // ✅ Debug: Log parameters nhận được
+            System.Diagnostics.Debug.WriteLine($"🎫 BookingService.Index received:");
+            System.Diagnostics.Debug.WriteLine($"  - selectedKeysCsv: {selectedKeysCsv ?? "(null)"}");
+            System.Diagnostics.Debug.WriteLine($"  - voucherId: {voucherId?.ToString() ?? "(null)"}");
+            System.Diagnostics.Debug.WriteLine($"  - voucherCode: {voucherCode ?? "(null)"}");
+            
             var jwt = HttpContext.Session.GetString("JWToken"); // 👈 kéo dòng này lên đầu để dùng cho cancel
 
             if (refresh)
@@ -121,6 +134,23 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var voucherIdStr = HttpContext.Session.GetString(SS_VOUCHER_ID);
                 if (Guid.TryParse(voucherIdStr, out var vid)) voucherId = vid;
+            }
+            
+            // ====== Nếu không có voucherId nhưng có voucherCode, tìm VoucherId từ code ======
+            if (!voucherId.HasValue && !string.IsNullOrWhiteSpace(voucherCode))
+            {
+                var allVouchers = await _cartService.GetCartVouchersAsync(jwt) ?? new List<ReadVoucherByCustomerDTOs>();
+                var foundByCode = allVouchers.FirstOrDefault(v => 
+                    string.Equals(v.Code, voucherCode, StringComparison.OrdinalIgnoreCase));
+                if (foundByCode != null)
+                {
+                    voucherId = foundByCode.VoucherId;
+                    System.Diagnostics.Debug.WriteLine($"  ✅ Found voucherId from code '{voucherCode}': {voucherId}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"  ❌ Could not find voucherId for code '{voucherCode}'");
+                }
             }
 
             // ----------------------------------------------------------------
@@ -295,6 +325,17 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 vm.VoucherId = chosen?.VoucherId;
                 vm.VoucherPercent = (int)Math.Round(pctDec);
                 vm.VoucherMaxAmount = maxCap;
+                
+                // ✅ Debug: Log voucher được gán vào ViewModel
+                System.Diagnostics.Debug.WriteLine($"  📋 ViewModel voucher info:");
+                System.Diagnostics.Debug.WriteLine($"     - VoucherId: {vm.VoucherId?.ToString() ?? "(null)"}");
+                System.Diagnostics.Debug.WriteLine($"     - VoucherPercent: {vm.VoucherPercent}%");
+                System.Diagnostics.Debug.WriteLine($"     - VoucherMaxAmount: {vm.VoucherMaxAmount}");
+                System.Diagnostics.Debug.WriteLine($"     - Discount: {discount}");
+                if (chosen != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"     - Code: {chosen.Code}");
+                }
 
                 // Lưu session cho flow (CHỈ NHÁNH GIỎ)
                 HttpContext.Session.SetString(SS_SELECTED_IDS, string.Join(',', ids));
@@ -523,20 +564,40 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     System.Text.Json.JsonSerializer.Serialize(result.Breakdown)
                 );
 
-                // ✨ Hiển thị số tiền ngay: truyền amount theo InvariantCulture
-                var amountStr = result.Total.ToString(CultureInfo.InvariantCulture);
+                // ✅ Lưu mapping BookingId -> ServiceName từ Breakdown (backend đã trả về ServiceName)
+                var serviceNamesMap = new Dictionary<string, string>();
+                if (result.Breakdown != null && result.Breakdown.Any())
+                {
+                    foreach (var item in result.Breakdown)
+                    {
+                        if (!string.IsNullOrWhiteSpace(item.ServiceName))
+                        {
+                            serviceNamesMap[item.BookingId.ToString()] = item.ServiceName;
+                        }
+                    }
+                }
+                HttpContext.Session.SetString(
+                    "BookingServiceNamesJson",
+                    System.Text.Json.JsonSerializer.Serialize(serviceNamesMap)
+                );
 
                 switch (model.SelectedPaymentCode?.ToUpperInvariant())
                 {
                     case "VNPAY":
-                        return RedirectToAction(
-                            "StartVnPay", "Payment",
-                            new { area = "Customer", bookingIds = result.BookingIds, amount = amountStr });
+                        // Tạo thông tin thanh toán cho VNPay
+                        // 🔑 GỬI BOOKING IDS QUA VNPAY để tránh mất session khi redirect
+                        var bookingIdsCsv = string.Join(",", result.BookingIds);
+                        var vnpayPayment = new PaymentInformationModel
+                        {
+                            OrderType = "billpayment",
+                            Amount = (double)result.Total,
+                            OrderDescription = $"BOOKINGS:{bookingIdsCsv}",  // 🔑 Encode booking IDs vào đây
+                            Name = model.RecipientFullName ?? "Khách hàng"
+                        };
 
-                    case "MOMO":
-                        return RedirectToAction(
-                            "StartMoMo", "Payment",
-                            new { area = "Customer", bookingIds = result.BookingIds, amount = amountStr });
+                        // Tạo URL VNPay và redirect trực tiếp
+                        var vnpayUrl = _vnPayService.CreatePaymentUrl(vnpayPayment, HttpContext);
+                        return Redirect(vnpayUrl);
 
                     default:
                         // COD
@@ -598,7 +659,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         [HttpGet]
         public async Task<IActionResult> ListHistoryBooking(CancellationToken ct)
         {
-            var statusOrder = new[] { "Pending", "Confirmed", "InProgress", "Completed", "Cancelled", "All" };
+            var statusOrder = new[] { "All", "Pending", "Confirmed", "InProgress", "Completed", "Cancelled" };
 
             var statusViMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -782,20 +843,21 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         ProviderId = providerId,
                         ProviderName = "Nhà cung cấp",
                         Url = "#",
+                        Title = "Điều khoản dịch vụ",
                         Description = @"<p>Chưa có điều khoản cụ thể cho nhà cung cấp này.</p>",
                         CreatedAt = DateTime.UtcNow
                     };
                 }
 
                 var providerName = System.Net.WebUtility.HtmlEncode(tos.ProviderName ?? "Nhà cung cấp");
+                var title = System.Net.WebUtility.HtmlEncode(tos.Title ?? "Điều khoản dịch vụ");
 
                 var html = $@"
 <div>
-  <div style=""font-weight:600;margin-bottom:6px"">{providerName}</div>
+  <div>{providerName}</div>
+  {(!string.IsNullOrWhiteSpace(tos.Title) ? $"<div>{title}</div>" : "")}
   <div>{tos.Description}</div>
-  <div style=""margin-top:8px"">
-    <a href=""{tos.Url}"" target=""_blank"" rel=""noopener"">Xem đầy đủ điều khoản</a>
-  </div>
+  {(!string.IsNullOrWhiteSpace(tos.Url) && tos.Url != "#" ? $"<div><a href=\"{tos.Url}\" target=\"_blank\" rel=\"noopener\">📄 Xem đầy đủ điều khoản</a></div>" : "")}
 </div>";
 
                 return Content(html, "text/html; charset=utf-8");
