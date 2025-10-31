@@ -77,8 +77,9 @@
                         <label asp-for="UnitType" class="form-label">Đơn vị tính <span class="text-danger">*</span></label>
                         <select asp-for="UnitType" class="form-select" required>
                             <option value="">-- Chọn đơn vị --</option>
-                            <option value="Unit">Unit (Lần/Căn/Phòng)</option>
+                            <option value="Hour">Hour (Giờ)</option>
                             <option value="Day">Day (Ngày)</option>
+                            <option value="Unit">Unit (Lần/Căn/Phòng)</option>
                         </select>
                         <span asp-validation-for="UnitType" class="text-danger"></span>
                     </div>
@@ -177,7 +178,12 @@
 
                 <!-- Options Section -->
                 <div class="mb-3">
-                    <label class="form-label">Options (Lựa chọn bổ sung)</label>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label">Options (Lựa chọn bổ sung)</label>
+                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#createOptionModalEdit">
+                            <i class="bi bi-plus-circle me-1"></i> Tạo Option mới
+                        </button>
+                    </div>
                     <div class="border rounded p-3">
                         @if (options.Any())
                         {
@@ -240,6 +246,42 @@
                 preview.style.display = 'none';
             }
         }
+        
+        // Create Option (Edit) handler
+        document.getElementById('createOptionFormEdit').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const optionData = {
+                OptionName: document.getElementById('optionNameEdit').value.trim(),
+                Description: document.getElementById('optionDescriptionEdit').value.trim(),
+                Price: parseFloat(document.getElementById('optionPriceEdit').value) || 0,
+                UnitType: document.getElementById('optionUnitTypeEdit').value
+            };
+
+            if (!optionData.OptionName) { alert('Vui lòng nhập tên option!'); return; }
+            if (!optionData.UnitType) { alert('Vui lòng chọn đơn vị!'); return; }
+            if (optionData.Price < 0) { alert('Giá phải >= 0!'); return; }
+
+            try {
+                const resp = await fetch('/Provider/ServiceManagement/CreateOption', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(optionData)
+                });
+                const result = await resp.json();
+                if (result && result.success) {
+                    const modalElement = document.getElementById('createOptionModalEdit');
+                    const modal = bootstrap.Modal.getInstance(modalElement) ?? new bootstrap.Modal(modalElement);
+                    modal.hide();
+                    this.reset();
+                    // Reload page to refresh options checkboxes quickly
+                    location.reload();
+                } else {
+                    alert(result?.message || 'Có lỗi xảy ra khi tạo option!');
+                }
+            } catch (err) {
+                alert('Có lỗi xảy ra khi tạo option!');
+            }
+        });
     </script>
     
     <style>
@@ -266,5 +308,54 @@
             font-size: 0.9rem;
         }
     </style>
+    
+    <!-- Create Option Modal (Edit) -->
+    <div class="modal fade" id="createOptionModalEdit" tabindex="-1" aria-labelledby="createOptionModalEditLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createOptionModalEditLabel">
+                        <i class="bi bi-gear me-2"></i>
+                        Tạo Option mới
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="createOptionFormEdit">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="optionNameEdit" class="form-label">Tên Option <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="optionNameEdit" required placeholder="VD: Thêm 2 giờ">
+                        </div>
+                        <div class="mb-3">
+                            <label for="optionDescriptionEdit" class="form-label">Mô tả</label>
+                            <textarea class="form-control" id="optionDescriptionEdit" rows="3" placeholder="Mô tả chi tiết về option..."></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="optionPriceEdit" class="form-label">Giá (VNĐ) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="optionPriceEdit" required min="0" step="1000" placeholder="100000">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="optionUnitTypeEdit" class="form-label">Đơn vị <span class="text-danger">*</span></label>
+                                <select class="form-select" id="optionUnitTypeEdit" required>
+                                    <option value="">-- Chọn đơn vị --</option>
+                                    <option value="Unit">Unit (Lần/Căn/Phòng)</option>
+                                    <option value="Day">Day (Ngày)</option>
+                                    <option value="Hour">Hour (Giờ)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle me-1"></i>
+                            Tạo Option
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 }
 

@@ -71,9 +71,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             var categories = await _serviceManagementService.GetAvailableCategoriesAsync(providerId, token);
             ViewBag.Categories = categories ?? new List<CategoryDTO>();
 
-            // Lấy danh sách Options
-            var options = await _serviceManagementService.GetAllOptionsAsync(token);
-            ViewBag.Options = options ?? new List<OptionDTO>();
+            // Không nạp Options dùng chung cho trang tạo mới (bắt đầu trống, provider tự thêm)
 
             ViewData["Title"] = "Tạo Dịch vụ mới";
             ViewBag.ProviderId = providerId;
@@ -102,8 +100,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 // Reload dropdown data
                 var categories = await _serviceManagementService.GetAvailableCategoriesAsync(providerId, token);
                 ViewBag.Categories = categories ?? new List<CategoryDTO>();
-                var options = await _serviceManagementService.GetAllOptionsAsync(token);
-                ViewBag.Options = options ?? new List<OptionDTO>();
+                // Không nạp Options ở trang tạo mới
                 ViewBag.ProviderId = providerId;
 
                 TempData["Error"] = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.";
@@ -122,8 +119,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 // Reload dropdown data
                 var categories = await _serviceManagementService.GetAvailableCategoriesAsync(providerId, token);
                 ViewBag.Categories = categories ?? new List<CategoryDTO>();
-                var options = await _serviceManagementService.GetAllOptionsAsync(token);
-                ViewBag.Options = options ?? new List<OptionDTO>();
+                // Không nạp Options ở trang tạo mới
                 ViewBag.ProviderId = providerId;
 
                 TempData["Error"] = response?.Message ?? "Tạo dịch vụ thất bại.";
@@ -167,9 +163,8 @@ namespace VHS_frontend.Areas.Provider.Controllers
             var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), token);
             ViewBag.Tags = tags ?? new List<TagDTO>();
 
-            // Load all options
-            var options = await _serviceManagementService.GetAllOptionsAsync(token);
-            ViewBag.Options = options ?? new List<OptionDTO>();
+            // Only pass options already selected with this service
+            ViewBag.Options = service.Options ?? new List<OptionDTO>();
 
             ViewData["Title"] = "Chỉnh sửa Dịch vụ";
             ViewBag.ServiceId = id;
@@ -194,8 +189,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 {
                     var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), token);
                     ViewBag.Tags = tags ?? new List<TagDTO>();
-                    var options = await _serviceManagementService.GetAllOptionsAsync(token);
-                    ViewBag.Options = options ?? new List<OptionDTO>();
+                    ViewBag.Options = service.Options ?? new List<OptionDTO>();
                     ViewBag.CurrentImageUrl = service.Images;
                     ViewBag.CategoryName = service.CategoryName;
                 }
@@ -220,8 +214,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 {
                     var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), token);
                     ViewBag.Tags = tags ?? new List<TagDTO>();
-                    var options = await _serviceManagementService.GetAllOptionsAsync(token);
-                    ViewBag.Options = options ?? new List<OptionDTO>();
+                    ViewBag.Options = service.Options ?? new List<OptionDTO>();
                     ViewBag.CurrentImageUrl = service.Images;
                     ViewBag.CategoryName = service.CategoryName;
                 }
@@ -271,38 +264,11 @@ namespace VHS_frontend.Areas.Provider.Controllers
             return Json(options ?? new List<OptionDTO>());
         }
 
-        // API endpoint to create new tag
+        // API endpoint to create new tag (disabled)
         [HttpPost]
-        public async Task<IActionResult> CreateTag([FromBody] VHS_frontend.Areas.Provider.Models.Tag.TagCreateDTO model)
+        public IActionResult CreateTag([FromBody] VHS_frontend.Areas.Provider.Models.Tag.TagCreateDTO model)
         {
-            var token = HttpContext.Session.GetString("JWToken");
-            
-            if (!ModelState.IsValid)
-            {
-                // Log chi tiết lỗi validation
-                var errors = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .Select(e => e.ErrorMessage)
-                    .ToList();
-                var errorMessage = string.Join("; ", errors);
-                
-                System.Diagnostics.Debug.WriteLine($"CreateTag ModelState Invalid: {errorMessage}");
-                System.Diagnostics.Debug.WriteLine($"Received CategoryId: {model.CategoryId}");
-                System.Diagnostics.Debug.WriteLine($"Received Name: {model.Name}");
-                
-                return Json(new { success = false, message = $"Dữ liệu không hợp lệ: {errorMessage}" });
-            }
-
-            try
-            {
-                var response = await _serviceManagementService.CreateTagAsync(model, token);
-                return Json(response);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"CreateTag Exception: {ex.Message}");
-                return Json(new { success = false, message = ex.Message });
-            }
+            return Json(new { success = false, message = "Tính năng tạo Tag đã bị vô hiệu hoá đối với Provider." });
         }
 
         // API endpoint to create new option
@@ -313,18 +279,11 @@ namespace VHS_frontend.Areas.Provider.Controllers
             
             if (!ModelState.IsValid)
             {
-                // Log chi tiết lỗi validation
                 var errors = ModelState.Values
                     .SelectMany(v => v.Errors)
                     .Select(e => e.ErrorMessage)
                     .ToList();
                 var errorMessage = string.Join("; ", errors);
-                
-                System.Diagnostics.Debug.WriteLine($"CreateOption ModelState Invalid: {errorMessage}");
-                System.Diagnostics.Debug.WriteLine($"Received OptionName: {model.OptionName}");
-                System.Diagnostics.Debug.WriteLine($"Received Price: {model.Price}");
-                System.Diagnostics.Debug.WriteLine($"Received UnitType: {model.UnitType}");
-                
                 return Json(new { success = false, message = $"Dữ liệu không hợp lệ: {errorMessage}" });
             }
 
@@ -340,22 +299,11 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
         }
 
-        // API endpoint to delete tag
+        // API endpoint to delete tag (disabled for Provider)
         [HttpDelete]
-        public async Task<IActionResult> DeleteTag(string id)
+        public IActionResult DeleteTag(string id)
         {
-            var token = HttpContext.Session.GetString("JWToken");
-
-            try
-            {
-                var response = await _serviceManagementService.DeleteTagAsync(id, token);
-                return Json(response);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"DeleteTag Exception: {ex.Message}");
-                return Json(new { success = false, message = ex.Message });
-            }
+            return Json(new { success = false, message = "Provider không được phép xoá Tag." });
         }
 
         // API endpoint to delete option

@@ -112,5 +112,21 @@ namespace VHS_frontend.Services.Provider
                 $"/api/provider/staff/{staffId}/schedule?weekStart={weekStartStr}", 
                 ct);
         }
+
+        // 🔑 Cập nhật mật khẩu cho Staff
+        public async Task<HttpResponseMessage> UpdateStaffPasswordAsync(
+            string staffId, 
+            StaffUpdatePasswordDTO dto, 
+            string? token = null, 
+            CancellationToken ct = default)
+        {
+            SetAuthHeader(token);
+            var json = JsonSerializer.Serialize(dto, _json);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            
+            return await _httpClient.PutAsync(
+                $"/api/staff/{staffId}/password", 
+                content, ct);
+        }
     }
 }

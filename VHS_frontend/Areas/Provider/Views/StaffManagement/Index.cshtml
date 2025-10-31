@@ -132,6 +132,13 @@
                                                     </a>
                                                     
                                                     <button type="button" 
+                                                            class="action-btn password-btn" 
+                                                            title="Cập nhật mật khẩu"
+                                                            onclick="showUpdatePasswordModal('@staff.StaffId', '@staff.StaffName')">
+                                                        <i class="bi bi-key"></i>
+                                                    </button>
+                                                    
+                                                    <button type="button" 
                                                             class="action-btn lock-btn" 
                                                             title="Khóa tài khoản"
                                                             onclick="lockStaff('@staff.StaffId', '@staff.StaffName')">
@@ -191,6 +198,13 @@
                                                     </a>
                                                     
                                                     <button type="button" 
+                                                            class="action-btn password-btn" 
+                                                            title="Cập nhật mật khẩu"
+                                                            onclick="showUpdatePasswordModal('@staff.StaffId', '@staff.StaffName')">
+                                                        <i class="bi bi-key"></i>
+                                                    </button>
+                                                    
+                                                    <button type="button" 
                                                             class="action-btn unlock-btn" 
                                                             title="Mở khóa"
                                                             onclick="unlockStaff('@staff.StaffId', '@staff.StaffName')">
@@ -205,6 +219,47 @@
                         }
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🔑 Modal Cập nhật mật khẩu -->
+<div class="modal fade" id="updatePasswordModal" tabindex="-1" aria-labelledby="updatePasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updatePasswordModalLabel">
+                    <i class="bi bi-key me-2"></i>
+                    Cập nhật mật khẩu
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nhân viên:</label>
+                    <p class="fw-bold text-primary" id="updatePasswordStaffName"></p>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="newPassword" class="form-label">Mật khẩu mới <span class="text-danger">*</span></label>
+                    <input type="password" class="form-control" id="newPassword" placeholder="Nhập mật khẩu mới" required>
+                    <div class="form-text">Mật khẩu phải có ít nhất 6 ký tự</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="confirmPassword" class="form-label">Xác nhận mật khẩu <span class="text-danger">*</span></label>
+                    <input type="password" class="form-control" id="confirmPassword" placeholder="Nhập lại mật khẩu mới" required>
+                </div>
+                
+                <input type="hidden" id="updatePasswordStaffId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" onclick="updateStaffPassword()">
+                    <i class="bi bi-check-lg me-2"></i>
+                    Cập nhật mật khẩu
+                </button>
             </div>
         </div>
     </div>
@@ -305,6 +360,89 @@
                     alert('Có lỗi xảy ra: ' + error.message);
                 });
             }
+        }
+
+        // 🔑 Cập nhật mật khẩu cho Staff
+        function showUpdatePasswordModal(staffId, staffName) {
+            // Set staff info in modal
+            document.getElementById('updatePasswordStaffId').value = staffId;
+            document.getElementById('updatePasswordStaffName').textContent = staffName;
+            
+            // Clear form
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('updatePasswordModal'));
+            modal.show();
+        }
+
+        function updateStaffPassword() {
+            const staffId = document.getElementById('updatePasswordStaffId').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Validation
+            if (!newPassword || !confirmPassword) {
+                alert('Vui lòng nhập đầy đủ thông tin');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                alert('Mật khẩu xác nhận không khớp');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                alert('Mật khẩu phải có ít nhất 6 ký tự');
+                return;
+            }
+            
+            // Get AntiForgeryToken
+            const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            
+            const formData = {
+                NewPassword: newPassword,
+                ConfirmPassword: confirmPassword
+            };
+            
+            fetch(`/Provider/StaffManagement/${staffId}/update-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'RequestVerificationToken': antiForgeryToken || ''
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    return response.text().then(text => {
+                        throw new Error('Server trả về dữ liệu không phải JSON');
+                    });
+                }
+                
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('updatePasswordModal'));
+                    modal.hide();
+                } else {
+                    alert('Lỗi: ' + (data.error || 'Không xác định'));
+                }
+            })
+            .catch(error => {
+                console.error('Update password error:', error);
+                alert('Có lỗi xảy ra: ' + error.message);
+            });
         }
     </script>
 }

@@ -519,5 +519,45 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 return RedirectToAction("Index");
             }
         }
+
+        // 🔑 Cập nhật mật khẩu cho Staff
+        [HttpPost("{id}/update-password")]
+        [Route("Provider/StaffManagement/{id}/update-password")]
+        public async Task<IActionResult> UpdatePassword(string id, [FromBody] StaffUpdatePasswordDTO model)
+        {
+            try
+            {
+                Console.WriteLine($"🔑 UpdatePassword called with id: {id}");
+                
+                var token = HttpContext.Session.GetString("JWToken");
+                if (string.IsNullOrEmpty(token))
+                {
+                    Console.WriteLine("❌ No token found in session");
+                    return Json(new { error = "Session hết hạn. Vui lòng đăng nhập lại." });
+                }
+
+                Console.WriteLine($"✅ Token found: {token.Substring(0, 20)}...");
+                
+                var result = await _staffManagementService.UpdateStaffPasswordAsync(id, model, token);
+                Console.WriteLine($"📡 Backend response status: {result.StatusCode}");
+                
+                if (result.IsSuccessStatusCode)
+                {
+                    Console.WriteLine("✅ Password update successful");
+                    return Json(new { success = true, message = "Cập nhật mật khẩu thành công!" });
+                }
+                else
+                {
+                    var errorContent = await result.Content.ReadAsStringAsync();
+                    Console.WriteLine($"❌ Backend error: {errorContent}");
+                    return Json(new { error = errorContent });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"💥 Exception in UpdatePassword: {ex.Message}");
+                return Json(new { error = ex.Message });
+            }
+        }
     }
 }

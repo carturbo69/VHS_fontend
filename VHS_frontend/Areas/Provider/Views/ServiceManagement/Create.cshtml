@@ -82,8 +82,9 @@
                         <label asp-for="UnitType" class="form-label">Đơn vị tính <span class="text-danger">*</span></label>
                         <select asp-for="UnitType" class="form-select" required>
                             <option value="">-- Chọn đơn vị --</option>
-                            <option value="Unit">Unit (Lần/Căn/Phòng)</option>
+                            <option value="Hour">Hour (Giờ)</option>
                             <option value="Day">Day (Ngày)</option>
+                            <option value="Unit">Unit (Lần/Căn/Phòng)</option>
                         </select>
                         <span asp-validation-for="UnitType" class="text-danger"></span>
                     </div>
@@ -106,13 +107,7 @@
 
                 <!-- Tags Section -->
                 <div class="mb-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <label class="form-label mb-0 fw-bold">Tags (Từ khóa)</label>
-                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTagModal" id="createTagBtn" disabled style="min-width: 150px;">
-                            <i class="bi bi-plus-circle me-1"></i>
-                            <strong>+ Tạo Tag mới</strong>
-                        </button>
-                    </div>
+                    <label class="form-label mb-0 fw-bold">Tags (Từ khóa)</label>
                     <div id="tagsContainer" class="border rounded p-3 bg-light">
                         <p class="text-muted mb-0">
                             <i class="bi bi-info-circle me-2"></i>
@@ -121,7 +116,7 @@
                     </div>
                     <small class="form-text text-muted">
                         <i class="bi bi-arrow-right me-1"></i>
-                        Chọn các tags liên quan đến dịch vụ của bạn hoặc tạo tag mới.
+                        Chọn các tags liên quan đến dịch vụ của bạn.
                     </small>
                 </div>
 
@@ -135,35 +130,14 @@
                         </button>
                     </div>
                     <div id="optionsContainer" class="border rounded p-3 bg-light">
-                        @if (options.Any())
-                        {
-                            <div class="row">
-                                @foreach (var option in options)
-                                {
-                                    <div class="col-md-4 mb-2">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="OptionIds" value="@option.OptionId" id="option_@option.OptionId" />
-                                            <label class="form-check-label" for="option_@option.OptionId">
-                                                @option.OptionName
-                                                <br />
-                                                <small class="text-muted">@option.Description - @option.Price.ToString("N0") VNĐ/@option.UnitType</small>
-                                            </label>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <p class="text-muted mb-0">
-                                <i class="bi bi-info-circle me-2"></i>
-                                Chưa có option nào. Bấm nút "Tạo Option mới" để thêm.
-                            </p>
-                        }
+                        <p class="text-muted mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Chưa có option nào.
+                        </p>
                     </div>
                     <small class="form-text text-muted">
                         <i class="bi bi-arrow-right me-1"></i>
-                        Chọn các lựa chọn bổ sung cho dịch vụ hoặc tạo option mới.
+                        Chọn các lựa chọn bổ sung cho dịch vụ.
                     </small>
                 </div>
 
@@ -179,44 +153,7 @@
     </div>
 </div>
 
-<!-- Create Tag Modal -->
-<div class="modal fade" id="createTagModal" tabindex="-1" aria-labelledby="createTagModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="createTagModalLabel">
-                    <i class="bi bi-tag me-2"></i>
-                    Tạo Tag mới
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="createTagForm">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="tagName" class="form-label">Tên Tag <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="tagName" name="name" required placeholder="VD: Dọn nhà cao cấp">
-                        <div class="invalid-feedback"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="tagDescription" class="form-label">Mô tả</label>
-                        <textarea class="form-control" id="tagDescription" name="description" rows="3" placeholder="Mô tả chi tiết về tag..."></textarea>
-                    </div>
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Tag sẽ được tạo cho danh mục: <strong id="selectedCategoryName">Chưa chọn</strong>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle me-1"></i>
-                        Tạo Tag
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<!-- Create Tag UI removed -->
 
 <!-- Create Option Modal -->
 <div class="modal fade" id="createOptionModal" tabindex="-1" aria-labelledby="createOptionModalLabel" aria-hidden="true">
@@ -282,13 +219,7 @@
             const selectedOption = this.options[this.selectedIndex];
             currentCategoryName = selectedOption.text;
             
-            // Update category name in tag modal
-            document.getElementById('selectedCategoryName').textContent = currentCategoryName;
-            
-            // Enable/disable create tag button
-            const createTagBtn = document.getElementById('createTagBtn');
-            createTagBtn.disabled = !currentCategoryId;
-            
+            // Update tags by category
             await loadTags();
         });
 
@@ -319,9 +250,7 @@
                                             ${tag.name}
                                         </label>
                                     </div>
-                                    <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="deleteTag('${tag.tagId}', '${tag.name}')" title="Xóa tag này">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    <!-- Provider không được xoá Tag -->
                                 </div>
                             </div>
                         `;
@@ -337,125 +266,9 @@
             }
         }
 
-        // Load options
-        async function loadOptions() {
-            const optionsContainer = document.getElementById('optionsContainer');
-            optionsContainer.innerHTML = '<p class="text-muted">Đang tải options...</p>';
+        // Không tự nạp options chung. Sẽ thêm dần các option vừa tạo vào danh sách.
 
-            try {
-                const response = await fetch('/Provider/ServiceManagement/GetAllOptions');
-                const options = await response.json();
-
-                if (options && options.length > 0) {
-                    let html = '<div class="row">';
-                    options.forEach(function (option) {
-                        html += `
-                            <div class="col-md-6 mb-2">
-                                <div class="d-flex align-items-center">
-                                    <div class="form-check flex-grow-1">
-                                        <input class="form-check-input" type="checkbox" name="OptionIds" value="${option.optionId}" id="option_${option.optionId}" />
-                                        <label class="form-check-label" for="option_${option.optionId}">
-                                            ${option.optionName}
-                                            <br />
-                                            <small class="text-muted">${option.description} - ${parseInt(option.price).toLocaleString()} VNĐ/${option.unitType}</small>
-                                        </label>
-                                    </div>
-                                    <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="deleteOption('${option.optionId}', '${option.optionName}')" title="Xóa option này">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    html += '</div>';
-                    optionsContainer.innerHTML = html;
-                } else {
-                    optionsContainer.innerHTML = '<p class="text-muted">Chưa có option nào.</p>';
-                }
-            } catch (error) {
-                console.error('Error loading options:', error);
-                optionsContainer.innerHTML = '<p class="text-danger">Lỗi khi tải options. Vui lòng thử lại.</p>';
-            }
-        }
-
-        // Create Tag Form Handler
-        document.getElementById('createTagForm').addEventListener('submit', async function (e) {
-            e.preventDefault();
-            
-            if (!currentCategoryId) {
-                alert('Vui lòng chọn danh mục trước khi tạo tag!');
-                return;
-            }
-
-            const tagData = {
-                CategoryId: currentCategoryId,
-                Name: document.getElementById('tagName').value.trim(),
-                Description: document.getElementById('tagDescription').value.trim()
-            };
-
-            // Validation
-            if (!tagData.Name) {
-                showNotification('Vui lòng nhập tên tag!', 'error');
-                return;
-            }
-            if (tagData.Name.length > 100) {
-                showNotification('Tên tag không được vượt quá 100 ký tự!', 'error');
-                return;
-            }
-
-            try {
-                console.log('Sending tag data:', tagData);
-                console.log('CategoryId type:', typeof tagData.CategoryId);
-                console.log('CategoryId value:', tagData.CategoryId);
-                
-                const response = await fetch('/Provider/ServiceManagement/CreateTag', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(tagData)
-                });
-
-                console.log('Tag response status:', response.status);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Tag error response:', errorText);
-                    showNotification(`Lỗi ${response.status}: ${errorText || 'Không thể tạo tag'}`, 'error');
-                    return;
-                }
-                
-                const result = await response.json();
-                console.log('Tag response data:', result);
-                
-                if (result && result.success) {
-                    // Close modal
-                    const modalElement = document.getElementById('createTagModal');
-                    const modal = bootstrap.Modal.getInstance(modalElement);
-                    if (modal) {
-                        modal.hide();
-                    } else {
-                        // Nếu chưa có instance, tạo mới rồi hide
-                        const newModal = new bootstrap.Modal(modalElement);
-                        newModal.hide();
-                    }
-                    
-                    // Reset form
-                    this.reset();
-                    
-                    // Reload tags
-                    await loadTags();
-                    
-                    // Show success message
-                    showNotification('Tạo tag thành công!', 'success');
-                } else {
-                    showNotification(result?.message || 'Có lỗi xảy ra khi tạo tag!', 'error');
-                }
-            } catch (error) {
-                console.error('Error creating tag:', error);
-                showNotification('Có lỗi xảy ra khi tạo tag!', 'error');
-            }
-        });
+        // Create Tag UI removed (no handler)
 
         // Create Option Form Handler
         document.getElementById('createOptionForm').addEventListener('submit', async function (e) {
@@ -468,70 +281,55 @@
                 UnitType: document.getElementById('optionUnitType').value
             };
 
-            // Validation
-            if (!optionData.OptionName) {
-                showNotification('Vui lòng nhập tên option!', 'error');
-                return;
-            }
-            if (!optionData.UnitType) {
-                showNotification('Vui lòng chọn đơn vị!', 'error');
-                return;
-            }
-            if (optionData.Price < 0) {
-                showNotification('Giá phải lớn hơn hoặc bằng 0!', 'error');
-                return;
-            }
+            if (!optionData.OptionName) { showNotification('Vui lòng nhập tên option!', 'error'); return; }
+            if (!optionData.UnitType) { showNotification('Vui lòng chọn đơn vị!', 'error'); return; }
+            if (optionData.Price < 0) { showNotification('Giá phải >= 0!', 'error'); return; }
 
             try {
-                console.log('Sending option data:', optionData);
-                console.log('Price value:', optionData.Price);
-                console.log('UnitType value:', optionData.UnitType);
-                
                 const response = await fetch('/Provider/ServiceManagement/CreateOption', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(optionData)
                 });
 
-                console.log('Option response status:', response.status);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Option error response:', errorText);
-                    showNotification(`Lỗi ${response.status}: ${errorText || 'Không thể tạo option'}`, 'error');
-                    return;
-                }
-                
                 const result = await response.json();
-                console.log('Option response data:', result);
-                
                 if (result && result.success) {
-                    // Close modal
                     const modalElement = document.getElementById('createOptionModal');
-                    const modal = bootstrap.Modal.getInstance(modalElement);
-                    if (modal) {
-                        modal.hide();
-                    } else {
-                        // Nếu chưa có instance, tạo mới rồi hide
-                        const newModal = new bootstrap.Modal(modalElement);
-                        newModal.hide();
-                    }
-                    
-                    // Reset form
+                    const modal = bootstrap.Modal.getInstance(modalElement) ?? new bootstrap.Modal(modalElement);
+                    modal.hide();
                     this.reset();
-                    
-                    // Reload options
-                    await loadOptions();
-                    
-                    // Show success message
+                    // Thêm option vừa tạo vào danh sách và auto-tick
+                    const opt = result.data;
+                    const container = document.getElementById('optionsContainer');
+                    if (container.querySelector('.text-muted')) {
+                        container.innerHTML = '';
+                    }
+                    const wrap = document.createElement('div');
+                    wrap.className = 'row';
+                    // nếu đã có row trước đó, dùng row hiện có
+                    const existingRow = container.querySelector('.row');
+                    const row = existingRow ?? wrap;
+                    if (!existingRow) container.appendChild(row);
+
+                    const col = document.createElement('div');
+                    col.className = 'col-md-6 mb-2';
+                    col.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <div class="form-check flex-grow-1">
+                                <input class="form-check-input" type="checkbox" name="OptionIds" value="${opt.optionId}" id="option_${opt.optionId}" checked />
+                                <label class="form-check-label" for="option_${opt.optionId}">
+                                    ${opt.optionName}
+                                    <br />
+                                    <small class="text-muted">${opt.description ?? ''} ${opt.price !== undefined ? '- ' + parseInt(opt.price).toLocaleString() + ' VNĐ/' + opt.unitType : ''}</small>
+                                </label>
+                            </div>
+                        </div>`;
+                    row.appendChild(col);
                     showNotification('Tạo option thành công!', 'success');
                 } else {
                     showNotification(result?.message || 'Có lỗi xảy ra khi tạo option!', 'error');
                 }
             } catch (error) {
-                console.error('Error creating option:', error);
                 showNotification('Có lỗi xảy ra khi tạo option!', 'error');
             }
         });
@@ -562,36 +360,7 @@
             }, 5000);
         }
 
-        // Delete Tag Function
-        async function deleteTag(tagId, tagName) {
-            // Confirmation dialog
-            if (!confirm(`Bạn có chắc chắn muốn xóa tag "${tagName}" không?\n\nLưu ý: Các dịch vụ đang sử dụng tag này sẽ bị ảnh hưởng.`)) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/Provider/ServiceManagement/DeleteTag?id=${tagId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const result = await response.json();
-                console.log('Delete tag response:', result);
-
-                if (result && result.success) {
-                    showNotification(`Đã xóa tag "${tagName}" thành công!`, 'success');
-                    // Reload tags
-                    await loadTags();
-                } else {
-                    showNotification(result?.message || 'Có lỗi xảy ra khi xóa tag!', 'error');
-                }
-            } catch (error) {
-                console.error('Error deleting tag:', error);
-                showNotification('Có lỗi xảy ra khi xóa tag!', 'error');
-            }
-        }
+        // Provider không có chức năng xoá Tag
 
         // Delete Option Function
         async function deleteOption(optionId, optionName) {
