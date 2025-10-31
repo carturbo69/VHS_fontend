@@ -11,11 +11,7 @@
     <div class="shop-profile-section">
         <div class="shop-info">
             <div class="shop-logo">
-                <img src="@Model.ShopInfo.Logo" alt="Shop Logo" class="logo-img">
-                <div class="favorite-btn">
-                    <i class="fas fa-heart"></i>
-                    <span>Yêu Thích</span>
-                </div>
+                <img src="@Model.ShopInfo.Logo" alt="Shop Logo" class="logo-img" onerror="this.src='/images/VeSinh.jpg'">
             </div>
             <div class="shop-details">
                 <h2 class="shop-name">@Model.ShopInfo.Name</h2>
@@ -38,96 +34,86 @@
                 <span class="stat-label">Dịch Vụ:</span>
                 <span class="stat-value">@Model.ShopInfo.TotalServices</span>
             </div>
+            @if (Model.ShopInfo.Rating > 0)
+            {
+                <div class="stat-item">
+                    <span class="stat-label">Đánh Giá:</span>
+                    <span class="stat-value">@Model.ShopInfo.Rating.ToString("0.0") @(Model.ShopInfo.TotalRatings > 0 ? $"({Model.ShopInfo.TotalRatings.ToString("N0")} đánh giá)" : "")</span>
+                </div>
+            }
+            @if (Model.ShopInfo.Followers > 0)
+            {
+                <div class="stat-item">
+                    <span class="stat-label">Người Theo Dõi:</span>
+                    <span class="stat-value">@Model.ShopInfo.Followers.ToString("N0")</span>
+                </div>
+            }
             <div class="stat-item">
-                <span class="stat-label">Đang Theo:</span>
-                <span class="stat-value">@Model.ShopInfo.Following</span>
+                <span class="stat-label">Tỉ Lệ Phản Hồi:</span>
+                <span class="stat-value">@Model.ShopInfo.ResponseRate.ToString("0.0")%</span>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">Tỉ Lệ Phản Hồi Chat:</span>
-                <span class="stat-value">@Model.ShopInfo.ResponseRate% (Trong Vài Giờ)</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Người Theo Dõi:</span>
-                <span class="stat-value">@Model.ShopInfo.Followers.ToString("N0")</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Đánh Giá:</span>
-                <span class="stat-value">@Model.ShopInfo.Rating (@Model.ShopInfo.TotalRatings.ToString("N0") Đánh Giá)</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Tham Gia:</span>
-                <span class="stat-value">@Model.ShopInfo.JoinDate</span>
-            </div>
+            @if (!string.IsNullOrEmpty(Model.ShopInfo.JoinDate) && Model.ShopInfo.JoinDate != "—")
+            {
+                <div class="stat-item">
+                    <span class="stat-label">Tham Gia:</span>
+                    <span class="stat-value">@Model.ShopInfo.JoinDate</span>
+                </div>
+            }
         </div>
     </div>
 
-    <!-- Shop Navigation Tabs -->
-    <div class="shop-nav-tabs">
-        <div class="nav-tabs">
-            <a href="#" class="nav-tab active">Dạo</a>
-            <a href="#" class="nav-tab">Dịch Vụ</a>
-            <a href="#" class="nav-tab">Vệ Sinh Máy Tính</a>
-            <a href="#" class="nav-tab">Vệ Sinh Laptop</a>
-            <a href="#" class="nav-tab">Vệ Sinh Máy Chủ</a>
-            <a href="#" class="nav-tab">Vệ Sinh Thiết Bị Mạng</a>
-            <a href="#" class="nav-tab">Bảo Trì Hệ Thống</a>
-            <a href="#" class="nav-tab">Thêm <i class="fas fa-chevron-down"></i></a>
-        </div>
-    </div>
 
     <!-- Bestselling Services Section -->
-    <div class="bestselling-section">
-        <div class="section-header">
-            <h3 class="section-title">DỊCH VỤ BÁN CHẠY</h3>
-            <a href="#" class="view-all-link">Xem Tất Cả ></a>
-        </div>
+    @if (Model.BestsellingServices.Any())
+    {
+        <div class="bestselling-section">
+            <div class="section-header">
+                <h3 class="section-title">DỊCH VỤ NỔI BẬT</h3>
+            </div>
         <div class="bestselling-carousel">
             @for (int i = 0; i < Model.BestsellingServices.Count; i++)
             {
                 var service = Model.BestsellingServices[i];
-                <div class="bestselling-item">
-                    <div class="rank-badge">@(i + 1)</div>
-                    <div class="shop-logo-small">
-                        <img src="@Model.ShopInfo.Logo" alt="Shop Logo">
-                    </div>
-                    <div class="product-tag">@service.Category</div>
-                    <div class="product-image">
-                        <img src="@service.Image" alt="@service.Name">
-                    </div>
-                    <div class="product-info">
-                        <div class="favorite-tag">Yêu thích</div>
-                        <h4 class="product-name">@service.Name</h4>
-                        <p class="product-description">@service.Description</p>
-                        <div class="product-price">@service.Price.ToString("N0")₫</div>
-                        <div class="commission-tag">HOA HỒNG XTRA</div>
-                        <div class="product-rating">
-                            <span class="rating">@service.Rating</span>
-                            <span class="sales">Đã bán @service.SalesCount</span>
+                <a asp-controller="Services" asp-action="Details" asp-route-id="@service.ServiceId" style="text-decoration: none; color: inherit;">
+                    <div class="bestselling-item">
+                        <div class="product-tags-wrapper">
+                            <div class="product-tag product-tag-main">@service.Category</div>
+                            @if (service.Tags != null && service.Tags.Any())
+                            {
+                                @foreach (var tag in service.Tags.Take(2))
+                                {
+                                    <div class="product-tag product-tag-sub">@tag</div>
+                                }
+                            }
+                        </div>
+                        <div class="product-image">
+                            <img src="@service.Image" alt="@service.Name" onerror="this.src='/images/VeSinh.jpg'">
+                        </div>
+                        <div class="product-info">
+                            <h4 class="product-name">@service.Name</h4>
+                            <p class="product-description">@service.Description</p>
+                            <div class="product-price">@service.Price.ToString("N0")₫</div>
+                            <div class="product-rating">
+                                @if (service.Rating > 0)
+                                {
+                                    <span class="rating">⭐ @service.Rating.ToString("0.0")</span>
+                                    @if (service.RatingCount > 0)
+                                    {
+                                        <span class="sales">(@service.RatingCount đánh giá)</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="sales">Chưa có đánh giá</span>
+                                }
+                            </div>
                         </div>
                     </div>
-                </div>
+                </a>
             }
         </div>
-    </div>
-
-    <!-- Shop Categories Section -->
-    <div class="shop-categories-section">
-        <div class="section-header">
-            <h3 class="section-title">DANH MỤC CỦA SHOP</h3>
-            <a href="#" class="view-all-link">Xem Tất Cả ></a>
         </div>
-        <div class="categories-carousel">
-            @foreach (var category in Model.ShopCategories)
-            {
-                <div class="category-item">
-                    <div class="category-icon">
-                        <img src="@category.Icon" alt="@category.Name">
-                    </div>
-                    <span class="category-name">@category.Name</span>
-                </div>
-            }
-        </div>
-    </div>
+    }
 
     <!-- Main Content Area -->
     <div class="main-content">
@@ -136,19 +122,32 @@
             <div class="categories-sidebar">
                 <h4 class="sidebar-title">Danh Mục</h4>
                 <div class="category-list">
-                    <div class="category-group">
-                        <div class="category-header">
-                            <span>• Dịch Vụ</span>
-                            <i class="fas fa-chevron-down"></i>
-                        </div>
-                        <div class="category-items">
-                            @foreach (var category in Model.AllCategories)
+                    <div class="category-items">
+                        <a href="#" data-category-id="" data-tag-id="" class="category-link @(Model.SelectedCategoryId == null && Model.SelectedTagId == null ? "active" : "")">
+                            Tất cả (@Model.ShopInfo.TotalServices)
+                        </a>
+                        @foreach (var category in Model.AllCategories.OrderBy(c => c.Name))
+                        {
+                            @if (category.ServiceCount > 0)
                             {
-                                <a href="#" class="category-link" data-category-id="@category.Id">
-                                    @category.Name
-                                </a>
+                                <div class="category-group">
+                                    <a href="#" data-category-id="@category.Id" data-tag-id="" class="category-link @(Model.SelectedCategoryId == category.Id && Model.SelectedTagId == null ? "active" : "")">
+                                        @category.Name (@category.ServiceCount)
+                                    </a>
+                                    @if (category.Tags != null && category.Tags.Any())
+                                    {
+                                        <div class="category-tags">
+                                            @foreach (var tag in category.Tags)
+                                            {
+                                                <a href="#" data-category-id="@category.Id" data-tag-id="@tag.TagId" class="tag-link @(Model.SelectedTagId == tag.TagId ? "active" : "")">
+                                                    @tag.Name (@tag.ServiceCount)
+                                                </a>
+                                            }
+                                        </div>
+                                    }
+                                </div>
                             }
-                        </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -160,41 +159,91 @@
             <div class="sort-pagination-bar">
                 <div class="sort-options">
                     <span class="sort-label">Sắp xếp theo:</span>
-                    <a href="#" class="sort-option @(Model.SortBy == "popular" ? "active" : "")" data-sort="popular">Phổ Biến</a>
-                    <a href="#" class="sort-option @(Model.SortBy == "newest" ? "active" : "")" data-sort="newest">Mới Nhất</a>
-                    <a href="#" class="sort-option @(Model.SortBy == "bestselling" ? "active" : "")" data-sort="bestselling">Bán Chạy</a>
-                    <a href="#" class="sort-option @(Model.SortBy == "price" ? "active" : "")" data-sort="price">Giá <i class="fas fa-chevron-down"></i></a>
+                    <a href="#" data-sort="popular" class="sort-option @(Model.SortBy == "popular" ? "active" : "")">Phổ Biến</a>
+                    <a href="#" data-sort="newest" class="sort-option @(Model.SortBy == "newest" ? "active" : "")">Mới Nhất</a>
+                    <a href="#" data-sort="bestselling" class="sort-option @(Model.SortBy == "bestselling" ? "active" : "")">Đặt Nhiều Nhất</a>
+                    <div class="price-sort-dropdown">
+                        <a href="#" class="sort-option @(Model.SortBy == "price-asc" || Model.SortBy == "price-desc" || Model.SortBy == "price" ? "active" : "")">
+                            Giá 
+                            <i class="fas fa-chevron-down"></i>
+                            @if (Model.SortBy == "price-asc" || Model.SortBy == "price")
+                            {
+                                <span class="sort-indicator">↑</span>
+                            }
+                            else if (Model.SortBy == "price-desc")
+                            {
+                                <span class="sort-indicator">↓</span>
+                            }
+                        </a>
+                        <div class="price-dropdown-menu">
+                            <a href="#" data-sort="price-asc" class="price-option @(Model.SortBy == "price-asc" || Model.SortBy == "price" ? "active" : "")">Thấp → Cao</a>
+                            <a href="#" data-sort="price-desc" class="price-option @(Model.SortBy == "price-desc" ? "active" : "")">Cao → Thấp</a>
+                        </div>
+                    </div>
                 </div>
-                <div class="pagination-info">
-                    <span>@Model.CurrentPage/@Model.TotalPages</span>
-                    <button class="page-btn prev-btn"><i class="fas fa-chevron-left"></i></button>
-                    <button class="page-btn next-btn"><i class="fas fa-chevron-right"></i></button>
+                <div class="pagination-info" id="pagination-info">
+                    <span>Trang @Model.CurrentPage/@Model.TotalPages</span>
+                    @if (Model.CurrentPage > 1)
+                    {
+                        <a href="#" data-page="@(Model.CurrentPage - 1)" class="page-btn prev-btn"><i class="fas fa-chevron-left"></i></a>
+                    }
+                    @if (Model.CurrentPage < Model.TotalPages)
+                    {
+                        <a href="#" data-page="@(Model.CurrentPage + 1)" class="page-btn next-btn"><i class="fas fa-chevron-right"></i></a>
+                    }
                 </div>
             </div>
 
             <!-- Product Grid -->
-            <div class="product-grid">
-                @foreach (var service in Model.Services)
+            <div class="product-grid" id="product-grid">
+                @if (!Model.Services.Any())
                 {
-                    <div class="product-card">
-                        <div class="shop-logo-small">
-                            <img src="@Model.ShopInfo.Logo" alt="Shop Logo">
-                        </div>
-                        <div class="product-tag">@service.Category</div>
-                        <div class="product-image">
-                            <img src="@service.Image" alt="@service.Name">
-                        </div>
-                        <div class="favorite-tag">Yêu thích</div>
-                        <div class="product-info">
-                            <h4 class="product-name">@service.Name</h4>
-                            <p class="product-description">@service.Description</p>
-                            <div class="product-price">@service.Price.ToString("N0")₫</div>
-                            <div class="product-rating">
-                                <span class="rating">@service.Rating</span>
-                                <span class="sales">Đã bán @service.SalesCount</span>
-                            </div>
-                        </div>
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>Chưa có dịch vụ nào trong danh mục này</p>
                     </div>
+                }
+                else
+                {
+                    @foreach (var service in Model.Services)
+                    {
+                        <a asp-controller="Services" asp-action="Details" asp-route-id="@service.ServiceId" class="product-card-link">
+                            <div class="product-card">
+                                <div class="product-tags-wrapper">
+                                    <div class="product-tag product-tag-main">@service.Category</div>
+                                    @if (service.Tags != null && service.Tags.Any())
+                                    {
+                                        @foreach (var tag in service.Tags.Take(3))
+                                        {
+                                            <div class="product-tag product-tag-sub">@tag</div>
+                                        }
+                                    }
+                                </div>
+                                <div class="product-image">
+                                    <img src="@service.Image" alt="@service.Name" onerror="this.src='/images/VeSinh.jpg'">
+                                </div>
+                                <div class="product-info">
+                                    <h4 class="product-name">@service.Name</h4>
+                                    <p class="product-description">@service.Description</p>
+                                    <div class="product-price">@service.Price.ToString("N0")₫</div>
+                                    <div class="product-rating">
+                                        @if (service.Rating > 0)
+                                        {
+                                            <span class="rating">⭐ @service.Rating.ToString("0.0")</span>
+                                            @if (service.RatingCount > 0)
+                                            {
+                                                <span class="sales">(@service.RatingCount đánh giá)</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="sales">Chưa có đánh giá</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    }
                 }
             </div>
         </div>
@@ -203,32 +252,190 @@
 
 @section Scripts {
     <script>
-        // Handle category filtering
-        document.querySelectorAll('.category-link').forEach(link => {
-            link.addEventListener('click', function(e) {
+        const providerId = '@Model.ProviderId';
+        let currentCategoryId = '@(Model.SelectedCategoryId?.ToString() ?? "")';
+        let currentTagId = '@(Model.SelectedTagId?.ToString() ?? "")';
+        let currentSortBy = '@Model.SortBy';
+        let currentPage = @Model.CurrentPage;
+
+        // Handle follow button
+        document.querySelectorAll('.btn-follow').forEach(btn => {
+            btn.addEventListener('click', function(e) {
                 e.preventDefault();
-                const categoryId = this.dataset.categoryId;
-                // Implement category filtering logic
-                console.log('Filter by category:', categoryId);
+                this.classList.toggle('followed');
+                const text = this.classList.contains('followed') ? 'Đang Theo' : 'Theo Dõi';
+                this.innerHTML = `<i class="fas fa-${this.classList.contains('followed') ? 'check' : 'plus'}"></i> ${text}`;
             });
         });
 
-        // Handle sorting
-        document.querySelectorAll('.sort-option').forEach(option => {
-            option.addEventListener('click', function(e) {
-                e.preventDefault();
-                const sortBy = this.dataset.sort;
-                // Implement sorting logic
-                console.log('Sort by:', sortBy);
-            });
-        });
+        // Price dropdown - show on hover
+        const priceDropdown = document.querySelector('.price-sort-dropdown');
+        const priceMenu = priceDropdown?.querySelector('.price-dropdown-menu');
 
-        // Handle pagination
-        document.querySelectorAll('.page-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                // Implement pagination logic
-                console.log('Page navigation');
+        if (priceDropdown && priceMenu) {
+            priceDropdown.addEventListener('mouseenter', function() {
+                priceMenu.classList.add('show');
             });
-        });
+
+            priceDropdown.addEventListener('mouseleave', function() {
+                priceMenu.classList.remove('show');
+            });
+        }
+
+        // Load data via AJAX
+        function loadData(categoryId, tagId, sortBy, page) {
+            currentCategoryId = categoryId || '';
+            currentTagId = tagId || '';
+            currentSortBy = sortBy || 'popular';
+            currentPage = page || 1;
+
+            // Update URL without reload
+            const params = new URLSearchParams({
+                providerId: providerId,
+                sortBy: sortBy || 'popular',
+                page: (page || 1).toString()
+            });
+            if (categoryId) params.append('categoryId', categoryId);
+            if (tagId) params.append('tagId', tagId);
+            
+            const url = `/ServiceShop?${params.toString()}`;
+            
+            // Update browser URL without reload
+            window.history.pushState({}, '', url);
+            
+            fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Update product grid
+                    const newGrid = doc.querySelector('#product-grid');
+                    if (newGrid) {
+                        document.querySelector('#product-grid').innerHTML = newGrid.innerHTML;
+                    }
+                    
+                    // Update pagination info
+                    const newPagination = doc.querySelector('#pagination-info');
+                    if (newPagination) {
+                        // Extract page number from pagination
+                        const pageText = newPagination.textContent;
+                        const pageMatch = pageText.match(/Trang (\d+)\/(\d+)/);
+                        if (pageMatch) {
+                            document.querySelector('#pagination-info span').textContent = pageText.match(/Trang \d+\/\d+/)[0];
+                        }
+                        
+                        // Update pagination buttons
+                        const paginationContainer = document.querySelector('#pagination-info');
+                        const oldButtons = paginationContainer.querySelectorAll('.page-btn');
+                        oldButtons.forEach(btn => btn.remove());
+                        
+                        const newButtons = newPagination.querySelectorAll('.page-btn');
+                        newButtons.forEach(btn => {
+                            const newBtn = btn.cloneNode(true);
+                            paginationContainer.appendChild(newBtn);
+                        });
+                        
+                        attachPageListeners();
+                    }
+
+                    // Update active states
+                    updateActiveStates();
+                    
+                    // Không scroll lên đầu, giữ nguyên vị trí
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                    // Fallback to full page reload if AJAX fails
+                    window.location.href = url;
+                });
+        }
+
+        // Update active states
+        function updateActiveStates() {
+            // Update category/tag links
+            document.querySelectorAll('.category-link, .tag-link').forEach(link => {
+                const linkCategoryId = link.getAttribute('data-category-id') || '';
+                const linkTagId = link.getAttribute('data-tag-id') || '';
+                
+                link.classList.remove('active');
+                if (linkCategoryId === currentCategoryId && linkTagId === currentTagId) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Update sort options
+            document.querySelectorAll('.sort-option, .price-option').forEach(link => {
+                const sort = link.getAttribute('data-sort');
+                link.classList.remove('active');
+                if (sort === currentSortBy || 
+                    (sort === 'price-asc' && currentSortBy === 'price')) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Update price dropdown indicator
+            const priceToggle = document.querySelector('.price-sort-dropdown .sort-option');
+            if (priceToggle) {
+                let indicator = priceToggle.querySelector('.sort-indicator');
+                if (!indicator) {
+                    indicator = document.createElement('span');
+                    indicator.className = 'sort-indicator';
+                    priceToggle.appendChild(indicator);
+                }
+                
+                if (currentSortBy === 'price-asc' || currentSortBy === 'price') {
+                    indicator.textContent = '↑';
+                } else if (currentSortBy === 'price-desc') {
+                    indicator.textContent = '↓';
+                } else {
+                    indicator.textContent = '';
+                }
+            }
+        }
+
+        // Attach event listeners
+        function attachListeners() {
+            // Category and tag links
+            document.querySelectorAll('.category-link, .tag-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const categoryId = this.getAttribute('data-category-id') || '';
+                    const tagId = this.getAttribute('data-tag-id') || '';
+                    loadData(categoryId, tagId, currentSortBy, 1);
+                });
+            });
+
+            // Sort options
+            document.querySelectorAll('.sort-option, .price-option').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const sort = this.getAttribute('data-sort');
+                    if (sort) {
+                        if (priceMenu) priceMenu.classList.remove('show');
+                        loadData(currentCategoryId, currentTagId, sort, 1);
+                    }
+                });
+            });
+        }
+
+        // Page navigation
+        function attachPageListeners() {
+            document.querySelectorAll('.page-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const page = parseInt(this.getAttribute('data-page')) || 1;
+                    loadData(currentCategoryId, currentTagId, currentSortBy, page);
+                });
+            });
+        }
+
+        // Initialize
+        attachListeners();
+        attachPageListeners();
     </script>
 }

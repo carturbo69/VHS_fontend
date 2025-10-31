@@ -88,7 +88,10 @@ builder.Services.AddHttpClient<AdminBookingService>(client =>
 });
 
 // ServiceShopService
-builder.Services.AddScoped<ServiceShopService>();
+builder.Services.AddHttpClient<ServiceShopService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
 
 // Connect VNPay API
 builder.Services.AddScoped<IVnPayService, VnPayService>();

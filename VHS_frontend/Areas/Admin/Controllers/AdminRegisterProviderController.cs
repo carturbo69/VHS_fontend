@@ -98,7 +98,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
             // Map TagId -> Name (load tất cả tags)
             var tags = await _tagSvc.GetAllAsync(includeDeleted: false, ct);
-            ViewBag.TagMap = (tags ?? new List<TagDTO>()).ToDictionary(x => x.TagId, x => x.Name);
+            ViewBag.TagMap = tags != null ? tags.ToDictionary(x => x.TagId, x => x.Name) : new Dictionary<Guid, string>();
 
             return View(dto);
         }
