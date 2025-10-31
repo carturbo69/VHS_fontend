@@ -74,10 +74,41 @@
         <div class="filters">
             <label class="lbl">Trạng thái</label>
             <select id="statusFilter" class="form-select">
-                <option value="all">Tất cả</option>
-                <option value="đang chờ duyệt">Chờ phê duyệt</option>
-                <option value="đã duyệt">Đã phê duyệt</option>
-                <option value="đã từ chối">Bị từ chối</option>
+                @if (status.Equals("All", StringComparison.OrdinalIgnoreCase))
+                {
+                    <option value="all" selected>Tất cả</option>
+                }
+                else
+                {
+                    <option value="all">Tất cả</option>
+                }
+                
+                @if (status.Equals("đang chờ duyệt", StringComparison.OrdinalIgnoreCase))
+                {
+                    <option value="đang chờ duyệt" selected>Chờ phê duyệt</option>
+                }
+                else
+                {
+                    <option value="đang chờ duyệt">Chờ phê duyệt</option>
+                }
+                
+                @if (status.Equals("đã duyệt", StringComparison.OrdinalIgnoreCase))
+                {
+                    <option value="đã duyệt" selected>Đã phê duyệt</option>
+                }
+                else
+                {
+                    <option value="đã duyệt">Đã phê duyệt</option>
+                }
+                
+                @if (status.Equals("đã từ chối", StringComparison.OrdinalIgnoreCase))
+                {
+                    <option value="đã từ chối" selected>Bị từ chối</option>
+                }
+                else
+                {
+                    <option value="đã từ chối">Bị từ chối</option>
+                }
             </select>
         </div>
 
@@ -129,7 +160,9 @@
 
 @section Scripts {
     <script>
-        let currentStatusFilter = 'all';
+        // Initialize with current server value
+        const statusFilter = document.getElementById('statusFilter');
+        let currentStatusFilter = statusFilter.value.toLowerCase();
         let currentSearchQuery = '';
 
         // Filter table by status and search
@@ -140,11 +173,13 @@
                 const account = tr.querySelector('.paccount')?.textContent?.toLowerCase() ?? '';
                 const phone = tr.querySelector('.pphone')?.textContent?.toLowerCase() ?? '';
                 
-                // Check status filter
-                const statusMatch = currentStatusFilter === 'all' || 
-                                  rowStatus === currentStatusFilter ||
-                                  (currentStatusFilter === 'đã duyệt' && (rowStatus === 'đã duyệt' || rowStatus === 'đã phê duyệt')) ||
-                                  (currentStatusFilter === 'đã từ chối' && (rowStatus === 'đã từ chối' || rowStatus === 'bị từ chối'));
+                // Check status filter - map to lowercase for comparison
+                const filterLower = currentStatusFilter.toLowerCase();
+                const statusMatch = filterLower === 'all' || 
+                                  rowStatus === filterLower ||
+                                  (filterLower === 'đã duyệt' && (rowStatus === 'đã duyệt' || rowStatus === 'đã phê duyệt' || rowStatus === 'approved')) ||
+                                  (filterLower === 'đã từ chối' && (rowStatus === 'đã từ chối' || rowStatus === 'bị từ chối' || rowStatus === 'rejected')) ||
+                                  (filterLower === 'đang chờ duyệt' && (rowStatus === 'pending' || rowStatus === 'đang chờ duyệt'));
                 
                 // Check search filter
                 const searchMatch = !currentSearchQuery || 
@@ -158,7 +193,7 @@
         }
 
         // Status filter change event
-        document.getElementById('statusFilter').addEventListener('change', function() {
+        statusFilter.addEventListener('change', function() {
             currentStatusFilter = this.value.toLowerCase();
             filterTable();
         });
@@ -168,5 +203,8 @@
             currentSearchQuery = this.value.toLowerCase().trim();
             filterTable();
         });
+        
+        // Apply initial filter on page load
+        filterTable();
     </script>
 }
