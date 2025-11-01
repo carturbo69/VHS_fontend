@@ -36,6 +36,27 @@
 }
 
 @functions {
+
+    public static DateTime ToVnLocal(DateTime utc)
+    {
+        var dtUtc = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        try
+        {
+            // Windows
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            return TimeZoneInfo.ConvertTimeFromUtc(dtUtc, tz);
+        }
+        catch
+        {
+            // Linux/macOS
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+            return TimeZoneInfo.ConvertTimeFromUtc(dtUtc, tz);
+        }
+    }
+
+    public static string ToVnHHmm(DateTime? utc)
+        => utc.HasValue ? ToVnLocal(utc.Value).ToString("HH:mm") : "";
+
     // Helper hiển thị trạng thái
     public static Microsoft.AspNetCore.Html.IHtmlContent RenderStatus(MessageStatus status)
     {
@@ -97,7 +118,8 @@
                         <div class="flex-grow-1">
                             <div class="d-flex">
                                 <div class="fw-semibold text-ellipsis-1">@c.Title</div>
-                                <div class="ms-auto small text-muted">@c.LastMessageAt?.ToString("HH:mm")</div>
+                                <div class="ms-auto small text-muted">@ToVnHHmm(c.LastMessageAt)</div>
+
                             </div>
                             <div class="small text-muted text-ellipsis-1">@c.LastMessageSnippet</div>
                         </div>
@@ -167,7 +189,8 @@
                         foreach (var m in selected.Messages.OrderBy(x => x.CreatedAt))
                         {
                             var isMe = m.SenderAccountId == me;
-                            var createdIso = m.CreatedAt.ToString("o");
+                            var createdIso = m.CreatedAt.ToUniversalTime().ToString("o");
+
                             var senderName = isMe ? "Bạn" : (otherInSelected?.AccountName ?? "Đối tác");
                             var snippetThis = SnippetOf(m);
 
@@ -212,7 +235,8 @@
                                         <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời">
                                             <i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span>
                                         </button>
-                                        <span class="text-muted">@m.CreatedAt.ToString("HH:mm")</span>
+                                        <span class="text-muted">@ToVnHHmm(m.CreatedAt)</span>
+
                                         @if (isMe)
                                         {
                                             @RenderStatus(m.Status)
@@ -560,12 +584,20 @@
 
             const meta = document.createElement('div');
             meta.className = 'msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2';
-            const t = new Date(msg.createdAt);
-            const hh = String(t.getHours()).padStart(2,'0');
-            const mm = String(t.getMinutes()).padStart(2,'0');
-            meta.innerHTML = '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
-                            + '<span class="text-muted">'+hh+':'+mm+'</span>'
-                            + (isMine ? statusHtml(msg.status || 'Sent') : '');
+                   const fmtVN = new Intl.DateTimeFormat('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+          timeZone: 'Asia/Ho_Chi_Minh'
+        });
+        const d = new Date(msg.createdAt);   // ISO-UTC từ server
+        const hhmm = isNaN(d) ? '' : fmtVN.format(d);
+
+        meta.innerHTML =
+          '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
+          + '<span class="text-muted">' + hhmm + '</span>'
+          + (isMine ? statusHtml(msg.status || 'Sent') : '');
+
             bubble.appendChild(meta);
 
             wrap.appendChild(bubble);
