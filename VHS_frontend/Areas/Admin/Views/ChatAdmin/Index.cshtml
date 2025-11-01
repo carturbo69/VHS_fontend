@@ -1,9 +1,10 @@
-﻿@using VHS_frontend.Areas.Customer.Models.ChatDTOs
+﻿@using VHS_frontend.Areas.Admin.Models.ChatDTOs
 @using Microsoft.AspNetCore.Html
 
 @model ChatPageVm
 
 @{
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
     ViewData["Title"] = "Chat";
     var me = Model.CurrentAccount?.AccountId ?? Guid.Empty;
 
@@ -32,10 +33,7 @@
     var msgMap = hasSelection && selected?.Messages != null
         ? selected.Messages.ToDictionary(x => x.MessageId)
         : new Dictionary<Guid, MessageDto>();
-
-
 }
-
 
 @functions {
     // Helper hiển thị trạng thái
@@ -63,11 +61,8 @@
     }
 }
 
-
-
 <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-<link rel="stylesheet" href="~/css/chat-customer.css" asp-append-version="true" />
-
+<link rel="stylesheet" href="~/css/chat-admin.css" asp-append-version="true" />
 
 <div class="container-fluid chat-wrapper">
     <div class="row h-100 g-0">
@@ -84,16 +79,6 @@
                 </div>
             </div>
 
-            <div class="pt-2 px-3">
-                <form method="post" action='@Url.Action("StartWithAdmin", "ChatCustomer", new { area = "Customer" })'>
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-success w-100 d-inline-flex align-items-center gap-2">
-                        <i class="bi bi-headset"></i> Chat với Admin
-                    </button>
-                </form>
-            </div>
-
-
             <div class="chat-scroll px-2">
                 @foreach (var c in Model.Conversations
                                 .OrderByDescending(x => x.IsPinned)
@@ -102,7 +87,7 @@
                     var isActive = c.ConversationId == Model.SelectedConversationId;
 
                     <a class="d-flex align-items-start gap-2 p-2 rounded conv-item @(isActive ? "bg-light" : "")"
-                       href="@Url.Action("Index", "ChatCustomer", new { area = "Customer", id = c.ConversationId })">
+                       href="@Url.Action("Index", "ChatAdmin", new { area = "Admin", id = c.ConversationId })">
                         <img class="avatar"
                              src="@((string.IsNullOrWhiteSpace(c.AvatarUrl) ? fallbackImg : c.AvatarUrl))"
                              alt=""
@@ -125,8 +110,6 @@
                 }
             </div>
         </aside>
-
-
 
         <!-- Khung chat -->
         @if (!hasSelection)
@@ -154,29 +137,28 @@
                     </div>
 
                     <!-- Nút 3 chấm ở góc phải -->
-                    <div class="ms-auto dropdown">
+                    <div class="ms-auto dropdown dropstart">
                         <button type="button"
-                                class="btn btn-link p-0 text-muted"
+                                class="btn btn-link p-0 text-muted dropdown-toggle"
                                 data-bs-toggle="dropdown"
+                                data-bs-display="static"
                                 aria-expanded="false"
                                 title="Tùy chọn">
                             <i class="bi bi-three-dots fs-4"></i>
                         </button>
 
-                        <div class="dropdown-menu dropdown-menu-end shadow-sm p-0" style="min-width:220px;">
+                        <div class="dropdown-menu shadow-sm p-0" style="min-width:220px;">
                             <form method="post"
-                                  action='@Url.Action("DeleteConversation", "ChatCustomer", new { area = "Customer", id = Model.SelectedConversationId, hide = true })'
+                                  action='@Url.Action("DeleteConversation","ChatAdmin", new { area="Admin", id = Model.SelectedConversationId, hide = true })'
                                   onsubmit="return confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?');">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="dropdown-item text-danger">
-                                    Xóa cuộc trò chuyện
-                                </button>
+                                <button type="submit" class="dropdown-item text-danger">Xóa cuộc trò chuyện</button>
                             </form>
                         </div>
                     </div>
 
-                </div>
 
+                </div>
 
                 <!-- Danh sách tin nhắn -->
                 <div id="msgList" class="msg-list">
@@ -217,7 +199,6 @@
                                         <div>@decodedBody</div>
                                     }
 
-
                                     @if (!string.IsNullOrWhiteSpace(m.ImageUrl))
                                     {
                                         <img src="@m.ImageUrl"
@@ -241,29 +222,13 @@
                             </div>
                         }
                     }
-                    else
-                    {
-                        @* Không có tin nhắn: hiển thị gợi ý nhanh *@
-                        <div class="empty-state d-flex flex-column align-items-center justify-content-center p-4 text-center text-muted">
-                            <i class="bi bi-chat-left-text fs-1 mb-2"></i>
-                            <div class="mb-3">Chưa có tin nhắn nào. Bạn muốn bắt đầu với một câu hỏi?</div>
-
-                            <div class="d-flex flex-wrap gap-2 justify-content-center">
-                                <!-- Lưu ý: data-text là nội dung sẽ gửi -->
-                                <button type="button" class="btn btn-outline-primary btn-sm quick-reply" data-text="Chào bạn, mình cần tư vấn dịch vụ.">Cần tư vấn dịch vụ</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm quick-reply" data-text="Bạn có thể báo giá giúp mình không?">Xin báo giá</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm quick-reply" data-text="Mình muốn đặt lịch sớm nhất có thể.">Đặt lịch sớm nhất</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm quick-reply" data-text="Cho mình hỏi thời gian làm việc và khu vực phục vụ?">Giờ làm & khu vực</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm quick-reply" data-text="Có khuyến mãi nào hiện tại không?">Hỏi khuyến mãi</button>
-                            </div>
-                        </div>
-                    }
+                    @* KHÔNG else: đã bỏ empty-state + quick replies *@
                 </div>
 
                 <!-- Ô soạn tin -->
                 <div class="msg-input p-3">
                     <form method="post"
-                          action='@Url.Action("Send", "ChatCustomer", new { area = "Customer" })'
+                          action='@Url.Action("Send", "ChatAdmin", new { area = "Admin" })'
                           class="w-100"
                           enctype="multipart/form-data">
 
@@ -327,9 +292,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
 
-
 @section Scripts {
-    @* Chỉ auto-scroll khi đã chọn hội thoại *@
+    @* Auto-scroll khi đã chọn hội thoại *@
     @if (hasSelection)
     {
         <script>
@@ -341,6 +305,7 @@
     }
 
     <script>
+        // ===== File attach preview + chặn gửi rỗng =====
         (function () {
           var pickBtn = document.getElementById('pickFileBtn');
           var fileInput = document.getElementById('fileInput');
@@ -350,31 +315,54 @@
           var removeBtn = document.getElementById('removeAttachBtn');
           var objectUrl = null;
 
-          if (!pickBtn || !fileInput) return;
+          // Form/Inputs
+          var form = document.querySelector('form[action*="ChatAdmin/Send"]');
+          var bodyInput = form?.querySelector('input[name="body"]');
+          var sendBtn = form?.querySelector('button[type="submit"]');
 
-          pickBtn.addEventListener('click', function () { fileInput.click(); });
+          function hasPayload() {
+            var hasText = !!(bodyInput && bodyInput.value.trim().length > 0);
+            var hasImage = !!(fileInput && fileInput.files && fileInput.files.length > 0);
+            return hasText || hasImage;
+          }
+          function refreshSendState() { if (sendBtn) sendBtn.disabled = !hasPayload(); }
 
-          fileInput.addEventListener('change', function () {
-            if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-
-            if (fileInput.files && fileInput.files.length > 0) {
-              var f = fileInput.files[0];
-
-              if (!f.type || !f.type.startsWith('image/')) {
-                alert('Vui lòng chọn file ảnh.');
-                fileInput.value = '';
-                previewWrap.classList.add('d-none');
-                return;
-              }
-
-              objectUrl = URL.createObjectURL(f);
-              imgEl.src = objectUrl;
-              nameEl.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
-              previewWrap.classList.remove('d-none');
-            } else {
-              previewWrap.classList.add('d-none');
+          form?.addEventListener('submit', function (e) {
+            if (!hasPayload()) {
+              e.preventDefault();
+              alert('Vui lòng nhập nội dung hoặc đính kèm ảnh trước khi gửi.');
+              bodyInput?.focus();
+              return false;
             }
+            if (sendBtn) sendBtn.disabled = true; // chặn spam
           });
+
+          bodyInput?.addEventListener('input', refreshSendState);
+
+          if (pickBtn && fileInput) {
+            pickBtn.addEventListener('click', function () { fileInput.click(); });
+            fileInput.addEventListener('change', function () {
+              if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+
+              if (fileInput.files && fileInput.files.length > 0) {
+                var f = fileInput.files[0];
+                if (!f.type || !f.type.startsWith('image/')) {
+                  alert('Vui lòng chọn file ảnh.');
+                  fileInput.value = '';
+                  previewWrap.classList.add('d-none');
+                  refreshSendState();
+                  return;
+                }
+                objectUrl = URL.createObjectURL(f);
+                imgEl.src = objectUrl;
+                nameEl.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
+                previewWrap.classList.remove('d-none');
+              } else {
+                previewWrap.classList.add('d-none');
+              }
+              refreshSendState();
+            });
+          }
 
           removeBtn?.addEventListener('click', function () {
             if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
@@ -382,21 +370,19 @@
             imgEl.src = '';
             nameEl.textContent = '';
             previewWrap.classList.add('d-none');
+            refreshSendState();
           });
+
+          // init state
+          refreshSendState();
         })();
-    </script>
 
-    @* ====== SignalR: trạng thái gửi/nhận/đã xem + Reply ====== *@
-    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
-
-    <script>
-        // ===== Reply UI: KHỞI TẠO ĐỘC LẬP =====
-        window.__initReplyUi = function () {
+        // ===== Reply UI: KHỞI TẠO ĐỘC LẬP (không phụ thuộc SignalR) =====
+        (function initReplyUi(){
           var pageMain = document.querySelector('main.chat-col[data-selected-conv]');
           if (!pageMain) return;
 
-          // Form & các phần tử của preview reply
-          var form = pageMain.querySelector('form[action*="ChatCustomer/Send"]');
+          var form = pageMain.querySelector('form[action*="ChatAdmin/Send"]');
           var bodyInput = form?.querySelector('input[name="body"]');
           var replyHidden = form?.querySelector('#replyToMessageId');
 
@@ -425,12 +411,10 @@
             clearReplyPreview();
           });
 
-          // BẮT SỰ KIỆN CLICK NÚT REPLY (event delegation)
+          // ✅ Sửa: bám vào chính nút được bấm
           pageMain.addEventListener('click', function(e){
             var btn = e.target.closest('.reply-btn');
             if (!btn) return;
-
-            // DÙNG btn.closest thay vì e.target.closest để chắc chắn đúng bubble
             var bubble = btn.closest('.bubble');
             if (!bubble) return;
 
@@ -440,25 +424,21 @@
 
             showReplyPreview(id, name, sn);
           }, {passive:true});
+        })();
+    </script>
 
-          // Nếu dùng quick-reply thì hủy trạng thái reply để không gắn nhầm
-          pageMain.addEventListener('click', function(e){
-            var qb = e.target.closest('.quick-reply');
-            if (!qb) return;
-            clearReplyPreview();
-          }, {passive:true});
-        };
-
-        // ===== Realtime (SignalR) GIỮ NGUYÊN NHƯ CŨ, chỉ chứa phần realtime =====
-        window.__initChatRealtime = function () {
+    @* ====== SignalR realtime (Admin) ====== *@
+    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+    <script>
+        window.__initAdminChatRealtime = function () {
           var pageMain = document.querySelector('main.chat-col[data-selected-conv]');
-          if (!pageMain) { console.debug('[chat] no selection, skip signalR'); return; }
+          if (!pageMain) { console.debug('[admin-chat] no selection, skip signalR'); return; }
 
           const me = '@(Model.CurrentAccount?.AccountId.ToString())';
           const selectedConversationId = '@Model.SelectedConversationId';
           const GUID_EMPTY = '00000000-0000-0000-0000-000000000000';
           if (!me || me.toLowerCase() === GUID_EMPTY) {
-            console.warn('[chat] me is empty GUID, skip signalR init');
+            console.warn('[admin-chat] me is empty GUID, skip signalR init');
             return;
           }
 
@@ -492,16 +472,16 @@
             if (!lastReadAt) return;
             document.querySelectorAll('.bubble[data-is-mine="true"]').forEach(b => {
               const created = parseIso(b.getAttribute('data-created-at'));
-              if (created && created <= lastReadAt){
-                setBubbleStatus(b, 'Delivered');
-              }
+              if (created && created <= lastReadAt){ setBubbleStatus(b, 'Delivered'); }
             });
           }
 
+          // ===== Chèn tham chiếu reply khi nhận tin mới từ server =====
           function attachReplyRefIfAny(bubbleEl, msg){
             if (!msg || !msg.replyToMessageId) return;
+
+            // ✅ Sửa: KHÔNG .toLowerCase() — giữ định dạng GUID đúng với data-message-id render từ Razor
             var refId = String(msg.replyToMessageId);
-            // Tìm chính xác theo attribute selector: so sánh nguyên văn
             var parent = document.querySelector('.bubble[data-message-id="'+refId+'"]');
 
             var name = parent?.getAttribute('data-sender-name') || (msg.replyToSenderName || '—');
@@ -524,6 +504,7 @@
             bubbleEl.insertAdjacentElement('afterbegin', wrap);
           }
 
+          // ===== SignalR =====
           const connection = new signalR.HubConnectionBuilder()
             .withUrl('/chathub')
             .withAutomaticReconnect()
@@ -550,7 +531,7 @@
 
             const bubble = document.createElement('div');
             bubble.className = 'bubble ' + (isMine ? 'me' : 'other');
-            bubble.setAttribute('data-message-id', msg.messageId);                  // giữ nguyên chữ hoa/thường
+            bubble.setAttribute('data-message-id', msg.messageId); // giữ nguyên
             bubble.setAttribute('data-created-at', msg.createdAt);
             bubble.setAttribute('data-is-mine', isMine ? 'true' : 'false');
             bubble.setAttribute('data-status', msg.status || 'Sent');
@@ -584,7 +565,7 @@
             const mm = String(t.getMinutes()).padStart(2,'0');
             meta.innerHTML = '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
                             + '<span class="text-muted">'+hh+':'+mm+'</span>'
-                            + (isMine ? (function(s){return s;})(statusHtml(msg.status || 'Sent')) : '');
+                            + (isMine ? statusHtml(msg.status || 'Sent') : '');
             bubble.appendChild(meta);
 
             wrap.appendChild(bubble);
@@ -592,47 +573,62 @@
             list.scrollTop = list.scrollHeight;
           });
 
-          connection.onreconnecting((err) => { console.info('[chat] reconnecting...', err); });
+          // reconnect lifecycle
+          connection.onreconnecting((err) => { console.info('[admin-chat] reconnecting...', err); });
           connection.onreconnected(async (connectionId) => {
-            console.info('[chat] reconnected as', connectionId, '— re-registering…');
-            try { await connection.invoke('Register', me); } catch (e) { console.error('[chat] re-register failed', e); }
+            console.info('[admin-chat] reconnected as', connectionId, '— re-registering…');
+            try { await connection.invoke('Register', me); }
+            catch (e) { console.error('[admin-chat] re-register failed', e); }
           });
           connection.onclose(async (err) => {
-            console.warn('[chat] connection closed, restarting…', err);
-            try { await connection.start(); await connection.invoke('Register', me); } catch (e) { console.error('[chat] restart failed', e); }
+            console.warn('[admin-chat] connection closed, restarting…', err);
+            try { await connection.start(); await connection.invoke('Register', me); }
+            catch (e) { console.error('[admin-chat] restart failed', e); }
           });
 
           (async function startAndRegister(){
             try { await connection.start(); await connection.invoke('Register', me); }
-            catch (e) { console.error('[chat] initial start failed, retrying in 2s…', e); setTimeout(startAndRegister, 2000); }
+            catch (e) { console.error('[admin-chat] initial start failed, retrying in 2s…', e); setTimeout(startAndRegister, 2000); }
+          })();
+
+          // (tuỳ chọn) menu header nếu có
+          (function () {
+            var btn = document.getElementById('headerMenuBtn');
+            var menu = document.getElementById('headerMenu');
+            if (!btn || !menu) return;
+
+            function closeMenu(){ menu.classList.add('d-none'); btn.setAttribute('aria-expanded','false'); }
+            function openMenu(){ menu.classList.remove('d-none'); btn.setAttribute('aria-expanded','true'); }
+
+            btn.addEventListener('click', function(e){
+              e.stopPropagation();
+              if (menu.classList.contains('d-none')) openMenu(); else closeMenu();
+            });
+            document.addEventListener('click', function(e){
+              if (!menu.contains(e.target) && e.target !== btn) closeMenu();
+            }, { passive:true });
+            document.addEventListener('keydown', function(e){
+              if (e.key === 'Escape') closeMenu();
+            });
           })();
         };
 
-        // Luôn khởi tạo Reply UI ngay
-        (function initUiEarly(){
-          // đợi chút cho DOM section này render xong
-          if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', window.__initReplyUi, { once:true });
-          } else {
-            window.__initReplyUi();
-          }
-        })();
-
-        // Realtime: như cũ — nếu có sẵn signalR thì init ngay, nếu chưa thì nạp CDN rồi init
+        // Nạp/khởi tạo SignalR
         (function ensureSignalRReady(){
           if (window.signalR?.HubConnectionBuilder) {
-            window.__initChatRealtime();
+            window.__initAdminChatRealtime();
             return;
           }
           var s = document.createElement('script');
           s.src = 'https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.5/signalr.min.js';
           s.defer = true;
-          s.onload = function(){ window.__initChatRealtime(); };
-          s.onerror = function(){ console.error('[chat] failed to load signalr.min.js'); };
+          s.onload = function(){ window.__initAdminChatRealtime(); };
+          s.onerror = function(){ console.error('[admin-chat] failed to load signalr.min.js'); };
           document.head.appendChild(s);
         })();
     </script>
 
-
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 }
+
+

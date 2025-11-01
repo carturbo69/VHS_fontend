@@ -1,20 +1,17 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
-using VHS_frontend.Areas.Customer.Models.ChatDTOs;
+using VHS_frontend.Areas.Provider.Models.ChatDTOs;
 using VHS_frontend.Services.Customer;
+using VHS_frontend.Services.Provider;
 
-namespace VHS_frontend.Areas.Customer.Controllers
+namespace VHS_frontend.Areas.Provider.Controllers
 {
-    [Area("Customer")]
-    // (Tùy chọn) Ép phải đăng nhập trước, vẫn giữ redirect thủ công để gắn returnUrl
-    // [Authorize]
-    public class ChatCustomerController : Controller
+    [Area("Provider")]
+    public class ChatProviderController : Controller
     {
-        private readonly ChatCustomerService _chatService;
+        private readonly ChatProviderService _chatService;
 
-        public ChatCustomerController(ChatCustomerService chatService)
+        public ChatProviderController(ChatProviderService chatService)
         {
             _chatService = chatService;
         }
@@ -35,6 +32,19 @@ namespace VHS_frontend.Areas.Customer.Controllers
             return string.IsNullOrWhiteSpace(s) ? null : s;
         }
 
+        /// <summary>
+        /// Nếu chưa có AccountID thì redirect về /Account/Login?returnUrl=...
+        /// Dùng cho mọi action, đỡ lặp code.
+        /// </summary>
+        private IActionResult? RedirectIfNoAccountId(out Guid myAccountId)
+        {
+            myAccountId = GetAccountId();
+            if (myAccountId != Guid.Empty) return null;
+
+            var returnUrl = $"{Request.Path}{Request.QueryString}";
+            return RedirectToAction("Login", "Account", new { area = "", returnUrl });
+        }
+
         [HttpGet]
         public async Task<IActionResult> UnreadTotal(CancellationToken ct)
         {
@@ -52,19 +62,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
             return Ok(new { total });
         }
 
-
-        /// <summary>
-        /// Nếu chưa có AccountID thì redirect về /Account/Login?returnUrl=...
-        /// Dùng cho mọi action, đỡ lặp code.
-        /// </summary>
-        private IActionResult? RedirectIfNoAccountId(out Guid myAccountId)
-        {
-            myAccountId = GetAccountId();
-            if (myAccountId != Guid.Empty) return null;
-
-            var returnUrl = $"{Request.Path}{Request.QueryString}";
-            return RedirectToAction("Login", "Account", new { area = "", returnUrl });
-        }
 
         [HttpGet]
         public async Task<IActionResult> WithProvider(Guid providerId, CancellationToken ct)
@@ -133,26 +130,23 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         // Areas/Customer/Controllers/ChatCustomerController.cs
-
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConversation(Guid id, bool hide = false, CancellationToken ct = default)
         {
-            // Ép login nếu chưa có AccountID
             if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
 
             var jwt = GetJwtFromRequest();
 
-            // Gọi API backend: DELETE api/Messages/conversations/{id}/me?accountId=...&hide=...
             await _chatService.ClearForMeAsync(
                 conversationId: id,
                 accountId: myId,
-                hide: hide,
+                hide: hide,              // <— giờ luôn nhận true từ form
                 jwtToken: jwt,
                 ct: ct
             );
 
-            // Về trang Chat, không chọn hội thoại nào (đã “clear” phía tôi)
+            // Quay về trang Chat, KHÔNG chọn hội thoại nào
             return RedirectToAction(nameof(Index));
         }
 
@@ -176,36 +170,30 @@ namespace VHS_frontend.Areas.Customer.Controllers
             return RedirectToAction(nameof(Index), new { id = conversationId });
         }
 
-
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Send(
-      Guid conversationId,
-      string? body,
-      IFormFile? image,
-      Guid? replyToMessageId,            // 👈 thêm tham số này để nhận từ form
-      CancellationToken ct)
+     Guid conversationId,
+     string? body,
+     IFormFile? image,
+     Guid? replyToMessageId,            // 👈 thêm tham số này để nhận từ form
+     CancellationToken ct)
         {
-
-
             if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
 
             var jwt = GetJwtFromRequest();
 
             await _chatService.SendMessageAsync(
                 conversationId: conversationId,
-                accountId: myId,               // 👈 đổi tên tham số cho khớp service mới
+                accountId: myId,             
                 body: body,
                 image: image,
-                replyToMessageId: replyToMessageId, // 👈 truyền xuống backend
+                replyToMessageId: replyToMessageId, 
                 jwtToken: jwt,
                 ct: ct
             );
 
             return RedirectToAction(nameof(Index), new { id = conversationId });
         }
-
-
-
     }
 }

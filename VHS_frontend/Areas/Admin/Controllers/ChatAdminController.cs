@@ -1,20 +1,16 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
-using VHS_frontend.Areas.Customer.Models.ChatDTOs;
-using VHS_frontend.Services.Customer;
+using VHS_frontend.Areas.Admin.Models.ChatDTOs;
+using VHS_frontend.Services.Admin;
 
-namespace VHS_frontend.Areas.Customer.Controllers
+namespace VHS_frontend.Areas.Admin.Controllers
 {
-    [Area("Customer")]
-    // (Tùy chọn) Ép phải đăng nhập trước, vẫn giữ redirect thủ công để gắn returnUrl
-    // [Authorize]
-    public class ChatCustomerController : Controller
+    [Area("Admin")]
+    public class ChatAdminController : Controller
     {
-        private readonly ChatCustomerService _chatService;
+        private readonly ChatAdminService _chatService;
 
-        public ChatCustomerController(ChatCustomerService chatService)
+        public ChatAdminController(ChatAdminService chatService)
         {
             _chatService = chatService;
         }
@@ -35,24 +31,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
             return string.IsNullOrWhiteSpace(s) ? null : s;
         }
 
-        [HttpGet]
-        public async Task<IActionResult> UnreadTotal(CancellationToken ct)
-        {
-            // Ép login nếu chưa có AccountID
-            if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
-
-            var jwt = GetJwtFromRequest();
-
-            var total = await _chatService.GetUnreadTotalAsync(
-                accountId: myId,
-                jwtToken: jwt,
-                ct: ct
-            );
-
-            return Ok(new { total });
-        }
-
-
         /// <summary>
         /// Nếu chưa có AccountID thì redirect về /Account/Login?returnUrl=...
         /// Dùng cho mọi action, đỡ lặp code.
@@ -64,6 +42,22 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             var returnUrl = $"{Request.Path}{Request.QueryString}";
             return RedirectToAction("Login", "Account", new { area = "", returnUrl });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> UnreadTotal(CancellationToken ct)
+        {
+            if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
+
+            var jwt = GetJwtFromRequest();
+
+            var total = await _chatService.GetUnreadTotalAsync(
+                accountId: myId,
+                jwtToken: jwt,
+                ct: ct
+            );
+
+            return Json(new { total });
         }
 
         [HttpGet]
@@ -133,61 +127,37 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         // Areas/Customer/Controllers/ChatCustomerController.cs
-
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConversation(Guid id, bool hide = false, CancellationToken ct = default)
         {
-            // Ép login nếu chưa có AccountID
             if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
 
             var jwt = GetJwtFromRequest();
 
-            // Gọi API backend: DELETE api/Messages/conversations/{id}/me?accountId=...&hide=...
             await _chatService.ClearForMeAsync(
                 conversationId: id,
                 accountId: myId,
-                hide: hide,
+                hide: hide,              // <— giờ luôn nhận true từ form
                 jwtToken: jwt,
                 ct: ct
             );
 
-            // Về trang Chat, không chọn hội thoại nào (đã “clear” phía tôi)
+            // Quay về trang Chat, KHÔNG chọn hội thoại nào
             return RedirectToAction(nameof(Index));
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> StartWithAdmin(CancellationToken ct)
-        {
-            // Bắt buộc đăng nhập (dựa vào AccountID)
-            if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
-
-            var jwt = GetJwtFromRequest();
-
-            // Gọi API backend: POST api/Messages/start-with-admin?myAccountId=...
-            var conversationId = await _chatService.FindOrStartConversationWithAdminAsync(
-                myAccountId: myId,
-                jwtToken: jwt,
-                ct: ct
-            );
-
-            // Mở thẳng hội thoại vừa tìm/khởi tạo
-            return RedirectToAction(nameof(Index), new { id = conversationId });
-        }
 
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Send(
-      Guid conversationId,
-      string? body,
-      IFormFile? image,
-      Guid? replyToMessageId,            // 👈 thêm tham số này để nhận từ form
-      CancellationToken ct)
+     Guid conversationId,
+     string? body,
+     IFormFile? image,
+     Guid? replyToMessageId,            // 👈 thêm tham số này để nhận từ form
+     CancellationToken ct)
         {
-
-
             if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
 
             var jwt = GetJwtFromRequest();
@@ -204,8 +174,5 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             return RedirectToAction(nameof(Index), new { id = conversationId });
         }
-
-
-
     }
 }

@@ -23,6 +23,22 @@ builder.Services.AddHttpClient<ProviderFeedbackService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+builder.Services.AddHttpClient<ChatAdminService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+builder.Services.AddHttpClient<ChatProviderService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+
+builder.Services.AddHttpClient<ChatCustomerService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
 builder.Services.AddHttpClient<IServiceCustomerService, ServiceCustomerService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
