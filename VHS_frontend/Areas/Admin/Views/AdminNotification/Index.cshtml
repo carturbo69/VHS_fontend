@@ -223,7 +223,7 @@
                             {
                                 @foreach (var notification in inboxNotifications)
                                 {
-                                    <tr data-id="@notification.NotificationId">
+                                    <tr data-id="@notification.NotificationId" class="notification-row" style="cursor: pointer;">
                                         <td>
                                             <span class="type-badge badge bg-info">@GetNotificationTypeInVietnamese(notification.NotificationType)</span>
                                         </td>
@@ -245,11 +245,11 @@
                                             <div class="btn-group">
                                                 @if (notification.IsRead != true)
                                                 {
-                                                    <button class="btn btn-sm btn-success soft btn-mark-read" data-id="@notification.NotificationId">
+                                                    <button class="btn btn-sm btn-success soft btn-mark-read" data-id="@notification.NotificationId" onclick="event.stopPropagation();">
                                                         <i class="bi bi-check-circle"></i> Đánh dấu đã đọc
                                                     </button>
                                                 }
-                                                <button class="btn btn-sm btn-outline-danger soft btn-delete" data-id="@notification.NotificationId">
+                                                <button class="btn btn-sm btn-outline-danger soft btn-delete" data-id="@notification.NotificationId" onclick="event.stopPropagation();">
                                                     <i class="bi bi-trash"></i> Xóa
                                                 </button>
                                             </div>
@@ -306,7 +306,7 @@
                             {
                                 @foreach (var notification in sentNotifications)
                                 {
-                                    <tr data-id="@notification.NotificationId">
+                                    <tr data-id="@notification.NotificationId" class="notification-row" style="cursor: pointer;">
                                         <td class="fw-semibold">@(notification.ReceiverName ?? notification.ReceiverEmail ?? "N/A")</td>
                                         <td>
                                             <span class="role-badge badge bg-secondary">@GetRoleInVietnamese(notification.ReceiverRole)</span>
@@ -464,6 +464,67 @@
     </div>
 </div>
 
+<!-- Modal: View Notification Detail -->
+<div class="modal fade" id="notificationDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content card-x">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-envelope-open me-2"></i>Chi tiết thông báo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <div class="notification-detail-content">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted">
+                                <i class="bi bi-person me-1"></i>Người nhận
+                            </label>
+                            <div class="detail-value" id="detailReceiverName">-</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted">
+                                <i class="bi bi-people me-1"></i>Vai trò
+                            </label>
+                            <div class="detail-value" id="detailReceiverRole">-</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted">
+                                <i class="bi bi-tag me-1"></i>Loại thông báo
+                            </label>
+                            <div class="detail-value" id="detailNotificationType">-</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted">
+                                <i class="bi bi-clock me-1"></i>Thời gian
+                            </label>
+                            <div class="detail-value" id="detailCreatedAt">-</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted">
+                                <i class="bi bi-eye me-1"></i>Trạng thái
+                            </label>
+                            <div class="detail-value" id="detailStatus">-</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-muted">
+                                <i class="bi bi-chat-text me-1"></i>Nội dung thông báo
+                            </label>
+                            <div class="detail-value-content p-3 bg-light rounded" id="detailContent">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="notificationDetailError" class="text-danger small mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-success soft" id="btnDetailMarkRead" style="display: none;">
+                    <i class="bi bi-check-circle"></i> Đánh dấu đã đọc
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         const routes = {
@@ -563,6 +624,110 @@
         // ===== Modals =====
         const notificationModal = new bootstrap.Modal(document.getElementById('notificationModal'));
         const sendToRoleModal = new bootstrap.Modal(document.getElementById('sendToRoleModal'));
+        const notificationDetailModal = new bootstrap.Modal(document.getElementById('notificationDetailModal'));
+
+        // ===== Helper function to convert role to Vietnamese =====
+        function getRoleInVietnamese(role) {
+            switch(role) {
+                case 'User': return 'Người dùng';
+                case 'Provider': return 'Nhà cung cấp';
+                case 'Admin': return 'Quản trị viên';
+                default: return role;
+            }
+        }
+
+        // ===== Helper function to convert notification type to Vietnamese =====
+        function getNotificationTypeInVietnamese(type) {
+            switch(type) {
+                case 'System': return 'Hệ thống';
+                case 'Booking': return 'Đặt lịch';
+                case 'Payment': return 'Thanh toán';
+                case 'Promotion': return 'Khuyến mãi';
+                default: return type;
+            }
+        }
+
+        // ===== View Notification Detail =====
+        let currentNotificationId = null;
+        
+        async function viewNotificationDetail(notificationId) {
+            try {
+                currentNotificationId = notificationId;
+                clearError('notificationDetailError');
+                
+                // Fetch notification details
+                const res = await fetch(routes.get + `?id=${notificationId}`);
+                
+                if (res.ok) {
+                    const notification = await res.json();
+                    
+                    // Populate modal with data
+                    document.getElementById('detailReceiverName').textContent = notification.receiverName || notification.receiverEmail || 'N/A';
+                    document.getElementById('detailReceiverRole').innerHTML = `<span class="badge bg-secondary">${getRoleInVietnamese(notification.receiverRole)}</span>`;
+                    document.getElementById('detailNotificationType').innerHTML = `<span class="badge bg-info">${getNotificationTypeInVietnamese(notification.notificationType)}</span>`;
+                    document.getElementById('detailCreatedAt').textContent = notification.createdAt ? new Date(notification.createdAt).toLocaleString('vi-VN') : 'N/A';
+                    document.getElementById('detailContent').textContent = notification.content || 'N/A';
+                    
+                    // Show status
+                    if (notification.isRead) {
+                        document.getElementById('detailStatus').innerHTML = '<span class="badge bg-success">Đã đọc</span>';
+                        document.getElementById('btnDetailMarkRead').style.display = 'none';
+                    } else {
+                        document.getElementById('detailStatus').innerHTML = '<span class="badge bg-warning">Chưa đọc</span>';
+                        // Only show mark as read button if notification is for Admin
+                        if (notification.receiverRole === 'Admin') {
+                            document.getElementById('btnDetailMarkRead').style.display = 'inline-block';
+                        } else {
+                            document.getElementById('btnDetailMarkRead').style.display = 'none';
+                        }
+                    }
+                    
+                    // Show modal
+                    notificationDetailModal.show();
+                    
+                } else {
+                    const error = await res.json();
+                    alert(error.message || 'Không thể tải chi tiết thông báo');
+                }
+            } catch (err) {
+                console.error('Error loading notification detail:', err);
+                alert('Không thể tải chi tiết thông báo');
+            }
+        }
+
+        // ===== Event listener for notification rows =====
+        document.addEventListener('click', async (e) => {
+            const row = e.target.closest('.notification-row');
+            if (row) {
+                const notificationId = row.dataset.id;
+                if (notificationId) {
+                    await viewNotificationDetail(notificationId);
+                }
+            }
+        });
+
+        // ===== Mark as read from detail modal =====
+        document.getElementById('btnDetailMarkRead')?.addEventListener('click', async () => {
+            if (!currentNotificationId) return;
+            
+            try {
+                const res = await fetch(routes.markAsRead + `?id=${currentNotificationId}`, { method: 'POST' });
+                if (res.ok) {
+                    // Update modal UI
+                    document.getElementById('detailStatus').innerHTML = '<span class="badge bg-success">Đã đọc</span>';
+                    document.getElementById('btnDetailMarkRead').style.display = 'none';
+                    
+                    // Close modal and refresh
+                    notificationDetailModal.hide();
+                    await applyFilter();
+                } else {
+                    const error = await res.json();
+                    alert(error.message || 'Có lỗi xảy ra');
+                }
+            } catch (err) {
+                alert('Không thể đánh dấu đã đọc');
+            }
+        });
 
         // ===== Create Notification Button =====
         document.getElementById('btnCreateNotification').addEventListener('click', () => {

@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 
 using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 using static System.Net.WebRequestMethods;
@@ -207,6 +208,81 @@ namespace VHS_frontend.Services.Customer
                 BankAccountNumber = "0123456789"
             };
             return Task.FromResult(demo);
+        }
+
+        /// <summary>
+        /// Customer cancels booking with refund request
+        /// </summary>
+        public async Task<bool> CancelBookingWithRefundAsync(
+            Guid bookingId,
+            string cancelReason,
+            string bankAccount,
+            string bankName,
+            string? accountHolderName,
+            string? jwtToken,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(jwtToken))
+                throw new UnauthorizedAccessException("JWT token is required");
+
+            SetAuthHeader(jwtToken);
+
+            var request = new
+            {
+                BookingId = bookingId,
+                CancelReason = cancelReason,
+                BankAccount = bankAccount,
+                BankName = bankName,
+                AccountHolderName = accountHolderName
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(request);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            using var res = await _httpClient.PostAsync("/api/Bookings/cancel-with-refund", content, ct);
+            
+            if (!res.IsSuccessStatusCode)
+            {
+                var body = await res.Content.ReadAsStringAsync(ct);
+                var msg = $"Lỗi hủy đơn ({(int)res.StatusCode} {res.ReasonPhrase}). Body: {body}";
+                throw new HttpRequestException(msg);
+            }
+
+            var responseJson = await res.Content.ReadAsStringAsync(ct);
+            var response = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<object>>(
+                responseJson,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            return response?.Success ?? false;
+        }
+
+        // Hàm này cho phép truyền object có đủ các trường động cho cancel refund
+        public async Task<ApiResponse<object>?> CancelBookingWithRefundFullAsync(object model, string? jwtToken, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(jwtToken))
+                throw new UnauthorizedAccessException("JWT token is required");
+            SetAuthHeader(jwtToken);
+            var json = System.Text.Json.JsonSerializer.Serialize(model);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var res = await _httpClient.PostAsync("/api/Bookings/cancel-with-refund", content, ct);
+            if (!res.IsSuccessStatusCode)
+            {
+                var body = await res.Content.ReadAsStringAsync(ct);
+                var msg = $"Lỗi hủy đơn ({(int)res.StatusCode} {res.ReasonPhrase}). Body: {body}";
+                throw new HttpRequestException(msg);
+            }
+            var responseJson = await res.Content.ReadAsStringAsync(ct);
+            var response = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<object>>(
+                responseJson,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return response;
+        }
+
+        public class ApiResponse<T>
+        {
+            public bool Success { get; set; }
+            public T? Data { get; set; }
+            public string? Message { get; set; }
         }
 
     }

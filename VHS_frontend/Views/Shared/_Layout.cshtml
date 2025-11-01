@@ -4,20 +4,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>@ViewData["Title"] - Viet Home Service</title>
+    @Html.AntiForgeryToken()
 
     <!-- Font đẹp: Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
 
-    <!-- CSS chung -->
-    <link rel="stylesheet" href="~/css/header.css" asp-append-version="true" />
+    <!-- CSS chung - ORDER MATTERS! notification.css trước, header.css sau để override -->
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <!-- <link rel="stylesheet" href="~/css/about.css" asp-append-version="true" /> -->
     <link rel="stylesheet" href="~/css/footer.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/notification.css" asp-append-version="true" />
     <!-- <link rel="stylesheet" href="~/css/service-shop.css" asp-append-version="true" /> -->
+    <link rel="stylesheet" href="~/css/header.css" asp-append-version="true" /> <!-- MUST BE LAST to override everything -->
 
 
     @* THÊM DÒNG NÀY để các view bơm CSS riêng *@
@@ -36,7 +38,10 @@
         @RenderBody()
     </main>
 
-    @await Html.PartialAsync("_Footer")
+    @if (ViewData["HideFooter"] == null || !(bool)ViewData["HideFooter"])
+    {
+        @await Html.PartialAsync("_Footer")
+    }
 
     <script>
         // Theme toggle
@@ -134,6 +139,43 @@
             }
         }
 
+        // Helper to format Vietnam time - COPY Y TRANG THÔNG BÁO
+        // C# backend: ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm")
+        // JS: formatVietnamTime(n.createdAt) → "dd/MM/yyyy HH:mm"
+        function formatVietnamTime(dateString) {
+            if (!dateString) return '';
+            
+            try {
+                // API trả về UTC time (ví dụ: "2025-10-26T12:34:16.2974194")
+                // Cần convert sang VN time (UTC+7)
+                const date = new Date(dateString);
+                
+                // LUÔN LUÔN convert sang VN timezone
+                const formatter = new Intl.DateTimeFormat('en-GB', {
+                    timeZone: 'Asia/Ho_Chi_Minh',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+                
+                const parts = formatter.formatToParts(date);
+                const day = parts.find(p => p.type === 'day')?.value || '00';
+                const month = parts.find(p => p.type === 'month')?.value || '00';
+                const year = parts.find(p => p.type === 'year')?.value || '0000';
+                const hour = parts.find(p => p.type === 'hour')?.value || '00';
+                const minute = parts.find(p => p.type === 'minute')?.value || '00';
+                
+                // Format: "dd/MM/yyyy HH:mm" (giống trang thông báo)
+                return `${day}/${month}/${year} ${hour}:${minute}`;
+            } catch (error) {
+                console.error('Error formatting time:', error, dateString);
+                return '';
+            }
+        }
+
         // Load danh sách thông báo từ API
         async function loadNotifications() {
             try {
@@ -170,11 +212,23 @@
             
             unreadNotifications.forEach(n => {
                 const li = document.createElement('li');
+                li.style.cursor = 'pointer';
+                li.onclick = () => markAsReadFromDropdown(n.notificationId);
+                
+                // DEBUG: Log raw time từ API
+                console.log('🕐 Raw createdAt từ API:', n.createdAt);
+                
+                // Format time giống y trang thông báo
+                const formattedTime = formatVietnamTime(n.createdAt);
+                
+                // DEBUG: Log formatted time
+                console.log('🕐 Formatted time:', formattedTime);
+                
                 li.innerHTML = `
                     <div class="d-block text-decoration-none">
-                        <div class="small text-muted">${new Date(n.createdAt).toLocaleString()}</div>
+                        <div class="small text-muted">${formattedTime}</div>
                         <div>${n.content}</div>
-                        <div><strong>Loại:</strong> ${n.notificationType}</div>
+                        <div><strong>Loại:</strong> ${getNotificationTypeVN(n.notificationType)}</div>
                     </div>`;
                 menu.appendChild(li);
             });
@@ -187,9 +241,74 @@
             menu.appendChild(all);
         }
 
-        // Không có chức năng mark as read trong dropdown
-        // Chỉ có thể clear thông báo qua trang thông báo
+        // Helper function để convert NotificationType sang tiếng Việt
+        function getNotificationTypeVN(type) {
+            if (!type) return 'Khác';
+            
+            const types = {
+                'PAYMENT_SUCCESS': 'Thanh toán thành công',
+                'NEW_BOOKING': 'Đơn hàng mới',
+                'BOOKING_CONFIRMED': 'Xác nhận đơn hàng',
+                'BOOKING_CANCELLED': 'Hủy đơn hàng',
+                'BOOKING_COMPLETED': 'Hoàn thành đơn hàng',
+                'THANH TOÁN THÀNH CÔNG': 'Thanh toán thành công',
+                'ĐƠN HÀNG MỚI': 'Đơn hàng mới',
+                'Payment': 'Thanh toán',
+                'Booking': 'Đặt lịch',
+                'System': 'Hệ thống',
+                'payment_success': 'Thanh toán thành công',
+                'new_booking': 'Đơn hàng mới'
+            };
+            
+            return types[type] || type;
+        }
 
+        // Mark notification as read from dropdown
+        async function markAsReadFromDropdown(notificationId) {
+            try {
+                // Lấy CSRF token
+                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (!tokenInput) {
+                    console.error('CSRF token not found');
+                    // Vẫn chuyển trang để xem thông báo
+                    window.location.href = '/Customer/Notification/Index';
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', tokenInput.value);
+                
+                const response = await fetch(`/Customer/Notification/MarkRead/${notificationId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    console.log('Marked as read successfully');
+                    // Reload notifications và chuyển trang
+                    await loadNotifications();
+                    loadUnreadCount();
+                    // Đợi một chút để cập nhật xong rồi mới chuyển trang
+                    setTimeout(() => {
+                        window.location.href = '/Customer/Notification/Index';
+                    }, 200);
+                } else {
+                    console.error('Failed to mark as read:', result.message || response.status);
+                    // Vẫn chuyển trang ngay cả khi lỗi
+                    window.location.href = '/Customer/Notification/Index';
+                }
+            } catch (error) {
+                console.error('Error marking notification as read:', error);
+                // Vẫn chuyển trang ngay cả khi lỗi
+                window.location.href = '/Customer/Notification/Index';
+            }
+        }
+
+        // FORCE RELOAD - Version timestamp để browser load code mới
+        console.log('=== NOTIFICATION SCRIPT LOADED v2025-10-26-19:20-FIXED ===');
+        
         document.addEventListener('DOMContentLoaded', async () => {
             // Load thông báo khi trang load
             await loadNotifications();
@@ -204,5 +323,14 @@
     </script>
 
     @RenderSection("Scripts", required: false)
+    
+    <!-- Chatbox AI -->
+    <link rel="stylesheet" href="~/css/chatbox.css" />
+    @await Html.PartialAsync("_Chatbox")
+    <script src="~/js/chatbox.js" type="text/javascript"></script>
+    <script>
+        console.log('=== Layout script section loaded ===');
+        console.log('DOM state:', document.readyState);
+    </script>
 </body>
 </html>

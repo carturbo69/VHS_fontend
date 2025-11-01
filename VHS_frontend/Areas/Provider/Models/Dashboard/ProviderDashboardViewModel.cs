@@ -1,3 +1,5 @@
+using VHS_frontend.Areas.Provider.Models.Schedule;
+
 namespace VHS_frontend.Areas.Provider.Models.Dashboard
 {
     public class ProviderDashboardViewModel
@@ -10,6 +12,7 @@ namespace VHS_frontend.Areas.Provider.Models.Dashboard
         public decimal MonthlyRevenue { get; set; }
         public List<RecentOrderViewModel> RecentOrders { get; set; } = new();
         public MonthlyStatsViewModel MonthlyStats { get; set; } = new();
+        public ScheduleOverviewViewModel? ScheduleOverview { get; set; }
     }
 
     public class RecentOrderViewModel

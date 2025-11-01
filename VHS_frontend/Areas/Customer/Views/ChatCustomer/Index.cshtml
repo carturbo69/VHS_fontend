@@ -1,27 +1,77 @@
-﻿@using VHS_frontend.Areas.Customer.Models.ChatDemo
+﻿@using VHS_frontend.Areas.Customer.Models.ChatDTOs
+@using Microsoft.AspNetCore.Html
+
 @model ChatPageVm
 
 @{
     ViewData["Title"] = "Chat";
     var me = Model.CurrentAccount?.AccountId ?? Guid.Empty;
 
-    // Lấy participant còn lại của cuộc trò chuyện đang chọn (để hiện tên/avatar ở header)
-    Func<ConversationDto, ConversationParticipantDto?> other = conv =>
-        conv?.Participants?.FirstOrDefault(p => p.AccountId != me);
-
     var selected = Model.SelectedConversation;
-    var otherInSelected = other(selected);
+    var hasSelection = selected != null;
 
-    // Ảnh dự phòng khi ảnh lỗi
+    MessageAccountDto? otherInSelected = null;
+    if (hasSelection)
+    {
+        otherInSelected = (selected!.ParticipantA?.AccountId == me ? selected.ParticipantB : selected.ParticipantA);
+    }
+
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+
+    // ===== Map hỗ trợ hiển thị trích dẫn tin gốc (reply) =====
+    Func<MessageDto, string> SnippetOf = (MessageDto m) =>
+    {
+        if (m == null) return "(Không có nội dung)";
+        // DECODE trước khi cắt
+        var bodyDecoded = string.IsNullOrWhiteSpace(m.Body) ? "" : System.Net.WebUtility.HtmlDecode(m.Body);
+        if (!string.IsNullOrWhiteSpace(bodyDecoded))
+            return bodyDecoded.Length > 140 ? bodyDecoded.Substring(0, 140) + "…" : bodyDecoded;
+        if (!string.IsNullOrWhiteSpace(m.ImageUrl)) return "[Ảnh]";
+        return "(Không có nội dung)";
+    };
+    var msgMap = hasSelection && selected?.Messages != null
+        ? selected.Messages.ToDictionary(x => x.MessageId)
+        : new Dictionary<Guid, MessageDto>();
+
+
 }
+
+
+@functions {
+    // Helper hiển thị trạng thái
+    public static Microsoft.AspNetCore.Html.IHtmlContent RenderStatus(MessageStatus status)
+    {
+        string icon = status switch
+        {
+            MessageStatus.Pending => "<i class=\"bi bi-clock-history\"></i>",
+            MessageStatus.Sent => "<i class=\"bi bi-check\"></i>",
+            MessageStatus.Delivered => "<i class=\"bi bi-check2-all\"></i>",
+            MessageStatus.Seen => "<i class=\"bi bi-check2-all\"></i>",
+            _ => ""
+        };
+        string text = status switch
+        {
+            MessageStatus.Pending => "Đang gửi",
+            MessageStatus.Sent => "Đã gửi",
+            MessageStatus.Delivered => "Đã nhận",
+            MessageStatus.Seen => "Đã xem",
+            _ => ""
+        };
+        return new Microsoft.AspNetCore.Html.HtmlString(
+            $"<span class=\"msg-status d-inline-flex align-items-center gap-1\" data-status=\"{status}\">{icon}<span class=\"d-none d-md-inline\">{text}</span></span>"
+        );
+    }
+}
+
+
 
 <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
 <link rel="stylesheet" href="~/css/chat-customer.css" asp-append-version="true" />
 
+
 <div class="container-fluid chat-wrapper">
     <div class="row h-100 g-0">
-        <!-- Sidebar: Tất cả người chat -->
+        <!-- Sidebar -->
         <aside class="col-12 col-md-4 col-lg-3 border-end chat-col d-flex flex-column">
             <div class="p-3">
                 <div class="input-group">
@@ -34,11 +84,20 @@
                 </div>
             </div>
 
+            <div class="pt-2 px-3">
+                <form method="post" action='@Url.Action("StartWithAdmin", "ChatCustomer", new { area = "Customer" })'>
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-success w-100 d-inline-flex align-items-center gap-2">
+                        <i class="bi bi-headset"></i> Chat với Admin
+                    </button>
+                </form>
+            </div>
+
+
             <div class="chat-scroll px-2">
                 @foreach (var c in Model.Conversations
                                 .OrderByDescending(x => x.IsPinned)
                                 .ThenByDescending(x => x.LastMessageAt))
-
                 {
                     var isActive = c.ConversationId == Model.SelectedConversationId;
 
@@ -67,206 +126,513 @@
             </div>
         </aside>
 
-        <!-- Khung chat: nội dung cuộc trò chuyện đang chọn -->
-        <main class="col-12 col-md-8 col-lg-9 chat-col d-flex flex-column">
-            <!-- Header -->
-            <div class="border-bottom p-3 d-flex align-items-center">
-                <img class="avatar me-2"
-                     src="@((string.IsNullOrWhiteSpace(otherInSelected?.Account?.AvatarUrl) ? fallbackImg : otherInSelected?.Account?.AvatarUrl))"
-                     alt=""
-                     loading="lazy" decoding="async" referrerpolicy="no-referrer"
-                     onerror="this.onerror=null;this.src='@fallbackImg';" />
 
-                <div class="me-3">
-                    <div class="fw-semibold">
-                        @(otherInSelected?.Account?.AccountName ?? "Chọn một cuộc trò chuyện")
+
+        <!-- Khung chat -->
+        @if (!hasSelection)
+        {
+            <!-- Chưa chọn hội thoại: panel phải trắng, không header, không nội dung, không ô soạn -->
+            <main class="col-12 col-md-8 col-lg-9 chat-col d-flex flex-column" style="background:#fff;"></main>
+        }
+        else
+        {
+            <!-- Đã chọn hội thoại: hiển thị đầy đủ -->
+            <main class="col-12 col-md-8 col-lg-9 chat-col d-flex flex-column"
+                  data-selected-conv="@Model.SelectedConversationId">
+                <!-- Header -->
+                <div class="border-bottom p-3 d-flex align-items-center position-relative">
+                    <img class="avatar me-2"
+                         src="@((string.IsNullOrWhiteSpace(otherInSelected?.AvatarUrl) ? fallbackImg : otherInSelected?.AvatarUrl))"
+                         alt=""
+                         loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                         onerror="this.onerror=null;this.src='@fallbackImg';" />
+
+                    <div class="me-3">
+                        <div class="fw-semibold">
+                            @(otherInSelected?.AccountName ?? selected!.Title ?? "Đối tác")
+                        </div>
                     </div>
+
+                    <!-- Nút 3 chấm ở góc phải -->
+                    <div class="ms-auto dropdown">
+                        <button type="button"
+                                class="btn btn-link p-0 text-muted"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                title="Tùy chọn">
+                            <i class="bi bi-three-dots fs-4"></i>
+                        </button>
+
+                        <div class="dropdown-menu dropdown-menu-end shadow-sm p-0" style="min-width:220px;">
+                            <form method="post"
+                                  action='@Url.Action("DeleteConversation", "ChatCustomer", new { area = "Customer", id = Model.SelectedConversationId, hide = true })'
+                                  onsubmit="return confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="dropdown-item text-danger">
+                                    Xóa cuộc trò chuyện
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
                 </div>
 
-                <div class="ms-auto small text-muted">
-                    @selected?.LastMessageAt?.ToString("dd/MM/yyyy HH:mm")
-                </div>
-            </div>
 
-            <!-- Danh sách tin nhắn -->
-            <div id="msgList" class="msg-list">
-                @if (selected?.Messages?.Count > 0)
-                {
-                    foreach (var m in selected.Messages.OrderBy(x => x.CreatedAt))
+                <!-- Danh sách tin nhắn -->
+                <div id="msgList" class="msg-list">
+                    @if (selected?.Messages?.Count > 0)
                     {
-                        var isMe = m.SenderAccountId == me;
+                        foreach (var m in selected.Messages.OrderBy(x => x.CreatedAt))
+                        {
+                            var isMe = m.SenderAccountId == me;
+                            var createdIso = m.CreatedAt.ToString("o");
+                            var senderName = isMe ? "Bạn" : (otherInSelected?.AccountName ?? "Đối tác");
+                            var snippetThis = SnippetOf(m);
 
-                        <div class="d-flex @(isMe ? "justify-content-end" : "justify-content-start")">
-                            <div class="bubble @(isMe ? "me" : "other")">
-                                @if (!string.IsNullOrWhiteSpace(m.Body))
-                                {
-                                    <div>@m.Body</div>
-                                }
+                            <div class="d-flex @(isMe ? "justify-content-end" : "justify-content-start")">
+                                <div class="bubble @(isMe ? "me" : "other")"
+                                     data-message-id="@m.MessageId"
+                                     data-created-at="@createdIso"
+                                     data-is-mine="@(isMe ? "true" : "false")"
+                                     data-status="@m.Status"
+                                     data-sender-name="@senderName"
+                                     data-snippet="@snippetThis">
 
-                                @* Hiển thị ảnh nếu có; nếu không có hoặc lỗi => fallback *@
-                                @if (!string.IsNullOrWhiteSpace(m.ImageUrl))
-                                {
-                                    <img src="@m.ImageUrl"
-                                         class="mt-2 rounded"
-                                         style="max-width:220px;"
-                                         loading="lazy" decoding="async" referrerpolicy="no-referrer"
-                                         onerror="this.onerror=null;this.src='@fallbackImg';" />
-                                }
-
-                                <!-- Meta: Giờ + Trạng thái (chỉ hiện cho tin mình gửi) -->
-                                <div class="msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2">
-                                    <span class="text-muted">@m.CreatedAt.ToString("HH:mm")</span>
-
-                                    @if (isMe)
+                                    @* Nếu là reply, hiển thị tham chiếu tin gốc *@
+                                    @if (m.ReplyToMessageId != null && msgMap.TryGetValue(m.ReplyToMessageId.Value, out var parent))
                                     {
-                                        var otherAcc = otherInSelected?.Account;
-                                        var rcpt = m.Receipts?.FirstOrDefault(r => r.RecipientAccountId == otherAcc?.AccountId);
-
-                                        if (rcpt?.IsRead == true)
-                                        {
-                                            <span class="status-label read">
-                                                Đã xem @(rcpt?.ReadAt?.ToString("HH:mm"))
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <span class="status-label sent">Đã gửi</span>
-                                        }
+                                        var parentName = parent.SenderAccountId == me ? "Bạn" : (otherInSelected?.AccountName ?? "Người kia");
+                                        <div class="reply-ref small text-muted border-start ps-2 mb-2">
+                                            <div class="fw-semibold">@parentName</div>
+                                            <div class="text-truncate" style="max-width: 420px;">@SnippetOf(parent)</div>
+                                        </div>
                                     }
+
+                                    @* Nội dung *@
+                                    @{
+                                        var decodedBody = string.IsNullOrWhiteSpace(m.Body) ? "" : System.Net.WebUtility.HtmlDecode(m.Body);
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(decodedBody))
+                                    {
+                                        <div>@decodedBody</div>
+                                    }
+
+
+                                    @if (!string.IsNullOrWhiteSpace(m.ImageUrl))
+                                    {
+                                        <img src="@m.ImageUrl"
+                                             class="mt-2 rounded"
+                                             style="max-width:220px;"
+                                             loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                                             onerror="this.onerror=null;this.src='@fallbackImg';" />
+                                    }
+
+                                    <div class="msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2">
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời">
+                                            <i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span>
+                                        </button>
+                                        <span class="text-muted">@m.CreatedAt.ToString("HH:mm")</span>
+                                        @if (isMe)
+                                        {
+                                            @RenderStatus(m.Status)
+                                        }
+                                    </div>
                                 </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @* Không có tin nhắn: hiển thị gợi ý nhanh *@
+                        <div class="empty-state d-flex flex-column align-items-center justify-content-center p-4 text-center text-muted">
+                            <i class="bi bi-chat-left-text fs-1 mb-2"></i>
+                            <div class="mb-3">Chưa có tin nhắn nào. Bạn muốn bắt đầu với một câu hỏi?</div>
+
+                            <div class="d-flex flex-wrap gap-2 justify-content-center">
+                                <!-- Lưu ý: data-text là nội dung sẽ gửi -->
+                                <button type="button" class="btn btn-outline-primary btn-sm quick-reply" data-text="Chào bạn, mình cần tư vấn dịch vụ.">Cần tư vấn dịch vụ</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm quick-reply" data-text="Bạn có thể báo giá giúp mình không?">Xin báo giá</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm quick-reply" data-text="Mình muốn đặt lịch sớm nhất có thể.">Đặt lịch sớm nhất</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm quick-reply" data-text="Cho mình hỏi thời gian làm việc và khu vực phục vụ?">Giờ làm & khu vực</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm quick-reply" data-text="Có khuyến mãi nào hiện tại không?">Hỏi khuyến mãi</button>
                             </div>
                         </div>
                     }
-                }
-                else
-                {
-                    <div class="h-100 d-flex align-items-center justify-content-center text-muted">
-                        Hãy chọn một cuộc trò chuyện ở cột bên trái để xem nội dung.
-                    </div>
-                }
-            </div>
+                </div>
 
-            <!-- Ô soạn tin -->
-            <div class="msg-input p-3">
-                @* NOTE: cần enctype để upload file *@
-                <form method="post"
-                      action='@Url.Action("Send", "ChatCustomer", new { area = "Customer" })'
-                      class="w-100"
-                      enctype="multipart/form-data">
+                <!-- Ô soạn tin -->
+                <div class="msg-input p-3">
+                    <form method="post"
+                          action='@Url.Action("Send", "ChatCustomer", new { area = "Customer" })'
+                          class="w-100"
+                          enctype="multipart/form-data">
 
-                    <input type="hidden" name="conversationId" value="@Model.SelectedConversationId" />
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="conversationId" value="@Model.SelectedConversationId" />
+                        <!-- ===== Hidden + pill hiển thị đang trả lời ===== -->
+                        <input type="hidden" name="replyToMessageId" id="replyToMessageId" value="" />
+                        <div id="replyPreview" class="replying-pill d-none p-2 mb-2 small d-flex align-items-start gap-2">
+                            <i class="bi bi-reply mt-1"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold" id="replyingToName"></div>
+                                <div class="text-muted text-truncate" id="replyingSnippet" style="max-width: 520px;"></div>
+                            </div>
+                            <button type="button" id="cancelReplyBtn" class="btn btn-sm btn-outline-secondary">Hủy</button>
+                        </div>
 
-                    @* Khung xem trước ảnh đính kèm *@
-                    <div id="attachPreview" class="d-none mt-2">
-                        <div class="d-inline-flex align-items-center gap-2 border rounded p-2 bg-light">
-                            <img id="attachThumb"
-                                 src=""
-                                 alt="Xem trước"
-                                 style="width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;"
-                                 onerror="this.onerror=null;this.src='@fallbackImg';" />
-                            <div class="small text-muted" id="attachName"></div>
-                            <button type="button" id="removeAttachBtn" class="btn btn-sm btn-outline-secondary">
-                                Bỏ ảnh
+                        <div id="attachPreview" class="d-none mt-2">
+                            <div class="d-inline-flex align-items-center gap-2 border rounded p-2 bg-light">
+                                <img id="attachThumb"
+                                     src=""
+                                     alt="Xem trước"
+                                     style="width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;"
+                                     onerror="this.onerror=null;this.src='@fallbackImg';" />
+                                <div class="small text-muted" id="attachName"></div>
+                                <button type="button" id="removeAttachBtn" class="btn btn-sm btn-outline-secondary">
+                                    Bỏ ảnh
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 align-items-start">
+                            <input type="text"
+                                   name="body"
+                                   class="form-control"
+                                   placeholder="Nhập tin nhắn…"
+                                   autocomplete="off" />
+
+                            <input type="file"
+                                   id="fileInput"
+                                   name="image"
+                                   class="d-none"
+                                   accept="image/*" />
+
+                            <button type="button"
+                                    id="pickFileBtn"
+                                    class="btn"
+                                    title="Đính kèm ảnh">
+                                <i class="bi bi-paperclip"></i>
+                            </button>
+
+                            <button type="submit" class="btn btn-primary">
+                                Gửi
                             </button>
                         </div>
-                    </div>
-
-                    <div class="d-flex gap-2 align-items-start">
-                        <input type="text"
-                               name="body"
-                               class="form-control"
-                               placeholder="Nhập tin nhắn…"
-                               autocomplete="off" />
-
-                        @* Input file ẩn *@
-                        <input type="file"
-                               id="fileInput"
-                               name="image"
-                               class="d-none"
-                               accept="image/*" />
-
-                        @* Nút mở thư mục chọn ảnh *@
-                        <button type="button"
-                                id="pickFileBtn"
-                                class="btn"
-                                title="Đính kèm ảnh">
-                            <i class="bi bi-paperclip"></i>
-                        </button>
-
-                        <button type="submit" class="btn btn-primary">
-                            Gửi
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </main>
+                    </form>
+                </div>
+            </main>
+        }
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+
+
 @section Scripts {
+    @* Chỉ auto-scroll khi đã chọn hội thoại *@
+    @if (hasSelection)
+    {
+        <script>
+            (function () {
+              var el = document.getElementById('msgList');
+              if (el) el.scrollTop = el.scrollHeight;
+            })();
+        </script>
+    }
+
     <script>
-        // Tự cuộn xuống cuối khi mở cuộc trò chuyện
         (function () {
-          var el = document.getElementById('msgList');
-          if (el) el.scrollTop = el.scrollHeight;
-        })();
+          var pickBtn = document.getElementById('pickFileBtn');
+          var fileInput = document.getElementById('fileInput');
+          var previewWrap = document.getElementById('attachPreview');
+          var imgEl = document.getElementById('attachThumb');
+          var nameEl = document.getElementById('attachName');
+          var removeBtn = document.getElementById('removeAttachBtn');
+          var objectUrl = null;
 
-        // Chọn ảnh + xem trước
-        (function () {
-            var pickBtn = document.getElementById('pickFileBtn');
-            var fileInput = document.getElementById('fileInput');
-            var previewWrap = document.getElementById('attachPreview');
-            var imgEl = document.getElementById('attachThumb');
-            var nameEl = document.getElementById('attachName');
-            var removeBtn = document.getElementById('removeAttachBtn');
-            var objectUrl = null;
+          if (!pickBtn || !fileInput) return;
 
-            if (!pickBtn || !fileInput) return;
+          pickBtn.addEventListener('click', function () { fileInput.click(); });
 
-            pickBtn.addEventListener('click', function () {
-                fileInput.click();
-            });
+          fileInput.addEventListener('change', function () {
+            if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
 
-            fileInput.addEventListener('change', function () {
-                // Clear preview cũ
-                if (objectUrl) {
-                    URL.revokeObjectURL(objectUrl);
-                    objectUrl = null;
-                }
+            if (fileInput.files && fileInput.files.length > 0) {
+              var f = fileInput.files[0];
 
-                if (fileInput.files && fileInput.files.length > 0) {
-                    var f = fileInput.files[0];
-
-                    // Bảo vệ: chỉ chấp nhận ảnh
-                    if (!f.type || !f.type.startsWith('image/')) {
-                        alert('Vui lòng chọn file ảnh.');
-                        fileInput.value = '';
-                        previewWrap.classList.add('d-none');
-                        return;
-                    }
-
-                    objectUrl = URL.createObjectURL(f);
-                    imgEl.src = objectUrl;
-                    nameEl.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
-                    previewWrap.classList.remove('d-none');
-                } else {
-                    previewWrap.classList.add('d-none');
-                }
-            });
-
-            removeBtn?.addEventListener('click', function () {
-                if (objectUrl) {
-                    URL.revokeObjectURL(objectUrl);
-                    objectUrl = null;
-                }
+              if (!f.type || !f.type.startsWith('image/')) {
+                alert('Vui lòng chọn file ảnh.');
                 fileInput.value = '';
-                imgEl.src = '';
-                nameEl.textContent = '';
                 previewWrap.classList.add('d-none');
-            });
+                return;
+              }
+
+              objectUrl = URL.createObjectURL(f);
+              imgEl.src = objectUrl;
+              nameEl.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
+              previewWrap.classList.remove('d-none');
+            } else {
+              previewWrap.classList.add('d-none');
+            }
+          });
+
+          removeBtn?.addEventListener('click', function () {
+            if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+            fileInput.value = '';
+            imgEl.src = '';
+            nameEl.textContent = '';
+            previewWrap.classList.add('d-none');
+          });
         })();
     </script>
 
-       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-   
+    @* ====== SignalR: trạng thái gửi/nhận/đã xem + Reply ====== *@
+    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+
+    <script>
+        // ===== Reply UI: KHỞI TẠO ĐỘC LẬP =====
+        window.__initReplyUi = function () {
+          var pageMain = document.querySelector('main.chat-col[data-selected-conv]');
+          if (!pageMain) return;
+
+          // Form & các phần tử của preview reply
+          var form = pageMain.querySelector('form[action*="ChatCustomer/Send"]');
+          var bodyInput = form?.querySelector('input[name="body"]');
+          var replyHidden = form?.querySelector('#replyToMessageId');
+
+          var replyPreview = document.getElementById('replyPreview');
+          var replyingToName = document.getElementById('replyingToName');
+          var replyingSnippet = document.getElementById('replyingSnippet');
+          var cancelReplyBtn = document.getElementById('cancelReplyBtn');
+
+          function showReplyPreview(id, name, snippet){
+            if (!replyHidden || !replyPreview) return;
+            replyHidden.value = id || '';
+            if (replyingToName) replyingToName.textContent = name || '—';
+            if (replyingSnippet) replyingSnippet.textContent = snippet || '';
+            replyPreview.classList.remove('d-none');
+            bodyInput?.focus();
+          }
+          function clearReplyPreview(){
+            if (replyHidden) replyHidden.value = '';
+            if (replyingToName) replyingToName.textContent = '';
+            if (replyingSnippet) replyingSnippet.textContent = '';
+            replyPreview?.classList.add('d-none');
+          }
+
+          cancelReplyBtn?.addEventListener('click', function(e){
+            e.preventDefault();
+            clearReplyPreview();
+          });
+
+          // BẮT SỰ KIỆN CLICK NÚT REPLY (event delegation)
+          pageMain.addEventListener('click', function(e){
+            var btn = e.target.closest('.reply-btn');
+            if (!btn) return;
+
+            // DÙNG btn.closest thay vì e.target.closest để chắc chắn đúng bubble
+            var bubble = btn.closest('.bubble');
+            if (!bubble) return;
+
+            var id = bubble.getAttribute('data-message-id') || '';
+            var name = bubble.getAttribute('data-sender-name') || '—';
+            var sn  = bubble.getAttribute('data-snippet') || '';
+
+            showReplyPreview(id, name, sn);
+          }, {passive:true});
+
+          // Nếu dùng quick-reply thì hủy trạng thái reply để không gắn nhầm
+          pageMain.addEventListener('click', function(e){
+            var qb = e.target.closest('.quick-reply');
+            if (!qb) return;
+            clearReplyPreview();
+          }, {passive:true});
+        };
+
+        // ===== Realtime (SignalR) GIỮ NGUYÊN NHƯ CŨ, chỉ chứa phần realtime =====
+        window.__initChatRealtime = function () {
+          var pageMain = document.querySelector('main.chat-col[data-selected-conv]');
+          if (!pageMain) { console.debug('[chat] no selection, skip signalR'); return; }
+
+          const me = '@(Model.CurrentAccount?.AccountId.ToString())';
+          const selectedConversationId = '@Model.SelectedConversationId';
+          const GUID_EMPTY = '00000000-0000-0000-0000-000000000000';
+          if (!me || me.toLowerCase() === GUID_EMPTY) {
+            console.warn('[chat] me is empty GUID, skip signalR init');
+            return;
+          }
+
+          function parseIso(s){ return s ? new Date(s) : null; }
+          function statusHtml(status){
+            let icon = '', text = '';
+            switch(status){
+              case 'Pending':   icon = '<i class="bi bi-clock-history"></i>'; text = 'Đang gửi'; break;
+              case 'Sent':      icon = '<i class="bi bi-check"></i>';         text = 'Đã gửi';   break;
+              case 'Delivered': icon = '<i class="bi bi-check2-all"></i>';    text = 'Đã nhận';  break;
+              case 'Seen':      icon = '<i class="bi bi-check2-all"></i>';    text = 'Đã xem';   break;
+            }
+            return '<span class="msg-status d-inline-flex align-items-center gap-1" data-status="'+status+'">'+icon+'<span class="d-none d-md-inline">'+text+'</span></span>';
+          }
+          function setBubbleStatus(bubble, status){
+            if (!bubble) return;
+            bubble.setAttribute('data-status', status);
+            const meta = bubble.querySelector('.msg-meta');
+            if (!meta) return;
+            let statusEl = meta.querySelector('.msg-status');
+            if (!statusEl){
+              if (bubble.dataset.isMine === 'true'){
+                meta.insertAdjacentHTML('beforeend', statusHtml(status));
+              }
+            } else {
+              statusEl.outerHTML = statusHtml(status);
+            }
+          }
+          function applyReadUpTo(lastReadAtIso){
+            const lastReadAt = parseIso(lastReadAtIso);
+            if (!lastReadAt) return;
+            document.querySelectorAll('.bubble[data-is-mine="true"]').forEach(b => {
+              const created = parseIso(b.getAttribute('data-created-at'));
+              if (created && created <= lastReadAt){
+                setBubbleStatus(b, 'Delivered');
+              }
+            });
+          }
+
+          function attachReplyRefIfAny(bubbleEl, msg){
+            if (!msg || !msg.replyToMessageId) return;
+            var refId = String(msg.replyToMessageId);
+            // Tìm chính xác theo attribute selector: so sánh nguyên văn
+            var parent = document.querySelector('.bubble[data-message-id="'+refId+'"]');
+
+            var name = parent?.getAttribute('data-sender-name') || (msg.replyToSenderName || '—');
+            var sn   = parent?.getAttribute('data-snippet')      || (msg.replyToSnippet || '(Không có nội dung)');
+
+            var wrap = document.createElement('div');
+            wrap.className = 'reply-ref small text-muted border-start ps-2 mb-2';
+
+            var nameEl = document.createElement('div');
+            nameEl.className = 'fw-semibold';
+            nameEl.textContent = name;
+
+            var snEl = document.createElement('div');
+            snEl.className = 'text-truncate';
+            snEl.style.maxWidth = '420px';
+            snEl.textContent = sn;
+
+            wrap.appendChild(nameEl);
+            wrap.appendChild(snEl);
+            bubbleEl.insertAdjacentElement('afterbegin', wrap);
+          }
+
+          const connection = new signalR.HubConnectionBuilder()
+            .withUrl('/chathub')
+            .withAutomaticReconnect()
+            .configureLogging(signalR.LogLevel.Information)
+            .build();
+
+          connection.on('conversation:readUpTo', payload => {
+            if (!payload) return;
+            if (String(payload.conversationId).toLowerCase() !== String(selectedConversationId).toLowerCase()) return;
+            applyReadUpTo(payload.lastReadAt);
+          });
+
+          connection.on('message:created', msg => {
+            if (!msg) return;
+            if (String(msg.conversationId).toLowerCase() !== String(selectedConversationId).toLowerCase()) return;
+
+            const list = document.getElementById('msgList');
+            if (!list) return;
+
+            const isMine = String(msg.senderAccountId).toLowerCase() === String(me).toLowerCase();
+
+            const wrap = document.createElement('div');
+            wrap.className = 'd-flex ' + (isMine ? 'justify-content-end' : 'justify-content-start');
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble ' + (isMine ? 'me' : 'other');
+            bubble.setAttribute('data-message-id', msg.messageId);                  // giữ nguyên chữ hoa/thường
+            bubble.setAttribute('data-created-at', msg.createdAt);
+            bubble.setAttribute('data-is-mine', isMine ? 'true' : 'false');
+            bubble.setAttribute('data-status', msg.status || 'Sent');
+
+            const senderName = isMine ? 'Bạn' : (msg.senderName || 'Đối tác');
+            const snippetThis = msg.body ? msg.body : (msg.imageUrl ? '[Ảnh]' : '(Không có nội dung)');
+            bubble.setAttribute('data-sender-name', senderName);
+            bubble.setAttribute('data-snippet', snippetThis);
+
+            attachReplyRefIfAny(bubble, msg);
+
+            if (msg.body){
+              const bodyEl = document.createElement('div');
+              bodyEl.textContent = msg.body;
+              bubble.appendChild(bodyEl);
+            }
+            if (msg.imageUrl){
+              const img = document.createElement('img');
+              img.src = msg.imageUrl;
+              img.className = 'mt-2 rounded';
+              img.style.maxWidth = '220px';
+              img.loading = 'lazy';
+              img.decoding = 'async';
+              bubble.appendChild(img);
+            }
+
+            const meta = document.createElement('div');
+            meta.className = 'msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2';
+            const t = new Date(msg.createdAt);
+            const hh = String(t.getHours()).padStart(2,'0');
+            const mm = String(t.getMinutes()).padStart(2,'0');
+            meta.innerHTML = '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
+                            + '<span class="text-muted">'+hh+':'+mm+'</span>'
+                            + (isMine ? (function(s){return s;})(statusHtml(msg.status || 'Sent')) : '');
+            bubble.appendChild(meta);
+
+            wrap.appendChild(bubble);
+            list.appendChild(wrap);
+            list.scrollTop = list.scrollHeight;
+          });
+
+          connection.onreconnecting((err) => { console.info('[chat] reconnecting...', err); });
+          connection.onreconnected(async (connectionId) => {
+            console.info('[chat] reconnected as', connectionId, '— re-registering…');
+            try { await connection.invoke('Register', me); } catch (e) { console.error('[chat] re-register failed', e); }
+          });
+          connection.onclose(async (err) => {
+            console.warn('[chat] connection closed, restarting…', err);
+            try { await connection.start(); await connection.invoke('Register', me); } catch (e) { console.error('[chat] restart failed', e); }
+          });
+
+          (async function startAndRegister(){
+            try { await connection.start(); await connection.invoke('Register', me); }
+            catch (e) { console.error('[chat] initial start failed, retrying in 2s…', e); setTimeout(startAndRegister, 2000); }
+          })();
+        };
+
+        // Luôn khởi tạo Reply UI ngay
+        (function initUiEarly(){
+          // đợi chút cho DOM section này render xong
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', window.__initReplyUi, { once:true });
+          } else {
+            window.__initReplyUi();
+          }
+        })();
+
+        // Realtime: như cũ — nếu có sẵn signalR thì init ngay, nếu chưa thì nạp CDN rồi init
+        (function ensureSignalRReady(){
+          if (window.signalR?.HubConnectionBuilder) {
+            window.__initChatRealtime();
+            return;
+          }
+          var s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.5/signalr.min.js';
+          s.defer = true;
+          s.onload = function(){ window.__initChatRealtime(); };
+          s.onerror = function(){ console.error('[chat] failed to load signalr.min.js'); };
+          document.head.appendChild(s);
+        })();
+    </script>
+
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 }

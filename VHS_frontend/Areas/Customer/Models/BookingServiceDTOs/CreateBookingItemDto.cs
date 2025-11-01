@@ -28,6 +28,8 @@
     public class BookingAmountItem
     {
         public Guid BookingId { get; set; }
+        public Guid ServiceId { get; set; }     // ✅ thêm để mapping
+        public string? ServiceName { get; set; } // ✅ thêm để hiển thị
         public decimal Subtotal { get; set; }   // giá dịch vụ + options (chưa trừ voucher)
         public decimal Discount { get; set; }   // phần voucher phân bổ
         public decimal Amount { get; set; }     // Subtotal - Discount (>= 0)

@@ -13,9 +13,18 @@ namespace VHS_frontend.Controllers
             _serviceShopService = serviceShopService;
         }
 
-        public async Task<IActionResult> Index(int? categoryId, string sortBy = "popular", int page = 1)
+        public async Task<IActionResult> Index(Guid? providerId, int? categoryId, Guid? tagId, string sortBy = "popular", int page = 1)
         {
-            var viewModel = await _serviceShopService.GetServiceShopViewModelAsync(categoryId, sortBy, page);
+            if (!providerId.HasValue)
+            {
+                return BadRequest("Provider ID is required");
+            }
+
+            var viewModel = await _serviceShopService.GetServiceShopViewModelAsync(providerId.Value, categoryId, tagId, sortBy, page);
+            if (viewModel == null)
+            {
+                return NotFound("Provider shop not found");
+            }
             return View(viewModel);
         }
 
@@ -29,15 +38,15 @@ namespace VHS_frontend.Controllers
             return View(service);
         }
 
-        public async Task<IActionResult> GetBestsellingServices()
+        public async Task<IActionResult> GetBestsellingServices(Guid providerId)
         {
-            var services = await _serviceShopService.GetBestsellingServicesAsync();
+            var services = await _serviceShopService.GetBestsellingServicesAsync(providerId);
             return Json(services);
         }
 
-        public async Task<IActionResult> GetServicesByCategory(int categoryId, string sortBy = "popular", int page = 1)
+        public async Task<IActionResult> GetServicesByCategory(Guid providerId, int categoryId, string sortBy = "popular", int page = 1)
         {
-            var services = await _serviceShopService.GetServicesByCategoryAsync(categoryId, sortBy, page);
+            var services = await _serviceShopService.GetServicesByCategoryAsync(providerId, categoryId, sortBy, page);
             return Json(services);
         }
     }

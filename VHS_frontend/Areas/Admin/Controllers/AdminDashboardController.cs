@@ -11,17 +11,20 @@ namespace VHS_frontend.Areas.Admin.Controllers
         private readonly ProviderAdminService _providerService;
         private readonly AdminRegisterProviderService _registerProviderService;
         private readonly AdminVoucherService _voucherService;
+        private readonly AdminBookingService _bookingService;
 
         public AdminDashboardController(
             CustomerAdminService customerService,
             ProviderAdminService providerService,
             AdminRegisterProviderService registerProviderService,
-            AdminVoucherService voucherService)
+            AdminVoucherService voucherService,
+            AdminBookingService bookingService)
         {
             _customerService = customerService;
             _providerService = providerService;
             _registerProviderService = registerProviderService;
             _voucherService = voucherService;
+            _bookingService = bookingService;
         }
 
         public async Task<IActionResult> Index()
@@ -46,6 +49,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 _customerService.SetBearerToken(token);
                 _providerService.SetBearerToken(token);
                 _voucherService.SetBearerToken(token);
+                _bookingService.SetBearerToken(token);
             }
             
             // Lấy dữ liệu thật từ API với error handling
@@ -53,6 +57,12 @@ namespace VHS_frontend.Areas.Admin.Controllers
             var providers = new List<VHS_frontend.Areas.Admin.Models.Provider.ProviderDTO>();
             var registerProviders = new List<VHS_frontend.Areas.Admin.Models.RegisterProvider.AdminProviderItemDTO>();
             var vouchers = new List<VHS_frontend.Areas.Admin.Models.Voucher.AdminVoucherItemDTO>();
+            
+            // Booking/Payment statistics
+            VHS_frontend.Areas.Admin.Models.Booking.AdminBookingStatisticsDTO? todayStats = null;
+            VHS_frontend.Areas.Admin.Models.Booking.AdminBookingStatisticsDTO? yesterdayStats = null;
+            var revenueChartData = new List<VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO>();
+            var ordersByHour = new List<VHS_frontend.Areas.Admin.Models.Booking.OrdersByHourDTO>();
             
             try
             {
@@ -98,23 +108,99 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 vouchers = new List<VHS_frontend.Areas.Admin.Models.Voucher.AdminVoucherItemDTO>();
             }
             
+            // Lấy dữ liệu booking/payment
+            try
+            {
+                var today = DateTime.Today;
+                var tomorrow = today.AddDays(1).AddTicks(-1);
+                var yesterday = today.AddDays(-1);
+                
+                todayStats = await _bookingService.GetStatisticsAsync(today, tomorrow);
+                yesterdayStats = await _bookingService.GetStatisticsAsync(yesterday, today.AddTicks(-1));
+                
+                // Debug logging
+                System.Diagnostics.Debug.WriteLine($"📊 Today Stats: Revenue={todayStats?.TotalRevenue}, Bookings={todayStats?.TotalBookings}, Completed={todayStats?.CompletedBookings}");
+                System.Diagnostics.Debug.WriteLine($"📊 Yesterday Stats: Revenue={yesterdayStats?.TotalRevenue}, Bookings={yesterdayStats?.TotalBookings}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Error getting booking stats: {ex.Message}");
+            }
+            
+            try
+            {
+                revenueChartData = await _bookingService.GetRevenueChartAsync(days: 7);
+                System.Diagnostics.Debug.WriteLine($"📈 Revenue Chart Data: {revenueChartData.Count} days");
+                foreach (var item in revenueChartData)
+                {
+                    System.Diagnostics.Debug.WriteLine($"   - {item.Date:dd/MM/yyyy}: {item.Revenue:N0} VND");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Error getting revenue chart: {ex.Message}");
+                revenueChartData = new List<VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO>();
+            }
+            
+            try
+            {
+                ordersByHour = await _bookingService.GetOrdersByHourAsync();
+                System.Diagnostics.Debug.WriteLine($"📊 Orders by Hour: {ordersByHour.Count} periods");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Error getting orders by hour: {ex.Message}");
+                ordersByHour = new List<VHS_frontend.Areas.Admin.Models.Booking.OrdersByHourDTO>();
+            }
+            
             // Tính toán dữ liệu thật
             var activeCustomers = customers.Count;
             var activeProviders = providers.Count;
-            var pendingRegistrations = registerProviders.Count(r => r.Status == "Pending");
+            var pendingRegistrations = registerProviders.Count(r => 
+                string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase));
             var activeVouchers = vouchers.Count;
+            
+            // Tính toán dữ liệu booking/payment
+            var todayRevenue = todayStats?.TotalRevenue ?? 0;
+            var yesterdayRevenue = yesterdayStats?.TotalRevenue ?? 0;
+            var revenueChange = yesterdayRevenue > 0 
+                ? Math.Round((double)(todayRevenue - yesterdayRevenue) / (double)yesterdayRevenue * 100, 1)
+                : (todayRevenue > 0 ? 100 : 0);
+            
+            var todayOrders = todayStats?.TotalBookings ?? 0;
+            var yesterdayOrders = yesterdayStats?.TotalBookings ?? 0;
+            var ordersChange = yesterdayOrders > 0 
+                ? Math.Round((double)(todayOrders - yesterdayOrders) / (double)yesterdayOrders * 100, 1)
+                : (todayOrders > 0 ? 100 : 0);
+            
+            // Tỷ lệ chuyển đổi = (Bookings hoàn thành / Tổng bookings) * 100
+            var completedBookings = todayStats?.CompletedBookings ?? 0;
+            var totalBookings = todayStats?.TotalBookings ?? 0;
+            var conversionRate = totalBookings > 0 
+                ? Math.Round((double)completedBookings / totalBookings * 100, 1)
+                : 0;
+            
+            var yesterdayCompleted = yesterdayStats?.CompletedBookings ?? 0;
+            var yesterdayTotal = yesterdayStats?.TotalBookings ?? 0;
+            var yesterdayConversion = yesterdayTotal > 0 
+                ? Math.Round((double)yesterdayCompleted / yesterdayTotal * 100, 1)
+                : 0;
+            var conversionChange = yesterdayConversion > 0
+                ? Math.Round(conversionRate - yesterdayConversion, 1)
+                : (conversionRate > 0 ? conversionRate : 0);
             
             // Tạo Model với dữ liệu thật
             var model = new DashboardViewModel
             {
-                // Stats Cards - Dữ liệu thật (0 khi chưa có API)
-                TodayRevenue = 0, // TODO: Lấy từ API orders
-                RevenueChange = 0,
-                RevenueProgress = 0,
+                // Stats Cards - Dữ liệu thật từ booking/payment
+                TodayRevenue = todayRevenue,
+                RevenueChange = revenueChange,
+                RevenueProgress = CalculateRevenueProgress(todayRevenue),
                 
-                TodayOrders = 0, // TODO: Lấy từ API orders
-                OrdersChange = 0,
-                OrdersProgress = 0,
+                TodayOrders = todayOrders,
+                OrdersChange = ordersChange,
+                OrdersProgress = CalculateOrdersProgress(todayOrders),
                 
                 ActiveCustomers = activeCustomers, // Dữ liệu thật
                 CustomersChange = CalculateCustomersChange(activeCustomers), // Tính toán % tăng trưởng thật
@@ -126,18 +212,26 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 
                 ActiveVouchers = activeVouchers, // Dữ liệu thật
                 
-                ConversionRate = activeCustomers > 0 ? Math.Min((double)activeProviders / activeCustomers * 100, 100) : 0, // Tính toán thật
-                ConversionChange = 0,
+                ConversionRate = conversionRate, // Tỷ lệ booking hoàn thành / tổng booking
+                ConversionChange = conversionChange,
                 
                 AverageRating = 0, // TODO: Lấy từ API ratings
                 RatingChange = 0,
                 
-                // Charts Data - Dữ liệu 0 (chờ API thật)
-                RevenueChartData = new List<decimal> { 0, 0, 0, 0, 0, 0, 0 },
-                RevenueChartLabels = new List<string> { "T2", "T3", "T4", "T5", "T6", "T7", "CN" },
+                // Charts Data - Dữ liệu thật từ API
+                RevenueChartData = revenueChartData.Any() 
+                    ? revenueChartData.Select(r => r.Revenue).ToList()
+                    : Enumerable.Repeat(0m, 7).ToList(),
+                RevenueChartLabels = revenueChartData.Any()
+                    ? revenueChartData.Select(r => r.Date.ToString("dd/MM")).ToList()
+                    : Enumerable.Range(0, 7).Select(i => DateTime.Today.AddDays(-6 + i).ToString("dd/MM")).ToList(),
                 
-                OrdersChartData = new List<int> { 0, 0, 0, 0, 0, 0 },
-                OrdersChartLabels = new List<string> { "00:00", "04:00", "08:00", "12:00", "16:00", "20:00" },
+                OrdersChartData = ordersByHour.Any()
+                    ? ordersByHour.Select(o => o.Orders).ToList()
+                    : Enumerable.Repeat(0, 6).ToList(),
+                OrdersChartLabels = ordersByHour.Any()
+                    ? ordersByHour.Select(o => o.Period).ToList()
+                    : new List<string> { "00:00", "04:00", "08:00", "12:00", "16:00", "20:00" },
                 
                 NewCustomersChartData = new List<int> { 0, 0, 0, 0, 0, 0, 0 },
                 NewCustomersChartLabels = new List<string> { "1/1", "5/1", "10/1", "15/1", "20/1", "25/1", "30/1" },
@@ -164,12 +258,20 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // Recent Activities - Dữ liệu thật
                 RecentActivities = registerProviders.Take(3).Select((r, index) => new RecentActivity
                 {
-                    Title = r.Status == "Pending" ? "Đăng ký mới chờ duyệt" : 
-                            r.Status == "Approved" ? "Đăng ký đã được duyệt" : "Đăng ký bị từ chối",
+                    Title = string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
+                            string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                            ? "Đăng ký mới chờ duyệt" : 
+                            string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) || 
+                            string.Equals(r.Status, "Approved", StringComparison.OrdinalIgnoreCase)
+                            ? "Đăng ký đã được duyệt" : "Đăng ký bị từ chối",
                     Description = $"{r.ProviderName} - {r.Description}",
                     CreatedAt = r.CreatedAt ?? DateTime.Now,
-                    ActivityType = r.Status == "Pending" ? "warning" : 
-                                  r.Status == "Approved" ? "success" : "info"
+                    ActivityType = string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
+                                   string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                                   ? "warning" : 
+                                   string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) || 
+                                   string.Equals(r.Status, "Approved", StringComparison.OrdinalIgnoreCase)
+                                   ? "success" : "info"
                 }).ToList(),
                 
                 // Provider Registrations - Dữ liệu thật
@@ -179,7 +281,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     CompanyName = r.ProviderName,
                     ServiceDescription = r.Description ?? "Không có mô tả",
                     CreatedAt = r.CreatedAt ?? DateTime.Now,
-                    Status = r.Status.ToLower()
+                    Status = NormalizeStatus(r.Status)
                 }).ToList()
             };
             
@@ -273,6 +375,47 @@ namespace VHS_frontend.Areas.Admin.Controllers
             // Mục tiêu: 50 provider = 100%
             const int targetProviders = 50;
             return Math.Min((double)currentProviders / targetProviders * 100, 100);
+        }
+        
+        private double CalculateRevenueProgress(decimal currentRevenue)
+        {
+            // Mục tiêu: 10,000,000 VND/ngày = 100%
+            const decimal targetRevenue = 10_000_000;
+            return Math.Min((double)(currentRevenue / targetRevenue * 100), 100);
+        }
+        
+        private double CalculateOrdersProgress(int currentOrders)
+        {
+            // Mục tiêu: 50 đơn/ngày = 100%
+            const int targetOrders = 50;
+            return Math.Min((double)currentOrders / targetOrders * 100, 100);
+        }
+        
+        /// <summary>
+        /// Chuẩn hóa status từ tiếng Việt hoặc tiếng Anh về lowercase tiếng Anh
+        /// </summary>
+        private string NormalizeStatus(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+                return "pending";
+            
+            // Chuẩn hóa status về tiếng Anh lowercase
+            if (string.Equals(status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase))
+                return "pending";
+            
+            if (string.Equals(status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Đã phê duyệt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Approved", StringComparison.OrdinalIgnoreCase))
+                return "approved";
+            
+            if (string.Equals(status, "Đã từ chối", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Bị từ chối", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(status, "Rejected", StringComparison.OrdinalIgnoreCase))
+                return "rejected";
+            
+            // Fallback: chuyển về lowercase
+            return status.ToLower();
         }
     }
 }
