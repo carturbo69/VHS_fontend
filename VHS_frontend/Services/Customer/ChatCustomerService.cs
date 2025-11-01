@@ -27,6 +27,7 @@ namespace VHS_frontend.Services.Customer
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
+
         static ChatCustomerService()
         {
             // Nếu BE trả "Sent"/"Delivered" (PascalCase)
@@ -123,7 +124,6 @@ namespace VHS_frontend.Services.Customer
             CancellationToken ct = default)
             => GetConversationDetailAsync(conversationId, accountId, take, before, markAsRead: false, jwtToken, ct);
 
-        // VHS_frontend/Services/Customer/ChatCustomerService.cs
 
         public async Task<Guid> FindOrStartConversationByProviderAsync(
             Guid myAccountId,

@@ -102,5 +102,4 @@
         public List<TipItemVm> SafetyTips { get; set; } = new();
     }
 
-
 }

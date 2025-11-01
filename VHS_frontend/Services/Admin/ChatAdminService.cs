@@ -118,7 +118,6 @@ namespace VHS_frontend.Services.Admin
             CancellationToken ct = default)
             => GetConversationDetailAsync(conversationId, accountId, take, before, markAsRead: false, jwtToken, ct);
 
-        // VHS_frontend/Services/Customer/ChatCustomerService.cs
 
         public async Task<Guid> FindOrStartConversationByProviderAsync(
             Guid myAccountId,
