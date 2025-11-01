@@ -1,5 +1,6 @@
 ﻿@using VHS_frontend.Areas.Customer.Models.ChatDTOs
 @using Microsoft.AspNetCore.Html
+@using System.Runtime.InteropServices
 
 @model ChatPageVm
 
@@ -38,6 +39,34 @@
 
 
 @functions {
+
+    private static TimeZoneInfo GetVnTz()
+    {
+        try
+        {
+            // Windows vs Linux/macOS
+            var tzId = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? "SE Asia Standard Time"
+                : "Asia/Ho_Chi_Minh";
+            return TimeZoneInfo.FindSystemTimeZoneById(tzId);
+        }
+        catch
+        {
+            // fallback +07:00 nếu máy chủ không có TZ
+            return TimeZoneInfo.CreateCustomTimeZone("VN_Fallback", TimeSpan.FromHours(7), "VN", "VN");
+        }
+    }
+
+    private static string HHmmVN(DateTime utc)
+    {
+        var fixedUtc = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        var vn = TimeZoneInfo.ConvertTimeFromUtc(fixedUtc, GetVnTz());
+        return vn.ToString("HH:mm");
+    }
+
+    // Overload nếu model dùng DateTimeOffset
+    private static string HHmmVN(DateTimeOffset dto) => HHmmVN(dto.UtcDateTime);
+
     // Helper hiển thị trạng thái
     public static Microsoft.AspNetCore.Html.IHtmlContent RenderStatus(MessageStatus status)
     {
@@ -112,7 +141,10 @@
                         <div class="flex-grow-1">
                             <div class="d-flex">
                                 <div class="fw-semibold text-ellipsis-1">@c.Title</div>
-                                <div class="ms-auto small text-muted">@c.LastMessageAt?.ToString("HH:mm")</div>
+                                <div class="ms-auto small text-muted">
+                                    @(c.LastMessageAt.HasValue? HHmmVN(c.LastMessageAt.Value) : "")
+                                </div>
+
                             </div>
                             <div class="small text-muted text-ellipsis-1">@c.LastMessageSnippet</div>
                         </div>
@@ -185,7 +217,8 @@
                         foreach (var m in selected.Messages.OrderBy(x => x.CreatedAt))
                         {
                             var isMe = m.SenderAccountId == me;
-                            var createdIso = m.CreatedAt.ToString("o");
+                            var createdIso = DateTime.SpecifyKind(m.CreatedAt, DateTimeKind.Utc).ToString("o");
+
                             var senderName = isMe ? "Bạn" : (otherInSelected?.AccountName ?? "Đối tác");
                             var snippetThis = SnippetOf(m);
 
@@ -231,7 +264,8 @@
                                         <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời">
                                             <i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span>
                                         </button>
-                                        <span class="text-muted">@m.CreatedAt.ToString("HH:mm")</span>
+                                        <span class="text-muted">@HHmmVN(m.CreatedAt)</span>
+
                                         @if (isMe)
                                         {
                                             @RenderStatus(m.Status)
@@ -597,20 +631,32 @@
               bubble.appendChild(img);
             }
 
-            const meta = document.createElement('div');
-            meta.className = 'msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2';
-            const t = new Date(msg.createdAt);
-            const hh = String(t.getHours()).padStart(2,'0');
-            const mm = String(t.getMinutes()).padStart(2,'0');
-            meta.innerHTML = '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
-                            + '<span class="text-muted">'+hh+':'+mm+'</span>'
-                            + (isMine ? (function(s){return s;})(statusHtml(msg.status || 'Sent')) : '');
-            bubble.appendChild(meta);
+                   const meta = document.createElement('div');
+        meta.className = 'msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2';
 
-            wrap.appendChild(bubble);
-            list.appendChild(wrap);
-            list.scrollTop = list.scrollHeight;
-          });
+        // Format giờ theo VN (Asia/Ho_Chi_Minh), 24h
+        const fmtVN = new Intl.DateTimeFormat('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+          timeZone: 'Asia/Ho_Chi_Minh'
+        });
+
+        // msg.createdAt phải là ISO-UTC có 'Z' (ví dụ: "2025-01-01T12:34:56.000Z")
+        const d = new Date(msg.createdAt);
+        const hhmm = isNaN(d) ? '' : fmtVN.format(d);
+
+        meta.innerHTML =
+          '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
+          + '<span class="text-muted">' + hhmm + '</span>'
+          + (isMine ? (function (s) { return s; })(statusHtml(msg.status || 'Sent')) : '');
+
+        bubble.appendChild(meta);
+
+        wrap.appendChild(bubble);
+        list.appendChild(wrap);
+        list.scrollTop = list.scrollHeight;
+
 
           connection.onreconnecting((err) => { console.info('[chat] reconnecting...', err); });
           connection.onreconnected(async (connectionId) => {
