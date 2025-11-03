@@ -126,13 +126,17 @@ builder.Services.AddHttpClient<ReportService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+
 // Chatbox Service
 builder.Services.AddHttpClient<ChatboxService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });
-// ServiceShopService
-builder.Services.AddScoped<ServiceShopService>();
+// ServiceShopService - QUAN TRỌNG: Phải có HttpClient với BaseAddress
+builder.Services.AddHttpClient<ServiceShopService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
 
 builder.Services.AddScoped<IVnPayService, VnPayService>();
 builder.Services.AddScoped<VnPayService>();

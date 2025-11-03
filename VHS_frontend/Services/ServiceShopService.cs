@@ -19,7 +19,7 @@ namespace VHS_frontend.Services
         private readonly IServiceCustomerService _serviceCustomerService;
         private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web)
         {
-            PropertyNameCaseInsensitive = true // Đảm bảo map đúng properties dù có khác case
+            PropertyNameCaseInsensitive = true
         };
 
         public ServiceShopService(HttpClient httpClient, IServiceCustomerService serviceCustomerService)
@@ -28,233 +28,295 @@ namespace VHS_frontend.Services
             _serviceCustomerService = serviceCustomerService;
         }
 
+        /// <summary>
+        /// Lấy ViewModel cho trang Service Shop với đầy đủ thông tin provider và services
+        /// </summary>
         public async Task<ServiceShopViewModel?> GetServiceShopViewModelAsync(Guid providerId, int? categoryId, Guid? tagId, string sortBy, int page)
         {
+            // Sử dụng cả Console và Debug để đảm bảo log được hiển thị
+            Console.WriteLine($"[ServiceShopService] === GetServiceShopViewModelAsync START ===");
+            Console.WriteLine($"[ServiceShopService] providerId: {providerId}");
+            Console.WriteLine($"[ServiceShopService] categoryId: {categoryId}, tagId: {tagId}, sortBy: {sortBy}, page: {page}");
+            System.Diagnostics.Debug.WriteLine($"=== GetServiceShopViewModelAsync START ===");
+            System.Diagnostics.Debug.WriteLine($"providerId: {providerId}");
+            System.Diagnostics.Debug.WriteLine($"categoryId: {categoryId}, tagId: {tagId}, sortBy: {sortBy}, page: {page}");
+            
             try
             {
-                // Lấy tất cả dịch vụ của provider
-                var response = await _httpClient.GetAsync($"api/ServiceProvider/provider/{providerId}");
-                if (!response.IsSuccessStatusCode)
-                {
-                    return null;
-                }
+                // BƯỚC 1: Lấy tất cả services của provider từ API
+                var providerServices = await GetProviderServicesAsync(providerId);
+                System.Diagnostics.Debug.WriteLine($"Step 1 Complete: Found {providerServices.Count} services for provider {providerId}");
 
-                var apiResponse = await response.Content.ReadFromJsonAsync<ApiResponseWrapper<List<ServiceProviderReadDTO>>>(_json);
-                var providerServices = apiResponse?.data ?? new List<ServiceProviderReadDTO>();
+                // BƯỚC 2: Lấy thông tin chi tiết của provider
+                var shopInfo = await GetShopInfoAsync(providerId, providerServices);
+                System.Diagnostics.Debug.WriteLine($"Step 2 Complete: ShopInfo - Name: '{shopInfo.Name}', TotalServices: {shopInfo.TotalServices}, Rating: {shopInfo.Rating}");
 
-                if (!providerServices.Any())
-                {
-                    return null;
-                }
+                // BƯỚC 3: Lấy categories và tags
+                var allCategories = await GetAllCategoriesAsync();
+                System.Diagnostics.Debug.WriteLine($"Step 3 Complete: Found {allCategories.Count} categories");
 
-                // Lấy thông tin provider từ dịch vụ đầu tiên (hoặc từ API riêng nếu có)
-                var firstService = providerServices.First();
-                
-                // Lấy thông tin provider từ service detail nếu có (hoặc dùng dữ liệu mock tạm)
-                // Trong thực tế nên có API riêng để lấy thông tin provider
-                var providerInfo = await GetProviderInfoAsync(providerId, firstService);
+                // BƯỚC 4: Lấy ratings và reviews từ homepage API (nhanh hơn)
+                var servicesRatingMap = await GetServicesRatingMapAsync(providerId);
+                System.Diagnostics.Debug.WriteLine($"Step 4 Complete: Rating map for {servicesRatingMap.Count} services");
 
-                // Lấy categories
-                var allCategories = await _serviceCustomerService.GetAllAsync();
-                
-                // Lấy rating thực tế từ API services-homepage
-                var allServicesFromHomepage = await _serviceCustomerService.GetAllServiceHomePageAsync();
-                var servicesRatingMap = allServicesFromHomepage
-                    .Where(s => s != null)
-                    .ToDictionary(s => s.ServiceId, s => new { 
-                        Rating = s.AverageRating, 
-                        TotalReviews = s.TotalReviews,
-                        SalesCount = 0 // Có thể lấy từ booking count nếu có API
-                    });
-                
-                // Lấy tags từ category cho các service không có tags (từ certificate được duyệt)
-                var categoryTagsMap = new Dictionary<Guid, List<TagDTO>>();
-                var uniqueCategoryIds = providerServices.Select(s => s.CategoryId).Distinct().ToList();
-                
-                foreach (var catId in uniqueCategoryIds)
-                {
-                    try
-                    {
-                        var tagsResponse = await _httpClient.GetAsync($"api/tag?categoryId={catId}&includeDeleted=false");
-                        if (tagsResponse.IsSuccessStatusCode)
-                        {
-                            var categoryTags = await tagsResponse.Content.ReadFromJsonAsync<List<TagDTO>>(_json);
-                            if (categoryTags != null && categoryTags.Any())
-                            {
-                                categoryTagsMap[catId] = categoryTags.Where(t => t != null && !string.IsNullOrWhiteSpace(t.Name) && !(t.IsDeleted ?? false)).ToList();
-                            }
-                        }
-                    }
-                    catch { /* Ignore errors */ }
-                }
-                
-                // Map services to ServiceItem với rating thực tế và tags từ category nếu cần
-                var allServiceItems = providerServices.Select(s => 
-                {
-                    var ratingInfo = servicesRatingMap.ContainsKey(s.ServiceId) 
-                        ? servicesRatingMap[s.ServiceId] 
-                        : null;
-                    
-                    // Nếu service không có tags, lấy từ category (certificate được duyệt)
-                    if ((s.Tags == null || !s.Tags.Any()) && categoryTagsMap.ContainsKey(s.CategoryId))
-                    {
-                        s.Tags = categoryTagsMap[s.CategoryId];
-                    }
-                    
-                    return MapToServiceItem(s, allCategories, ratingInfo);
-                }).ToList();
+                // BƯỚC 5: Lấy tags theo category
+                var categoryTagsMap = await GetCategoryTagsMapAsync(providerServices);
+                System.Diagnostics.Debug.WriteLine($"Step 5 Complete: Tags for {categoryTagsMap.Count} categories");
 
-                // Lọc theo category và tag nếu có
-                var filteredServices = allServiceItems;
-                if (categoryId.HasValue)
-                {
-                    filteredServices = allServiceItems.Where(s => s.CategoryId == categoryId.Value).ToList();
-                }
-                
-                // Lọc theo tag nếu có (chỉ lấy services có tag này)
-                if (tagId.HasValue)
-                {
-                    // Lấy tên tag từ categoryTagsMap để filter
-                    string? tagName = null;
-                    foreach (var catTags in categoryTagsMap.Values)
-                    {
-                        var tag = catTags.FirstOrDefault(t => t.TagId == tagId.Value);
-                        if (tag != null && !string.IsNullOrWhiteSpace(tag.Name))
-                        {
-                            tagName = tag.Name;
-                            break;
-                        }
-                    }
-                    
-                    if (!string.IsNullOrWhiteSpace(tagName))
-                    {
-                        filteredServices = filteredServices.Where(s => 
-                            s.Tags != null && s.Tags.Contains(tagName)).ToList();
-                    }
-                }
+                // BƯỚC 6: Map services thành ServiceItems
+                var allServiceItems = MapServicesToServiceItems(providerServices, allCategories, servicesRatingMap, categoryTagsMap);
+                System.Diagnostics.Debug.WriteLine($"Step 6 Complete: Mapped {allServiceItems.Count} ServiceItems");
 
-                // Áp dụng logic sorting theo yêu cầu
-                filteredServices = ApplySortingLogic(filteredServices, sortBy);
+                // BƯỚC 7: Lọc, sort và phân trang
+                var (filteredServices, totalPages) = ApplyFiltersAndPagination(allServiceItems, categoryId, tagId, categoryTagsMap, sortBy, page);
+                System.Diagnostics.Debug.WriteLine($"Step 7 Complete: Filtered to {filteredServices.Count} services, {totalPages} pages");
 
-                // Pagination - hiển thị tất cả nếu ít, phân trang nếu nhiều
-                var pageSize = 50; // Tăng pageSize để hiển thị nhiều dịch vụ hơn
-                var totalPages = Math.Max(1, (int)Math.Ceiling(filteredServices.Count / (double)pageSize));
-                var paginatedServices = filteredServices.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+                // BƯỚC 8: Tạo các collections cho view
+                var bestsellingServices = GetBestsellingServices(allServiceItems);
+                var shopCategories = BuildShopCategories(allServiceItems);
+                var allCategoriesViewModel = BuildAllCategoriesViewModel(allCategories, allServiceItems, categoryTagsMap);
 
-                // Lấy bestselling services (top 6 theo rating và sales)
-                var bestsellingServices = allServiceItems
-                    .OrderByDescending(s => s.Rating)
-                    .ThenByDescending(s => s.SalesCount)
-                    .Take(6)
-                    .ToList();
-
-                // Tạo shop categories từ services - nhóm theo CategoryId (Guid)
-                var categoryMap = new Dictionary<int, (string Name, int Count)>();
-                foreach (var item in allServiceItems)
-                {
-                    if (!categoryMap.ContainsKey(item.CategoryId))
-                    {
-                        categoryMap[item.CategoryId] = (item.Category, 0);
-                    }
-                    var current = categoryMap[item.CategoryId];
-                    categoryMap[item.CategoryId] = (current.Name, current.Count + 1);
-                }
-
-                var shopCategories = categoryMap.Select(kvp => new ServiceCategory
-                {
-                    Id = kvp.Key,
-                    Name = kvp.Value.Name,
-                    Icon = "/images/categories/default.png",
-                    ServiceCount = kvp.Value.Count
-                }).ToList();
-
-                // Map TẤT CẢ categories từ allCategories, hiển thị số lượng services của provider trong mỗi category
-                // Và lấy tags cho mỗi category (từ certificate được duyệt)
-                var mappedCategories = allCategories
-                    .Select(c => 
-                    {
-                        var matchingServices = allServiceItems.Where(s => 
-                            s.Category.ToLower() == (c.Name ?? "").ToLower()).ToList();
-                        var matchingService = matchingServices.FirstOrDefault();
-                        
-                        // Lấy tags của category này từ categoryTagsMap (đã load ở trên)
-                        var categoryTags = new List<CategoryTag>();
-                        if (categoryTagsMap.ContainsKey(c.CategoryId))
-                        {
-                            var tagsInCategory = categoryTagsMap[c.CategoryId];
-                            foreach (var tag in tagsInCategory)
-                            {
-                                // Đếm số service có tag này thuộc category này
-                                var servicesWithTag = allServiceItems.Where(s =>
-                                    s.Category.ToLower() == (c.Name ?? "").ToLower() &&
-                                    s.Tags != null && s.Tags.Contains(tag.Name)).ToList();
-                                
-                                if (servicesWithTag.Any())
-                                {
-                                    categoryTags.Add(new CategoryTag
-                                    {
-                                        TagId = tag.TagId,
-                                        Name = tag.Name,
-                                        ServiceCount = servicesWithTag.Count
-                                    });
-                                }
-                            }
-                        }
-                        
-                        return new ServiceCategory
-                        {
-                            Id = matchingService?.CategoryId ?? c.CategoryId.GetHashCode(),
-                            Name = c.Name ?? "",
-                            Icon = "/images/categories/default.png",
-                            ServiceCount = matchingServices.Count,
-                            Tags = categoryTags.OrderBy(t => t.Name).ToList()
-                        };
-                    })
-                    .Where(c => c.ServiceCount > 0) // Chỉ hiển thị categories có services của provider này
-                    .ToList();
-
+                // BƯỚC 9: Tạo và trả về ViewModel
                 var viewModel = new ServiceShopViewModel
                 {
-                    ShopInfo = providerInfo,
+                    ProviderId = providerId,
+                    ShopInfo = shopInfo,
                     BestsellingServices = bestsellingServices,
                     ShopCategories = shopCategories,
-                    AllCategories = mappedCategories,
-                    Services = paginatedServices,
+                    AllCategories = allCategoriesViewModel,
+                    Services = filteredServices,
                     CurrentPage = page,
                     TotalPages = totalPages,
                     SelectedCategoryId = categoryId,
                     SelectedTagId = tagId,
-                    SortBy = sortBy,
-                    ProviderId = providerId
+                    SortBy = sortBy
                 };
 
+                System.Diagnostics.Debug.WriteLine($"=== GetServiceShopViewModelAsync END ===");
+                System.Diagnostics.Debug.WriteLine($"ViewModel created with {filteredServices.Count} services, ShopInfo.Name: '{shopInfo.Name}'");
+                
                 return viewModel;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return null;
+                System.Diagnostics.Debug.WriteLine($"ERROR in GetServiceShopViewModelAsync: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                
+                // Trả về ViewModel với fallback data thay vì null
+                return CreateFallbackViewModel(providerId, categoryId, tagId, sortBy, page);
             }
         }
 
-        private async Task<ShopInfo> GetProviderInfoAsync(Guid providerId, ServiceProviderReadDTO firstService)
+        #region Private Helper Methods
+
+        /// <summary>
+        /// BƯỚC 1: Lấy tất cả services của provider từ API
+        /// </summary>
+        private async Task<List<ServiceProviderReadDTO>> GetProviderServicesAsync(Guid providerId)
         {
-            // Lấy thông tin provider từ service detail
             try
             {
-                // Lấy từ một service detail để lấy provider info
-                var serviceDetailResponse = await _httpClient.GetAsync($"api/Services/{firstService.ServiceId}");
-                if (serviceDetailResponse.IsSuccessStatusCode)
+                Console.WriteLine($"[GetProviderServicesAsync] START - providerId: {providerId}");
+                Console.WriteLine($"[GetProviderServicesAsync] Calling API: api/ServiceProvider/provider/{providerId}");
+                
+                HttpResponseMessage? response = null;
+                try
                 {
-                    var serviceDetail = await serviceDetailResponse.Content.ReadFromJsonAsync<ServiceDetailDTOs>(_json);
-                    if (serviceDetail?.Provider != null)
-                    {
-                        var p = serviceDetail.Provider;
-                        var images = !string.IsNullOrEmpty(p.Images) 
-                            ? p.Images.Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim()
-                            : null;
+                    response = await _httpClient.GetAsync($"api/ServiceProvider/provider/{providerId}");
+                    Console.WriteLine($"[GetProviderServicesAsync] API call completed. Status: {response.StatusCode}");
+                }
+                catch (Exception httpEx)
+                {
+                    Console.WriteLine($"[GetProviderServicesAsync] EXCEPTION during API call: {httpEx.Message}");
+                    Console.WriteLine($"[GetProviderServicesAsync] StackTrace: {httpEx.StackTrace}");
+                    return new List<ServiceProviderReadDTO>();
+                }
+                
+                if (response == null)
+                {
+                    Console.WriteLine($"[GetProviderServicesAsync] ERROR: Response is null");
+                    return new List<ServiceProviderReadDTO>();
+                }
+                
+                Console.WriteLine($"[GetProviderServicesAsync] API Response Status: {response.StatusCode}");
+                System.Diagnostics.Debug.WriteLine($"API Response Status: {response.StatusCode}");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[GetProviderServicesAsync] WARNING: API call failed. Status: {response.StatusCode}, Content: {errorContent.Substring(0, Math.Min(500, errorContent.Length))}");
+                    System.Diagnostics.Debug.WriteLine($"WARNING: API call failed with status {response.StatusCode}");
+                    return new List<ServiceProviderReadDTO>();
+                }
 
-                        // Tính tỷ lệ phản hồi từ reviews
-                        double responseRate = 100.0; // Mặc định 100% như trang detail
+                string? jsonContent = null;
+                try
+                {
+                    jsonContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[GetProviderServicesAsync] Response content length: {jsonContent?.Length ?? 0}");
+                }
+                catch (Exception readEx)
+                {
+                    Console.WriteLine($"[GetProviderServicesAsync] EXCEPTION reading response content: {readEx.Message}");
+                    return new List<ServiceProviderReadDTO>();
+                }
+
+                ApiResponseWrapper<List<ServiceProviderReadDTO>>? apiResponse = null;
+                try
+                {
+                    apiResponse = await response.Content.ReadFromJsonAsync<ApiResponseWrapper<List<ServiceProviderReadDTO>>>(_json);
+                    Console.WriteLine($"[GetProviderServicesAsync] JSON deserialized. Success: {apiResponse?.success ?? false}");
+                }
+                catch (Exception jsonEx)
+                {
+                    Console.WriteLine($"[GetProviderServicesAsync] EXCEPTION deserializing JSON: {jsonEx.Message}");
+                    Console.WriteLine($"[GetProviderServicesAsync] JSON content preview: {jsonContent?.Substring(0, Math.Min(200, jsonContent?.Length ?? 0))}");
+                    return new List<ServiceProviderReadDTO>();
+                }
+                
+                var allServices = apiResponse?.data ?? new List<ServiceProviderReadDTO>();
+                Console.WriteLine($"[GetProviderServicesAsync] API returned {allServices.Count} services");
+                System.Diagnostics.Debug.WriteLine($"API returned {allServices.Count} services");
+                
+                if (allServices.Count > 0)
+                {
+                    Console.WriteLine($"[GetProviderServicesAsync] First service ProviderId: {allServices[0].ProviderId}, Expected: {providerId}, Match: {allServices[0].ProviderId == providerId}");
+                }
+                
+                // Đảm bảo chỉ lấy services có ProviderId khớp
+                var validServices = allServices
+                    .Where(s => s != null && s.ProviderId == providerId)
+                    .ToList();
+
+                if (validServices.Count != allServices.Count)
+                {
+                    Console.WriteLine($"[GetProviderServicesAsync] WARNING: Filtered out {allServices.Count - validServices.Count} services with mismatched ProviderId");
+                    System.Diagnostics.Debug.WriteLine($"WARNING: Filtered out {allServices.Count - validServices.Count} services with mismatched ProviderId");
+                }
+
+                // Log first few services for debugging
+                foreach (var svc in validServices.Take(3))
+                {
+                    Console.WriteLine($"[GetProviderServicesAsync] Service: {svc.Title}, ProviderId: {svc.ProviderId}, Category: {svc.CategoryName}");
+                    System.Diagnostics.Debug.WriteLine($"  Service: {svc.Title}, ProviderId: {svc.ProviderId}, Category: {svc.CategoryName}");
+                }
+
+                Console.WriteLine($"[GetProviderServicesAsync] END - Returning {validServices.Count} valid services");
+                return validServices;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetProviderServicesAsync] FATAL EXCEPTION: {ex.Message}");
+                Console.WriteLine($"[GetProviderServicesAsync] StackTrace: {ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"ERROR in GetProviderServicesAsync: {ex.Message}");
+                return new List<ServiceProviderReadDTO>();
+            }
+        }
+
+        /// <summary>
+        /// BƯỚC 2: Lấy thông tin chi tiết của provider từ service details
+        /// </summary>
+        private async Task<ShopInfo> GetShopInfoAsync(Guid providerId, List<ServiceProviderReadDTO> providerServices)
+        {
+            System.Diagnostics.Debug.WriteLine($"GetShopInfoAsync: providerId={providerId}, servicesCount={providerServices.Count}");
+
+            if (!providerServices.Any())
+            {
+                System.Diagnostics.Debug.WriteLine($"No services found, returning fallback ShopInfo");
+                return CreateFallbackShopInfo(providerId, 0);
+            }
+
+            // Thử lấy từ service đầu tiên (ưu tiên service có ProviderId khớp)
+            var servicesToTry = providerServices
+                .Where(s => s.ProviderId == providerId)
+                .Take(5)
+                .ToList();
+
+            if (!servicesToTry.Any())
+            {
+                servicesToTry = providerServices.Take(5).ToList();
+            }
+
+            foreach (var service in servicesToTry)
+            {
+                try
+                {
+                    Console.WriteLine($"[GetShopInfoAsync] Trying service {service.ServiceId} for provider info");
+                    System.Diagnostics.Debug.WriteLine($"Trying service {service.ServiceId} for provider info");
+                    
+                    var serviceDetailResponse = await _httpClient.GetAsync($"api/Services/{service.ServiceId}");
+                    Console.WriteLine($"[GetShopInfoAsync] Service detail API Response: {serviceDetailResponse.StatusCode}");
+                    
+                    if (!serviceDetailResponse.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"[GetShopInfoAsync] Service detail API failed, trying next service");
+                        continue;
+                    }
+
+                    var serviceDetail = await serviceDetailResponse.Content.ReadFromJsonAsync<ServiceDetailDTOs>(_json);
+                    if (serviceDetail == null)
+                    {
+                        Console.WriteLine($"[GetShopInfoAsync] Service detail is null, trying next service");
+                        System.Diagnostics.Debug.WriteLine($"Service detail is null, trying next service");
+                        continue;
+                    }
+                    
+                    Console.WriteLine($"[GetShopInfoAsync] Service detail loaded. ProviderId: {serviceDetail.ProviderId}, Expected: {providerId}, Provider object: {(serviceDetail.Provider != null ? "EXISTS" : "NULL")}");
+
+                    var provider = serviceDetail.Provider;
+                    
+                    // QUAN TRỌNG: Vì service đã nằm trong providerServices (đã được API filter theo providerId),
+                    // NÊN CHẤP NHẬN provider info luôn nếu:
+                    // 1. Service có trong list providerServices (đã filter đúng)
+                    // 2. HOẶC serviceDetail.ProviderId khớp với providerId
+                    // 3. HOẶC provider.ProviderId khớp với providerId
+                    bool isServiceInList = providerServices.Any(s => s.ServiceId == service.ServiceId);
+                    bool serviceDetailIdMatches = serviceDetail.ProviderId == providerId;
+                    bool providerIdMatches = provider != null && provider.ProviderId == providerId;
+                    bool hasProviderName = provider != null && !string.IsNullOrWhiteSpace(provider.ProviderName);
+                    
+                    // CHẤP NHẬN nếu service có trong list HOẶC có ProviderId khớp HOẶC có ProviderName
+                    bool shouldAccept = isServiceInList || serviceDetailIdMatches || providerIdMatches || hasProviderName;
+                    
+                    System.Diagnostics.Debug.WriteLine($"Service {service.ServiceId}: Checking acceptance criteria");
+                    System.Diagnostics.Debug.WriteLine($"  isServiceInList: {isServiceInList} (service is in providerServices)");
+                    System.Diagnostics.Debug.WriteLine($"  serviceDetailIdMatches: {serviceDetailIdMatches} (serviceDetail.ProviderId={serviceDetail.ProviderId} == {providerId})");
+                    System.Diagnostics.Debug.WriteLine($"  providerIdMatches: {providerIdMatches} (provider.ProviderId matches)");
+                    System.Diagnostics.Debug.WriteLine($"  hasProviderName: {hasProviderName}");
+                    System.Diagnostics.Debug.WriteLine($"  shouldAccept: {shouldAccept}");
+                    
+                    if (provider != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  provider.ProviderId: {provider.ProviderId}");
+                        System.Diagnostics.Debug.WriteLine($"  provider.ProviderName: '{provider.ProviderName ?? "NULL"}'");
+                        System.Diagnostics.Debug.WriteLine($"  provider.Status: '{provider.Status ?? "NULL"}'");
+                        System.Diagnostics.Debug.WriteLine($"  provider.AverageRatingAllServices: {provider.AverageRatingAllServices}");
+                        System.Diagnostics.Debug.WriteLine($"  provider.JoinedAt: {provider.JoinedAt}");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  WARNING: Provider object is NULL");
+                    }
+                    
+                    if (shouldAccept)
+                    {
+                        // Lấy tên provider - ưu tiên từ Provider object
+                        string providerName = "Đối tác VHS";
+                        if (provider != null && !string.IsNullOrWhiteSpace(provider.ProviderName))
+                        {
+                            providerName = provider.ProviderName;
+                        }
+                        else if (provider == null)
+                        {
+                            // Nếu không có Provider object, giữ tên mặc định
+                            providerName = "Đối tác VHS";
+                        }
+                        
+                        Console.WriteLine($"[GetShopInfoAsync] SUCCESS: Accepting provider info - Name: '{providerName}'");
+                        System.Diagnostics.Debug.WriteLine($"SUCCESS: Accepting provider info - Name: '{providerName}'");
+                        
+                        // Tính response rate từ reviews
+                        double responseRate = 100.0;
                         int totalRatings = 0;
                         
                         if (serviceDetail.Reviews != null && serviceDetail.Reviews.Any())
@@ -264,65 +326,363 @@ namespace VHS_frontend.Services
                             if (totalRatings > 0)
                             {
                                 responseRate = Math.Round((reviewsWithReply * 100.0) / totalRatings, 1);
-                                // Đảm bảo không bao giờ = 0, nếu không có reply thì vẫn hiển thị 100% như trang detail
                                 if (responseRate == 0 && totalRatings > 0)
                                 {
-                                    responseRate = 100.0; // Như trang detail hiển thị
+                                    responseRate = 100.0;
                                 }
                             }
                         }
 
-                        return new ShopInfo
+                        // Lấy logo từ images
+                        var logo = "/images/VeSinh.jpg";
+                        if (provider != null && !string.IsNullOrEmpty(provider.Images))
+                        {
+                            var images = provider.Images.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                            if (images.Length > 0)
+                            {
+                                logo = images[0].Trim();
+                            }
+                        }
+
+                        // Lấy rating từ provider hoặc mặc định 0
+                        // Lưu ý: Rating sẽ được tính lại trong EnhanceShopInfoWithAllServices từ tất cả services
+                        double rating = 0;
+                        if (provider != null && provider.AverageRatingAllServices > 0)
+                        {
+                            rating = provider.AverageRatingAllServices; // Giá trị tạm, sẽ được cập nhật trong EnhanceShopInfoWithAllServices
+                        }
+
+                        // Lấy status
+                        string status = "Online";
+                        if (provider != null)
+                        {
+                            status = (provider.Status == "Active" || provider.Status == "Approved") ? "Online" : "Offline";
+                        }
+
+                        // Lấy join date
+                        string joinDate = "—";
+                        if (provider != null && provider.JoinedAt.HasValue)
+                        {
+                            joinDate = provider.JoinedAt.Value.ToString("MM/yyyy");
+                        }
+
+                        var shopInfo = new ShopInfo
                         {
                             Id = providerId.GetHashCode(),
-                            Name = p.ProviderName ?? "Đối tác VHS",
-                            Logo = images ?? "/images/VeSinh.jpg",
-                            Status = p.Status == "Active" ? "Online" : "Offline",
+                            Name = providerName,
+                            Logo = logo,
+                            Status = status,
                             LastOnline = "Gần đây",
-                            TotalServices = p.TotalServices,
-                            Following = 0, // Cần API riêng
-                            Followers = 0, // Cần API riêng
+                            TotalServices = providerServices.Count,
+                            Following = 0,
+                            Followers = 0,
                             ResponseRate = responseRate,
-                            Rating = p.AverageRatingAllServices,
+                            Rating = rating,
                             TotalRatings = totalRatings > 0 ? totalRatings : serviceDetail.TotalReviews,
-                            JoinDate = p.JoinedAt?.ToString("MM/yyyy") ?? "—",
+                            JoinDate = joinDate,
                             IsFollowed = false
+                        };
+
+                        // Enhance với ratings từ tất cả services
+                        await EnhanceShopInfoWithAllServices(shopInfo, providerId, providerServices);
+                        
+                        System.Diagnostics.Debug.WriteLine($"Final ShopInfo: Name='{shopInfo.Name}', Rating={shopInfo.Rating}, TotalRatings={shopInfo.TotalRatings}, TotalServices={shopInfo.TotalServices}");
+                        
+                        return shopInfo;
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"REJECTING: shouldAccept=false");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ERROR getting service detail {service.ServiceId}: {ex.Message}");
+                    continue;
+                }
+            }
+
+            // Fallback nếu không lấy được từ service details
+            System.Diagnostics.Debug.WriteLine($"WARNING: Could not get provider info from service details, using fallback");
+            return CreateFallbackShopInfo(providerId, providerServices.Count);
+        }
+
+        /// <summary>
+        /// Enhance ShopInfo với ratings và reviews từ tất cả services
+        /// </summary>
+        private async Task EnhanceShopInfoWithAllServices(ShopInfo shopInfo, Guid providerId, List<ServiceProviderReadDTO> providerServices)
+        {
+            try
+            {
+                Console.WriteLine($"[EnhanceShopInfoWithAllServices] START - providerId: {providerId}, servicesCount: {providerServices.Count}");
+                
+                // Tính rating trung bình có trọng số từ homepage API (weighted average)
+                double totalWeightedRating = 0;
+                int totalReviewsCount = 0;
+                var allRatings = new List<double>();
+
+                try
+                {
+                    var allServicesFromHomepage = await _serviceCustomerService.GetAllServiceHomePageAsync();
+                    if (allServicesFromHomepage != null)
+                    {
+                        var providerServicesFromHomepage = allServicesFromHomepage
+                            .Where(s => s != null && s.ProviderId == providerId)
+                            .ToList();
+
+                        Console.WriteLine($"[EnhanceShopInfoWithAllServices] Found {providerServicesFromHomepage.Count} services from homepage API");
+
+                        foreach (var svc in providerServicesFromHomepage)
+                        {
+                            if (svc.AverageRating > 0 && svc.TotalReviews > 0)
+                            {
+                                // Tính weighted average: tổng (rating * số reviews) / tổng số reviews
+                                totalWeightedRating += svc.AverageRating * svc.TotalReviews;
+                                totalReviewsCount += svc.TotalReviews;
+                                Console.WriteLine($"[EnhanceShopInfoWithAllServices] Service {svc.ServiceId}: Rating={svc.AverageRating}, Reviews={svc.TotalReviews}");
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[EnhanceShopInfoWithAllServices] Error getting homepage services: {ex.Message}");
+                }
+
+                // Nếu chưa có đủ từ homepage, lấy từ service details để có rating thực tế
+                if (totalReviewsCount == 0 && providerServices.Any())
+                {
+                    Console.WriteLine($"[EnhanceShopInfoWithAllServices] No data from homepage, getting from service details");
+                    var servicesToCheck = providerServices.Take(5).ToList();
+                    foreach (var service in servicesToCheck)
+                    {
+                        try
+                        {
+                            var serviceDetailResponse = await _httpClient.GetAsync($"api/Services/{service.ServiceId}");
+                            if (serviceDetailResponse.IsSuccessStatusCode)
+                            {
+                                var serviceDetail = await serviceDetailResponse.Content.ReadFromJsonAsync<ServiceDetailDTOs>(_json);
+                                if (serviceDetail?.Provider != null && serviceDetail.Provider.ProviderId == providerId)
+                                {
+                                    if (serviceDetail.Reviews != null && serviceDetail.Reviews.Any())
+                                    {
+                                        foreach (var review in serviceDetail.Reviews)
+                                        {
+                                            if (review.Rating.HasValue && review.Rating.Value > 0)
+                                            {
+                                                allRatings.Add(review.Rating.Value);
+                                                totalReviewsCount++;
+                                            }
+                                        }
+                                        Console.WriteLine($"[EnhanceShopInfoWithAllServices] Service {service.ServiceId}: Added {serviceDetail.Reviews.Count(r => r.Rating.HasValue && r.Rating.Value > 0)} ratings");
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[EnhanceShopInfoWithAllServices] Error getting service detail {service.ServiceId}: {ex.Message}");
+                        }
+                    }
+                }
+
+                // Cập nhật rating
+                if (totalReviewsCount > 0)
+                {
+                    double averageRating = 0;
+                    
+                    // Nếu có weighted rating từ homepage
+                    if (totalWeightedRating > 0)
+                    {
+                        averageRating = totalWeightedRating / totalReviewsCount;
+                        Console.WriteLine($"[EnhanceShopInfoWithAllServices] Calculated weighted average: {averageRating} from {totalReviewsCount} reviews");
+                    }
+                    // Hoặc tính từ actual ratings
+                    else if (allRatings.Any())
+                    {
+                        averageRating = allRatings.Average();
+                        Console.WriteLine($"[EnhanceShopInfoWithAllServices] Calculated average from actual ratings: {averageRating} from {allRatings.Count} ratings");
+                    }
+                    
+                    shopInfo.Rating = Math.Round(averageRating, 1);
+                    shopInfo.TotalRatings = totalReviewsCount;
+                    Console.WriteLine($"[EnhanceShopInfoWithAllServices] Final Rating: {shopInfo.Rating}, TotalRatings: {shopInfo.TotalRatings}");
+                }
+                else
+                {
+                    // Nếu không có đánh giá nào, set rating = 0
+                    shopInfo.Rating = 0;
+                    shopInfo.TotalRatings = 0;
+                    Console.WriteLine($"[EnhanceShopInfoWithAllServices] No reviews found, setting Rating to 0");
+                }
+
+                // Tính response rate
+                if (totalReviewsCount > 0)
+                {
+                    int reviewsWithReplyCount = 0;
+                    var servicesToCheck = providerServices.Take(5).ToList();
+                    foreach (var service in servicesToCheck)
+                    {
+                        try
+                        {
+                            var serviceDetailResponse = await _httpClient.GetAsync($"api/Services/{service.ServiceId}");
+                            if (serviceDetailResponse.IsSuccessStatusCode)
+                            {
+                                var serviceDetail = await serviceDetailResponse.Content.ReadFromJsonAsync<ServiceDetailDTOs>(_json);
+                                if (serviceDetail?.Reviews != null)
+                                {
+                                    reviewsWithReplyCount += serviceDetail.Reviews.Count(r => !string.IsNullOrWhiteSpace(r.Reply));
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    if (reviewsWithReplyCount > 0)
+                    {
+                        shopInfo.ResponseRate = Math.Round((reviewsWithReplyCount * 100.0) / totalReviewsCount, 1);
+                        if (shopInfo.ResponseRate == 0)
+                        {
+                            shopInfo.ResponseRate = 100.0;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Warning: Failed to enhance shop info: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Lấy tất cả categories
+        /// </summary>
+        private async Task<List<CategoryDTO>> GetAllCategoriesAsync()
+        {
+            try
+            {
+                return await _serviceCustomerService.GetAllAsync() ?? new List<CategoryDTO>();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Warning: Failed to get categories: {ex.Message}");
+                return new List<CategoryDTO>();
+            }
+        }
+
+        /// <summary>
+        /// Lấy rating map từ homepage API
+        /// </summary>
+        private async Task<Dictionary<Guid, object>> GetServicesRatingMapAsync(Guid providerId)
+        {
+            var ratingMap = new Dictionary<Guid, object>();
+            try
+            {
+                var allServicesFromHomepage = await _serviceCustomerService.GetAllServiceHomePageAsync();
+                if (allServicesFromHomepage != null)
+                {
+                    var providerServices = allServicesFromHomepage
+                        .Where(s => s != null && s.ProviderId == providerId)
+                        .ToList();
+
+                    foreach (var svc in providerServices)
+                    {
+                        ratingMap[svc.ServiceId] = new
+                        {
+                            Rating = svc.AverageRating,
+                            TotalReviews = svc.TotalReviews,
+                            SalesCount = 0
                         };
                     }
                 }
             }
-            catch { }
-
-            // Fallback
-            return new ShopInfo
+            catch (Exception ex)
             {
-                Id = providerId.GetHashCode(),
-                Name = "Đối tác VHS",
-                Logo = "/images/VeSinh.jpg",
-                Status = "Online",
-                LastOnline = "Gần đây",
-                TotalServices = 0,
-                Following = 0,
-                Followers = 0,
-                ResponseRate = 99.0,
-                Rating = 4.5,
-                TotalRatings = 0,
-                JoinDate = "—",
-                IsFollowed = false
-            };
+                System.Diagnostics.Debug.WriteLine($"Warning: Failed to get rating map: {ex.Message}");
+            }
+            return ratingMap;
         }
 
+        /// <summary>
+        /// Lấy tags theo category
+        /// </summary>
+        private async Task<Dictionary<Guid, List<TagDTO>>> GetCategoryTagsMapAsync(List<ServiceProviderReadDTO> providerServices)
+        {
+            var categoryTagsMap = new Dictionary<Guid, List<TagDTO>>();
+            var uniqueCategoryIds = providerServices.Select(s => s.CategoryId).Distinct().ToList();
+
+            foreach (var catId in uniqueCategoryIds)
+            {
+                try
+                {
+                    var tagsResponse = await _httpClient.GetAsync($"api/tag?categoryId={catId}&includeDeleted=false");
+                    if (tagsResponse.IsSuccessStatusCode)
+                    {
+                        var categoryTags = await tagsResponse.Content.ReadFromJsonAsync<List<TagDTO>>(_json);
+                        if (categoryTags != null && categoryTags.Any())
+                        {
+                            categoryTagsMap[catId] = categoryTags
+                                .Where(t => t != null && !string.IsNullOrWhiteSpace(t.Name) && !(t.IsDeleted ?? false))
+                                .ToList();
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            return categoryTagsMap;
+        }
+
+        /// <summary>
+        /// Map services thành ServiceItems
+        /// </summary>
+        private List<ServiceItem> MapServicesToServiceItems(
+            List<ServiceProviderReadDTO> providerServices,
+            List<CategoryDTO> allCategories,
+            Dictionary<Guid, object> servicesRatingMap,
+            Dictionary<Guid, List<TagDTO>> categoryTagsMap)
+        {
+            var serviceItems = new List<ServiceItem>();
+
+            foreach (var dto in providerServices)
+            {
+                try
+                {
+                    // Lấy rating info
+                    var ratingInfo = servicesRatingMap.ContainsKey(dto.ServiceId) ? servicesRatingMap[dto.ServiceId] : null;
+
+                    // Nếu service không có tags, lấy từ category
+                    if ((dto.Tags == null || !dto.Tags.Any()) && categoryTagsMap.ContainsKey(dto.CategoryId))
+                    {
+                        dto.Tags = categoryTagsMap[dto.CategoryId];
+                    }
+
+                    var serviceItem = MapToServiceItem(dto, allCategories, ratingInfo);
+                    serviceItems.Add(serviceItem);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ERROR mapping service {dto.ServiceId}: {ex.Message}");
+                }
+            }
+
+            return serviceItems;
+        }
+
+        /// <summary>
+        /// Map một ServiceProviderReadDTO thành ServiceItem
+        /// </summary>
         private ServiceItem MapToServiceItem(ServiceProviderReadDTO dto, List<CategoryDTO>? categories = null, object? ratingInfo = null)
         {
             var images = !string.IsNullOrEmpty(dto.Images)
                 ? dto.Images.Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim()
                 : null;
 
-            // Tìm categoryId từ categories list bằng cách match Name
+            // Map categoryId
             var mappedCategoryId = 0;
             if (categories != null)
             {
-                var matchedCategory = categories.FirstOrDefault(c => 
+                var matchedCategory = categories.FirstOrDefault(c =>
                     (c.Name ?? "").ToLower() == (dto.CategoryName ?? "").ToLower());
                 if (matchedCategory != null)
                 {
@@ -338,29 +698,29 @@ namespace VHS_frontend.Services
                 mappedCategoryId = dto.CategoryId.GetHashCode();
             }
 
-            // Lấy rating từ ratingInfo nếu có
+            // Lấy rating từ ratingInfo
             double rating = 0;
             int ratingCount = 0;
             int salesCount = 0;
-            
+
             if (ratingInfo != null)
             {
                 var ratingType = ratingInfo.GetType();
                 var ratingProp = ratingType.GetProperty("Rating");
                 var reviewsProp = ratingType.GetProperty("TotalReviews");
                 var salesProp = ratingType.GetProperty("SalesCount");
-                
+
                 if (ratingProp != null)
                     rating = Convert.ToDouble(ratingProp.GetValue(ratingInfo) ?? 0);
-                
+
                 if (reviewsProp != null)
                     ratingCount = Convert.ToInt32(reviewsProp.GetValue(ratingInfo) ?? 0);
-                
+
                 if (salesProp != null)
                     salesCount = Convert.ToInt32(salesProp.GetValue(ratingInfo) ?? 0);
             }
 
-            // Lấy tags từ dto - kiểm tra kỹ lưỡng
+            // Lấy tags
             var tags = new List<string>();
             if (dto.Tags != null && dto.Tags.Any())
             {
@@ -376,7 +736,7 @@ namespace VHS_frontend.Services
             return new ServiceItem
             {
                 Id = dto.ServiceId.GetHashCode(),
-                ServiceId = dto.ServiceId,  // Lưu Guid để link
+                ServiceId = dto.ServiceId,
                 Name = dto.Title,
                 Description = dto.Description ?? "",
                 Image = images ?? "/images/VeSinh.jpg",
@@ -392,43 +752,218 @@ namespace VHS_frontend.Services
             };
         }
 
+        /// <summary>
+        /// Áp dụng filters, sorting và pagination
+        /// </summary>
+        private (List<ServiceItem> filteredServices, int totalPages) ApplyFiltersAndPagination(
+            List<ServiceItem> allServiceItems,
+            int? categoryId,
+            Guid? tagId,
+            Dictionary<Guid, List<TagDTO>> categoryTagsMap,
+            string sortBy,
+            int page)
+        {
+            var filteredServices = allServiceItems;
+
+            // Filter by category
+            if (categoryId.HasValue)
+            {
+                filteredServices = filteredServices.Where(s => s.CategoryId == categoryId.Value).ToList();
+            }
+
+            // Filter by tag
+            if (tagId.HasValue)
+            {
+                string? tagName = null;
+                foreach (var catTags in categoryTagsMap.Values)
+                {
+                    var tag = catTags.FirstOrDefault(t => t.TagId == tagId.Value);
+                    if (tag != null && !string.IsNullOrWhiteSpace(tag.Name))
+                    {
+                        tagName = tag.Name;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(tagName))
+                {
+                    filteredServices = filteredServices.Where(s =>
+                        s.Tags != null && s.Tags.Contains(tagName)).ToList();
+                }
+            }
+
+            // Apply sorting
+            filteredServices = ApplySortingLogic(filteredServices, sortBy);
+
+            // Pagination
+            var pageSize = 50;
+            var totalPages = Math.Max(1, (int)Math.Ceiling(filteredServices.Count / (double)pageSize));
+            var paginatedServices = filteredServices.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            return (paginatedServices, totalPages);
+        }
+
+        /// <summary>
+        /// Áp dụng sorting logic
+        /// </summary>
         private List<ServiceItem> ApplySortingLogic(List<ServiceItem> services, string sortBy)
         {
             return sortBy.ToLower() switch
             {
-                // Phổ Biến: Hiển thị tất cả dịch vụ (không filter)
                 "popular" => services.OrderByDescending(s => s.Rating).ThenByDescending(s => s.SalesCount).ToList(),
-                
-                // Mới Nhất: Chỉ lấy dịch vụ được tạo trong 1 tháng gần nhất, sort theo CreatedAt DESC
                 "newest" => services
                     .Where(s => s.CreatedAt.HasValue && s.CreatedAt.Value >= DateTime.UtcNow.AddMonths(-1))
                     .OrderByDescending(s => s.CreatedAt)
                     .ToList(),
-                
-                // Bán Chạy: Chỉ lấy dịch vụ có rating >= 4 sao, sort theo rating DESC rồi sales DESC
                 "bestselling" => services
                     .Where(s => s.Rating >= 4.0)
                     .OrderByDescending(s => s.Rating)
                     .ThenByDescending(s => s.SalesCount)
                     .ToList(),
-                
-                // Giá: Từ thấp đến cao
                 "price-asc" => services.OrderBy(s => s.Price).ToList(),
-                
-                // Giá: Từ cao đến thấp
                 "price-desc" => services.OrderByDescending(s => s.Price).ToList(),
-                
-                // Giá: Default (từ thấp đến cao)
                 "price" => services.OrderBy(s => s.Price).ToList(),
-                
-                // Default: Giống Phổ Biến
                 _ => services.OrderByDescending(s => s.Rating).ThenByDescending(s => s.SalesCount).ToList()
             };
         }
 
+        /// <summary>
+        /// Lấy bestselling services
+        /// </summary>
+        private List<ServiceItem> GetBestsellingServices(List<ServiceItem> allServiceItems)
+        {
+            return allServiceItems
+                .OrderByDescending(s => s.Rating)
+                .ThenByDescending(s => s.SalesCount)
+                .Take(6)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Build shop categories từ services
+        /// </summary>
+        private List<ServiceCategory> BuildShopCategories(List<ServiceItem> allServiceItems)
+        {
+            var categoryMap = new Dictionary<int, (string Name, int Count)>();
+            foreach (var item in allServiceItems)
+            {
+                if (!categoryMap.ContainsKey(item.CategoryId))
+                {
+                    categoryMap[item.CategoryId] = (item.Category, 0);
+                }
+                var current = categoryMap[item.CategoryId];
+                categoryMap[item.CategoryId] = (current.Name, current.Count + 1);
+            }
+
+            return categoryMap.Select(kvp => new ServiceCategory
+            {
+                Id = kvp.Key,
+                Name = kvp.Value.Name,
+                Icon = "/images/categories/default.png",
+                ServiceCount = kvp.Value.Count
+            }).ToList();
+        }
+
+        /// <summary>
+        /// Build all categories view model
+        /// </summary>
+        private List<ServiceCategory> BuildAllCategoriesViewModel(
+            List<CategoryDTO> allCategories,
+            List<ServiceItem> allServiceItems,
+            Dictionary<Guid, List<TagDTO>> categoryTagsMap)
+        {
+            return allCategories
+                .Select(c =>
+                {
+                    var matchingServices = allServiceItems.Where(s =>
+                        s.Category.ToLower() == (c.Name ?? "").ToLower()).ToList();
+
+                    var categoryTags = new List<CategoryTag>();
+                    if (categoryTagsMap.ContainsKey(c.CategoryId))
+                    {
+                        var tagsInCategory = categoryTagsMap[c.CategoryId];
+                        foreach (var tag in tagsInCategory)
+                        {
+                            var servicesWithTag = allServiceItems.Where(s =>
+                                s.Category.ToLower() == (c.Name ?? "").ToLower() &&
+                                s.Tags != null && s.Tags.Contains(tag.Name)).ToList();
+
+                            if (servicesWithTag.Any())
+                            {
+                                categoryTags.Add(new CategoryTag
+                                {
+                                    TagId = tag.TagId,
+                                    Name = tag.Name,
+                                    ServiceCount = servicesWithTag.Count
+                                });
+                            }
+                        }
+                    }
+
+                    var matchingService = matchingServices.FirstOrDefault();
+                    return new ServiceCategory
+                    {
+                        Id = matchingService?.CategoryId ?? c.CategoryId.GetHashCode(),
+                        Name = c.Name ?? "",
+                        Icon = "/images/categories/default.png",
+                        ServiceCount = matchingServices.Count,
+                        Tags = categoryTags.OrderBy(t => t.Name).ToList()
+                    };
+                })
+                .Where(c => c.ServiceCount > 0)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Tạo fallback ShopInfo
+        /// </summary>
+        private ShopInfo CreateFallbackShopInfo(Guid providerId, int serviceCount)
+        {
+            return new ShopInfo
+            {
+                Id = providerId.GetHashCode(),
+                Name = "Đối tác VHS",
+                Logo = "/images/VeSinh.jpg",
+                Status = "Online",
+                LastOnline = "Gần đây",
+                TotalServices = serviceCount,
+                Following = 0,
+                Followers = 0,
+                ResponseRate = 100.0,
+                Rating = 0, // Đảm bảo rating = 0 khi không có đánh giá
+                TotalRatings = 0, // Đảm bảo TotalRatings = 0 khi không có đánh giá
+                JoinDate = "—",
+                IsFollowed = false
+            };
+        }
+
+        /// <summary>
+        /// Tạo fallback ViewModel
+        /// </summary>
+        private ServiceShopViewModel CreateFallbackViewModel(Guid providerId, int? categoryId, Guid? tagId, string sortBy, int page)
+        {
+            return new ServiceShopViewModel
+            {
+                ProviderId = providerId,
+                ShopInfo = CreateFallbackShopInfo(providerId, 0),
+                BestsellingServices = new List<ServiceItem>(),
+                ShopCategories = new List<ServiceCategory>(),
+                AllCategories = new List<ServiceCategory>(),
+                Services = new List<ServiceItem>(),
+                CurrentPage = page,
+                TotalPages = 1,
+                SelectedCategoryId = categoryId,
+                SelectedTagId = tagId,
+                SortBy = sortBy
+            };
+        }
+
+        #endregion
+
+        #region Public Methods
+
         public async Task<ServiceItem?> GetServiceByIdAsync(int id)
         {
-            // Implement nếu cần
             return await Task.FromResult<ServiceItem?>(null);
         }
 
@@ -443,37 +978,8 @@ namespace VHS_frontend.Services
             var viewModel = await GetServiceShopViewModelAsync(providerId, categoryId, null, sortBy, page);
             return viewModel?.Services ?? new List<ServiceItem>();
         }
-    }
 
-    // DTO classes cho API response
-    public class ApiResponseWrapper<T>
-    {
-        public bool success { get; set; }
-        public T? data { get; set; }
-    }
-
-    public class ServiceProviderReadDTO
-    {
-        public Guid ServiceId { get; set; }
-        public Guid ProviderId { get; set; }
-        public Guid CategoryId { get; set; }
-        public string CategoryName { get; set; } = string.Empty;
-        public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public decimal Price { get; set; }
-        public string UnitType { get; set; } = string.Empty;
-        public int BaseUnit { get; set; }
-        public string? Images { get; set; }
-        public string? Status { get; set; }
-        public DateTime? CreatedAt { get; set; }
-        public List<TagDTO>? Tags { get; set; }
-    }
-
-    public class TagDTO
-    {
-        public Guid TagId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public Guid CategoryId { get; set; }
-        public bool? IsDeleted { get; set; }
+        #endregion
     }
 }
+
