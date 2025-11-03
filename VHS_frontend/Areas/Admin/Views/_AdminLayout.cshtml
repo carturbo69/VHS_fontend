@@ -71,9 +71,9 @@
                 <i class="bi bi-tools"></i><span>Quản lí dịch vụ</span>
             </a>
 
-            <a asp-controller="AdPayment" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdPayment" ? "active" : "")"
-               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="AdPayment" ? "page" : null)">
+            <a asp-controller="AdminPaymentManagement" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminPaymentManagement" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminPaymentManagement" ? "page" : null)">
                 <i class="bi bi-credit-card-2-front"></i><span>Quản lí thanh toán</span>
             </a>
 
@@ -95,10 +95,10 @@
                 <i class="bi bi-ticket-perforated"></i><span>Quản lí voucher</span>
             </a>
 
-            <a asp-controller="Complaint" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Complaint" ? "active" : "")"
-               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Complaint" ? "page" : null)">
-                <i class="bi bi-flag"></i><span>Quản lí phản ánh</span>
+            <a asp-controller="AdminComplaint" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminComplaint" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminComplaint" ? "page" : null)">
+                <i class="bi bi-exclamation-triangle-fill"></i><span>Quản lí khiếu nại</span>
             </a>
 
             <a asp-controller="AdminNotification" asp-action="Index"
@@ -127,6 +127,19 @@
             </div>
 
             <div class="right">
+
+                <!-- Chat -->
+                <a asp-area="Admin" asp-controller="ChatAdmin" asp-action="Index"
+                   class="icon-btn chat-btn" aria-label="Chat">
+                    <svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 4h16v12H5.17L4 17.17V4z" fill="none" stroke="currentColor" stroke-width="2" />
+                        <circle cx="8" cy="10" r="1.5" />
+                        <circle cx="12" cy="10" r="1.5" />
+                        <circle cx="16" cy="10" r="1.5" />
+                    </svg>
+                    <span class="chat-badge" data-chat-count>0</span>
+                </a>
+
                 <!-- Notifications -->
                 <div class="notif">
                     <a href="/Admin/AdminNotification?tab=inbox" id="notificationBtn" class="btn btn-link notif-btn" aria-label="Notifications">
@@ -211,6 +224,45 @@
             });
           }
         })();
+
+                  async function updateAdminChatUnreadCount() {
+          try {
+            const url = '@Url.Action("UnreadTotal", "ChatAdmin", new { area = "Admin" })';
+            const resp = await fetch(url, { credentials: 'same-origin' });
+            if (!resp.ok || resp.redirected) return;
+
+            const contentType = resp.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) return;
+
+            const data = await resp.json();
+            const badge = document.querySelector('[data-chat-count]');
+
+                   if (badge) {
+          const total = Number(data?.total ?? 0);
+          // luôn hiển thị
+          badge.style.display = 'inline-flex';
+          // đổi màu theo trạng thái (ví dụ)
+          badge.classList.toggle('is-empty', total === 0);
+          badge.textContent = total;
+        }
+
+
+            if (badge) {
+              const total = Number(data?.total ?? 0);
+              badge.textContent = total;
+              badge.style.display = total > 0 ? 'inline-flex' : 'none';
+            }
+
+          } catch (e) {
+            console.error('Không thể tải số tin nhắn chưa đọc (Admin):', e);
+          }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+          updateAdminChatUnreadCount();
+          setInterval(updateAdminChatUnreadCount, 30000);
+        });
+
 
         // =========================
         // Theme sync + toggle

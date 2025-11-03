@@ -1,0 +1,134 @@
+@model VHS_frontend.Areas.Admin.Models.Payment.PaymentDashboardDTO
+
+@if (Model != null)
+{
+    <div class="dashboard-content">
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card stat-refunds">
+                <div class="stat-icon">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-value">@Model.PendingRefunds</span>
+                    <span class="stat-label">Hoàn tiền chờ xử lý</span>
+                    <span class="stat-amount">@Model.TotalRefundAmount.ToString("N0") VNĐ</span>
+                </div>
+            </div>
+
+            <div class="stat-card stat-payouts">
+                <div class="stat-icon">
+                    <i class="bi bi-cash-coin"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-value">@Model.PendingPayouts</span>
+                    <span class="stat-label">Thanh toán chờ phê duyệt</span>
+                    <span class="stat-amount">@Model.TotalPayoutAmount.ToString("N0") VNĐ</span>
+                </div>
+            </div>
+
+            <div class="stat-card stat-escrow">
+                <div class="stat-icon">
+                    <i class="bi bi-safe"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-value">@Model.SystemEscrowBalance.ToString("N0")</span>
+                    <span class="stat-label">Số dư escrow</span>
+                    <span class="stat-unit">VNĐ</span>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.Statistics != null)
+        {
+            <div class="stats-grid stats-secondary">
+                <div class="stat-card stat-monthly">
+                    <div class="stat-icon">
+                        <i class="bi bi-calendar-month"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-label">Hoàn tiền tháng này</span>
+                        <span class="stat-amount">@Model.Statistics.TotalRefundsThisMonth.ToString("N0") VNĐ</span>
+                        <span class="stat-sub">Trung bình: @Model.Statistics.AverageRefundAmount.ToString("N0") VNĐ</span>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-monthly">
+                    <div class="stat-icon">
+                        <i class="bi bi-calendar-month"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-label">Thanh toán tháng này</span>
+                        <span class="stat-amount">@Model.Statistics.TotalPayoutsThisMonth.ToString("N0") VNĐ</span>
+                        <span class="stat-sub">Trung bình: @Model.Statistics.AveragePayoutAmount.ToString("N0") VNĐ</span>
+                    </div>
+                </div>
+
+                <div class="stat-card stat-today">
+                    <div class="stat-icon">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-label">Xử lý hôm nay</span>
+                        <span class="stat-amount">Hoàn tiền: @Model.Statistics.RefundsProcessedToday</span>
+                        <span class="stat-sub">Thanh toán: @Model.Statistics.PayoutsProcessedToday</span>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (Model.RecentTransactions != null && Model.RecentTransactions.Any())
+        {
+            <div class="recent-transactions">
+                <h3>Giao dịch gần đây</h3>
+                <div class="transactions-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Loại</th>
+                                <th>Số tiền</th>
+                                <th>Trạng thái</th>
+                                <th>Thời gian</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var transaction in Model.RecentTransactions)
+                            {
+                                <tr>
+                                    <td>#@transaction.TransactionId.ToString().Substring(0, 8)</td>
+                                    <td>
+                                        <span class="badge badge-@(transaction.Type.ToLower())">
+                                            @transaction.Type
+                                        </span>
+                                    </td>
+                                    <td>@transaction.Amount.ToString("N0") VNĐ</td>
+                                    <td>
+                                        <span class="status-badge status-@transaction.Status.ToLower()">
+                                            @transaction.Status
+                                        </span>
+                                    </td>
+                                    <td>@transaction.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="bi bi-inbox"></i>
+        </div>
+        <h3>Không có dữ liệu</h3>
+        <p>Không thể tải thông tin dashboard.</p>
+    </div>
+}
+
+
+
+

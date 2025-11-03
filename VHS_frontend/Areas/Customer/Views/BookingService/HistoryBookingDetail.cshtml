@@ -1,7 +1,6 @@
 ﻿@model VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTO
 @{
     ViewData["Title"] = "Chi tiết đơn dịch vụ";
-    Layout = "~/Views/Shared/_Layout.cshtml";
 
     // Chỉ 4 trạng thái chính + Cancelled (để hiện banner), KHÔNG có "All"
     var statusViMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -17,7 +16,8 @@
     var statusCode = string.IsNullOrWhiteSpace(Model?.NormalizedStatus) ? "Pending" : Model.NormalizedStatus;
     var statusVi = statusViMap.TryGetValue(statusCode, out var vi) ? vi : statusCode;
 
-    var IsPending = statusCode.Equals("Pending", StringComparison.OrdinalIgnoreCase);
+    // Sử dụng IsPendingStatus property để check cả tiếng Anh và tiếng Việt
+    var IsPending = Model?.IsPendingStatus ?? statusCode.Equals("Pending", StringComparison.OrdinalIgnoreCase);
     var IsConfirmed = statusCode.Equals("Confirmed", StringComparison.OrdinalIgnoreCase);
     var IsWorking = statusCode.Equals("InProgress", StringComparison.OrdinalIgnoreCase);
     var IsCompleted = statusCode.Equals("Completed", StringComparison.OrdinalIgnoreCase);
@@ -82,67 +82,70 @@
 <link rel="stylesheet" href="~/css/history-booking-detail.css" asp-append-version="true" />
 
 <div class="container my-3">
-    <!-- Page Header -->
-    <div class="page-header d-flex justify-content-between align-items-start">
-        <div class="flex-grow-1">
-            <div class="page-breadcrumb mb-3">
-                <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking">Lịch sử đơn dịch vụ</a>
-                <span class="separator">/</span>
-                <span class="current">Chi tiết đơn</span>
-            </div>
-            <div class="d-flex align-items-center gap-3 mb-2">
-                <h1 class="page-title mb-0">Chi tiết đơn dịch vụ</h1>
-            </div>
-            <p class="page-subtitle">Mã đơn: <strong>@(string.IsNullOrWhiteSpace(Model?.BookingCode) ? "—" : Model.BookingCode)</strong></p>
-        </div>
-    </div>
-
-    <!-- Header block -->
-    <div class="card-block p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap">
         <div>
-            <span class="status-pill status-@statusCode">
-                <i class="bi bi-truck"></i>
-                @StatusHeadline(statusCode)
-            </span>
+            <div class="fw-semibold">MÃ ĐƠN HÀNG: @(string.IsNullOrWhiteSpace(Model?.BookingCode) ? "—" : Model.BookingCode)</div>
+            <div class="text-danger fw-bold">@StatusHeadline(statusCode)</div>
             @if (IsCancelled)
             {
-                <div class="small text-muted mt-2" style="font-weight: 500;">Đơn đã bị hủy. Vui lòng xem lý do hủy ở bên dưới nếu có.</div>
+                <div class="small text-muted">Đơn đã bị hủy. Vui lòng xem lý do hủy ở bên dưới nếu có.</div>
             }
         </div>
 
         <!-- Nút hành động -->
-        <div class="d-flex gap-2 flex-wrap">
+        <div class="d-flex gap-2">
             @if (IsCompleted)
             {
-                <button class="btn btn-danger btn-sm"><i class="bi bi-arrow-repeat me-1"></i> Đặt lại</button>
-                <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportService" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-danger btn-report btn-sm"><i class="bi bi-shield-exclamation me-1"></i> Báo cáo / Hoàn tiền</a>
+                var hasReport = ViewBag.HasReport == true;
+                var reportId = ViewBag.ReportId as Guid?;
 
-                @if (!IsReviewed)  // chỉ hiện khi CHƯA review
+                <button class="btn btn-danger">Mua Lại</button>
+                
+                if (hasReport && reportId.HasValue)
                 {
-                    <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#reviewModal-@Model.BookingId">
-                        <i class="bi bi-star me-1"></i> Đánh giá
+                    <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportDetail" asp-route-reportId="@reportId.Value" class="btn btn-outline-primary">
+                        <i class="bi bi-file-earmark-text"></i> Xem chi tiết báo cáo
+                    </a>
+                }
+                else
+                {
+                    <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportService" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-secondary">
+                        <i class="bi bi-exclamation-triangle"></i> Báo cáo / Hoàn tiền
+                    </a>
+                }
+
+                if (!IsReviewed)  // chỉ hiện khi CHƯA review
+                {
+                    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reviewModal-@Model.BookingId">
+                        Đánh giá
                     </button>
                 }
                 else
                 {
-                    <span class="btn btn-outline-success btn-sm disabled"><i class="bi bi-check2-circle me-1"></i> Đã đánh giá</span>
+                    <span class="btn btn-outline-success disabled">Đã đánh giá</span>
                 }
             }
 
             else if (IsPending)
             {
-                <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-telephone me-1"></i> Liên hệ Shop</button>
-                <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelModal-@Model.BookingId"><i class="bi bi-x-octagon me-1"></i> Hủy đơn</button>
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        onclick="window.location.href='@Url.Action("WithProvider", "ChatCustomer", new { area = "Customer", providerId = Model.ProviderId })'">
+                    <i class="bi bi-chat-dots me-1"></i> Liên hệ Shop
+                </button>
+
+                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal-@Model.BookingId">Hủy đơn</button>
             }
             else if (IsWorking || IsConfirmed)
             {
-                <button class="btn btn-primary btn-sm"><i class="bi bi-box-seam me-1"></i> Xem vận đơn</button>
-                <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-headset me-1"></i> Liên hệ Shipper</button>
+                <button class="btn btn-primary">Xem vận đơn</button>
+                <button class="btn btn-outline-secondary">Liên hệ Shipper</button>
             }
             else if (IsCancelled)
             {
-                <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-info-circle me-1"></i> Lý do hủy</button>
-                <button class="btn btn-danger btn-sm"><i class="bi bi-arrow-repeat me-1"></i> Đặt lại</button>
+                <button class="btn btn-outline-secondary">Lý do hủy</button>
+                <button class="btn btn-danger">Mua Lại</button>
             }
         </div>
     </div>
@@ -150,8 +153,7 @@
     <!-- Steps: chỉ hiện cho 4 trạng thái chính -->
     @if (IsFourStates)
     {
-        <div class="h6 mb-3" style="font-weight: 700; font-size: 18px; color: var(--foreground);">Tiến trình đơn dịch vụ</div>
-        <div class="progress-steps card-block p-4">
+        <div class="progress-steps">
             <div class="step @StepClass("Pending")">
                 <div class="icon"><i class="bi bi-receipt"></i></div>
                 <div class="label">Chờ xác nhận</div>
@@ -213,10 +215,10 @@
     }
 
     <!-- Address + Timeline -->
-    <div class="row g-4">
+    <div class="row g-3">
         <div class="col-lg-6">
-            <div class="card-block p-4 h-100">
-                <div class="h6 mb-3" style="font-weight: 700; font-size: 18px; color: var(--foreground);"><i class="bi bi-geo-alt me-2" style="color: var(--accent);"></i> Địa Chỉ Đặt Dịch Vụ</div>
+            <div class="card-block p-3 h-100">
+                <div class="h6">Địa Chỉ Đặt Dịch Vụ</div>
                 <div class="fw-semibold">@(!string.IsNullOrWhiteSpace(Model?.RecipientFullName) ? Model.RecipientFullName : "—")</div>
                 <div>@(!string.IsNullOrWhiteSpace(Model?.RecipientPhone) ? Model.RecipientPhone : "—")</div>
                 <div>@(!string.IsNullOrWhiteSpace(Model?.AddressLine) ? Model.AddressLine : "—")</div>
@@ -229,8 +231,8 @@
         </div>
 
         <div class="col-lg-6">
-            <div class="card-block p-4 h-100">
-                <div class="h6 mb-3" style="font-weight: 700; font-size: 18px; color: var(--foreground);"><i class="bi bi-clock-history me-2" style="color: var(--accent);"></i> Dòng thời gian</div>
+            <div class="card-block p-3 h-100">
+                <div class="h6">Tiến trình dịch vụ</div>
                 <div class="timeline">
                     @foreach (var e in (Model?.Timeline ?? new List<VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTO.TrackingEventDTO>()).OrderBy(t => t.Time))
                     {
@@ -304,7 +306,8 @@
     </div>
 
     <!-- Service block -->
-    <div class="card-block p-4">
+
+    <div class="card-block p-3 mt-3">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
             <div class="d-flex align-items-center gap-2">
                 <img src="/images/shop-badge.svg" width="24" height="24" alt="shop"
@@ -321,7 +324,7 @@
             <div class="d-flex align-items-center gap-2 shop-actions">
                 <a class="btn btn-ghost btn-sm"
                    asp-area="Customer"
-                   asp-controller="Chat"
+                   asp-controller="ChatCustomer"
                    asp-action="WithProvider"
                    asp-route-providerId="@Model.ProviderId">
                     <i class="bi bi-chat-dots me-1"></i> Chat
@@ -345,14 +348,14 @@
             }
             <img src="@serviceImg"
                  alt="Ảnh dịch vụ"
-                 class="zoomable rounded-2"
+                 class="zoomable"
                  loading="lazy" decoding="async"
                  onerror="this.onerror=null;this.src='@fallbackImg';"
                  style="width:96px;height:96px;object-fit:cover;border:1px solid #eee;border-radius:6px" />
 
             <div class="flex-grow-1">
                 <div class="fw-semibold">@Model?.Service?.Title</div>
-                <div class="text-muted small">Số lượng: x@(Model?.Service?.Quantity ?? 0)</div>
+                <div class="text-muted">x@(Model?.Service?.Quantity ?? 0)</div>
                 @if (Model?.Options?.Any() == true)
                 {
                     <div class="mt-1">
@@ -375,7 +378,7 @@
                     <div class="fw-semibold">@optionPrice.ToString("N0")đ</div>
                 }
                 <hr class="my-1" />
-                <div class="fs-5 fw-bold text-success">@total.ToString("N0")đ</div>
+                <div class="fs-5 fw-bold">@total.ToString("N0")đ</div>
             </div>
         </div>
 
@@ -407,11 +410,11 @@
     </div>
 
     <!-- Prices -->
-    <div class="card-block p-4 mt-3">
-        <div class="price-row subtotal"><span>Tổng tiền hàng</span><span>@currency(Model?.Subtotal ?? 0m)</span></div>
+    <div class="card-block p-3 mt-3">
+        <div class="price-row"><span>Tổng tiền hàng</span><span>@currency(Model?.Subtotal ?? 0m)</span></div>
         <div class="price-row"><span>Voucher</span><span>-@currency(Model?.VoucherDiscount ?? 0m)</span></div>
         <div class="price-row"><span>Phương thức thanh toán</span><span>@(string.IsNullOrWhiteSpace(Model?.PaymentMethod) ? "—" : Model.PaymentMethod)</span></div>
-        <div class="price-row total">
+        <div class="price-row">
             <span class="fw-semibold">Thành tiền</span>
             <span class="price-strong fs-4">@currency(grandTotal)</span>
         </div>
@@ -435,14 +438,14 @@
 <div class="modal fade" id="tosModal" tabindex="-1" aria-labelledby="tosModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header border-0">
+            <div class="modal-header">
                 <h5 id="tosModalLabel" class="modal-title">Điều khoản dịch vụ</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body" id="tosModalBody">
                 <div class="muted">Đang tải điều khoản...</div>
             </div>
-            <div class="modal-footer border-0">
+            <div class="modal-footer">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
             </div>
         </div>
@@ -466,7 +469,7 @@
             ">
                 @Html.AntiForgeryToken()
 
-                <div class="modal-header border-0">
+                <div class="modal-header">
                     <h5 class="modal-title">Đánh Giá Dịch Vụ</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -530,59 +533,15 @@
                     </div>
                 </div>
 
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i> Hủy</button>
-                    <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-send me-1"></i> Gửi đánh giá</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger">Gửi đánh giá</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 }
-
-<div class="modal fade" id="cancelModal-@Model.BookingId" tabindex="-1" aria-labelledby="cancelModalLabel-@Model.BookingId" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post">
-                @Html.AntiForgeryToken()
-                <div class="modal-header border-0">
-                    <h5 class="modal-title" id="cancelModalLabel-@Model.BookingId">Hủy đơn hàng</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-
-                <div class="modal-body">
-                    <input type="hidden" name="BookingId" value="@Model.BookingId" />
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Lý do hủy <span class="text-danger">*</span></label>
-                        <textarea class="form-control" name="Reason" rows="3" required placeholder="Vui lòng mô tả ngắn gọn lý do hủy..."></textarea>
-                        <div class="form-text">Ví dụ: Đặt nhầm dịch vụ, thay đổi thời gian, tìm được nhà cung cấp khác...</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Tên ngân hàng <span class="text-danger">*</span></label>
-                        <input class="form-control" name="BankName" required placeholder="VD: Vietcombank" />
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Tên chủ tài khoản <span class="text-danger">*</span></label>
-                        <input class="form-control" name="AccountHolderName" required placeholder="VD: NGUYEN VAN A" />
-                    </div>
-
-                    <div class="mb-1">
-                        <label class="form-label fw-bold">Số tài khoản <span class="text-danger">*</span></label>
-                        <input class="form-control" name="BankAccountNumber" required inputmode="numeric" pattern="[0-9]{6,20}" placeholder="Chỉ nhập số, 6–20 ký tự" />
-                    </div>
-                    <small class="text-muted">Thông tin ngân hàng được dùng để hoàn tiền (nếu áp dụng).</small>
-                </div>
-
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i> Đóng</button>
-                    <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash3 me-1"></i> Xác nhận hủy</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -755,3 +714,86 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Hủy Đơn (chỉ hiển thị khi đơn ở trạng thái Pending) -->
+@if (IsPending)
+{
+    <div class="modal fade" id="cancelModal-@Model.BookingId" tabindex="-1" aria-labelledby="cancelModalLabel-@Model.BookingId" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="BookingId" value="@Model.BookingId" />
+
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="cancelModalLabel-@Model.BookingId">@(ViewBag.SiteName ?? "localhost:7161") cho biết</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Bạn đang hủy đơn hàng. Sau khi hủy, bạn sẽ được hoàn tiền vào tài khoản ngân hàng đã cung cấp.
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="Reason-@Model.BookingId" class="form-label fw-bold">
+                                Lý do hủy đơn <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="Reason" 
+                                      id="Reason-@Model.BookingId" 
+                                      class="form-control" 
+                                      rows="4" 
+                                      placeholder="Vui lòng nêu rõ lý do hủy đơn..."
+                                      required></textarea>
+                        </div>
+
+                        <hr />
+
+                        <div class="h6 mb-3">Thông tin tài khoản ngân hàng để nhận hoàn tiền</div>
+
+                        <div class="mb-3">
+                            <label for="BankAccountNumber-@Model.BookingId" class="form-label">
+                                Số tài khoản <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" 
+                                   name="BankAccountNumber" 
+                                   id="BankAccountNumber-@Model.BookingId" 
+                                   class="form-control" 
+                                   placeholder="Nhập số tài khoản ngân hàng"
+                                   required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="BankName-@Model.BookingId" class="form-label">
+                                Tên ngân hàng <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" 
+                                   name="BankName" 
+                                   id="BankName-@Model.BookingId" 
+                                   class="form-control" 
+                                   placeholder="Ví dụ: Vietcombank, Vietinbank..."
+                                   required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="AccountHolderName-@Model.BookingId" class="form-label">
+                                Tên chủ tài khoản
+                            </label>
+                            <input type="text" 
+                                   name="AccountHolderName" 
+                                   id="AccountHolderName-@Model.BookingId" 
+                                   class="form-control" 
+                                   placeholder="Tên chủ tài khoản (không bắt buộc)">
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                        <button type="submit" class="btn btn-primary">OK</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}

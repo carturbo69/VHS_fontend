@@ -110,14 +110,19 @@
                     <div class="dropdown">
                         <button class="dropdown-toggle">👤 @username</button>
                         <div class="dropdown-menu">
-                            <a asp-area="" asp-controller="Account" asp-action="Profile" class="dropdown-item">Thông tin cá nhân</a>
+                            <a asp-area="Customer" asp-controller="Profile" asp-action="Index" class="dropdown-item">
+                                <i class="bi bi-person me-2"></i>Thông tin cá nhân
+                            </a>
                             <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" class="dropdown-item">
-                                Lịch sử dịch vụ
+                                <i class="bi bi-clock-history me-2"></i>Lịch sử dịch vụ
                             </a>
                             <a asp-area="Customer" asp-controller="ReviewCustomer" asp-action="Index" class="dropdown-item">
-                                Đánh giá dịch vụ
+                                <i class="bi bi-star me-2"></i>Đánh giá dịch vụ
                             </a>
-                            <a asp-area="" asp-controller="Account" asp-action="Logout" class="dropdown-item">Đăng xuất</a>
+                            <div class="dropdown-divider"></div>
+                            <a asp-area="" asp-controller="Account" asp-action="Logout" class="dropdown-item">
+                                <i class="bi bi-box-arrow-right me-2"></i>Đăng xuất
+                            </a>
                         </div>
                     </div>
                 }
@@ -148,6 +153,32 @@
 </header>
 
 <script>
+
+     // --- 📨 Cập nhật tổng tin nhắn chưa đọc ---
+    async function updateChatUnreadCount() {
+        try {
+            const resp = await fetch('/Customer/ChatCustomer/UnreadTotal');
+            if (!resp.ok) return;
+
+            const data = await resp.json();
+            const badge = document.querySelector('[data-chat-count]');
+            if (badge) {
+                const total = data.total ?? 0;
+                badge.textContent = total;
+                badge.style.display = total > 0 ? 'inline-flex' : 'none';
+            }
+        } catch (e) {
+            console.error('Không thể tải số tin nhắn chưa đọc:', e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateCartCount();         // có sẵn rồi
+        updateChatUnreadCount();   // 👈 thêm dòng này
+        setInterval(updateCartCount, 30000);
+        setInterval(updateChatUnreadCount, 30000); // 30 giây cập nhật 1 lần
+    });
+
     // Hàm gọi API lấy tổng số dịch vụ trong giỏ hàng
     async function updateCartCount() {
         try {

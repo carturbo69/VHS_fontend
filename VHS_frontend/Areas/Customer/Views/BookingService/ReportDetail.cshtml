@@ -1,13 +1,37 @@
-﻿@model VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.ComplaintDTO
+﻿@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@model VHS_frontend.Areas.Customer.Models.ReportDTOs.ReadReportDTO
 @{
-    ViewData["Title"] = "Báo cáo/Hoàn tiền";
+    ViewData["Title"] = "Chi tiết báo cáo";
     Layout = "~/Views/Shared/_Layout.cshtml";
 
     string FmtMoney(decimal v) => string.Format(System.Globalization.CultureInfo.GetCultureInfo("vi-VN"), "{0:#,0}", v);
+    
+    // Get backend URL for images
+    var backendUrl = Configuration["Apis:Backend"] ?? "http://localhost:5154";
+    string GetFullImageUrl(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath)) return "/images/placeholder.png";
+        if (relativePath.StartsWith("http://") || relativePath.StartsWith("https://")) return relativePath;
+        return backendUrl + relativePath;
+    }
 
-    var serviceImg = string.IsNullOrWhiteSpace(Model?.ServiceImage)
-        ? Url.Content("~/images/VeSinh.jpg")
-        : Model!.ServiceImage;
+    var statusBadgeClass = Model?.Status switch
+    {
+        "Pending" => "kb-badge-warning",
+        "InReview" => "kb-badge-info",
+        "Resolved" => "kb-badge-success",
+        "Rejected" => "kb-badge-danger",
+        _ => "kb-badge-secondary"
+    };
+
+    var statusText = Model?.Status switch
+    {
+        "Pending" => "Chờ xử lý",
+        "InReview" => "Đang xem xét",
+        "Resolved" => "Đã giải quyết",
+        "Rejected" => "Đã từ chối",
+        _ => Model?.Status ?? "Không xác định"
+    };
 }
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -19,9 +43,9 @@
     <!-- Header -->
     <div class="kb-header d-flex flex-wrap align-items-center justify-content-between mb-4">
         <div class="d-flex align-items-center gap-2">
-            <h2 class="kb-title mb-0">Báo cáo / Hoàn tiền</h2>
-            <span class="kb-badge kb-badge-warning">
-                <i class="bi bi-shield-exclamation me-1"></i>Đang xử lý báo cáo
+            <h2 class="kb-title mb-0">Chi tiết báo cáo</h2>
+            <span class="kb-badge @statusBadgeClass">
+                <i class="bi bi-shield-exclamation me-1"></i>@statusText
             </span>
         </div>
         <div class="d-flex gap-2">
@@ -37,26 +61,21 @@
     <!-- Service / Product -->
     <div class="kb-card mb-4">
         <div class="kb-card-header">
-            <i class="bi bi-bag me-2"></i>Sản phẩm / Dịch vụ
+            <i class="bi bi-bag me-2"></i>Dịch vụ
         </div>
         <div class="kb-card-body">
             <div class="row g-3 align-items-start">
-                <div class="col-auto">
-                    <img src="@serviceImg" alt="Ảnh dịch vụ" class="kb-thumb" loading="lazy" decoding="async"
-                         onerror="this.onerror=null;this.src='@Url.Content("~/images/VeSinh.jpg")'" />
-                </div>
                 <div class="col">
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <div class="fw-bold fs-6">@Model?.ServiceTitle</div>
+                        <div class="fw-bold fs-6">@Model?.ServiceName</div>
                         @if (!string.IsNullOrWhiteSpace(Model?.ProviderName))
                         {
                             <span class="kb-chip"><i class="bi bi-shop me-1"></i>@Model.ProviderName</span>
                         }
                     </div>
 
-                    <div class="text-muted small mt-1 d-flex flex-wrap gap-3">
-                        <span>Giá niêm yết: <strong>@FmtMoney(Model?.OriginalPrice ?? 0) đ</strong></span>
-                        <span>Giá thanh toán: <strong class="text-brand">@FmtMoney(Model?.Price ?? 0) đ</strong></span>
+                    <div class="text-muted small mt-1">
+                        <span>Mã đơn: <strong>@Model?.BookingId</strong></span>
                     </div>
                 </div>
             </div>
@@ -69,79 +88,89 @@
             <i class="bi bi-flag me-2"></i>Nội dung báo cáo
         </div>
         <div class="kb-card-body">
-            <div class="row g-3">
+            <div class="row g-3 mb-3">
                 <div class="col-md-4">
-                    <div class="kb-label">Lý do</div>
-                    <div class="fw-semibold">@(!string.IsNullOrWhiteSpace(Model?.ComplaintType) ? Model!.ComplaintType : "—")</div>
+                    <div class="kb-label">Loại báo cáo</div>
+                    <div class="fw-semibold">@Model?.ComplaintType</div>
                 </div>
-                <div class="col-md-8">
+                <div class="col-md-4">
+                    <div class="kb-label">Ngày tạo</div>
+                    <div class="text-muted">@Model?.CreatedAt?.ToString("dd/MM/yyyy HH:mm")</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="kb-label">Trạng thái</div>
+                    <div class="fw-semibold">@statusText</div>
+                </div>
+            </div>
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="kb-label">Tiêu đề</div>
+                    <div class="fw-semibold">@Model?.Title</div>
+                </div>
+                <div class="col-12">
                     <div class="kb-label">Mô tả chi tiết</div>
                     <div class="text-muted">@(!string.IsNullOrWhiteSpace(Model?.Description) ? Model!.Description : "—")</div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Finance / Refund summary (tùy chọn hiển thị) -->
-    <div class="kb-card mb-4">
-        <div class="kb-card-header">
-            <i class="bi bi-cash-coin me-2"></i>Thông tin tài chính
-        </div>
-        <div class="kb-card-body">
-            <div class="table-responsive">
-                <table class="table table-borderless table-sm align-middle mb-0">
-                    <tbody>
-                        <tr>
-                            <td class="text-muted">Giá gốc</td>
-                            <td class="text-end fw-semibold">@FmtMoney(Model?.OriginalPrice ?? 0) đ</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Giá thanh toán</td>
-                            <td class="text-end fw-semibold">@FmtMoney(Model?.Price ?? 0) đ</td>
-                        </tr>
-                        <tr class="border-top">
-                            <td class="fw-bold">Giá trị yêu cầu hoàn</td>
-                            <td class="text-end fw-bold fs-5 text-brand">
-                                @FmtMoney(Model?.Price ?? 0) đ
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="text-muted small mt-2">
-                * Giá trị hoàn chỉ là dự kiến và có thể thay đổi sau khi đối soát.
-            </div>
+            @if (Model?.AttachmentUrls != null && Model.AttachmentUrls.Any())
+            {
+                <div class="row g-3 mt-2">
+                    <div class="col-12">
+                        <div class="kb-label">Hình ảnh đính kèm</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var url in Model.AttachmentUrls)
+                            {
+                                var fullImageUrl = GetFullImageUrl(url);
+                                <a href="@fullImageUrl" target="_blank" rel="noopener">
+                                    <img src="@fullImageUrl" class="img-thumbnail" style="width:100px;height:100px;object-fit:cover;" 
+                                         alt="Attachment"
+                                         onerror="this.onerror=null;this.src='/images/placeholder.png';" />
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Model?.ResolutionNote))
+            {
+                <div class="row g-3 mt-3">
+                    <div class="col-12">
+                        <div class="kb-label">Ghi chú xử lý</div>
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle me-2"></i>@Model.ResolutionNote
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 
     <!-- Actions -->
-    <div class="kb-card">
-        <div class="kb-card-body d-flex flex-wrap gap-2 justify-content-end">
-            <a asp-area="Customer"
-               asp-controller="Support"
-               asp-action="Chat"
-               asp-route-bookingId="@Model?.BookingId"
-               class="btn btn-outline-secondary">
-                <i class="bi bi-chat-dots me-1"></i>Liên hệ hỗ trợ
-            </a>
-
-            <a asp-area="Customer"
-               asp-controller="BookingService"
-               asp-action="CancelComplaint"
-               asp-route-bookingId="@Model?.BookingId"
-               class="btn btn-ghost"
-               onclick="return confirm('Bạn chắc chắn muốn hủy báo cáo này?');">
-                <i class="bi bi-x-circle me-1"></i>Hủy báo cáo
-            </a>
-
-            <a asp-area="Customer"
-               asp-controller="BookingService"
-               asp-action="EditComplaint"
-               asp-route-bookingId="@Model?.BookingId"
-               class="btn btn-brand">
-                <i class="bi bi-pencil-square me-1"></i>Cập nhật báo cáo
-            </a>
+    @if (Model?.Status == "Pending" || Model?.Status == "InReview")
+    {
+        <div class="kb-card">
+            <div class="kb-card-body d-flex flex-wrap gap-2 justify-content-end">
+                <a asp-area="Customer"
+                   asp-controller="BookingService"
+                   asp-action="ListHistoryBooking"
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Quay lại danh sách
+                </a>
+            </div>
         </div>
-    </div>
+    }
+    else
+    {
+        <div class="kb-card">
+            <div class="kb-card-body">
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Báo cáo này đã được xử lý. Nếu bạn có thắc mắc, vui lòng liên hệ bộ phận hỗ trợ.
+                </div>
+            </div>
+        </div>
+    }
 
 </div>
