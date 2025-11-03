@@ -6,6 +6,7 @@ using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 using VHS_frontend.Areas.Customer.Models.CartItemDTOs;
 using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
 using VHS_frontend.Areas.Customer.Models.VoucherDTOs;
+using VHS_frontend.Areas.Customer.Models.ReportDTOs;
 using VHS_frontend.Services.Customer;
 
 namespace VHS_frontend.Areas.Customer.Controllers
@@ -16,6 +17,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
     {
         private readonly CartServiceCustomer _cartService;
         private readonly BookingServiceCustomer _bookingServiceCustomer;
+        private readonly UserAddressService _userAddressService;
+        private readonly ReportService _reportService;
 
         // Session keys để giữ lựa chọn trong flow checkout
         private const string SS_SELECTED_IDS = "CHECKOUT_SELECTED_IDS";
@@ -27,10 +30,16 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
         private const string SS_CHECKOUT_DIRECT = "CHECKOUT_DIRECT_JSON";
 
-        public BookingServiceController(CartServiceCustomer cartService, BookingServiceCustomer bookingServiceCustomer)
+        public BookingServiceController(
+            CartServiceCustomer cartService, 
+            BookingServiceCustomer bookingServiceCustomer, 
+            UserAddressService userAddressService,
+            ReportService reportService)
         {
             _cartService = cartService;
             _bookingServiceCustomer = bookingServiceCustomer;
+            _userAddressService = userAddressService;
+            _reportService = reportService;
         }
 
         // Helper: lấy AccountId từ claim/session
@@ -99,10 +108,13 @@ namespace VHS_frontend.Areas.Customer.Controllers
         {
             var jwt = HttpContext.Session.GetString("JWToken"); // 👈 kéo dòng này lên đầu để dùng cho cancel
 
+            // ✅ Luôn kiểm tra và xóa booking chưa thanh toán khi vào trang này
+            // (không chỉ khi refresh=1, để đảm bảo booking được dọn dẹp khi user quay lại)
+            await CancelPendingIfAnyAsync(jwt);
+
             if (refresh)
             {
                 HttpContext.Session.Remove("BookingBreakdownJson");
-                await CancelPendingIfAnyAsync(jwt);             // 👈 THÊM DÒNG NÀY
             }
 
             // ====== Helpers ======
@@ -647,7 +659,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 model.BookingId == Guid.Empty ||
                 string.IsNullOrWhiteSpace(model.Reason) ||
                 string.IsNullOrWhiteSpace(model.BankName) ||
-                string.IsNullOrWhiteSpace(model.AccountHolderName) ||
                 string.IsNullOrWhiteSpace(model.BankAccountNumber))
             {
                 TempData["ToastError"] = "Vui lòng nhập đầy đủ thông tin hủy đơn.";
@@ -657,76 +668,214 @@ namespace VHS_frontend.Areas.Customer.Controllers
             try
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
+                if (string.IsNullOrWhiteSpace(jwtToken))
+                {
+                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+                    return RedirectToAction("Login", "Account", new { area = "" });
+                }
+                var accountId = GetAccountId();
+                if (accountId == Guid.Empty)
+                {
+                    TempData["ToastError"] = "Không tìm thấy thông tin tài khoản.";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+                var createRefundReq = new {
+                    BookingId = model.BookingId,
+                    BankAccount = model.BankAccountNumber,
+                    BankName = model.BankName,
+                    AccountHolderName = model.AccountHolderName,
+                    CancelReason = model.Reason
+                };
+                // Giả định _bookingServiceCustomer đã cập nhật API call phù hợp BE
+                // Kiểm tra lại status trước khi submit (để tránh submit nhầm)
+                // Sử dụng cả NormalizedStatus và Status gốc để xử lý cả tiếng Anh và tiếng Việt
+                var bookingDetail = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, model.BookingId);
+                if (bookingDetail != null)
+                {
+                    var rawStatus = (bookingDetail.Status ?? "").Trim();
+                    var normalizedStatus = bookingDetail.NormalizedStatus;
+                    
+                    // Kiểm tra xem có phải Pending không (cả tiếng Anh và các biến thể tiếng Việt)
+                    var isPending = normalizedStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
+                                    rawStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
+                                    rawStatus.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase) ||
+                                    rawStatus.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase) ||
+                                    rawStatus.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase);
 
-                await Task.CompletedTask;
+                    if (!isPending)
+                    {
+                        // Lấy status tiếng Việt để hiển thị
+                        var statusVi = bookingDetail.StatusVi;
+                        if (string.IsNullOrWhiteSpace(statusVi) || statusVi == "—")
+                        {
+                            statusVi = bookingDetail.NormalizedStatus switch
+                            {
+                                "Confirmed" => "Đã xác nhận",
+                                "InProgress" => "Đang thực hiện",
+                                "Completed" => "Đã hoàn thành",
+                                "Cancelled" => "Đã hủy",
+                                _ => rawStatus // Hiển thị status gốc nếu không map được
+                            };
+                        }
+                        TempData["ToastError"] = $"Không thể hủy đơn này. Chỉ có thể hủy đơn ở trạng thái 'Chờ xác nhận'. Đơn hiện tại đang ở trạng thái: {statusVi}.";
+                        return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
+                    }
+                }
 
-                TempData["ToastSuccess"] = "Hủy đơn thành công. Yêu cầu hoàn tiền sẽ được xử lý trong thời gian sớm nhất.";
+                var result = await _bookingServiceCustomer.CancelBookingWithRefundFullAsync(createRefundReq, jwtToken);
+                if (result?.Success == true)
+                {
+                    TempData["ToastSuccess"] = "Hủy đơn thành công. Yêu cầu hoàn tiền sẽ được xử lý trong thời gian sớm nhất.";
+                }
+                else
+                {
+                    // Parse message từ backend để hiển thị rõ ràng hơn
+                    var errorMsg = result?.Message ?? "Không thể hủy đơn. Vui lòng thử lại.";
+                    if (errorMsg.Contains("Only pending bookings can be cancelled"))
+                    {
+                        errorMsg = "Chỉ có thể hủy đơn ở trạng thái 'Chờ xác nhận'. Vui lòng kiểm tra lại trạng thái đơn hàng.";
+                    }
+                    TempData["ToastError"] = errorMsg;
+                    return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
+                }
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
-            catch (UnauthorizedAccessException ex)
+            catch (HttpRequestException ex)
             {
-                TempData["ToastError"] = $"Bạn cần đăng nhập lại: {ex.Message}";
-                return RedirectToAction(nameof(ListHistoryBooking));
+                // Parse error message từ backend
+                var errorMsg = ex.Message;
+                if (errorMsg.Contains("Only pending bookings can be cancelled"))
+                {
+                    errorMsg = "Chỉ có thể hủy đơn ở trạng thái 'Chờ xác nhận'. Đơn hàng của bạn có thể đã được xác nhận hoặc đang ở trạng thái khác.";
+                    TempData["ToastError"] = errorMsg;
+                    // Redirect về chi tiết đơn để user thấy trạng thái hiện tại
+                    return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
+                }
+                TempData["ToastError"] = $"Không thể hủy đơn: {errorMsg}";
+                return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
             }
             catch (Exception ex)
             {
                 TempData["ToastError"] = $"Không thể hủy đơn: {ex.Message}";
-                return RedirectToAction(nameof(ListHistoryBooking));
+                return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
             }
         }
 
         // GET: /Customer/BookingService/ReportService/{bookingId}
         [HttpGet]
-        public IActionResult ReportService(Guid bookingId)
+        public async Task<IActionResult> ReportService(Guid bookingId, CancellationToken ct)
         {
-            // TODO: lấy thông tin thực từ DB/API theo bookingId
-            // Dữ liệu mock để hiển thị
-            var vm = new ComplaintDTO
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
             {
-                BookingId = bookingId,
-                ServiceTitle = "Dầu Tắm Oliv 3X Dưỡng Ẩm 650ml",
-                ProviderName = "Oliv Official",
-                Price = 108800,
-                OriginalPrice = 197500,
-                ServiceImage = "/images/sample1.png"
-            };
-            return View(vm); // View: Areas/Customer/Views/BookingService/ReportService.cshtml
+                TempData["ToastError"] = "Bạn cần đăng nhập.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            try
+            {
+                // Lấy thông tin booking detail
+                var bookingDetail = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, bookingId);
+                if (bookingDetail == null)
+                {
+                    TempData["ToastError"] = "Không tìm thấy đơn hàng.";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+
+                // Tạo ViewModel với dữ liệu thực
+                var vm = new ReportServiceViewModel
+                {
+                    BookingId = bookingId,
+                    ProviderId = bookingDetail.ProviderId,
+                    ServiceTitle = bookingDetail.Service?.Title ?? "Dịch vụ",
+                    ProviderName = bookingDetail.ProviderName ?? "Provider",
+                    ServiceImage = bookingDetail.Service?.Image ?? "/images/VeSinh.jpg",
+                    Price = bookingDetail.Total,
+                    OriginalPrice = bookingDetail.Service?.UnitPrice ?? 0,
+                    ReportTypes = _reportService.GetReportTypes()
+                };
+
+                return View(vm);
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
         }
 
         // POST: /Customer/BookingService/SubmitReport
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitReport(ComplaintDTO model)
+        public async Task<IActionResult> SubmitReport(
+            [FromForm] Guid BookingId,
+            [FromForm] ReportTypeEnum ReportType,
+            [FromForm] string Title,
+            [FromForm] string? Description,
+            [FromForm] Guid? ProviderId,
+            [FromForm] List<IFormFile>? Attachments,
+            CancellationToken ct)
         {
-            if (model.BookingId == Guid.Empty ||
-                string.IsNullOrWhiteSpace(model.ComplaintType) ||
-                string.IsNullOrWhiteSpace(model.Description))
+            if (BookingId == Guid.Empty || string.IsNullOrWhiteSpace(Title))
             {
-                TempData["ToastError"] = "Vui lòng chọn lý do và nhập mô tả.";
-                return RedirectToAction(nameof(ReportService), new { bookingId = model.BookingId });
+                TempData["ToastError"] = "Vui lòng điền đầy đủ thông tin báo cáo.";
+                return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
             }
 
             try
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
+                if (string.IsNullOrWhiteSpace(jwtToken))
+                {
+                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn.";
+                    return RedirectToAction("Login", "Account", new { area = "" });
+                }
 
-                // TODO: Gọi API backend lưu khiếu nại (Complaint)
-                // await _complaintService.CreateAsync(jwtToken, model);
+                var createDto = new CreateReportDTO
+                {
+                    BookingId = BookingId,
+                    ReportType = ReportType,
+                    Title = Title,
+                    Description = Description,
+                    ProviderId = ProviderId,
+                    Attachments = Attachments
+                };
 
-                await Task.CompletedTask; // demo
+                var result = await _reportService.CreateReportAsync(createDto, jwtToken, ct);
 
-                TempData["ToastSuccess"] = "Gửi báo cáo thành công. Hệ thống sẽ xử lý trong thời gian sớm nhất.";
-                return RedirectToAction(nameof(ListHistoryBooking));
+                if (result != null)
+                {
+                    TempData["ToastSuccess"] = "Gửi báo cáo thành công. Hệ thống sẽ xử lý trong thời gian sớm nhất.";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+                else
+                {
+                    TempData["ToastError"] = "Không thể tạo báo cáo. Vui lòng thử lại.";
+                    return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
+                }
             }
             catch (UnauthorizedAccessException ex)
             {
                 TempData["ToastError"] = $"Bạn cần đăng nhập lại: {ex.Message}";
-                return RedirectToAction(nameof(ListHistoryBooking));
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (HttpRequestException ex)
+            {
+                // Parse error message for special cases
+                if (ex.Message.Contains("Booking đã được báo cáo trước đó"))
+                {
+                    TempData["DuplicateReportError"] = "Booking đã được báo cáo trước đó. Mỗi đơn hàng chỉ được báo cáo 1 lần.";
+                }
+                else
+                {
+                    TempData["ToastError"] = $"Không thể gửi báo cáo: {ex.Message}";
+                }
+                return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
             }
             catch (Exception ex)
             {
-                TempData["ToastError"] = $"Không thể gửi báo cáo: {ex.Message}";
-                return RedirectToAction(nameof(ListHistoryBooking));
+                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
+                return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
             }
         }
 
@@ -838,7 +987,27 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 currentStatus = status.Trim();
 
             ViewBag.CurrentStatus = currentStatus;
-            ViewBag.FourStates = fourStates; 
+            ViewBag.FourStates = fourStates;
+
+            // Check if booking has a report
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                if (!string.IsNullOrWhiteSpace(jwtToken))
+                {
+                    var (hasReport, report) = await _reportService.CheckBookingHasReportAsync(id, jwtToken);
+                    ViewBag.HasReport = hasReport;
+                    ViewBag.ReportId = report?.ComplaintId;
+                }
+                else
+                {
+                    ViewBag.HasReport = false;
+                }
+            }
+            catch
+            {
+                ViewBag.HasReport = false;
+            }
 
             return View("HistoryBookingDetail", vm);
         }
@@ -866,44 +1035,76 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
 
-        public IActionResult ReportDetail(Guid bookingId)
+        public async Task<IActionResult> ReportDetail(Guid reportId, CancellationToken ct)
         {
-            // TODO: Lấy ComplaintDTO thực tế từ DB
-            var vm = new ComplaintDTO
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
             {
-                BookingId = bookingId,
-                ComplaintType = "Hàng/ dịch vụ không như mô tả",
-                Description = "Ghế vệ sinh xong vẫn còn vết bẩn nhẹ ở tay vịn.",
-                ServiceTitle = "Vệ sinh sofa vải 3 chỗ",
-                ProviderName = "HouseCare",
-                ServiceImage = "/images/sofa.png",
-                OriginalPrice = 390000,
-                Price = 350000
-            };
-            return View(vm);
+                TempData["ToastError"] = "Bạn cần đăng nhập.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                if (string.IsNullOrWhiteSpace(jwtToken))
+                {
+                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn.";
+                    return RedirectToAction("Login", "Account", new { area = "" });
+                }
+
+                var report = await _reportService.GetReportByIdAsync(reportId, jwtToken, ct);
+                if (report == null)
+                {
+                    TempData["ToastError"] = "Không tìm thấy báo cáo.";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+
+                return View(report);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                TempData["ToastError"] = "Bạn cần đăng nhập lại.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
         }
 
         // ===== Helpers: load dữ liệu thật =====
 
         private async Task<(List<UserAddressDto> list, Guid? defaultId)> LoadUserAddressesAsync(Guid accountId, string? jwt)
         {
-            // TODO: gọi AddressService thật ở đây
-            var list = new List<UserAddressDto>();
+            // Gọi API UserAddress từ database
+            if (string.IsNullOrWhiteSpace(jwt))
+            {
+                // Không có JWT - trả về rỗng
+                return (new List<UserAddressDto>(), null);
+            }
 
-            // Fallback dùng địa chỉ mẫu khi chưa có service
+            try
+            {
+                // Gọi API thật từ backend
+                var list = await _userAddressService.GetUserAddressesAsync(jwt);
 
-            if (list.Count == 0)
-                list = BookingViewModel.AddressSample();
+                // Lấy id đã chọn từ session (nếu có)
+                Guid? selected = null;
+                var selFromSession = HttpContext.Session.GetString(SS_SELECTED_ADDR);
+                if (Guid.TryParse(selFromSession, out var selId) && list.Any(a => a.AddressId == selId))
+                    selected = selId;
+                else
+                    selected = list.FirstOrDefault()?.AddressId;
 
-            // Lấy id đã chọn từ session (nếu có)
-            Guid? selected = null;
-            var selFromSession = HttpContext.Session.GetString(SS_SELECTED_ADDR);
-            if (Guid.TryParse(selFromSession, out var selId) && list.Any(a => a.AddressId == selId))
-                selected = selId;
-            else
-                selected = list.FirstOrDefault()?.AddressId;
-
-            return (list, selected);
+                return (list, selected);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading addresses from API: {ex.Message}");
+                return (new List<UserAddressDto>(), null);
+            }
         }
 
 

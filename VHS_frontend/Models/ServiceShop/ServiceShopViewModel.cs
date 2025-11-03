@@ -4,6 +4,7 @@ namespace VHS_frontend.Models.ServiceShop
 {
     public class ServiceShopViewModel
     {
+        public Guid ProviderId { get; set; }
         public ShopInfo ShopInfo { get; set; } = new ShopInfo();
         public List<ServiceItem> BestsellingServices { get; set; } = new List<ServiceItem>();
         public List<ServiceCategory> ShopCategories { get; set; } = new List<ServiceCategory>();
@@ -12,6 +13,7 @@ namespace VHS_frontend.Models.ServiceShop
         public int CurrentPage { get; set; } = 1;
         public int TotalPages { get; set; } = 1;
         public int? SelectedCategoryId { get; set; }
+        public Guid? SelectedTagId { get; set; }
         public string SortBy { get; set; } = "popular";
     }
 
@@ -39,5 +41,13 @@ namespace VHS_frontend.Models.ServiceShop
         public string Icon { get; set; } = string.Empty;
         public int ServiceCount { get; set; }
         public List<ServiceCategory> SubCategories { get; set; } = new List<ServiceCategory>();
+        public List<CategoryTag> Tags { get; set; } = new List<CategoryTag>();
+    }
+
+    public class CategoryTag
+    {
+        public Guid TagId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int ServiceCount { get; set; }
     }
 }

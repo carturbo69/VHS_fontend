@@ -2,76 +2,97 @@
 @using System.Globalization
 @{
     ViewData["Title"] = "Thanh toán thành công";
+    Layout = "~/Views/Shared/_Layout.cshtml";
     var vi = CultureInfo.GetCultureInfo("vi-VN");
+    
+    // Lấy thời gian hiện tại theo timezone Việt Nam (UTC+7)
+    var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+    var currentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
 }
 
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-7">
-            <div class="card shadow-sm border-0">
-                <div class="card-body p-4 text-center">
-                    <div class="mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" fill="currentColor" class="bi bi-check-circle text-success" viewBox="0 0 16 16" role="img" aria-label="success">
-                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
-                            <path d="m10.97 4.97-.02.022L7.477 8.44 5.525 6.525a.75.75 0 0 0-1.06 1.06L6.97 10.09a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05" />
-                        </svg>
-                    </div>
+@section Styles {
+    <link rel="stylesheet" href="~/css/payment-success.css" asp-append-version="true" />
+}
 
-                    <h2 class="fw-semibold">Thanh toán thành công</h2>
-                    <p class="text-muted mb-4">
-                        Cảm ơn bạn! Giao dịch qua <strong>@(string.IsNullOrWhiteSpace(Model.Gateway) ? "cổng thanh toán" : Model.Gateway)</strong> đã được ghi nhận.
-                    </p>
-
-                    <div class="text-start mx-auto" style="max-width: 560px;">
-                        <div class="d-flex justify-content-between border-bottom py-2">
-                            <span class="text-muted">Tổng tiền</span>
-                            <strong>@Model.Total.ToString("c0", vi)</strong>
-                        </div>
-
-                        <div class="py-3">
-                            <div class="small text-muted mb-1">Mã dịch vụ/đặt chỗ:</div>
-                            @if (Model.BookingIds != null && Model.BookingIds.Any())
-                            {
-                                <ul class="list-group small">
-                                    @foreach (var id in Model.BookingIds)
-                                    {
-                                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            <code>@id</code>
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Đã thanh toán</span>
-                                        </li>
-                                    }
-                                </ul>
-                            }
-                            else
-                            {
-                                <div class="alert alert-info small mb-0">
-                                    Không tìm thấy danh sách booking. Nếu bạn vừa thanh toán, vui lòng kiểm tra trong “Đơn hàng của tôi”.
-                                </div>
-                            }
-                        </div>
-
-                        @if (!string.IsNullOrWhiteSpace(Model.Note))
-                        {
-                            <div class="alert alert-success" role="alert">
-                                @Model.Note
-                            </div>
-                        }
-                    </div>
-
-                    <div class="d-flex gap-2 justify-content-center mt-4">
-                        <a asp-area="Customer" asp-controller="BookingService" asp-action="Index" class="btn btn-primary">
-                            Xem đơn hàng
-                        </a>
-                        <a asp-area="Customer" asp-controller="BookingService" asp-action="Index" class="btn btn-outline-secondary">
-                            Về trang đặt dịch vụ
-                        </a>
-                    </div>
-
-                    <div class="text-muted small mt-3">
-                        Mọi thắc mắc về giao dịch, vui lòng liên hệ CSKH. Mã tham chiếu: @DateTime.Now.Ticks
-                    </div>
-                </div>
+<div class="payment-success-wrapper">
+    <div class="payment-success-card">
+        <div class="success-icon-wrapper">
+            <div class="success-icon">
+                <svg viewBox="0 0 52 52">
+                    <path d="M14 27l9 9 19-19" />
+                </svg>
             </div>
+        </div>
+
+        <h1>🎉 Thanh toán thành công!</h1>
+        <p>Cảm ơn bạn! Giao dịch qua <strong>@(string.IsNullOrWhiteSpace(Model.Gateway) ? "cổng thanh toán" : Model.Gateway)</strong> đã được ghi nhận thành công.</p>
+
+        <div class="transaction-info">
+            <div class="transaction-info-item">
+                <label>Phương thức thanh toán</label>
+                <span>@(string.IsNullOrWhiteSpace(Model.Gateway) ? "COD" : Model.Gateway)</span>
+            </div>
+            @if (Model.BookingIds != null && Model.BookingIds.Any())
+            {
+                <div class="transaction-info-item">
+                    <label>Số lượng dịch vụ</label>
+                    <span>@Model.BookingIds.Count booking</span>
+                </div>
+            }
+            <div class="transaction-info-item highlight">
+                <label>Tổng thanh toán</label>
+                <span>@Model.Total.ToString("N0")₫</span>
+            </div>
+            <div class="transaction-info-item">
+                <label>Thời gian</label>
+                <span>@currentTime.ToString("dd/MM/yyyy HH:mm:ss")</span>
+            </div>
+        </div>
+
+        @if (Model.BookingIds != null && Model.BookingIds.Any())
+        {
+            <div class="booking-list">
+                <div class="booking-list-title">Dịch vụ đã đặt thành công:</div>
+                @for (int i = 0; i < Model.BookingIds.Count; i++)
+                {
+                    var bookingId = Model.BookingIds[i];
+                    var serviceName = Model.ServiceNames.TryGetValue(bookingId, out var name) ? name : $"Dịch vụ số {i + 1}";
+                    <div class="booking-item">
+                        <div class="booking-number">
+                            <span class="number-badge">@(i + 1)</span>
+                            <span class="booking-label">@serviceName</span>
+                        </div>
+                        <span class="badge">✓ Đã thanh toán</span>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="warning-box">
+                <p><strong>ℹ️ Lưu ý:</strong> Không tìm thấy danh sách booking. Nếu bạn vừa thanh toán, vui lòng kiểm tra trong "Lịch sử booking".</p>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.Note))
+        {
+            <div class="warning-box">
+                <p>@Model.Note</p>
+            </div>
+        }
+
+        <div class="btn-group">
+            <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" class="btn-primary-success">
+                📋 Xem lịch sử booking
+            </a>
+            <a asp-area="" asp-controller="Home" asp-action="Index" class="btn-secondary-success">
+                🏠 Về trang chủ
+            </a>
+        </div>
+
+        <div class="footer-note">
+            Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi qua <strong>hotline</strong> hoặc <strong>email hỗ trợ</strong>.
+            <br>Mã tham chiếu: <strong>@DateTime.Now.Ticks</strong>
         </div>
     </div>
 </div>

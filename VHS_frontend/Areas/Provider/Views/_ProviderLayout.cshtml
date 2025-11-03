@@ -57,6 +57,12 @@
                 <i class="bi bi-people"></i><span>Quản lí nhân viên</span>
             </a>
 
+            <a asp-area="Provider" asp-controller="ProviderSchedule" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderSchedule" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderSchedule" ? "page" : null)">
+                <i class="bi bi-calendar-week"></i><span>Lịch làm việc</span>
+            </a>
+
             <a asp-area="Provider" asp-controller="ProviderFeedback" asp-action="Index"
                class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderFeedback" ? "active" : "")"
                aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderFeedback" ? "page" : null)">
@@ -67,6 +73,12 @@
                class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Revenue" ? "active" : "")"
                aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Revenue" ? "page" : null)">
                 <i class="bi bi-graph-up"></i><span>Báo cáo doanh thu</span>
+            </a>
+
+            <a asp-area="Provider" asp-controller="ProviderWithdrawal" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderWithdrawal" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderWithdrawal" ? "page" : null)">
+                <i class="bi bi-bank"></i><span>Rút tiền</span>
             </a>
 
             <a asp-area="Provider" asp-controller="Profile" asp-action="Index"
@@ -94,6 +106,19 @@
             </div>
 
             <div class="right">
+
+                <!-- Chat -->
+                <a asp-area="Provider" asp-controller="ChatProvider" asp-action="Index"
+                   class="icon-btn chat-btn" aria-label="Chat">
+                    <svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 4h16v12H5.17L4 17.17V4z" fill="none" stroke="currentColor" stroke-width="2" />
+                        <circle cx="8" cy="10" r="1.5" />
+                        <circle cx="12" cy="10" r="1.5" />
+                        <circle cx="16" cy="10" r="1.5" />
+                    </svg>
+                    <span class="chat-badge" data-chat-count>0</span>
+                </a>
+
                 <!-- Notifications -->
                 <div class="notif">
                     <button id="notificationBtn" class="btn btn-link notif-btn" aria-expanded="false" aria-label="Notifications">
@@ -136,6 +161,48 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+
+         // --- 📨 Cập nhật tổng tin nhắn chưa đọc (Provider) ---
+          async function updateProviderChatUnreadCount() {
+          try {
+            const url = '@Url.Action("UnreadTotal", "ChatProvider", new { area = "Provider" })';
+            const resp = await fetch(url, { credentials: 'same-origin' });
+
+            // Nếu bị redirect về trang login, resp.redirected sẽ true
+            if (!resp.ok || resp.redirected) return;
+
+            const contentType = resp.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) return;
+
+            const data = await resp.json();
+            const badge = document.querySelector('[data-chat-count]');
+
+                    if (badge) {
+          const total = Number(data?.total ?? 0);
+          // luôn hiển thị
+          badge.style.display = 'inline-flex';
+          // đổi màu theo trạng thái (ví dụ)
+          badge.classList.toggle('is-empty', total === 0);
+          badge.textContent = total;
+        }
+
+
+            if (badge) {
+              const total = Number(data?.total ?? 0);
+              badge.textContent = total;
+              badge.style.display = total > 0 ? 'inline-flex' : 'none';
+            }
+
+          } catch (e) {
+            console.error('Không thể tải số tin nhắn chưa đọc (Provider):', e);
+          }
+        }
+
+
+  document.addEventListener('DOMContentLoaded', () => {
+    updateProviderChatUnreadCount();            // gọi ngay khi load
+    setInterval(updateProviderChatUnreadCount, 30000); // 30s/lần
+  });
         // =========================
         // Sidebar: giữ trạng thái + chống giật khi load
         // =========================
@@ -219,6 +286,11 @@
           async function loadUnreadCount() {
             try {
               const res = await fetch(`${proxyBase}/unread-count`);
+              if (!res.ok) {
+                // Service not available, hide notification badge
+                notifBadge.style.display = 'none';
+                return;
+              }
               const dto = await res.json();
               if (dto.count > 0) {
                 notifBadge.textContent = dto.count;
@@ -226,7 +298,10 @@
               } else {
                 notifBadge.style.display = 'none';
               }
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+              // Silently fail - notification service not available
+              notifBadge.style.display = 'none';
+            }
           }
 
           async function loadNotifications() {

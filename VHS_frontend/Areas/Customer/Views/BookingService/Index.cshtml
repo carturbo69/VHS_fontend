@@ -10,6 +10,45 @@
     var placeOrderFormId = "placeOrderForm";
 }
 
+<!-- Leaflet Maps (OpenStreetMap) - FREE, không cần API Key -->
+@if (Model.Address.Latitude.HasValue && Model.Address.Longitude.HasValue)
+{
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        let map;
+        
+        function initMap() {
+            const lat = @Model.Address.Latitude.Value;
+            const lng = @Model.Address.Longitude.Value;
+            
+            // Khởi tạo bản đồ
+            map = L.map('addressMap').setView([lat, lng], 15);
+            
+            // Thêm layer tile từ OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // Thêm marker
+            const marker = L.marker([lat, lng]).addTo(map);
+            marker.bindPopup('@Html.Raw(Model.Address.ToDisplayString())').openPopup();
+        }
+        
+        // Khởi tạo bản đồ khi trang load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('addressMap')) {
+                initMap();
+            }
+        });
+    </script>
+}
+
+<!-- Leaflet CSS & JS cho modal bản đồ -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 @functions {
     string AddonSummary(IEnumerable<BookItemOption> opts)
     {
@@ -28,6 +67,19 @@
 <link rel="stylesheet" href="~/css/booking-service.css" asp-append-version="true" />
 
 <section class="checkout-page">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title-wrapper">
+            <h1 class="page-title">Thanh Toán Dịch Vụ</h1>
+            <p class="page-subtitle">Xác nhận thông tin và hoàn tất đặt dịch vụ của bạn</p>
+        </div>
+        <div class="page-breadcrumb">
+            <a href="@Url.Action("Index", "Cart", new { area = "Customer" })">Giỏ hàng</a>
+            <span class="separator">›</span>
+            <span class="current">Thanh toán</span>
+        </div>
+    </div>
+
     <!-- Địa chỉ nhận hàng -->
     <div class="address-card">
         <div class="addr-title">
@@ -39,6 +91,12 @@
             <!-- ✅ thêm id để JS cập nhật khi chọn trong modal -->
             <div id="currentAddressText">@Model.Address.ToDisplayString()</div>
         </div>
+        
+        <!-- Bản đồ hiển thị vị trí -->
+        @if (Model.Address.Latitude.HasValue && Model.Address.Longitude.HasValue)
+        {
+            <div id="addressMap" style="width: 100%; height: 250px; margin-top: 1rem; border-radius: 8px; overflow: hidden;"></div>
+        }
     </div>
 
     <div class="grid">
@@ -61,9 +119,13 @@
                             <!-- Cột 1: Ảnh -->
                             <img class="thumb" src="@it.Image" alt="@it.ServiceName" />
 
-                            <!-- Cột 2: Tên dịch vụ -->
+                            <!-- Cột 2: Tên dịch vụ + Đơn giá -->
                             <div>
                                 <div><strong>@it.ServiceName</strong></div>
+                                <div class="service-price-info">
+                                    <span class="price-label">Đơn giá:</span>
+                                    <span class="price-value">@Money(it.UnitPrice)</span>
+                                </div>
                             </div>
 
                             <!-- Cột 3: Tuỳ chọn hiển thị sẵn -->
@@ -104,12 +166,6 @@
                                     }
                                 </div>
                             </div>
-
-                            <!-- Cột 4: Đơn giá -->
-                            <div class="price">@Money(it.UnitPrice)</div>
-
-                            <!-- Cột 6: Thành tiền -->
-                            <div class="line-total">@Money(it.LineTotal)</div>
                         </div>
 
                         <!-- ✅ CHÈN MỚI: gửi đúng danh sách OptionIds đang hiển thị cho item này -->
@@ -269,6 +325,10 @@
         <!-- Tóm tắt -->
         <div>
             <div class="summary-box">
+                <div class="summary-header">
+                    <h3>Tóm tắt đơn hàng</h3>
+                </div>
+                
                 <form id="@placeOrderFormId" asp-area="Customer" asp-controller="BookingService" asp-action="PlaceOrder" method="post">
                     @Html.AntiForgeryToken()
 
@@ -301,10 +361,9 @@
                         <div id="voucherAppliedInfo"></div>
                     </div>
 
-                    <div style="margin-top:12px">
-
-                        <button class="btn" type="button" onclick="cancelCheckout()">Hủy</button>
-                        <button class="btn-place" type="submit">Đặt hàng</button>
+                    <div class="summary-actions">
+                        <button class="btn-cancel" type="button" onclick="cancelCheckout()">Hủy</button>
+                        <button class="btn-place" type="submit">Đặt dịch vụ</button>
                     </div>
                 </form>
             </div>
@@ -389,34 +448,129 @@
         <form id="addressUpsertForm" asp-area="Customer" asp-controller="Address" asp-action="Upsert" method="post" style="margin-top:12px">
             @Html.AntiForgeryToken()
             <input type="hidden" name="AddressId" id="AddressId" />
+            <!-- Hidden fields để lưu tọa độ -->
+            <input type="hidden" id="Latitude" name="Latitude" />
+            <input type="hidden" id="Longitude" name="Longitude" />
+
+            <!-- Bản đồ để chọn vị trí -->
+            <div class="form-row">
+                <label>📍 Chọn vị trí trên bản đồ (nhấn vào bản đồ)</label>
+                <div id="addressMapPicker" style="width: 100%; height: 300px; border-radius: 8px; border: 2px solid #e0e0e0; cursor: pointer;"></div>
+                <small style="color: #666; margin-top: 4px;">Nhấn vào bản đồ để chọn vị trí chính xác</small>
+            </div>
 
             <div class="form-row">
-                <label for="StreetAddress">Địa chỉ</label>
-                <input type="text" id="StreetAddress" name="StreetAddress" required />
+                <label for="streetAddress">Địa chỉ</label>
+                <input type="text" id="streetAddress" name="streetAddress" required placeholder="Nhập địa chỉ hoặc chọn trên bản đồ" />
+                <button type="button" id="btnGeocode" class="btn btn-sm" style="margin-top: 4px;" title="Lấy địa chỉ từ tọa độ đã chọn">
+                    🔍 Lấy địa chỉ từ vị trí đã chọn
+                </button>
             </div>
 
-            <div class="form-grid-3">
+            <div class="form-grid-2">
                 <div class="form-row">
-                    <label for="WardName">Phường/Xã</label>
-                    <input type="text" id="WardName" name="WardName" required />
+                    <label for="wardName">Phường/Xã</label>
+                    <input type="text" id="wardName" name="wardName" required />
                 </div>
                 <div class="form-row">
-                    <label for="DistrictName">Quận/Huyện</label>
-                    <input type="text" id="DistrictName" name="DistrictName" required />
-                </div>
-                <div class="form-row">
-                    <label for="ProvinceName">Tỉnh/Thành</label>
-                    <input type="text" id="ProvinceName" name="ProvinceName" required />
+                    <label for="provinceName">Tỉnh/Thành</label>
+                    <input type="text" id="provinceName" name="provinceName" required />
                 </div>
             </div>
+            <!-- Hidden field để gửi districtName (optional) -->
+            <input type="hidden" id="districtName" name="districtName" />
 
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
                 <button type="button" class="btn" onclick="closeUpsertModal()">Hủy</button>
-                <button type="submit" class="btn primary">Lưu</button>
+                <button type="submit" class="btn primary" id="btnSaveAddress">Lưu</button>
             </div>
         </form>
+        <script>
+        // Validate form trước khi submit
+        (function() {
+          const form = document.getElementById('addressUpsertForm');
+          if (!form) return;
+          
+          form.addEventListener('submit', function(e) {
+            console.log('=== Form submit triggered ===');
+            console.log('Form action:', form.action);
+            console.log('Form method:', form.method);
+            
+            const street = document.getElementById('streetAddress')?.value.trim() || '';
+            const ward = document.getElementById('wardName')?.value.trim() || '';
+            const province = document.getElementById('provinceName')?.value.trim() || '';
+            const lat = document.getElementById('Latitude')?.value.trim() || '';
+            const lng = document.getElementById('Longitude')?.value.trim() || '';
+            const district = document.getElementById('districtName')?.value.trim() || '';
+            
+            console.log('Form values:', { street, ward, province, lat, lng, district });
+            
+            if (!street || !ward || !province) {
+              e.preventDefault();
+              e.stopPropagation();
+              alert('Vui lòng điền đầy đủ thông tin địa chỉ (Địa chỉ, Phường/Xã, Tỉnh/Thành)');
+              return false;
+            }
+            
+            if (!lat || !lng) {
+              console.warn('Missing coordinates, but allowing submission');
+              // Không chặn nếu thiếu tọa độ, chỉ cảnh báo
+            }
+            
+            // Nếu mọi thứ OK, form sẽ submit bình thường
+            console.log('Form validation passed, submitting...');
+            console.log('Form action URL:', form.action);
+            return true;
+          });
+          
+          // Không cần xử lý gì, để form submit tự nhiên
+          const btnSave = document.getElementById('btnSaveAddress');
+          if (btnSave) {
+            console.log('Save button found');
+          } else {
+            console.error('Save button NOT found!');
+          }
+          
+          // Debug: Log khi form loaded
+          console.log('Address form initialized');
+          console.log('Form element:', form);
+          console.log('Save button:', btnSave);
+        })();
+        </script>
     </div>
 </div>
+
+<style>
+/* Form grid styles */
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-row {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-row label {
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-row input {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+@@media (max-width: 768px) {
+    .form-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 
 <!-- Modal Điều khoản dịch vụ -->
 <div class="modal" id="tosModal">
@@ -427,9 +581,6 @@
         </div>
         <div id="tosModalBody" style="margin-top:12px; max-height:65vh; overflow:auto">
             <!-- Nội dung nạp qua AJAX -->
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
-            <button type="button" class="btn" onclick="closeTosModal()">Đã hiểu</button>
         </div>
     </div>
 </div>
@@ -523,23 +674,193 @@
         }
 
         /* ========= Modal Upsert Address ========= */
+        let addressPickerMap, addressPickerMarker;
+        
         function openCreateAddressForm(){
           document.getElementById('upsertTitle').innerText = 'Thêm địa chỉ';
           document.getElementById('AddressId').value = '';
-          document.getElementById('StreetAddress').value = '';
-          document.getElementById('WardName').value = '';
-          document.getElementById('DistrictName').value = '';
-          document.getElementById('ProvinceName').value = '';
+          document.getElementById('streetAddress').value = '';
+          document.getElementById('wardName').value = '';
+          document.getElementById('provinceName').value = '';
+          document.getElementById('districtName').value = '';
+          document.getElementById('Latitude').value = '';
+          document.getElementById('Longitude').value = '';
+          
+          // Khởi tạo bản đồ cho modal
+          setTimeout(() => {
+            initAddressPickerMap();
+          }, 300);
+          
           document.getElementById('addressUpsertModal').classList.add('open');
         }
+        
+        function initAddressPickerMap() {
+          // Khởi tạo bản đồ Leaflet
+          if (!addressPickerMap) {
+            // Mặc định: Cần Thơ
+            const defaultLat = 10.0452;
+            const defaultLng = 105.7469;
+            
+            addressPickerMap = L.map('addressMapPicker').setView([defaultLat, defaultLng], 13);
+            
+            // Thêm OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '© OpenStreetMap contributors'
+            }).addTo(addressPickerMap);
+            
+            // Thêm marker có thể di chuyển
+            addressPickerMarker = L.marker([defaultLat, defaultLng], {
+              draggable: true
+            }).addTo(addressPickerMap);
+            
+            // Cập nhật tọa độ khi kéo marker
+            addressPickerMarker.on('dragend', function(e) {
+              const pos = addressPickerMarker.getLatLng();
+              document.getElementById('Latitude').value = pos.lat;
+              document.getElementById('Longitude').value = pos.lng;
+            });
+            
+            // Nhấn vào bản đồ để thêm marker
+            addressPickerMap.on('click', function(e) {
+              const lat = e.latlng.lat;
+              const lng = e.latlng.lng;
+              
+              document.getElementById('Latitude').value = lat;
+              document.getElementById('Longitude').value = lng;
+              
+              // Di chuyển marker đến vị trí mới
+              addressPickerMarker.setLatLng([lat, lng]);
+            });
+          }
+          
+          // Thiết lập tọa độ ban đầu
+          const lat = document.getElementById('Latitude').value || 10.0452;
+          const lng = document.getElementById('Longitude').value || 105.7469;
+          addressPickerMap.setView([lat, lng], 13);
+          addressPickerMarker.setLatLng([lat, lng]);
+        }
+        
+        // Nút "Lấy địa chỉ từ vị trí đã chọn" - Reverse Geocoding
+        document.addEventListener('click', function(e) {
+          if (e.target && e.target.id === 'btnGeocode') {
+            const lat = document.getElementById('Latitude').value;
+            const lng = document.getElementById('Longitude').value;
+            
+            if (!lat || !lng) {
+              alert('Vui lòng chọn vị trí trên bản đồ trước');
+              return;
+            }
+            
+            // Hiển thị loading
+            const btn = e.target;
+            btn.disabled = true;
+            btn.textContent = 'Đang tải...';
+            
+            // Gọi API Nominatim để lấy địa chỉ từ tọa độ
+            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=vi`)
+              .then(response => response.json())
+              .then(data => {
+                if (data && data.address) {
+                  // Debug: In ra toàn bộ response để xem cấu trúc
+                  console.log('=== Nominatim Full Response ===');
+                  console.log(data);
+                  console.log('=== Address Object ===');
+                  console.log(data.address);
+                  
+                  // streetAddress - Đường/Phố
+                  const street = data.address.road || 
+                                 data.address.house_number || 
+                                 data.address.pedestrian || '';
+                  document.getElementById('streetAddress').value = street;
+                  
+                  // Parse cho Việt Nam: Kiểm tra từng field trong response
+                  let ward = '', district = '', province = '';
+                  
+                  // Hàm helper để check và extract theo prefix
+                  function extractByPrefix(value, wardPrefix, districtPrefix) {
+                    if (!value) return '';
+                    const v = value.trim();
+                    if (v.startsWith('Phường ') || v.startsWith('Xã ')) {
+                      return v.replace(/^(Phường|Xã)\s*/, '');
+                    } else if (v.startsWith('Quận ') || v.startsWith('Huyện ')) {
+                      return v.replace(/^(Quận|Huyện)\s*/, '');
+                    }
+                    return '';
+                  }
+                  
+                  // Tìm Phường/Xã - search trong ALL fields
+                  const allFields = [
+                    data.address.suburb,
+                    data.address.village,
+                    data.address.city_district,
+                    data.address.county,
+                    data.address.quarter,
+                    data.address.neighbourhood,
+                    data.address.municipality
+                  ];
+                  
+                  for (const fieldValue of allFields) {
+                    if (fieldValue && (fieldValue.includes('Phường ') || fieldValue.includes('Xã '))) {
+                      ward = fieldValue.replace(/^(Phường|Xã)\s*/, '');
+                      break; // Tìm thấy rồi thì dừng
+                    }
+                  }
+                  
+                  // Tìm Quận/Huyện - search trong các field còn lại
+                  const districtFields = [
+                    data.address.city_district,
+                    data.address.county,
+                    data.address.municipality
+                  ];
+                  
+                  for (const fieldValue of districtFields) {
+                    if (fieldValue && (fieldValue.includes('Quận ') || fieldValue.includes('Huyện '))) {
+                      district = fieldValue.replace(/^(Quận|Huyện)\s*/, '');
+                      break;
+                    }
+                  }
+                  
+                  // Tìm Tỉnh/Thành
+                  const potentialProvince = data.address.state || 
+                                          data.address.city || 
+                                          data.address.province || '';
+                  
+                  if (potentialProvince) {
+                    province = potentialProvince.replace(/^(Tỉnh|Thành phố)\s*/, '');
+                  }
+                  
+                  document.getElementById('wardName').value = ward;
+                  document.getElementById('districtName').value = district;
+                  document.getElementById('provinceName').value = province;
+                  
+                  console.log('Final mapped:', { street, ward, district, province });
+                  
+                  btn.disabled = false;
+                  btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
+                  
+                  if (!ward && !district && !province) {
+                    alert('Không thể tự động điền. Vui lòng kiểm tra console (F12) để xem dữ liệu từ API.');
+                  }
+                } else {
+                  alert('Không tìm thấy địa chỉ tại vị trí này. Vui lòng thử lại.');
+                }
+              })
+              .catch(error => {
+                console.error('Geocoding error:', error);
+                alert('Không thể lấy địa chỉ từ vị trí đã chọn');
+                btn.disabled = false;
+                btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
+              });
+          }
+        });
         function openEditAddressForm(btn){
           const row = btn.closest('.addr-item');
           document.getElementById('upsertTitle').innerText = 'Sửa địa chỉ';
           document.getElementById('AddressId').value = row.dataset.id;
-          document.getElementById('StreetAddress').value = row.dataset.street;
-          document.getElementById('WardName').value = row.dataset.ward;
-          document.getElementById('DistrictName').value = row.dataset.district;
-          document.getElementById('ProvinceName').value = row.dataset.province;
+          document.getElementById('streetAddress').value = row.dataset.street;
+          document.getElementById('wardName').value = row.dataset.ward;
+          document.getElementById('districtName').value = row.dataset.district;
+          document.getElementById('provinceName').value = row.dataset.province;
           document.getElementById('addressUpsertModal').classList.add('open');
         }
         function closeUpsertModal(){ document.getElementById('addressUpsertModal').classList.remove('open'); }
@@ -798,13 +1119,42 @@
           panel?.addEventListener('click', (e)=>{ if(e.target === panel) closePanel(); });
 
           // Khởi tạo từ server (nếu đã có VoucherId trong model)
-          (function initFromServer(){
+          (async function initFromServer(){
             const firstId = (voucherIdInput?.value || '').trim();
             const percent   = Number('@Model.VoucherPercent'.toString().replace(',', '.'));
             const maxAmount = Number('@Model.VoucherMaxAmount'.toString().replace(',', '.'));
-                  if(firstId){
-          CURRENT_VOUCHER = { VoucherId: firstId, DiscountPercent: percent||0, DiscountMaxAmount: maxAmount||0 };
-        }
+            
+            if(firstId){
+              // ✅ Fetch đầy đủ thông tin voucher từ server để có Code
+              try {
+                const vouchers = await fetchVouchers();
+                const found = vouchers.find(v => {
+                  const vid = pick(v, 'VoucherId', 'voucherId', 'Id', 'id');
+                  return vid && vid.toString().toLowerCase() === firstId.toLowerCase();
+                });
+                
+                if (found) {
+                  CURRENT_VOUCHER = normalizeVoucher(found);
+                } else {
+                  // Fallback nếu không tìm thấy trong danh sách
+                  CURRENT_VOUCHER = { 
+                    VoucherId: firstId, 
+                    DiscountPercent: percent||0, 
+                    DiscountMaxAmount: maxAmount||0,
+                    Code: '' // để updateVoucherUI không bị lỗi
+                  };
+                }
+              } catch (e) {
+                console.error('Failed to load voucher details:', e);
+                // Fallback
+                CURRENT_VOUCHER = { 
+                  VoucherId: firstId, 
+                  DiscountPercent: percent||0, 
+                  DiscountMaxAmount: maxAmount||0,
+                  Code: ''
+                };
+              }
+            }
 
             updateVoucherUI();
             if (CURRENT_VOUCHER) refreshTotalsLocal();

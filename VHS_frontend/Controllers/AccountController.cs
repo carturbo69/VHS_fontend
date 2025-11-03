@@ -14,19 +14,28 @@ namespace VHS_frontend.Controllers
         }
 
         [HttpGet]
-        public IActionResult Login() => View(new LoginDTO());
+        public IActionResult Login(string? returnUrl = null)
+        {
+            ViewBag.ReturnUrl = returnUrl;
+            return View(new LoginDTO());
+        }
 
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginDTO model)
+        public async Task<IActionResult> Login(LoginDTO model, string? returnUrl = null)
         {
-            if (!ModelState.IsValid) return View(model);
+            if (!ModelState.IsValid)
+            {
+                ViewBag.ReturnUrl = returnUrl;
+                return View(model);
+            }
 
             var result = await _authService.LoginAsync(model);
             if (result == null)
             {
                 ModelState.AddModelError(string.Empty, "Sai tài khoản hoặc mật khẩu");
+                ViewBag.ReturnUrl = returnUrl;
                 return View(model);
             }
 
@@ -59,6 +68,12 @@ namespace VHS_frontend.Controllers
 
             TempData["ToastType"] = "success";
             TempData["ToastMessage"] = $"Đăng nhập thành công! Xin chào {(result.DisplayName ?? model.Username)} 👋";
+
+            // ✅ Nếu có returnUrl, redirect về đó thay vì redirect theo role
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
 
             return RedirectByRole(result.Role);
         }

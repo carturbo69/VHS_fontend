@@ -56,12 +56,22 @@
             get
             {
                 var s = (Status ?? "").Trim();
+                // Tiếng Anh
                 if (s.Equals("Pending", StringComparison.OrdinalIgnoreCase)) return "Pending";
                 if (s.Equals("Confirmed", StringComparison.OrdinalIgnoreCase)) return "Confirmed";
                 if (s.Equals("InProgress", StringComparison.OrdinalIgnoreCase)) return "InProgress";
                 if (s.Equals("Completed", StringComparison.OrdinalIgnoreCase)) return "Completed";
                 if (s.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)) return "Cancelled";
                 if (s.Equals("All", StringComparison.OrdinalIgnoreCase)) return "All";
+                // Tiếng Việt -> chuẩn hóa sang tiếng Anh
+                if (s.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase)) return "Pending";
+                if (s.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase)) return "Pending";
+                if (s.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase)) return "Pending";
+                if (s.Equals("Xác Nhận", StringComparison.OrdinalIgnoreCase)) return "Confirmed";
+                if (s.Equals("Bắt Đầu Làm Việc", StringComparison.OrdinalIgnoreCase)) return "InProgress";
+                if (s.Equals("Hoàn thành", StringComparison.OrdinalIgnoreCase)) return "Completed";
+                if (s.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)) return "Cancelled";
+                if (s.Equals("Tất cả", StringComparison.OrdinalIgnoreCase)) return "All";
                 // fallback: giữ nguyên
                 return s;
             }
@@ -78,6 +88,23 @@
             "All" => "Tất cả",
             _ => "—"
         };
+
+        /// <summary>
+        /// Kiểm tra xem booking có đang ở trạng thái Pending (cả tiếng Anh và tiếng Việt) không.
+        /// Cho phép hủy đơn ở các trạng thái này.
+        /// </summary>
+        [JsonIgnore]
+        public bool IsPendingStatus
+        {
+            get
+            {
+                var status = (Status ?? "").Trim();
+                return status.Equals("Pending", StringComparison.OrdinalIgnoreCase) ||
+                       status.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase) ||
+                       status.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase) ||
+                       status.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase);
+            }
+        }
 
         // ====== Sub DTOs ======
         public class ServiceInBookingDTO

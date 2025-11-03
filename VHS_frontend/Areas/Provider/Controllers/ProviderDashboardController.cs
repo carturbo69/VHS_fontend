@@ -1,21 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Provider.Models.Dashboard;
-using VHS_frontend.Areas.Provider.Models.Booking;
-using VHS_frontend.Services.Provider;
 
 namespace VHS_frontend.Areas.Provider.Controllers
 {
     [Area("Provider")]
     public class ProviderDashboardController : Controller
     {
-        private readonly BookingProviderService _bookingService;
-
-        public ProviderDashboardController(BookingProviderService bookingService)
-        {
-            _bookingService = bookingService;
-        }
-
-        public async Task<IActionResult> Index()
+        public IActionResult Index()
         {
             // Lấy ProviderId từ Session
             var providerIdStr = HttpContext.Session.GetString("ProviderId");
@@ -88,73 +79,54 @@ namespace VHS_frontend.Areas.Provider.Controllers
             // Tạo model cho dashboard với dữ liệu thực từ API statistics
             var model = new ProviderDashboardViewModel
             {
-                ProviderName = HttpContext.Session.GetString("ProviderName") ?? "Provider",
-                TotalServices = statistics?.TotalServices ?? 0,
-                ActiveOrders = statistics?.ConfirmedCount ?? 0,
-                CompletedOrders = statistics?.CompletedCount ?? 0,
-                PendingBookings = statistics?.PendingCount ?? 0,
-                MonthlyRevenue = statistics?.ThisMonthRevenue ?? 0,
-                RecentOrders = recentBookingsResult?.Items?.Select(b => new RecentOrderViewModel
+                ProviderName = HttpContext.Session.GetString("ProviderName") ?? "Provider Demo",
+                TotalServices = 12,
+                ActiveOrders = 8,
+                CompletedOrders = 156,
+                PendingBookings = 5,
+                MonthlyRevenue = 12500000, // 12.5 triệu VND
+                RecentOrders = new List<RecentOrderViewModel>
                 {
-                    OrderId = b.BookingCode,
-                    CustomerName = b.CustomerName,
-                    ServiceName = b.ServiceName,
-                    OrderDate = b.BookingTime,
-                    Status = TranslateStatus(b.Status),
-                    Amount = b.Amount
-                }).ToList() ?? new List<RecentOrderViewModel>(),
-                MonthlyStats = monthlyRevenue != null ? new MonthlyStatsViewModel
+                    new RecentOrderViewModel
+                    {
+                        OrderId = "ORD001",
+                        CustomerName = "Nguyễn Văn A",
+                        ServiceName = "Vệ sinh nhà cửa",
+                        OrderDate = DateTime.Now.AddHours(-2),
+                        Status = "Đang thực hiện",
+                        Amount = 500000
+                    },
+                    new RecentOrderViewModel
+                    {
+                        OrderId = "ORD002", 
+                        CustomerName = "Trần Thị B",
+                        ServiceName = "Sửa chữa điện nước",
+                        OrderDate = DateTime.Now.AddHours(-5),
+                        Status = "Hoàn thành",
+                        Amount = 800000
+                    },
+                    new RecentOrderViewModel
+                    {
+                        OrderId = "ORD003",
+                        CustomerName = "Lê Văn C", 
+                        ServiceName = "Dọn dẹp văn phòng",
+                        OrderDate = DateTime.Now.AddDays(-1),
+                        Status = "Đã thanh toán",
+                        Amount = 1200000
+                    }
+                },
+                MonthlyStats = new MonthlyStatsViewModel
                 {
-                    January = monthlyRevenue.January,
-                    February = monthlyRevenue.February,
-                    March = monthlyRevenue.March,
-                    April = monthlyRevenue.April,
-                    May = monthlyRevenue.May,
-                    June = monthlyRevenue.June,
-                    July = monthlyRevenue.July,
-                    August = monthlyRevenue.August,
-                    September = monthlyRevenue.September,
-                    October = monthlyRevenue.October,
-                    November = monthlyRevenue.November,
-                    December = monthlyRevenue.December
-                } : new MonthlyStatsViewModel()
+                    January = 8500000,
+                    February = 9200000,
+                    March = 7800000,
+                    April = 11200000,
+                    May = 12500000
+                }
             };
 
             ViewData["Title"] = "Dashboard";
             return View(model);
-        }
-
-        private decimal GetCurrentMonthRevenue(MonthlyRevenueViewModel monthlyRevenue)
-        {
-            var currentMonth = DateTime.Now.Month;
-            return currentMonth switch
-            {
-                1 => monthlyRevenue.January,
-                2 => monthlyRevenue.February,
-                3 => monthlyRevenue.March,
-                4 => monthlyRevenue.April,
-                5 => monthlyRevenue.May,
-                6 => monthlyRevenue.June,
-                7 => monthlyRevenue.July,
-                8 => monthlyRevenue.August,
-                9 => monthlyRevenue.September,
-                10 => monthlyRevenue.October,
-                11 => monthlyRevenue.November,
-                12 => monthlyRevenue.December,
-                _ => 0
-            };
-        }
-
-        private string TranslateStatus(string status)
-        {
-            return status switch
-            {
-                "Pending" => "Chờ xử lý",
-                "Confirmed" => "Đã xác nhận",
-                "Completed" => "Hoàn thành",
-                "Canceled" => "Đã hủy",
-                _ => status
-            };
         }
     }
 }

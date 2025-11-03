@@ -1,0 +1,119 @@
+@model List<VHS_frontend.Areas.Admin.Models.Payment.UnconfirmedBookingRefundDTO>
+
+<div class="refunds-content">
+    <div class="section-header">
+        <h2>Hoàn tiền cho đơn hàng</h2>
+        <p>Danh sách các đơn hàng đã bị hủy hoặc đang chờ xác nhận cần được hoàn tiền</p>
+    </div>
+
+    @if (Model != null && Model.Any())
+    {
+        <div class="bookings-list">
+            @foreach (var booking in Model)
+            {
+                <div class="booking-card">
+                    <div class="booking-header">
+                        <div class="booking-id">
+                            <span class="badge">Booking #@booking.BookingId.ToString().Substring(0, 8)</span>
+                        </div>
+                        <div class="booking-status">
+                            @{
+                                var statusText = booking.BookingStatus == "Canceled" ? "Đã hủy" : 
+                                                 booking.BookingStatus == "Pending" ? "Chờ xác nhận" : 
+                                                 booking.BookingStatus;
+                                var statusClass = booking.BookingStatus == "Canceled" ? "status-canceled" : "status-pending";
+                            }
+                            <span class="status-badge @statusClass">@statusText</span>
+                        </div>
+                    </div>
+
+                    <div class="booking-content">
+                        <div class="booking-info-row">
+                            <div class="info-item">
+                                <i class="bi bi-person-circle"></i>
+                                <div>
+                                    <strong>Khách hàng:</strong>
+                                    <div>@booking.CustomerName</div>
+                                    <small>@booking.CustomerEmail</small>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <i class="bi bi-gear"></i>
+                                <div>
+                                    <strong>Dịch vụ:</strong>
+                                    <div>@booking.ServiceName</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="booking-info-row">
+                            <div class="info-item">
+                                <i class="bi bi-calendar3"></i>
+                                <div>
+                                    <strong>Ngày đặt:</strong>
+                                    <div>@booking.BookingDate.ToString("dd/MM/yyyy HH:mm")</div>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <i class="bi bi-cash-stack"></i>
+                                <div>
+                                    <strong>Số tiền:</strong>
+                                    <div class="amount">@booking.PaymentAmount.ToString("N0") VNĐ</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="payment-info">
+                            <small>
+                                <i class="bi bi-credit-card"></i>
+                                Phương thức: @booking.PaymentMethod | 
+                                Trạng thái: @booking.PaymentStatus
+                            </small>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(booking.CancelReason))
+                        {
+                            <div class="cancel-info mt-2 p-2 bg-light rounded">
+                                <strong><i class="bi bi-info-circle"></i> Lý do hủy:</strong>
+                                <div>@booking.CancelReason</div>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(booking.BankAccount))
+                        {
+                            <div class="bank-info mt-2 p-2 bg-light rounded">
+                                <strong><i class="bi bi-bank"></i> Thông tin ngân hàng:</strong>
+                                <div>
+                                    <div>STK: @booking.BankAccount</div>
+                                    <div>Ngân hàng: @booking.BankName</div>
+                                    @if (!string.IsNullOrWhiteSpace(booking.AccountHolderName))
+                                    {
+                                        <div>Chủ tài khoản: @booking.AccountHolderName</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="booking-actions">
+                        <button class="btn btn-success" onclick="approveRefund('@booking.BookingId')">
+                            <i class="bi bi-check-circle"></i>
+                            Chấp nhận hoàn tiền
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            <div class="empty-icon">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <h3>Không có đơn hàng nào cần hoàn tiền</h3>
+            <p>Tất cả các đơn hàng đã được xử lý hoặc không có đơn hàng nào ở trạng thái chờ xác nhận.</p>
+        </div>
+    }
+</div>
+

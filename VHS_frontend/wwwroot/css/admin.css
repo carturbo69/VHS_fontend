@@ -448,7 +448,7 @@ body.sidebar-collapsed #page {
     padding: 8px;
     border-radius: 8px;
     transition: color 0.1s ease, background-color 0.1s ease, transform 0.1s ease;
-    overflow: hidden;
+    overflow: visible; /* Đổi từ hidden sang visible để badge không bị cắt */
     cursor: pointer;
 }
 
@@ -477,14 +477,16 @@ body.sidebar-collapsed #page {
     padding: 0 5px;
     border-radius: 9px;
     background: linear-gradient(135deg, var(--accent-orange), var(--primary));
-    color: #fff;
+    color: #fff !important;
     font-size: 11px;
     line-height: 18px;
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
     box-shadow: 0 2px 8px color-mix(in oklab, var(--primary) 30%, transparent);
     transition: all 0.3s ease;
+    z-index: 10; /* Đảm bảo badge luôn hiển thị trên cùng */
+    pointer-events: none; /* Không chặn click vào button */
 }
 
 .badge-dot:hover {
@@ -494,44 +496,382 @@ body.sidebar-collapsed #page {
 
 .notif-menu {
     position: absolute;
-    top: 38px;
+    top: 42px;
     right: 0;
-    width: 420px;
-    max-height: 420px;
+    width: 380px;
+    max-height: 520px;
     overflow-y: auto;
+    overflow-x: hidden;
     background: var(--card);
     color: var(--fg);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: 0 10px 30px color-mix(in oklab, var(--primary) 15%, transparent);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px color-mix(in oklab, var(--primary) 20%, transparent),
+                0 8px 24px rgba(0, 0, 0, 0.12),
+                0 0 0 1px color-mix(in oklab, var(--primary) 5%, transparent);
     display: none;
-    padding: 8px;
+    padding: 0;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .notif-menu:hover {
-    box-shadow: 0 16px 40px color-mix(in oklab, var(--primary) 20%, transparent);
+    box-shadow: 0 16px 48px color-mix(in oklab, var(--primary) 25%, transparent),
+                0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
-    .notif-menu li {
-        padding: 6px 8px;
-        border-radius: 8px;
+    /* Header của dropdown */
+    .notif-header {
+        padding: 18px 24px;
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--fg);
+        border-bottom: 1px solid var(--border);
+        background: var(--card);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        backdrop-filter: blur(12px);
+        border-radius: 16px 16px 0 0;
+        margin: 0;
+        letter-spacing: 0.2px;
+    }
+    
+    /* Light mode - header text */
+    :root:not(.dark) .notif-header {
+        color: #1f2937 !important;
+        background: #ffffff;
+        border-bottom-color: #e5e7eb;
     }
 
-        .notif-menu li:hover {
-            background: color-mix(in oklab, var(--primary) 8%, var(--muted) 92%);
-            transform: translateX(4px);
-            box-shadow: 0 2px 8px color-mix(in oklab, var(--primary) 15%, transparent);
-        }
+    .notif-menu li {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-radius: 0;
+    }
 
-    /* Scrollbar for menu */
+    /* Notification items */
+    .notif-menu .notification-item {
+        display: block;
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border);
+        border-radius: 0;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        position: relative;
+        color: var(--fg);
+        margin: 0;
+    }
+    
+    .notif-menu .notification-item:first-of-type {
+        padding-top: 12px;
+    }
+    
+    .notif-menu .notification-item:last-of-type {
+        padding-bottom: 16px;
+    }
+    
+    .notif-menu .notification-item + .notification-item {
+        margin-top: 0;
+    }
+
+    .notif-menu .notification-item:last-of-type {
+        border-bottom: none;
+    }
+
+    .notif-menu .notification-item.unread {
+        background: linear-gradient(90deg,
+            color-mix(in oklab, var(--primary) 7%, var(--card) 93%),
+            var(--card) 98%,
+            var(--card)
+        );
+        border-left: 3px solid var(--primary);
+        padding-left: 21px;
+        color: var(--fg);
+    }
+
+    .notif-menu .notification-item.unread::before {
+        content: '';
+        position: absolute;
+        left: 9px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 6px;
+        height: 6px;
+        background: var(--primary);
+        border-radius: 50%;
+        box-shadow: 0 0 0 2px var(--card),
+                    0 0 0 4px color-mix(in oklab, var(--primary) 20%, transparent),
+                    0 2px 8px color-mix(in oklab, var(--primary) 30%, transparent);
+        animation: pulse 2s ease-in-out infinite;
+        z-index: 1;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+            transform: translateY(-50%) scale(1);
+        }
+        50% {
+            opacity: 0.6;
+            transform: translateY(-50%) scale(1.2);
+        }
+    }
+
+    .notif-menu .notification-item.read {
+        background: var(--card);
+        opacity: 0.95;
+        color: var(--fg);
+    }
+    
+    /* Light mode specific - màu chữ dễ nhìn */
+    :root:not(.dark) .notif-menu .notification-item {
+        color: #1f2937 !important;
+    }
+    
+    :root:not(.dark) .notif-menu .notification-item.unread {
+        color: #111827 !important;
+    }
+    
+    :root:not(.dark) .notif-menu .notification-item.read {
+        color: #4b5563 !important;
+    }
+
+    .notif-menu .notification-item:hover {
+        background: color-mix(in oklab, var(--primary) 9%, var(--muted) 91%);
+        transform: translateX(1px);
+        box-shadow: inset 3px 0 0 0 var(--primary);
+    }
+    
+    .notif-menu .notification-item.unread:hover {
+        background: linear-gradient(90deg,
+            color-mix(in oklab, var(--primary) 12%, var(--card) 88%),
+            var(--card) 96%,
+            var(--card)
+        );
+    }
+
+    .notif-menu .notification-item.read:hover {
+        background: color-mix(in oklab, var(--primary) 7%, var(--muted) 93%);
+        opacity: 1;
+    }
+    
+
+
+    /* Empty state */
+    .notif-empty {
+        padding: 40px 20px;
+        margin: 0;
+    }
+
+    /* Divider */
+    .notif-divider {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--border), transparent);
+        margin: 4px 24px;
+        padding: 0;
+        border: none;
+    }
+
+    /* Footer actions */
+    .notif-action {
+        padding: 0;
+        margin: 0;
+        border-top: 1px solid var(--border);
+    }
+
+    .notif-action:first-of-type {
+        border-top: 1px solid var(--border);
+        margin-top: 0;
+        padding-top: 4px;
+    }
+
+    .notif-action > a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 14px 24px;
+        border-radius: 0;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        font-weight: 500;
+        color: var(--fg);
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+    
+    .notif-action:last-child > a {
+        border-radius: 0 0 16px 16px;
+        padding-bottom: 16px;
+    }
+    
+    /* Light mode - action links */
+    :root:not(.dark) .notif-action > a {
+        color: #374151 !important;
+        font-weight: 500;
+    }
+    
+    :root:not(.dark) .notif-action > a:hover {
+        color: var(--primary) !important;
+    }
+    
+    :root:not(.dark) .notif-action > a i {
+        color: inherit;
+    }
+
+    .notif-action > a:hover {
+        background: color-mix(in oklab, var(--primary) 10%, var(--card) 90%);
+        color: var(--primary);
+    }
+    
+    .notif-action > a:hover i {
+        transform: scale(1.1);
+    }
+
+    /* Empty state */
+    .notif-menu li.text-center {
+        padding: 40px 20px;
+        color: var(--muted-fg);
+        font-style: italic;
+    }
+    
+    /* Light mode - empty state */
+    :root:not(.dark) .notif-menu li.text-center {
+        color: #6b7280 !important;
+        font-weight: 400;
+    }
+    
+    :root:not(.dark) .notif-menu li.text-center p {
+        color: #6b7280 !important;
+    }
+
+    /* Notification link */
+    .notification-link {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        padding: 0;
+        width: 100%;
+    }
+    
+    /* Đảm bảo link không thay đổi màu */
+    .notification-link,
+    .notification-link:visited,
+    .notification-link:hover {
+        color: inherit;
+    }
+    
+    /* Light mode - màu cho notification link */
+    :root:not(.dark) .notification-link {
+        color: inherit !important;
+    }
+    
+    :root:not(.dark) .notification-link:visited,
+    :root:not(.dark) .notification-link:hover {
+        color: inherit !important;
+    }
+
+    /* Notification content styling */
+    .notif-menu .notification-content {
+        padding: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .notif-menu .notification-text {
+        font-weight: 500;
+        color: var(--fg);
+        margin-bottom: 10px;
+        line-height: 1.6;
+        font-size: 0.9rem;
+    }
+    
+    /* Light mode - màu chữ dễ đọc */
+    :root:not(.dark) .notif-menu .notification-text {
+        color: #111827 !important;
+        font-weight: 500;
+    }
+    
+    :root:not(.dark) .notif-menu .notification-item.read .notification-text {
+        color: #374151 !important;
+    }
+
+    .notif-menu .notification-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 0.8rem;
+        color: var(--muted-fg);
+        margin-top: 6px;
+        flex-wrap: wrap;
+    }
+
+    .notif-menu .notification-meta small {
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        color: var(--muted-fg);
+        font-weight: 400;
+    }
+    
+    /* Light mode - màu text meta */
+    :root:not(.dark) .notif-menu .notification-meta {
+        color: #6b7280 !important;
+    }
+    
+    :root:not(.dark) .notif-menu .notification-meta small {
+        color: #6b7280 !important;
+        font-weight: 400;
+    }
+    
+    :root:not(.dark) .notif-menu .notification-meta small i {
+        color: #9ca3af !important;
+    }
+
+    .notif-menu .notification-meta .type-badge {
+        font-size: 0.7rem;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-weight: 500;
+        background: linear-gradient(135deg, var(--accent-orange), var(--primary));
+        color: white;
+        box-shadow: 0 2px 4px color-mix(in oklab, var(--primary) 25%, transparent);
+        letter-spacing: 0.2px;
+    }
+
+    /* Scrollbar cho menu */
     .notif-menu::-webkit-scrollbar {
         width: 6px;
     }
 
+    .notif-menu::-webkit-scrollbar-track {
+        background: transparent;
+        margin: 16px 0;
+    }
+
     .notif-menu::-webkit-scrollbar-thumb {
-        background: rgba(0,0,0,.25);
+        background: color-mix(in oklab, var(--primary) 40%, var(--muted) 60%);
         border-radius: 10px;
+        transition: background 0.3s ease;
+        border: 1px solid var(--card);
+    }
+
+    .notif-menu::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, var(--primary), var(--accent-orange));
     }
 
 
@@ -797,3 +1137,11 @@ body:not(.sidebar-collapsed) #sidebar .sidebar-nav .nav-link span {
     color: var(--primary);
 }
 
+.badge-dot {
+    background-color: #dc3545;
+}
+    /* đỏ khi có unread */
+    .badge-dot.is-empty {
+        background-color: #6c757d;
+    }
+/* xám khi 0 */

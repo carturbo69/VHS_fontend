@@ -1,0 +1,117 @@
+@{
+    ViewData["Title"] = "Thanh toán thành công";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var transactionId = ViewBag.TransactionId as string;
+    var bookingIds = ViewBag.BookingIds as List<Guid>;
+    var needLogin = ViewBag.NeedLogin as bool? ?? false;
+    var total = ViewBag.Total as decimal? ?? 0;
+    
+    // Lấy thời gian hiện tại theo timezone Việt Nam (UTC+7)
+    var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+    var currentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/payment-success.css" asp-append-version="true" />
+}
+
+<div class="payment-success-wrapper">
+    <div class="payment-success-card">
+        <div class="success-icon-wrapper">
+            <div class="success-icon">
+                <svg viewBox="0 0 52 52">
+                    <path d="M14 27l9 9 19-19" />
+                </svg>
+            </div>
+        </div>
+
+        <h1>🎉 Thanh toán thành công!</h1>
+        <p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi. Giao dịch của bạn đã được xử lý thành công.</p>
+
+        <div class="transaction-info">
+            <div class="transaction-info-item">
+                <label>Phương thức thanh toán</label>
+                <span>VNPay</span>
+            </div>
+            @if (!string.IsNullOrEmpty(transactionId))
+            {
+                <div class="transaction-info-item">
+                    <label>Mã giao dịch</label>
+                    <span>@transactionId</span>
+                </div>
+            }
+            @if (bookingIds != null && bookingIds.Any())
+            {
+                <div class="transaction-info-item">
+                    <label>Số lượng dịch vụ</label>
+                    <span>@bookingIds.Count booking</span>
+                </div>
+            }
+            @if (total > 0)
+            {
+                <div class="transaction-info-item highlight">
+                    <label>Tổng thanh toán</label>
+                    <span>@total.ToString("N0")₫</span>
+                </div>
+            }
+            <div class="transaction-info-item">
+                <label>Thời gian</label>
+                <span>@currentTime.ToString("dd/MM/yyyy HH:mm:ss")</span>
+            </div>
+        </div>
+
+        @if (bookingIds != null && bookingIds.Any())
+        {
+            var serviceNamesMap = ViewBag.ServiceNames as Dictionary<Guid, string> ?? new Dictionary<Guid, string>();
+            <div class="booking-list">
+                <div class="booking-list-title">Dịch vụ đã đặt thành công:</div>
+                @for (int i = 0; i < bookingIds.Count; i++)
+                {
+                    var bookingId = bookingIds[i];
+                    var serviceName = serviceNamesMap.TryGetValue(bookingId, out var name) ? name : $"Dịch vụ số {i + 1}";
+                    <div class="booking-item">
+                        <div class="booking-number">
+                            <span class="number-badge">@(i + 1)</span>
+                            <span class="booking-label">@serviceName</span>
+                        </div>
+                        <span class="badge">✓ Đã thanh toán</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (needLogin)
+        {
+            <div class="warning-box">
+                <p><strong>⚠️ Lưu ý:</strong> Vui lòng đăng nhập để xem chi tiết đơn hàng và theo dõi trạng thái dịch vụ.</p>
+            </div>
+
+            <div class="btn-group">
+                <a href="@Url.Action("Login", "Account", new { area = "", returnUrl = Url.Action("ConfirmVnPayAfterLogin", "Payment", new { area = "Customer", bookingIds = string.Join(",", bookingIds ?? new List<Guid>()), transactionId }) })" 
+                   class="btn-primary-success">
+                    🔐 Đăng nhập ngay
+                </a>
+                <a href="@Url.Action("Index", "Home", new { area = "" })" class="btn-secondary-success">
+                    🏠 Về trang chủ
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="btn-group">
+                <a href="@Url.Action("ListHistoryBooking", "BookingService", new { area = "Customer" })" 
+                   class="btn-primary-success">
+                    📋 Xem lịch sử booking
+                </a>
+                <a href="@Url.Action("Index", "Home", new { area = "" })" class="btn-secondary-success">
+                    🏠 Về trang chủ
+                </a>
+            </div>
+        }
+
+        <div class="footer-note">
+            Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi qua <strong>hotline</strong> hoặc <strong>email hỗ trợ</strong>.
+        </div>
+    </div>
+</div>
+

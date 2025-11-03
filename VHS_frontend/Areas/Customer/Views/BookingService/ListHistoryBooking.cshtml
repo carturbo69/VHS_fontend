@@ -4,7 +4,7 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 
     // Nhận cấu hình từ Controller (fallback nếu thiếu)
-    var statusOrder = (string[])ViewBag.StatusOrder ?? new[] { "Pending", "Confirmed", "InProgress", "Completed", "Cancelled", "All" };
+    var statusOrder = (string[])ViewBag.StatusOrder ?? new[] { "All", "Pending", "Confirmed", "InProgress", "Completed", "Cancelled" };
     var statusViMap = ViewBag.StatusViMap as IDictionary<string, string>
                       ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                       {
@@ -27,11 +27,24 @@
 <link href="~/css/list-histrory-booking.css" rel="stylesheet" />
 
 <div class="container my-3">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1 class="page-title">
+            Lịch sử đơn dịch vụ
+        </h1>
+        <p class="page-subtitle">Quản lý và theo dõi tất cả các đơn dịch vụ của bạn</p>
+    </div>
     <!-- Toast kết quả (tuỳ chọn) -->
     @if (TempData["ToastSuccess"] != null || TempData["ToastError"] != null)
     {
-        <div class="alert @(TempData["ToastSuccess"] != null ? "alert-success" : "alert-danger")" role="alert">
-            @(TempData["ToastSuccess"] ?? TempData["ToastError"])
+        <div class="custom-alert @(TempData["ToastSuccess"] != null ? "alert-success" : "alert-danger")" role="alert">
+            <i class="bi @(TempData["ToastSuccess"] != null ? "bi-check-circle-fill" : "bi-exclamation-circle-fill")"></i>
+            <div class="alert-content">
+                @(TempData["ToastSuccess"] ?? TempData["ToastError"])
+            </div>
+            <button type="button" class="alert-close" onclick="this.parentElement.remove()">
+                <i class="bi bi-x"></i>
+            </button>
         </div>
     }
 
@@ -65,14 +78,57 @@
             var price = $"{o.TotalPrice:N0}đ";
             var isDone = string.Equals(o.Status?.Trim(), "Completed", StringComparison.OrdinalIgnoreCase);
             var statusText = statusViMap.TryGetValue(o.Status ?? "", out var viText) ? viText : (o.Status ?? "");
+            // Chuẩn hóa code trạng thái về EN để lọc/tô màu nhất quán; chấp nhận cả VI và EN từ backend
+            var stRaw = (o.Status ?? "").Trim();
+            string stCode = stRaw; // fallback
+            if (stRaw.Equals("Pending", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase))
+            {
+                stCode = "Pending";
+                statusText = "Chờ xác nhận";
+            }
+            else if (stRaw.Equals("Confirmed", StringComparison.OrdinalIgnoreCase)
+                     || stRaw.Equals("Xác nhận", StringComparison.OrdinalIgnoreCase)
+                     || stRaw.Equals("Đã xác nhận", StringComparison.OrdinalIgnoreCase))
+            {
+                stCode = "Confirmed";
+                statusText = statusViMap["Confirmed"];
+            }
+            else if (stRaw.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
+                     || stRaw.Equals("Bắt đầu làm việc", StringComparison.OrdinalIgnoreCase)
+                     || stRaw.Equals("Đang thực hiện", StringComparison.OrdinalIgnoreCase))
+            {
+                stCode = "InProgress";
+                statusText = statusViMap["InProgress"];
+            }
+            else if (stRaw.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                     || stRaw.Equals("Hoàn thành", StringComparison.OrdinalIgnoreCase))
+            {
+                stCode = "Completed";
+                statusText = statusViMap["Completed"];
+            }
+            else if (stRaw.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+                     || stRaw.Equals("Canceled", StringComparison.OrdinalIgnoreCase)
+                     || stRaw.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)
+                     || stRaw.Equals("Đã huỷ", StringComparison.OrdinalIgnoreCase))
+            {
+                stCode = "Cancelled";
+                statusText = statusViMap["Cancelled"];
+            }
             var isReviewed = o.HasReview; // đã có review hay chưa
 
-            <div class="shop-row order-card" data-status="@o.Status" data-title="@o.ServiceTitle @o.ProviderName">
+            <div class="shop-row order-card" data-status="@stCode" data-title="@o.ServiceTitle @o.ProviderName">
                 <!-- Header -->
                 <div class="shop-head">
                     <img src="/images/shop-badge.svg" width="24" height="24" alt="shop" />
                     <div class="shop-name">@o.ProviderName</div>
-                    <button class="btn btn-sm btn-outline-danger ms-2">Chat</button>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger ms-2"
+                            onclick="window.location.href='@Url.Action("WithProvider", "ChatCustomer", new { area = "Customer", providerId = o.ProviderId })'">
+                        <i class="bi bi-chat-dots me-1"></i> Chat
+                    </button>
                     <button class="btn btn-sm btn-outline-secondary">Xem Shop</button>
 
                     <div class="ms-auto d-flex align-items-center gap-3">
@@ -127,23 +183,29 @@
                         }
                     </div>
 
-                    <!-- Cột giá bên phải: tách rõ các phần -->
-                    <div class="text-end">
-                        <div class="text-muted small">Giá dịch vụ</div>
-                        <div class="fw-semibold">@toCurrency(servicePrice)</div>
-
-                        <div class="text-muted small mt-1">+ Tổng tuỳ chọn</div>
-                        <div class="fw-semibold">@toCurrency(optionTotal)</div>
-
-                        <hr class="my-2" />
-
-                        <div class="text-muted small">Tạm tính</div>
-                        <div class="fw-semibold">@toCurrency(subTotal)</div>
-
+                    <!-- Cột giá bên phải: tóm tắt gọn -->
+                    <div class="price-summary">
+                        <div class="price-row">
+                            <span class="price-label">Giá dịch vụ:</span>
+                            <span class="price-value">@toCurrency(servicePrice)</span>
+                        </div>
+                        @if (optionTotal > 0)
+                        {
+                            <div class="price-row">
+                                <span class="price-label">Tuỳ chọn:</span>
+                                <span class="price-value">@toCurrency(optionTotal)</span>
+                            </div>
+                        }
+                        <div class="price-row subtotal">
+                            <span class="price-label">Tổng cộng:</span>
+                            <span class="price-value">@toCurrency(subTotal)</span>
+                        </div>
                         @if (voucher > 0)
                         {
-                            <div class="text-muted small mt-1">Voucher</div>
-                            <div class="fw-semibold text-success">-@toCurrency(voucher)</div>
+                            <div class="price-row discount">
+                                <span class="price-label">Giảm giá:</span>
+                                <span class="price-value">-@toCurrency(voucher)</span>
+                            </div>
                         }
                     </div>
                 </div>
@@ -156,7 +218,7 @@
 
                 <!-- Action -->
                 @{
-                    var st = (o.Status ?? "").Trim(); // EN
+                    var st = stCode; // EN đã chuẩn hóa
                     var actionName =
                     st.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ? "CanceledDetail" :
                     "HistoryBookingDetail";
@@ -170,19 +232,19 @@
                        asp-controller="BookingService"
                        asp-action="@actionName"
                        asp-route-id="@o.BookingId"
-                       asp-route-status="@o.Status"
+                       asp-route-status="@stCode"
                        class="btn btn-outline-primary">
                         @detailText
                     </a>
 
                     @if (isDone) // Completed
                     {
-                        <button class="btn btn-danger">Mua Lại</button>
+                        <button class="btn btn-danger">Đặt lại</button>
                         <a asp-area="Customer"
                            asp-controller="BookingService"
                            asp-action="ReportService"
                            asp-route-bookingId="@o.BookingId"
-                           class="btn btn-outline-secondary">
+                           class="btn btn-outline-danger btn-report">
                             Báo cáo / Hoàn tiền
                         </a>
                         @if (!isReviewed)
@@ -197,7 +259,11 @@
                     }
                     else if (st.Equals("Pending", StringComparison.OrdinalIgnoreCase))
                     {
-                        <button class="btn btn-outline-secondary">Liên hệ Shop</button>
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                onclick="window.location.href='@Url.Action("WithProvider", "ChatCustomer", new { area = "Customer", providerId = o.ProviderId })'">
+                            <i class="bi bi-chat-text me-1"></i> Liên hệ Shop
+                        </button>
                         <button class="btn btn-outline-danger"
                                 data-bs-toggle="modal"
                                 data-bs-target="#cancelModal-@o.BookingId">
@@ -207,7 +273,7 @@
                     else if (st.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
                     {
                         <button class="btn btn-outline-secondary">Lý do hủy</button>
-                        <button class="btn btn-danger">Mua Lại</button>
+                        <button class="btn btn-danger">Đặt lại</button>
                     }
                 </div>
 

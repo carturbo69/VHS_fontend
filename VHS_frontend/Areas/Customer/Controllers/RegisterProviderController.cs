@@ -7,8 +7,15 @@ namespace VHS_frontend.Areas.Customer.Controllers
     public class RegisterProviderController : Controller
     {
         private readonly RegisterProviderService _svc;
-
-        public RegisterProviderController(RegisterProviderService svc) => _svc = svc;
+        private readonly IConfiguration _config;
+        private readonly ILogger<RegisterProviderController> _logger;
+        
+        public RegisterProviderController(RegisterProviderService svc, IConfiguration config, ILogger<RegisterProviderController> logger)
+        {
+            _svc = svc;
+            _config = config;
+            _logger = logger;
+        }
 
         [HttpGet]
         public async Task<IActionResult> Register(CancellationToken ct)
@@ -22,16 +29,21 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             // 1) Kiểm tra hồ sơ gần nhất
             var mine = await _svc.GetMyProviderAsync(ct);
-            if (mine != null && !mine.Status.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
+            if (mine != null)
             {
-                // Đang có Pending/Approved => chặn đăng ký lại
-                return RedirectToAction(nameof(Success), new { id = mine.ProviderId, stat = mine.Status });
-            }
-
-            // 2) Nếu Rejected hoặc chưa có hồ sơ => cho đăng ký
-            // LƯU Ý: KHÔNG truyền ProviderId ẩn xuống form nữa (Rejected sẽ tạo ProviderId mới)
-            if (mine != null && mine.Status.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
-            {
+                var statusLower = mine.Status?.ToLower() ?? "";
+                
+                // ✅ Chuẩn hóa: Check cả tiếng Anh (standard) và tiếng Việt (data cũ)
+                bool isRejected = statusLower == "rejected" || statusLower == "đã từ chối" || statusLower == "bị từ chối";
+                
+                if (!isRejected)
+                {
+                    // Đang có Pending/Approved => chặn đăng ký lại
+                    return RedirectToAction(nameof(Success), new { id = mine.ProviderId, stat = mine.Status });
+                }
+                
+                // 2) Nếu Rejected => cho đăng ký lại
+                // LƯU Ý: KHÔNG truyền ProviderId ẩn xuống form nữa (Rejected sẽ tạo ProviderId mới)
                 ViewBag.ExistingStatus = mine.Status; // chỉ để hiển thị thông báo
             }
 
@@ -41,6 +53,9 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 .OrderBy(c => c.Name)
                 .Select(c => new { Id = c.CategoryId, Name = c.Name })
                 .ToList();
+
+            // Pass backend URL to view
+            ViewBag.BackendUrl = _config["Apis:Backend"]?.TrimEnd('/') ?? "";
 
             if (TempData["ApiError"] is string apiErr && !string.IsNullOrWhiteSpace(apiErr))
                 ViewBag.ApiError = apiErr;
@@ -55,17 +70,26 @@ namespace VHS_frontend.Areas.Customer.Controllers
         [RequestFormLimits(MultipartBodyLengthLimit = 50_000_000, ValueCountLimit = 4096, KeyLengthLimit = 4096)]
         public async Task<IActionResult> RegisterFallback(CancellationToken ct)
         {
+            Console.WriteLine("===== REGISTER FALLBACK ACTION HIT =====");
+            Console.WriteLine($"Request Method: {Request.Method}");
+            Console.WriteLine($"Request Path: {Request.Path}");
+            
             var token = HttpContext.Session.GetString("JWToken");
             bool isAjax =
                 string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase) ||
                 (Request.Headers.Accept.ToString()?.Contains("application/json", StringComparison.OrdinalIgnoreCase) ?? false);
 
+            Console.WriteLine($"IsAjax: {isAjax}");
+            Console.WriteLine($"HasToken: {!string.IsNullOrEmpty(token)}");
+
             if (string.IsNullOrEmpty(token))
             {
+                Console.WriteLine("No token - redirecting to login");
                 if (isAjax) return StatusCode(401, new { ok = false, message = "Bạn chưa đăng nhập." });
                 return RedirectToAction("Login", "Account", new { area = "" });
             }
             _svc.SetBearerToken(token);
+            Console.WriteLine("Token set - calling service...");
 
             try
             {
@@ -115,7 +139,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 // Clear cache để đảm bảo dữ liệu mới nhất
                 _svc.ClearCache();
 
-                if (isAjax) return Ok(new { ok = true, providerId = id, status = stat, refresh = true });
+                Console.WriteLine($"Registration successful - ProviderId: {id}, Status: {stat}");
+                
+                // ✅ KHÔNG DÙNG refresh: true - để JavaScript redirect đến Success page
+                if (isAjax) return Ok(new { ok = true, providerId = id, status = stat });
 
                 return RedirectToAction(nameof(Success), new { id, stat });
             }
@@ -130,10 +157,40 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         [HttpGet]
-        public IActionResult Success(Guid id, string? stat)
+        public async Task<IActionResult> Success(Guid id, string? stat, CancellationToken ct = default)
         {
-            ViewBag.ProviderId = id;
-            ViewBag.Status = string.IsNullOrWhiteSpace(stat) ? "Pending" : stat;
+            var token = HttpContext.Session.GetString("JWToken");
+            if (string.IsNullOrEmpty(token))
+                return RedirectToAction("Login", "Account", new { area = "" });
+
+            _svc.SetBearerToken(token);
+
+            // ✅ LẤY STATUS MỚI NHẤT TỪ DATABASE (đồng bộ với admin)
+            try
+            {
+                var provider = await _svc.GetMyProviderAsync(ct);
+                if (provider != null)
+                {
+                    ViewBag.ProviderId = provider.ProviderId;
+                    ViewBag.Status = provider.Status ?? "Pending";
+                    _logger.LogInformation("✅ Success page - Provider {Id}, Real-time Status: {Status}", provider.ProviderId, provider.Status);
+                }
+                else
+                {
+                    // Fallback nếu không tìm thấy (dùng query string)
+                    ViewBag.ProviderId = id;
+                    ViewBag.Status = string.IsNullOrWhiteSpace(stat) ? "Pending" : stat;
+                    _logger.LogWarning("⚠️ Success page - Provider not found, using fallback status from query string");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error loading provider status");
+                // Fallback
+                ViewBag.ProviderId = id;
+                ViewBag.Status = string.IsNullOrWhiteSpace(stat) ? "Pending" : stat;
+            }
+
             return View();
         }
     }

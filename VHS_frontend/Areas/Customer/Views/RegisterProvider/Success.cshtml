@@ -4,20 +4,19 @@
 
     var providerId = (Guid)(ViewBag.ProviderId ?? Guid.Empty);
     var statusRaw = (string)(ViewBag.Status ?? "Pending");
+    var statusLower = statusRaw?.ToLower() ?? "pending";
 
-    string statusDisplay = statusRaw?.ToLower() switch
-    {
-        "approved" => "Đã phê duyệt",
-        "rejected" => "Bị từ chối",
-        _ => "Đang chờ phê duyệt"
-    };
+    // ✅ Chuẩn hóa: Check cả tiếng Anh (standard) và tiếng Việt (data cũ)
+    bool IsApproved() => statusLower == "approved" || statusLower == "đã duyệt" || statusLower == "đã phê duyệt";
+    bool IsRejected() => statusLower == "rejected" || statusLower == "đã từ chối" || statusLower == "bị từ chối";
 
-    string badgeClass = statusRaw?.ToLower() switch
-    {
-        "approved" => "badge ok",
-        "rejected" => "badge rej",
-        _ => "badge pending"
-    };
+    string statusDisplay = IsApproved() ? "Đã phê duyệt" : 
+                          IsRejected() ? "Bị từ chối" : 
+                          "Đang chờ phê duyệt";
+
+    string badgeClass = IsApproved() ? "badge ok" : 
+                       IsRejected() ? "badge rej" : 
+                       "badge pending";
 }
 @section Styles {
     <link rel="stylesheet" href="~/css/register-provider.css" asp-append-version="true" />
@@ -26,12 +25,35 @@
 <main class="success-wrap" role="main" aria-labelledby="su-title">
     <div class="su-head">
         <div class="su-icon" aria-hidden="true">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M20 7L9 18l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
+            @if (IsRejected())
+            {
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="color: #ef4444;">
+                    <path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+                </svg>
+            }
+            else
+            {
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M20 7L9 18l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            }
         </div>
-        <h1 id="su-title" class="su-title">Đăng ký Provider thành công</h1>
-        <p class="su-sub">Hồ sơ đã được gửi. Vui lòng xác nhận để quay về trang chủ.</p>
+        
+        @if (IsRejected())
+        {
+            <h1 id="su-title" class="su-title" style="color: #ef4444;">Hồ sơ bị từ chối</h1>
+            <p class="su-sub">Hồ sơ của bạn đã bị từ chối. Vui lòng đăng ký lại với thông tin mới.</p>
+        }
+        else if (IsApproved())
+        {
+            <h1 id="su-title" class="su-title" style="color: #10b981;">Hồ sơ đã được duyệt</h1>
+            <p class="su-sub">Chúc mừng! Hồ sơ Provider của bạn đã được phê duyệt.</p>
+        }
+        else
+        {
+            <h1 id="su-title" class="su-title">Đăng ký Provider thành công</h1>
+            <p class="su-sub">Hồ sơ đã được gửi. Vui lòng chờ admin phê duyệt.</p>
+        }
     </div>
 
     <div class="su-body">
@@ -43,9 +65,21 @@
         </div>
 
         <div class="btns">
-            <a asp-area="" asp-controller="Home" asp-action="Index" class="btn primary" aria-label="Xác nhận và về trang chủ">
-                <span>Xác nhận &amp; về Home</span>
-            </a>
+            @if (IsRejected())
+            {
+                <a asp-area="Customer" asp-controller="RegisterProvider" asp-action="Register" class="btn primary" aria-label="Đăng ký lại">
+                    <span>Đăng ký lại</span>
+                </a>
+                <a asp-area="" asp-controller="Home" asp-action="Index" class="btn ghost" aria-label="Về trang chủ">
+                    <span>Về trang chủ</span>
+                </a>
+            }
+            else
+            {
+                <a asp-area="" asp-controller="Home" asp-action="Index" class="btn primary" aria-label="Xác nhận và về trang chủ">
+                    <span>Xác nhận &amp; về Home</span>
+                </a>
+            }
         </div>
     </div>
 </main>
