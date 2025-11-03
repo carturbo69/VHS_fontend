@@ -61,11 +61,35 @@ namespace VHS_frontend.Services.Provider
             formContent.Add(new StringContent(dto.UnitType), "UnitType");
             formContent.Add(new StringContent(dto.BaseUnit.ToString()), "BaseUnit");
 
-            if (dto.Images != null)
+            if (dto.Avatar != null)
             {
-                var fileContent = new StreamContent(dto.Images.OpenReadStream());
-                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(dto.Images.ContentType);
-                formContent.Add(fileContent, "Images", dto.Images.FileName);
+                using var msA = new MemoryStream();
+                await dto.Avatar.CopyToAsync(msA, ct);
+                var fileContent = new ByteArrayContent(msA.ToArray());
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(dto.Avatar.ContentType ?? "application/octet-stream");
+                formContent.Add(fileContent, "Avatar", dto.Avatar.FileName);
+            }
+
+            if (dto.Avatar != null)
+            {
+                using var msA2 = new MemoryStream();
+                await dto.Avatar.CopyToAsync(msA2, ct);
+                var fileContent = new ByteArrayContent(msA2.ToArray());
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(dto.Avatar.ContentType ?? "application/octet-stream");
+                formContent.Add(fileContent, "Avatar", dto.Avatar.FileName);
+            }
+
+            if (dto.Images != null && dto.Images.Count > 0)
+            {
+                foreach (var img in dto.Images)
+                {
+                    if (img == null) continue;
+                    using var ms = new MemoryStream();
+                    await img.CopyToAsync(ms, ct);
+                    var fileContent = new ByteArrayContent(ms.ToArray());
+                    fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(img.ContentType ?? "application/octet-stream");
+                    formContent.Add(fileContent, "Images", img.FileName);
+                }
             }
 
             // Add TagIds
@@ -99,11 +123,17 @@ namespace VHS_frontend.Services.Provider
             if (!string.IsNullOrEmpty(dto.Status))
                 formContent.Add(new StringContent(dto.Status), "Status");
 
-            if (dto.Images != null)
+            if (dto.Images != null && dto.Images.Count > 0)
             {
-                var fileContent = new StreamContent(dto.Images.OpenReadStream());
-                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(dto.Images.ContentType);
-                formContent.Add(fileContent, "Images", dto.Images.FileName);
+                foreach (var img in dto.Images)
+                {
+                    if (img == null) continue;
+                    using var ms = new MemoryStream();
+                    await img.CopyToAsync(ms, ct);
+                    var fileContent = new ByteArrayContent(ms.ToArray());
+                    fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(img.ContentType ?? "application/octet-stream");
+                    formContent.Add(fileContent, "Images", img.FileName);
+                }
             }
 
             // Add TagIds

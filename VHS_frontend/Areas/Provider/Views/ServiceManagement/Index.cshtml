@@ -64,17 +64,28 @@
                                     <td>
                                         @if (!string.IsNullOrEmpty(service.Images))
                                         {
-                                            var imageUrl = service.Images.StartsWith("http") 
-                                                ? service.Images 
-                                                : $"http://localhost:5154{service.Images}";
-                                            
-                                            <img src="@imageUrl" 
-                                                 alt="@service.Title" 
-                                                 class="service-thumbnail" 
-                                                 data-original-path="@service.Images"
-                                                 data-full-url="@imageUrl"
-                                                 onerror="console.error('Image load error:', this.dataset.fullUrl); this.onerror=null; this.parentElement.innerHTML='<div class=\'no-image-placeholder\'><i class=\'bi bi-image\'></i><small class=\'text-danger\'>Lỗi</small></div>';" 
-                                                 onload="console.log('Image loaded:', this.dataset.fullUrl);" />
+                                            var first = service.Images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                                            var imageUrl = (first ?? string.Empty).StartsWith("http")
+                                                ? first
+                                                : $"http://localhost:5154{first}";
+
+                                            if (!string.IsNullOrEmpty(first))
+                                            {
+                                                <img src="@imageUrl"
+                                                     alt="@service.Title"
+                                                     class="service-thumbnail"
+                                                     data-original-path="@first"
+                                                     data-full-url="@imageUrl"
+                                                     onerror="console.error('Image load error:', this.dataset.fullUrl); this.onerror=null; this.parentElement.innerHTML='<div class=\'no-image-placeholder\'><i class=\'bi bi-image\'></i><small class=\'text-danger\'>Lỗi</small></div>';"
+                                                     onload="console.log('Image loaded:', this.dataset.fullUrl);" />
+                                            }
+                                            else
+                                            {
+                                                <div class="no-image-placeholder">
+                                                    <i class="bi bi-image"></i>
+                                                    <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">Chưa có ảnh</small>
+                                                </div>
+                                            }
                                         }
                                         else
                                         {
@@ -124,6 +135,10 @@
                                         @if (service.Status == "Active")
                                         {
                                             <span class="badge bg-success">Hoạt động</span>
+                                        }
+                                        else if (service.Status == "Pending")
+                                        {
+                                            <span class="badge bg-secondary">Đang Chờ</span>
                                         }
                                         else
                                         {

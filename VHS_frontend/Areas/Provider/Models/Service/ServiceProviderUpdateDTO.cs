@@ -21,7 +21,8 @@ namespace VHS_frontend.Areas.Provider.Models.Service
         [Range(1, int.MaxValue, ErrorMessage = "Đơn vị cơ bản phải lớn hơn 0.")]
         public int BaseUnit { get; set; }
 
-        public IFormFile? Images { get; set; }
+        public IFormFile? Avatar { get; set; }
+        public List<IFormFile>? Images { get; set; }
 
         public string? Status { get; set; }
 

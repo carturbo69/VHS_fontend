@@ -79,6 +79,12 @@ builder.Services.AddHttpClient<AdminNotificationService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+// HttpClient cho Admin duyệt dịch vụ
+builder.Services.AddHttpClient<AdminServiceApprovalService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
 // ServiceShopService
 builder.Services.AddScoped<ServiceShopService>();
 
