@@ -37,6 +37,52 @@ namespace VHS_frontend.Areas.Provider.Controllers
             return providerId;
         }
 
+        // POST: Provider/ServiceManagement/ToggleStatus/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleStatus(string id, string targetStatus)
+        {
+            var token = HttpContext.Session.GetString("JWToken");
+
+            try
+            {
+                var service = await _serviceManagementService.GetServiceByIdAsync(id, token);
+                if (service == null)
+                {
+                    TempData["Error"] = "Không tìm thấy dịch vụ.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                var updateDto = new ServiceProviderUpdateDTO
+                {
+                    Title = service.Title,
+                    Description = service.Description,
+                    Price = service.Price,
+                    UnitType = service.UnitType,
+                    BaseUnit = service.BaseUnit,
+                    Status = targetStatus,
+                    TagIds = service.Tags.Select(t => t.TagId).ToList(),
+                    OptionIds = service.Options.Select(o => o.OptionId).ToList()
+                };
+
+                var resp = await _serviceManagementService.UpdateServiceAsync(id, updateDto, token);
+                if (resp?.Success == true)
+                {
+                    TempData["Success"] = targetStatus == "Active" ? "Đã bật hoạt động dịch vụ." : "Đã tạm dừng dịch vụ.";
+                }
+                else
+                {
+                    TempData["Error"] = resp?.Message ?? "Không thể cập nhật trạng thái dịch vụ.";
+                }
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = ex.Message;
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
         // GET: Provider/ServiceManagement
         public async Task<IActionResult> Index()
         {
@@ -105,6 +151,13 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
                 TempData["Error"] = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.";
                 return View(model);
+            }
+
+            // Gộp input hình ảnh: nếu người dùng chỉ upload qua Images (multi), lấy ảnh đầu tiên làm Avatar
+            if ((model.Avatar == null || model.Avatar.Length == 0) && model.Images != null && model.Images.Count > 0)
+            {
+                model.Avatar = model.Images.FirstOrDefault();
+                model.Images = model.Images.Skip(1).ToList();
             }
 
             var response = await _serviceManagementService.CreateServiceAsync(model, token);
@@ -197,6 +250,13 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
                 TempData["Error"] = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.";
                 return View(model);
+            }
+
+            // Gộp input hình ảnh: nếu chỉ upload qua Images (multi), tách ra Avatar + Images
+            if ((model.Avatar == null || model.Avatar.Length == 0) && model.Images != null && model.Images.Count > 0)
+            {
+                model.Avatar = model.Images.FirstOrDefault();
+                model.Images = model.Images.Skip(1).ToList();
             }
 
             var response = await _serviceManagementService.UpdateServiceAsync(id, model, token);

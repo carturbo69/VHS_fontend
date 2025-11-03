@@ -220,7 +220,15 @@
                         </span>
                     </div>
 
-                    @if (Model.Status == "Pending")
+                    @{ 
+                        var statusNorm = (Model.Status ?? string.Empty).Trim();
+                        bool isConfirmed = string.Equals(statusNorm, "Confirmed", StringComparison.OrdinalIgnoreCase);
+                        bool isCompleted = string.Equals(statusNorm, "Completed", StringComparison.OrdinalIgnoreCase);
+                        bool isCanceled  = string.Equals(statusNorm, "Canceled",  StringComparison.OrdinalIgnoreCase);
+                        // Hiển thị nút nếu đơn chưa ở các trạng thái cuối cùng
+                        bool canAct = !(isConfirmed || isCompleted || isCanceled);
+                    }
+                    @if (canAct)
                     {
                         <div class="d-grid gap-2">
                             <button type="button" class="btn btn-success btn-lg" onclick="updateStatus('Confirmed')">
@@ -605,6 +613,8 @@
         return status switch
         {
             "Pending" => "Chờ xử lý",
+            "PendingPayment" => "Chờ xử lý",
+            "Processing" => "Chờ xử lý",
             "Confirmed" => "Đã xác nhận",
             "Completed" => "Hoàn thành",
             "Canceled" => "Đã hủy",

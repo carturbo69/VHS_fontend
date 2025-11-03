@@ -18,9 +18,27 @@ builder.Services.AddHttpClient<ReviewServiceCustomer>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+builder.Services.AddHttpClient<UserAddressService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // Ví dụ: https://localhost:7154
+});
+
+
 builder.Services.AddHttpClient<ProviderFeedbackService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+// Chat Admin
+builder.Services.AddHttpClient<ChatAdminService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
+// Chat Provider
+builder.Services.AddHttpClient<ChatProviderService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });
 
 builder.Services.AddHttpClient<IServiceCustomerService, ServiceCustomerService>(client =>
@@ -36,6 +54,12 @@ builder.Services.AddHttpClient<CartServiceCustomer>(client =>
 builder.Services.AddHttpClient<BookingServiceCustomer>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+// HttpClient cho ReportService (Customer)
+builder.Services.AddHttpClient<ReportService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });
 
 builder.Services.AddHttpClient<CategoryAdminService>(client =>
@@ -70,6 +94,10 @@ builder.Services.AddHttpClient<AdminFeedbackService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+builder.Services.AddHttpClient<AdminComplaintService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 builder.Services.AddHttpClient<NotificationService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
@@ -79,22 +107,49 @@ builder.Services.AddHttpClient<AdminNotificationService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
 
+// HttpClient cho Admin Booking Service
+builder.Services.AddHttpClient<AdminBookingService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
+// Payment Management (Admin)
+builder.Services.AddHttpClient<PaymentManagementService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
 // HttpClient cho Admin duyệt dịch vụ
 builder.Services.AddHttpClient<AdminServiceApprovalService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });
 
-// ServiceShopService
-builder.Services.AddScoped<ServiceShopService>();
+// ServiceShopService - dùng Typed HttpClient
+builder.Services.AddHttpClient<ServiceShopService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
 
-builder.Services.AddScoped<VnPayService>();
+builder.Services.AddScoped<IVnPayService, VnPayService>();
 builder.Services.AddScoped<MoMoService>();
 
 // HttpClient cho Provider Profile Service
 builder.Services.AddHttpClient<ProviderProfileService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+
+// Provider Withdrawal
+builder.Services.AddHttpClient<ProviderWithdrawalService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
+// Profile Service (Customer)
+builder.Services.AddHttpClient<ProfileServiceCustomer>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });
 
 
@@ -124,6 +179,18 @@ builder.Services.AddHttpClient<StaffManagementService>(client => {
 
 // HttpClient cho Booking Provider Service
 builder.Services.AddHttpClient<BookingProviderService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
+// HttpClient cho ChatCustomerService (Customer area)
+builder.Services.AddHttpClient<ChatCustomerService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
+// Chatbox AI Service (Customer)
+builder.Services.AddHttpClient<ChatboxService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });

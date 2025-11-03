@@ -103,7 +103,7 @@
                     <span asp-validation-for="Status" class="text-danger"></span>
                 </div>
 
-                <!-- Images -->
+                <!-- Images (Gộp avatar + ảnh mô tả) -->
                 <div class="mb-3">
                     <label class="form-label">Hình ảnh dịch vụ</label>
                     @{
@@ -114,54 +114,36 @@
                         string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
                     }
 
-                    <!-- Avatar hiện tại -->
+                    <!-- Hình ảnh hiện tại (gộp avatar + mô tả) -->
                     <div class="mb-3">
-                        <label class="form-label">Ảnh đại diện hiện tại</label>
-                        @if (!string.IsNullOrEmpty(avatar))
-                        {
-                            var avatarUrl = ToUrl(avatar);
-                            <div class="mb-2 text-center">
-                                <img src="@avatarUrl" alt="Avatar" class="img-thumbnail shadow-sm" style="max-width: 300px; max-height: 300px; object-fit: cover; border-radius: 0.5rem;"
-                                     onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Không thể tải ảnh</div>';" />
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="mb-2 text-center">
-                                <div class="no-image-placeholder-large">
-                                    <i class="bi bi-image"></i>
-                                    <p class="text-muted mt-2">Chưa có ảnh đại diện</p>
-                                </div>
-                            </div>
-                        }
-                        <input asp-for="Avatar" type="file" class="form-control" accept="image/*" />
-                        <span asp-validation-for="Avatar" class="text-danger"></span>
-                        <small class="form-text text-muted">Để trống nếu không muốn thay đổi ảnh đại diện.</small>
-                    </div>
-
-                    <!-- Ảnh mô tả hiện tại -->
-                    <div class="mb-3">
-                        <label class="form-label">Ảnh mô tả hiện tại</label>
-                        @if (descImgs.Any())
-                        {
-                            <div class="row g-2">
-                                @foreach (var p in descImgs)
+                        <div class="image-inline-gallery d-flex align-items-start gap-3 flex-wrap">
+                            <div class="avatar-block">
+                                @if (!string.IsNullOrEmpty(avatar))
                                 {
-                                    var u = ToUrl(p);
-                                    <div class="col-auto">
-                                        <img src="@u" class="img-thumbnail" style="width: 110px; height: 110px; object-fit: cover;" alt="Desc"
-                                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning p-2\'>Lỗi ảnh</div>';" />
-                                    </div>
+                                    var avatarUrl = ToUrl(avatar);
+                                    <img src="@avatarUrl" alt="Avatar" class="img-thumbnail shadow-sm avatar-img"
+                                         onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Không thể tải ảnh</div>';" />
+                                }
+                                else
+                                {
+                                    <div class="no-image-placeholder-large"></div>
                                 }
                             </div>
-                        }
-                        else
-                        {
-                            <div class="text-muted">Chưa có ảnh mô tả.</div>
-                        }
-                        <input asp-for="Images" type="file" class="form-control mt-2" accept="image/*" multiple />
+                            <div class="thumbs d-flex flex-row flex-wrap gap-2">
+                                @if (descImgs.Any())
+                                {
+                                    @foreach (var p in descImgs)
+                                    {
+                                        var u = ToUrl(p);
+                                        <img src="@u" class="img-thumbnail thumb-img" alt="Desc"
+                                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning p-2\'>Lỗi ảnh</div>';" />
+                                    }
+                                }
+                            </div>
+                        </div>
+                        <input name="Images" type="file" class="form-control mt-3" accept="image/*" multiple />
                         <span asp-validation-for="Images" class="text-danger"></span>
-                        <small class="form-text text-muted">Có thể chọn nhiều ảnh mới để thay thế toàn bộ ảnh mô tả.</small>
+                        <small class="form-text text-muted">Chọn 1 hoặc nhiều ảnh mới. Ảnh đầu tiên sẽ là ảnh đại diện; các ảnh còn lại là ảnh mô tả.</small>
                     </div>
                 </div>
 

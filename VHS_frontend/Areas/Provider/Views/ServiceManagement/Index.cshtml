@@ -138,21 +138,43 @@
                                         }
                                         else if (service.Status == "Pending")
                                         {
-                                            <span class="badge bg-secondary">Đang Chờ</span>
+                                            <span class="badge bg-secondary">Đang chờ</span>
                                         }
                                         else
                                         {
-                                            <span class="badge bg-danger">Không hoạt động</span>
+                                            <span class="badge bg-warning text-dark">Tạm dừng</span>
                                         }
                                     </td>
                                     <td>
-                                        <div class="btn-group" role="group">
-                                            <a asp-action="Edit" asp-route-id="@service.ServiceId" class="btn btn-sm btn-warning" title="Chỉnh sửa">
-                                                <i class="bi bi-pencil"></i>
+                                        <div class="actions-stack" role="group">
+                                            <a asp-action="Edit" asp-route-id="@service.ServiceId" class="btn btn-action btn-action--lg btn-edit" title="Chỉnh sửa" data-bs-toggle="tooltip" data-bs-placement="top">
+                                                <i class="bi bi-pencil-square"></i>
+                                                <span class="label d-none d-xl-inline">Chỉnh sửa</span>
                                             </a>
-                                            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" data-service-id="@service.ServiceId" data-service-name="@service.Title" title="Xóa">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
+                                            @if (service.Status == "Active")
+                                            {
+                                                <form asp-action="ToggleStatus" method="post" class="d-inline" data-bs-toggle="tooltip" data-bs-placement="top" title="Tạm dừng dịch vụ">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@service.ServiceId" />
+                                                    <input type="hidden" name="targetStatus" value="Inactive" />
+                                                    <button type="submit" class="btn btn-action btn-action--lg btn-toggle-pause" title="Tạm dừng">
+                                                        <i class="bi bi-pause-circle"></i>
+                                                        <span class="label d-none d-xl-inline">Tạm dừng</span>
+                                                    </button>
+                                                </form>
+                                            }
+                                            else if (service.Status != "Pending")
+                                            {
+                                                <form asp-action="ToggleStatus" method="post" class="d-inline" data-bs-toggle="tooltip" data-bs-placement="top" title="Bật hoạt động">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@service.ServiceId" />
+                                                    <input type="hidden" name="targetStatus" value="Active" />
+                                                    <button type="submit" class="btn btn-action btn-action--lg btn-toggle-play" title="Bật hoạt động">
+                                                        <i class="bi bi-play-circle"></i>
+                                                        <span class="label d-none d-xl-inline">Bật</span>
+                                                    </button>
+                                                </form>
+                                            }
                                         </div>
                                     </td>
                                 </tr>
@@ -201,6 +223,13 @@
 
 @section Scripts {
     <script>
+        // Enable Bootstrap tooltips for action buttons
+        document.addEventListener('DOMContentLoaded', function () {
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
         var deleteModal = document.getElementById('deleteModal');
         deleteModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
