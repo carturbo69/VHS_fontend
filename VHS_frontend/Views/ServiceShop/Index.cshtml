@@ -3,6 +3,21 @@
     ViewData["Title"] = "Shop Dịch Vụ Vệ Sinh";
 }
 
+@{
+    // DEBUG: Kiểm tra dữ liệu Model
+    System.Diagnostics.Debug.WriteLine($"=== ServiceShop View DEBUG ===");
+    System.Diagnostics.Debug.WriteLine($"Model is null: {Model == null}");
+    if (Model != null)
+    {
+        System.Diagnostics.Debug.WriteLine($"ProviderId: {Model.ProviderId}");
+        System.Diagnostics.Debug.WriteLine($"ShopInfo.Name: '{Model.ShopInfo?.Name ?? "NULL"}'");
+        System.Diagnostics.Debug.WriteLine($"ShopInfo.Logo: '{Model.ShopInfo?.Logo ?? "NULL"}'");
+        System.Diagnostics.Debug.WriteLine($"ShopInfo.TotalServices: {Model.ShopInfo?.TotalServices ?? 0}");
+        System.Diagnostics.Debug.WriteLine($"Services count: {Model.Services?.Count ?? 0}");
+        System.Diagnostics.Debug.WriteLine($"BestsellingServices count: {Model.BestsellingServices?.Count ?? 0}");
+    }
+}
+
 <link rel="stylesheet" href="~/css/service-shop.css" asp-append-version="true" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
@@ -20,12 +35,16 @@
                     @Model.ShopInfo.Status @Model.ShopInfo.LastOnline
                 </p>
                 <div class="shop-actions">
-                    <button class="btn-follow @(Model.ShopInfo.IsFollowed ? "followed" : "")">
-                        <i class="fas fa-plus"></i> @(Model.ShopInfo.IsFollowed ? "Đang Theo" : "Theo Dõi")
-                    </button>
-                    <button class="btn-chat">
+                    @* <button class="btn-follow @(Model.ShopInfo.IsFollowed ? "followed" : "")"> *@
+                    @*     <i class="fas fa-plus"></i> @(Model.ShopInfo.IsFollowed ? "Đang Theo" : "Theo Dõi") *@
+                    @* </button> *@
+                    <a class="btn-chat"
+                       asp-area="Customer"
+                       asp-controller="ChatCustomer"
+                       asp-action="WithProvider"
+                       asp-route-providerId="@Model.ProviderId">
                         <i class="fas fa-comments"></i> Chat
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>
@@ -34,13 +53,19 @@
                 <span class="stat-label">Dịch Vụ:</span>
                 <span class="stat-value">@Model.ShopInfo.TotalServices</span>
             </div>
-            @if (Model.ShopInfo.Rating > 0)
-            {
-                <div class="stat-item">
-                    <span class="stat-label">Đánh Giá:</span>
-                    <span class="stat-value">@Model.ShopInfo.Rating.ToString("0.0") @(Model.ShopInfo.TotalRatings > 0 ? $"({Model.ShopInfo.TotalRatings.ToString("N0")} đánh giá)" : "")</span>
-                </div>
-            }
+            <div class="stat-item">
+                <span class="stat-label">Đánh Giá:</span>
+                <span class="stat-value">
+                    @if (Model.ShopInfo.Rating > 0 && Model.ShopInfo.TotalRatings > 0)
+                    {
+                        @Model.ShopInfo.Rating.ToString("0.0") @($"({Model.ShopInfo.TotalRatings.ToString("N0")} đánh giá)")
+                    }
+                    else
+                    {
+                        <text>Chưa có đánh giá</text>
+                    }
+                </span>
+            </div>
             @if (Model.ShopInfo.Followers > 0)
             {
                 <div class="stat-item">
@@ -77,10 +102,9 @@
                 <a asp-controller="Services" asp-action="Details" asp-route-id="@service.ServiceId" style="text-decoration: none; color: inherit;">
                     <div class="bestselling-item">
                         <div class="product-tags-wrapper">
-                            <div class="product-tag product-tag-main">@service.Category</div>
                             @if (service.Tags != null && service.Tags.Any())
                             {
-                                @foreach (var tag in service.Tags.Take(2))
+                                @foreach (var tag in service.Tags.Take(3))
                                 {
                                     <div class="product-tag product-tag-sub">@tag</div>
                                 }
@@ -210,7 +234,6 @@
                         <a asp-controller="Services" asp-action="Details" asp-route-id="@service.ServiceId" class="product-card-link">
                             <div class="product-card">
                                 <div class="product-tags-wrapper">
-                                    <div class="product-tag product-tag-main">@service.Category</div>
                                     @if (service.Tags != null && service.Tags.Any())
                                     {
                                         @foreach (var tag in service.Tags.Take(3))

@@ -195,6 +195,86 @@ namespace VHS_frontend.Areas.Customer.Controllers
         // ====== VNPay Integration - Standard Methods ======
 
         /// <summary>
+        /// Bắt đầu thanh toán VNPay từ booking
+        /// URL: /Customer/Payment/StartVnPay?bookingIds=guid1,guid2&amount=810000.00
+        /// </summary>
+        [HttpGet]
+        public IActionResult StartVnPay([FromQuery] List<Guid>? bookingIds, [FromQuery] string? amount)
+        {
+            if (NotLoggedIn())
+            {
+                TempData["ToastError"] = "Bạn cần đăng nhập.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            // Nếu bookingIds rỗng, thử parse từ query string dạng comma-separated
+            if (bookingIds == null || bookingIds.Count == 0)
+            {
+                var bookingIdsStr = Request.Query["bookingIds"].ToString();
+                if (!string.IsNullOrWhiteSpace(bookingIdsStr))
+                {
+                    bookingIds = bookingIdsStr
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                        .Where(g => g != Guid.Empty)
+                        .Distinct()
+                        .ToList();
+                }
+            }
+
+            if (bookingIds == null || bookingIds.Count == 0)
+            {
+                TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
+
+            // Parse amount từ string (dùng InvariantCulture)
+            if (!decimal.TryParse(amount, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var amountDecimal))
+            {
+                // Fallback: thử tính từ session nếu amount không hợp lệ
+                try
+                {
+                    amountDecimal = ComputeAmountFromSession(bookingIds);
+                }
+                catch
+                {
+                    TempData["ToastError"] = "Số tiền thanh toán không hợp lệ.";
+                    return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+                }
+            }
+
+            // Lưu booking IDs vào session để callback có thể sử dụng
+            HttpContext.Session.SetString("CHECKOUT_PENDING_BOOKING_IDS", string.Join(",", bookingIds));
+
+            // Lưu service names vào session cho success page
+            var serviceNames = GetServiceNamesFromSession();
+            foreach (var bookingId in bookingIds)
+            {
+                if (!serviceNames.ContainsKey(bookingId))
+                {
+                    // Nếu chưa có trong session, có thể lấy từ API hoặc để trống
+                    // serviceNames sẽ được cập nhật sau nếu cần
+                }
+            }
+
+            // Build OrderDescription theo format: "BOOKINGS:guid1,guid2,guid3"
+            var orderDescription = $"BOOKINGS:{string.Join(",", bookingIds)}";
+
+            // Tạo PaymentInformationModel
+            var paymentModel = new PaymentInformationModel
+            {
+                OrderType = "other",
+                Amount = (double)amountDecimal,
+                OrderDescription = orderDescription,
+                Name = "Thanh toán dịch vụ"
+            };
+
+            // Tạo URL thanh toán và redirect
+            var url = _vnPayService.CreatePaymentUrl(paymentModel, HttpContext);
+            return Redirect(url);
+        }
+
+        /// <summary>
         /// Tạo URL thanh toán VNPay và chuyển hướng người dùng đến cổng thanh toán
         /// </summary>
         public IActionResult CreatePaymentUrlVnpay(PaymentInformationModel model)
@@ -316,14 +396,43 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                     TempData["ToastError"] = errorMessage;
                     
-                    // Nếu chưa login, hiển thị thông báo
+                    // 🔑 LẤY BOOKING IDS ĐỂ HỦY (từ OrderDescription hoặc session)
+                    List<Guid>? bookingIdsToCancel = null;
+                    var orderInfoCancel = response.OrderDescription ?? "";
+                    
+                    if (orderInfoCancel.StartsWith("BOOKINGS:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var bookingIdsPart = orderInfoCancel.Substring("BOOKINGS:".Length);
+                        bookingIdsToCancel = bookingIdsPart
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                            .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                            .Where(g => g != Guid.Empty)
+                            .Distinct()
+                            .ToList();
+                    }
+                    else
+                    {
+                        // Fallback: lấy từ session
+                        var pendingBookingsCsv = HttpContext.Session.GetString("CHECKOUT_PENDING_BOOKING_IDS");
+                        if (!string.IsNullOrWhiteSpace(pendingBookingsCsv))
+                        {
+                            bookingIdsToCancel = pendingBookingsCsv
+                                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                                .Where(g => g != Guid.Empty)
+                                .Distinct()
+                                .ToList();
+                        }
+                    }
+                    
+                    // ✅ HỦY BOOKING ĐANG CHỜ (truyền bookingIds cụ thể nếu có)
+                    await CancelPendingFromIdsOrSessionAsync(bookingIdsToCancel, ct);
+                    
+                    // Nếu chưa login, hiển thị thông báo nhưng vẫn đã hủy booking
                     if (NotLoggedIn())
                     {
                         return Content($"Thanh toán thất bại. {errorMessage}. Vui lòng đăng nhập lại và thử lại.");
                     }
-                    
-                    // Hủy các booking đang chờ
-                    await CancelPendingFromIdsOrSessionAsync(null, ct);
                     
                     return RedirectToAction("Index", "BookingService", new { area = "Customer", refresh = 1 });
                 }
