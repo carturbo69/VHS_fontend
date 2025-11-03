@@ -14,7 +14,14 @@ namespace VHS_frontend.Areas.Provider.Controllers
         private void AttachBearerIfAny()
         {
             var token = HttpContext.Session.GetString("JWToken");
-            if (!string.IsNullOrWhiteSpace(token)) _svc.SetBearerToken(token);
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                _svc.SetBearerToken(token);
+            }
+            else
+            {
+                Console.WriteLine("Warning: JWToken not found in session for ProviderNotification");
+            }
         }
 
         // GET: Provider/ProviderNotification/Index - Trang danh sách thông báo
