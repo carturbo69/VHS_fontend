@@ -92,24 +92,30 @@
     }
 }
 
+@section Styles {
+    <link rel="stylesheet" href="~/css/chat-customer.css" asp-append-version="true" />
+}
 
-
-<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-<link rel="stylesheet" href="~/css/chat-customer.css" asp-append-version="true" />
-
-
-<div class="container-fluid chat-wrapper">
-    <div class="row h-100 g-0">
+<!-- Wrapper để isolate chat khỏi header -->
+<div class="chat-page-wrapper">
+    <div class="container-fluid chat-wrapper">
+        <div class="row h-100 g-0">
         <!-- Sidebar -->
         <aside class="col-12 col-md-4 col-lg-3 border-end chat-col d-flex flex-column">
             <div class="p-3">
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input class="form-control" placeholder="Tìm theo tên hoặc nội dung…" />
+                    <input type="text" 
+                           id="searchConversation" 
+                           class="form-control" 
+                           placeholder="Tìm theo tên hoặc nội dung…" 
+                           autocomplete="off" />
                 </div>
                 <div class="d-flex align-items-center mt-2 small text-muted">
                     <span class="fw-semibold">Tất cả cuộc trò chuyện</span>
-                    <span class="ms-auto">(@Model.Conversations.Count)</span>
+                    <span class="ms-auto">
+                        <span id="conversationCount">(@Model.Conversations.Count)</span>
+                    </span>
                 </div>
             </div>
 
@@ -123,7 +129,7 @@
             </div>
 
 
-            <div class="chat-scroll px-2">
+            <div class="chat-scroll px-2" id="conversationList">
                 @foreach (var c in Model.Conversations
                                 .OrderByDescending(x => x.IsPinned)
                                 .ThenByDescending(x => x.LastMessageAt))
@@ -131,7 +137,9 @@
                     var isActive = c.ConversationId == Model.SelectedConversationId;
 
                     <a class="d-flex align-items-start gap-2 p-2 rounded conv-item @(isActive ? "bg-light" : "")"
-                       href="@Url.Action("Index", "ChatCustomer", new { area = "Customer", id = c.ConversationId })">
+                       href="@Url.Action("Index", "ChatCustomer", new { area = "Customer", id = c.ConversationId })"
+                       data-search-title="@(c.Title?.ToLower() ?? "")"
+                       data-search-snippet="@(c.LastMessageSnippet?.ToLower() ?? "")">
                         <img class="avatar"
                              src="@((string.IsNullOrWhiteSpace(c.AvatarUrl) ? fallbackImg : c.AvatarUrl))"
                              alt=""
@@ -186,22 +194,31 @@
                     </div>
 
                     <!-- Nút 3 chấm ở góc phải -->
-                    <div class="ms-auto dropdown">
+                    <div class="ms-auto dropdown" id="chatOptionsDropdown">
                         <button type="button"
+                                id="chatOptionsBtn"
                                 class="btn btn-link p-0 text-muted"
                                 data-bs-toggle="dropdown"
                                 aria-expanded="false"
-                                title="Tùy chọn">
+                                title="Tùy chọn"
+                                style="cursor: pointer; z-index: 1000;">
                             <i class="bi bi-three-dots fs-4"></i>
                         </button>
 
-                        <div class="dropdown-menu dropdown-menu-end shadow-sm p-0" style="min-width:220px;">
+                        <div class="dropdown-menu dropdown-menu-end shadow-sm p-0" 
+                             id="chatOptionsMenu"
+                             style="min-width:220px; z-index: 1001;"
+                             aria-labelledby="chatOptionsBtn">
                             <form method="post"
+                                  id="deleteConversationForm"
                                   action='@Url.Action("DeleteConversation", "ChatCustomer", new { area = "Customer", id = Model.SelectedConversationId, hide = true })'
                                   onsubmit="return confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?');">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="dropdown-item text-danger">
-                                    Xóa cuộc trò chuyện
+                                <button type="submit" 
+                                        id="deleteConversationBtn"
+                                        class="dropdown-item text-danger"
+                                        style="cursor: pointer; pointer-events: auto;">
+                                    <i class="bi bi-trash me-2"></i>Xóa cuộc trò chuyện
                                 </button>
                             </form>
                         </div>
@@ -261,7 +278,14 @@
                                     }
 
                                     <div class="msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2">
-                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời">
+                                        <button type="button" 
+                                                class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" 
+                                                title="Trả lời"
+                                                data-message-id="@m.MessageId"
+                                                data-sender-name="@senderName"
+                                                data-snippet="@snippetThis"
+                                                onclick="window.handleReplyClickDirect(this); return false;"
+                                                style="cursor: pointer !important; pointer-events: auto !important; z-index: 10 !important; position: relative !important;">
                                             <i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span>
                                         </button>
                                         <span class="text-muted">@HHmmVN(m.CreatedAt)</span>
@@ -311,24 +335,23 @@
                                 <div class="fw-semibold" id="replyingToName"></div>
                                 <div class="text-muted text-truncate" id="replyingSnippet" style="max-width: 520px;"></div>
                             </div>
-                            <button type="button" id="cancelReplyBtn" class="btn btn-sm btn-outline-secondary">Hủy</button>
+                            <button type="button" id="cancelReplyBtn" class="btn btn-sm btn-outline-secondary" onclick="window.cancelReply(); return false;" style="cursor: pointer !important; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 18px; font-weight: bold;">×</button>
                         </div>
 
-                        <div id="attachPreview" class="d-none mt-2">
-                            <div class="d-inline-flex align-items-center gap-2 border rounded p-2 bg-light">
+                        <div id="attachPreview" class="d-none mt-2 mb-2">
+                            <div class="image-preview-container position-relative d-inline-block">
                                 <img id="attachThumb"
                                      src=""
                                      alt="Xem trước"
-                                     style="width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;"
+                                     style="width: 120px; height: 120px; object-fit: cover; border-radius: 12px; border: 2px solid #e2e8f0; display: block; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);"
                                      onerror="this.onerror=null;this.src='@fallbackImg';" />
-                                <div class="small text-muted" id="attachName"></div>
-                                <button type="button" id="removeAttachBtn" class="btn btn-sm btn-outline-secondary">
-                                    Bỏ ảnh
+                                <button type="button" id="removeAttachBtn" class="btn-close-image position-absolute" style="top: -8px; right: -8px; width: 28px; height: 28px; border-radius: 50%; background: #ffffff; border: 2px solid #dc3545; color: #dc3545; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); transition: all 0.2s ease; z-index: 10;">
+                                    ×
                                 </button>
                             </div>
                         </div>
 
-                        <div class="d-flex gap-2 align-items-start">
+                        <div class="d-flex gap-2 align-items-center">
                             <input type="text"
                                    name="body"
                                    class="form-control"
@@ -348,14 +371,15 @@
                                 <i class="bi bi-paperclip"></i>
                             </button>
 
-                            <button type="submit" class="btn btn-primary">
-                                Gửi
+                            <button type="submit" class="btn btn-primary" title="Gửi tin nhắn">
+                                <i class="bi bi-send-fill"></i>
                             </button>
                         </div>
                     </form>
                 </div>
             </main>
         }
+        </div>
     </div>
 </div>
 
@@ -373,6 +397,213 @@
             })();
         </script>
     }
+
+    @* Search functionality *@
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Initializing search functionality...');
+            
+            const searchInput = document.getElementById('searchConversation');
+            const conversationList = document.getElementById('conversationList');
+            const conversationCount = document.getElementById('conversationCount');
+            
+            if (!searchInput) {
+                console.error('Search input not found!');
+                return;
+            }
+            if (!conversationList) {
+                console.error('Conversation list not found!');
+                return;
+            }
+            if (!conversationCount) {
+                console.error('Conversation count not found!');
+                return;
+            }
+
+            console.log('All search elements found:', {
+                input: searchInput,
+                list: conversationList,
+                count: conversationCount
+            });
+
+            function getAllConversations() {
+                return Array.from(conversationList.querySelectorAll('.conv-item'));
+            }
+
+            // Debounce để tránh filter quá nhiều lần
+            let searchTimeout;
+            
+            function filterConversations() {
+                const actualSearchInput = document.getElementById('searchConversation');
+                if (!actualSearchInput) return;
+                
+                const searchTerm = (actualSearchInput.value || '').toLowerCase().trim();
+                const allConversations = getAllConversations();
+                
+                console.log('Filtering with term:', searchTerm, 'Total conversations:', allConversations.length);
+                
+                if (!searchTerm) {
+                    // Hiển thị tất cả
+                    allConversations.forEach(item => {
+                        item.style.display = '';
+                        item.style.visibility = '';
+                        item.hidden = false;
+                    });
+                    conversationCount.textContent = '(@Model.Conversations.Count)';
+                    return;
+                }
+
+                let visibleCount = 0;
+                
+                // Ẩn tất cả trước
+                allConversations.forEach(item => {
+                    item.style.display = 'none';
+                    item.style.visibility = 'hidden';
+                    item.hidden = true;
+                });
+                
+                // Chỉ hiển thị những cái khớp
+                allConversations.forEach(item => {
+                    let title = item.getAttribute('data-search-title') || '';
+                    let snippet = item.getAttribute('data-search-snippet') || '';
+                    
+                    // Fallback: nếu không có data attribute, lấy từ text content
+                    if (!title && !snippet) {
+                        const titleEl = item.querySelector('.fw-semibold');
+                        const snippetEl = item.querySelector('.small.text-muted.text-ellipsis-1');
+                        title = titleEl ? (titleEl.textContent || '').toLowerCase().trim() : '';
+                        snippet = snippetEl ? (snippetEl.textContent || '').toLowerCase().trim() : '';
+                    }
+                    
+                    // Tìm kiếm trong cả title và snippet
+                    const searchText = (title + ' ' + snippet).toLowerCase().trim();
+                    const matches = searchText.includes(searchTerm) || 
+                                   title.includes(searchTerm) || 
+                                   snippet.includes(searchTerm);
+                    
+                    if (matches && searchTerm.length > 0) {
+                        // Hiển thị item này
+                        item.style.display = '';
+                        item.style.visibility = '';
+                        item.hidden = false;
+                        visibleCount++;
+                    }
+                });
+
+                conversationCount.textContent = '(' + visibleCount + ')';
+                console.log('Filtered to:', visibleCount, 'conversations');
+            }
+
+            const actualSearchInput = searchInput;
+            
+            actualSearchInput.addEventListener('input', function (e) {
+                console.log('Input event triggered:', e.target.value);
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function() {
+                    filterConversations();
+                }, 150);
+            });
+
+            actualSearchInput.addEventListener('keyup', function (e) {
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                    if (e.key === 'Escape' && actualSearchInput.value) {
+                        actualSearchInput.value = '';
+                        filterConversations();
+                    }
+                }
+            });
+
+            // Clear search khi click vào icon
+            const iconElement = actualSearchInput.parentElement.querySelector('.input-group-text');
+            if (iconElement) {
+                iconElement.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Icon clicked');
+                    if (actualSearchInput.value) {
+                        actualSearchInput.value = '';
+                        filterConversations();
+                        actualSearchInput.focus();
+                    }
+                });
+            } else {
+                console.warn('Icon element not found');
+            }
+
+            // Test search on load
+            console.log('Search initialized successfully!', {
+                input: actualSearchInput,
+                list: conversationList,
+                count: conversationCount,
+                conversations: getAllConversations().length
+            });
+        });
+    </script>
+
+    @* Initialize dropdown functionality *@
+    <script>
+        (function() {
+            // Đảm bảo dropdown hoạt động sau khi Bootstrap load
+            function initDropdown() {
+                const dropdownBtn = document.getElementById('chatOptionsBtn');
+                const dropdownMenu = document.getElementById('chatOptionsMenu');
+                const deleteBtn = document.getElementById('deleteConversationBtn');
+                
+                if (!dropdownBtn || !dropdownMenu) {
+                    console.log('Dropdown elements not found');
+                    return;
+                }
+                
+                console.log('Initializing dropdown...');
+                
+                // Đảm bảo button có thể click
+                dropdownBtn.style.pointerEvents = 'auto';
+                dropdownBtn.style.cursor = 'pointer';
+                
+                // Đảm bảo menu có thể hiển thị
+                dropdownMenu.style.pointerEvents = 'auto';
+                
+                // Xử lý click cho delete button
+                // Không cần xử lý gì ở đây vì form đã có onsubmit với confirm
+                // Button type="submit" sẽ tự động trigger form submit
+                
+                // Toggle dropdown manually nếu Bootstrap chưa load
+                dropdownBtn.addEventListener('click', function(e) {
+                    console.log('Dropdown button clicked');
+                    e.stopPropagation();
+                    
+                    // Nếu Bootstrap đã load, để Bootstrap xử lý
+                    if (window.bootstrap && window.bootstrap.Dropdown) {
+                        return;
+                    }
+                    
+                    // Fallback: toggle manually
+                    const isShowing = dropdownMenu.classList.contains('show');
+                    if (isShowing) {
+                        dropdownMenu.classList.remove('show');
+                    } else {
+                        dropdownMenu.classList.add('show');
+                    }
+                });
+                
+                // Đóng dropdown khi click bên ngoài
+                document.addEventListener('click', function(e) {
+                    if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                        dropdownMenu.classList.remove('show');
+                    }
+                });
+            }
+            
+            // Chờ Bootstrap load hoặc DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(initDropdown, 100);
+                });
+            } else {
+                setTimeout(initDropdown, 100);
+            }
+        })();
+    </script>
 
     <script>
         (function () {
@@ -400,7 +631,6 @@
           var fileInput = document.getElementById('fileInput');
           var previewWrap = document.getElementById('attachPreview');
           var imgEl = document.getElementById('attachThumb');
-          var nameEl = document.getElementById('attachName');
           var removeBtn = document.getElementById('removeAttachBtn');
           var objectUrl = null;
 
@@ -423,7 +653,6 @@
 
               objectUrl = URL.createObjectURL(f);
               imgEl.src = objectUrl;
-              nameEl.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
               previewWrap.classList.remove('d-none');
             } else {
               previewWrap.classList.add('d-none');
@@ -434,74 +663,376 @@
             if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
             fileInput.value = '';
             imgEl.src = '';
-            nameEl.textContent = '';
             previewWrap.classList.add('d-none');
           });
         })();
+    </script>
+
+    @* ====== Reply System - Định nghĩa sớm để có thể dùng trong HTML ====== *@
+    <script>
+        // Định nghĩa GLOBAL function ngay từ đầu để có thể dùng trong inline onclick
+        window.handleReplyClickDirect = function(btn) {
+          console.log('[Reply] ===== handleReplyClickDirect called =====', btn);
+          
+          if (!btn) {
+            console.error('[Reply] No button provided');
+            return false;
+          }
+          
+          // Lấy elements
+          var replyHidden = document.getElementById('replyToMessageId');
+          var replyPreview = document.getElementById('replyPreview');
+          var replyingToName = document.getElementById('replyingToName');
+          var replyingSnippet = document.getElementById('replyingSnippet');
+          
+          if (!replyHidden || !replyPreview) {
+            console.error('[Reply] Elements not ready, initializing...');
+            // Thử khởi tạo lại
+            if (window.__initReplyUi) {
+              window.__initReplyUi();
+            }
+            setTimeout(function() {
+              window.handleReplyClickDirect(btn);
+            }, 100);
+            return false;
+          }
+          
+          // Lấy data từ button hoặc bubble
+          var id = btn.getAttribute('data-message-id') || '';
+          var name = btn.getAttribute('data-sender-name') || '—';
+          var snippet = btn.getAttribute('data-snippet') || '';
+          
+          // Nếu không có trên button, tìm từ bubble
+          if (!id) {
+            var bubble = btn.closest('.bubble');
+            if (bubble) {
+              id = bubble.getAttribute('data-message-id') || '';
+              name = bubble.getAttribute('data-sender-name') || '—';
+              snippet = bubble.getAttribute('data-snippet') || '';
+            }
+          }
+          
+          console.log('[Reply] Data found:', {id, name, snippet});
+          
+          if (id && id.trim() !== '') {
+            // Hiển thị reply preview
+            replyHidden.value = id;
+            if (replyingToName) replyingToName.textContent = name || '—';
+            if (replyingSnippet) replyingSnippet.textContent = snippet || '';
+            
+            replyPreview.classList.remove('d-none');
+            replyPreview.style.display = 'flex';
+            replyPreview.style.visibility = 'visible';
+            replyPreview.style.opacity = '1';
+            replyPreview.style.height = 'auto';
+            replyPreview.style.padding = '10px 14px';
+            replyPreview.style.marginBottom = '10px';
+            
+            var form = document.querySelector('form[action*="ChatCustomer/Send"]');
+            var bodyInput = form?.querySelector('input[name="body"]');
+            if (bodyInput) bodyInput.focus();
+            
+            console.log('[Reply] ✓ Preview shown successfully');
+          } else {
+            console.error('[Reply] No valid message ID found');
+          }
+          
+          return false;
+        };
+        
+        // Hàm hủy reply - GLOBAL để có thể gọi từ inline onclick
+        window.cancelReply = function() {
+          console.log('[Reply] ===== cancelReply called =====');
+          
+          var replyHidden = document.getElementById('replyToMessageId');
+          var replyPreview = document.getElementById('replyPreview');
+          var replyingToName = document.getElementById('replyingToName');
+          var replyingSnippet = document.getElementById('replyingSnippet');
+          
+          if (replyHidden) replyHidden.value = '';
+          if (replyingToName) replyingToName.textContent = '';
+          if (replyingSnippet) replyingSnippet.textContent = '';
+          
+          if (replyPreview) {
+            replyPreview.classList.add('d-none');
+            replyPreview.style.display = 'none';
+            replyPreview.style.visibility = 'hidden';
+            replyPreview.style.opacity = '0';
+            replyPreview.style.height = '0';
+            replyPreview.style.padding = '0';
+            replyPreview.style.margin = '0';
+          }
+          
+          console.log('[Reply] ✓ Reply cancelled successfully');
+          return false;
+        };
+        
+        console.log('[Reply] handleReplyClickDirect and cancelReply functions defined');
     </script>
 
     @* ====== SignalR: trạng thái gửi/nhận/đã xem + Reply ====== *@
     <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
 
     <script>
-        // ===== Reply UI: KHỞI TẠO ĐỘC LẬP =====
-        window.__initReplyUi = function () {
-          var pageMain = document.querySelector('main.chat-col[data-selected-conv]');
-          if (!pageMain) return;
-
-          // Form & các phần tử của preview reply
-          var form = pageMain.querySelector('form[action*="ChatCustomer/Send"]');
-          var bodyInput = form?.querySelector('input[name="body"]');
-          var replyHidden = form?.querySelector('#replyToMessageId');
-
-          var replyPreview = document.getElementById('replyPreview');
-          var replyingToName = document.getElementById('replyingToName');
-          var replyingSnippet = document.getElementById('replyingSnippet');
-          var cancelReplyBtn = document.getElementById('cancelReplyBtn');
-
-          function showReplyPreview(id, name, snippet){
-            if (!replyHidden || !replyPreview) return;
-            replyHidden.value = id || '';
+        // ===== Reply UI: CÁCH ĐƠN GIẢN VÀ CHẮC CHẮN =====
+        (function initReplySystem() {
+          // Biến global để các hàm có thể truy cập
+          var replyHidden = null;
+          var replyPreview = null;
+          var replyingToName = null;
+          var replyingSnippet = null;
+          var bodyInput = null;
+          
+          // Hàm hiển thị reply preview
+          function showReplyPreview(id, name, snippet) {
+            console.log('[Reply] showReplyPreview called:', {id, name, snippet});
+            if (!id || id.trim() === '') {
+              clearReplyPreview();
+              return;
+            }
+            
+            if (!replyHidden || !replyPreview) {
+              console.error('[Reply] Elements not ready:', {
+                replyHidden: !!replyHidden,
+                replyPreview: !!replyPreview
+              });
+              return;
+            }
+            
+            replyHidden.value = id;
             if (replyingToName) replyingToName.textContent = name || '—';
             if (replyingSnippet) replyingSnippet.textContent = snippet || '';
+            
             replyPreview.classList.remove('d-none');
-            bodyInput?.focus();
+            replyPreview.style.display = 'flex';
+            replyPreview.style.visibility = 'visible';
+            replyPreview.style.opacity = '1';
+            replyPreview.style.height = 'auto';
+            replyPreview.style.padding = '10px 14px';
+            replyPreview.style.marginBottom = '10px';
+            
+            if (bodyInput) bodyInput.focus();
+            console.log('[Reply] ✓ Preview shown successfully');
           }
-          function clearReplyPreview(){
+          
+          // Hàm ẩn reply preview
+          function clearReplyPreview() {
             if (replyHidden) replyHidden.value = '';
             if (replyingToName) replyingToName.textContent = '';
             if (replyingSnippet) replyingSnippet.textContent = '';
-            replyPreview?.classList.add('d-none');
+            if (replyPreview) {
+              replyPreview.classList.add('d-none');
+              replyPreview.style.display = 'none';
+              replyPreview.style.visibility = 'hidden';
+              replyPreview.style.opacity = '0';
+              replyPreview.style.height = '0';
+              replyPreview.style.padding = '0';
+              replyPreview.style.margin = '0';
+            }
           }
-
-          cancelReplyBtn?.addEventListener('click', function(e){
-            e.preventDefault();
-            clearReplyPreview();
-          });
-
-          // BẮT SỰ KIỆN CLICK NÚT REPLY (event delegation)
-          pageMain.addEventListener('click', function(e){
-            var btn = e.target.closest('.reply-btn');
+          
+          // Cập nhật global function để dùng internal functions
+          if (window.handleReplyClickDirect) {
+            var originalFunction = window.handleReplyClickDirect;
+            window.handleReplyClickDirect = function(btn) {
+              // Gọi function gốc trước
+              var result = originalFunction.call(this, btn);
+              
+              // Cập nhật references nếu có
+              if (!replyHidden || !replyPreview) {
+                replyHidden = document.getElementById('replyToMessageId');
+                replyPreview = document.getElementById('replyPreview');
+                replyingToName = document.getElementById('replyingToName');
+                replyingSnippet = document.getElementById('replyingSnippet');
+                var form = document.querySelector('main.chat-col[data-selected-conv]')?.querySelector('form[action*="ChatCustomer/Send"]');
+                bodyInput = form?.querySelector('input[name="body"]');
+              }
+              
+              return result;
+            };
+          }
+          
+          // Hàm xử lý click reply button (internal)
+          function handleReplyClick(btn) {
             if (!btn) return;
-
-            // DÙNG btn.closest thay vì e.target.closest để chắc chắn đúng bubble
+            
             var bubble = btn.closest('.bubble');
-            if (!bubble) return;
-
+            if (!bubble) {
+              console.warn('[Reply] No bubble found');
+              return;
+            }
+            
             var id = bubble.getAttribute('data-message-id') || '';
             var name = bubble.getAttribute('data-sender-name') || '—';
-            var sn  = bubble.getAttribute('data-snippet') || '';
-
-            showReplyPreview(id, name, sn);
-          }, {passive:true});
-
-          // Nếu dùng quick-reply thì hủy trạng thái reply để không gắn nhầm
-          pageMain.addEventListener('click', function(e){
-            var qb = e.target.closest('.quick-reply');
-            if (!qb) return;
+            var snippet = bubble.getAttribute('data-snippet') || '';
+            
+            console.log('[Reply] Button clicked:', {id, name, snippet});
+            
+            if (id && id.trim() !== '') {
+              showReplyPreview(id, name, snippet);
+            }
+          }
+          
+          // Hàm setup một reply button
+          function setupReplyButton(btn) {
+            if (!btn) return;
+            
+            console.log('[Reply] Setting up button:', btn);
+            
+            // Đảm bảo CSS
+            btn.style.pointerEvents = 'auto';
+            btn.style.cursor = 'pointer';
+            btn.style.zIndex = '10';
+            btn.style.position = 'relative';
+            
+            // Lấy data từ bubble nếu chưa có trên button
+            if (!btn.hasAttribute('data-message-id')) {
+              var bubble = btn.closest('.bubble');
+              if (bubble) {
+                btn.setAttribute('data-message-id', bubble.getAttribute('data-message-id') || '');
+                btn.setAttribute('data-sender-name', bubble.getAttribute('data-sender-name') || '—');
+                btn.setAttribute('data-snippet', bubble.getAttribute('data-snippet') || '');
+              }
+            }
+            
+            // Inline onclick nếu chưa có
+            if (!btn.getAttribute('onclick')) {
+              btn.setAttribute('onclick', 'window.handleReplyClickDirect(this); return false;');
+            }
+            
+            // Thêm event listener
+            if (!btn.hasAttribute('data-reply-initialized')) {
+              btn.setAttribute('data-reply-initialized', 'true');
+              
+              btn.addEventListener('click', function(e) {
+                console.log('[Reply] addEventListener triggered');
+                e.preventDefault();
+                e.stopPropagation();
+                window.handleReplyClickDirect(btn);
+              }, true);
+              
+              // Backup onclick
+              var originalOnclick = btn.onclick;
+              btn.onclick = function(e) {
+                console.log('[Reply] onclick handler triggered');
+                e.preventDefault();
+                e.stopPropagation();
+                window.handleReplyClickDirect(btn);
+                if (originalOnclick) originalOnclick.call(this, e);
+              };
+            }
+          }
+          
+          // Hàm khởi tạo
+          function initialize() {
+            var pageMain = document.querySelector('main.chat-col[data-selected-conv]');
+            if (!pageMain) {
+              console.log('[Reply] Waiting for pageMain...');
+              setTimeout(initialize, 100);
+              return;
+            }
+            
+            var form = pageMain.querySelector('form[action*="ChatCustomer/Send"]');
+            bodyInput = form?.querySelector('input[name="body"]');
+            replyHidden = document.getElementById('replyToMessageId');
+            replyPreview = document.getElementById('replyPreview');
+            replyingToName = document.getElementById('replyingToName');
+            replyingSnippet = document.getElementById('replyingSnippet');
+            var cancelReplyBtn = document.getElementById('cancelReplyBtn');
+            
+            if (!replyHidden || !replyPreview) {
+              console.log('[Reply] Waiting for elements...');
+              setTimeout(initialize, 100);
+              return;
+            }
+            
+            console.log('[Reply] Initializing...');
+            
+            // Clear preview ban đầu
             clearReplyPreview();
-          }, {passive:true});
-        };
+            
+            // Cancel button - đảm bảo có inline onclick và event listener
+            if (cancelReplyBtn) {
+              // Thêm inline onclick nếu chưa có
+              if (!cancelReplyBtn.getAttribute('onclick')) {
+                cancelReplyBtn.setAttribute('onclick', 'window.cancelReply(); return false;');
+              }
+              
+              // Thêm event listener backup
+              cancelReplyBtn.addEventListener('click', function(e) {
+                console.log('[Reply] Cancel button clicked via addEventListener');
+                e.preventDefault();
+                e.stopPropagation();
+                window.cancelReply();
+              }, true);
+              
+              console.log('[Reply] Cancel button configured');
+            } else {
+              console.warn('[Reply] Cancel button not found');
+            }
+            
+            // Clear khi submit
+            if (form) {
+              form.addEventListener('submit', function() {
+                setTimeout(clearReplyPreview, 500);
+              });
+            }
+            
+            // Setup tất cả reply buttons hiện có
+            function setupAllButtons() {
+              var allBtns = pageMain.querySelectorAll('.reply-btn');
+              console.log('[Reply] Found', allBtns.length, 'reply buttons');
+              allBtns.forEach(setupReplyButton);
+            }
+            
+            setupAllButtons();
+            
+            // Observer để setup buttons mới
+            if (window.MutationObserver) {
+              var observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                  mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) {
+                      if (node.classList && node.classList.contains('reply-btn')) {
+                        setupReplyButton(node);
+                      }
+                      var btns = node.querySelectorAll && node.querySelectorAll('.reply-btn');
+                      if (btns) {
+                        btns.forEach(setupReplyButton);
+                      }
+                    }
+                  });
+                });
+              });
+              observer.observe(pageMain, { childList: true, subtree: true });
+              console.log('[Reply] MutationObserver active');
+            }
+            
+            // Event delegation backup
+            pageMain.addEventListener('click', function(e) {
+              if (e.target.closest('.quick-reply')) return;
+              
+              var btn = e.target.closest('.reply-btn');
+              if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleReplyClick(btn);
+              }
+            }, true);
+            
+            console.log('[Reply] ✓ Initialized');
+          }
+          
+          // Khởi tạo ngay hoặc khi DOM ready
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initialize);
+          } else {
+            setTimeout(initialize, 100);
+          }
+          
+          // Export để SignalR có thể gọi
+          window.__initReplyUi = initialize;
+        })();
 
         // ===== Realtime (SignalR) GIỮ NGUYÊN NHƯ CŨ, chỉ chứa phần realtime =====
         window.__initChatRealtime = function () {
@@ -647,11 +1178,23 @@
         const hhmm = isNaN(d) ? '' : fmtVN.format(d);
 
         meta.innerHTML =
-          '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
+          '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời" data-message-id="' + msg.messageId + '" data-sender-name="' + (senderName || '—') + '" data-snippet="' + (snippetThis || '') + '" onclick="window.handleReplyClickDirect(this); return false;" style="cursor: pointer !important; pointer-events: auto !important; z-index: 10 !important; position: relative !important;"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
           + '<span class="text-muted">' + hhmm + '</span>'
           + (isMine ? (function (s) { return s; })(statusHtml(msg.status || 'Sent')) : '');
 
         bubble.appendChild(meta);
+        
+        // Setup reply button ngay sau khi tạo
+        setTimeout(function() {
+          var newReplyBtn = meta.querySelector('.reply-btn');
+          if (newReplyBtn && window.handleReplyClickDirect) {
+            console.log('[Reply] Setting up new SignalR button');
+            newReplyBtn.style.pointerEvents = 'auto';
+            newReplyBtn.style.cursor = 'pointer';
+            newReplyBtn.style.zIndex = '10';
+            newReplyBtn.style.position = 'relative';
+          }
+        }, 10);
 
         wrap.appendChild(bubble);
         list.appendChild(wrap);
@@ -674,15 +1217,7 @@
           })();
         };
 
-        // Luôn khởi tạo Reply UI ngay
-        (function initUiEarly(){
-          // đợi chút cho DOM section này render xong
-          if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', window.__initReplyUi, { once:true });
-          } else {
-            window.__initReplyUi();
-          }
-        })();
+        // Reply system đã được khởi tạo tự động ở trên
 
         // Realtime: như cũ — nếu có sẵn signalR thì init ngay, nếu chưa thì nạp CDN rồi init
         (function ensureSignalRReady(){
