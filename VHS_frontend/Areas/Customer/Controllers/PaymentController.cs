@@ -5,6 +5,7 @@ using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 using VHS_frontend.Services.Customer;
 using VHS_frontend.Services.Customer.Interfaces;
 using VHS_frontend.Models.Payment;
+using Microsoft.AspNetCore.Http;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
@@ -193,6 +194,84 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         // ====== VNPay Integration - Standard Methods ======
+
+        /// <summary>
+        /// Start VNPay payment flow - được gọi từ BookingService sau khi place order
+        /// URL: /Customer/Payment/StartVnPay?bookingIds=...&amount=...
+        /// </summary>
+        [HttpGet]
+        public IActionResult StartVnPay([FromQuery] string? bookingIds, [FromQuery] string? amount)
+        {
+            if (NotLoggedIn())
+            {
+                TempData["ToastError"] = "Bạn cần đăng nhập.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            if (string.IsNullOrWhiteSpace(bookingIds))
+            {
+                TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
+
+            // Parse booking IDs
+            var bookingIdList = bookingIds
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                .Where(g => g != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (bookingIdList.Count == 0)
+            {
+                TempData["ToastError"] = "Danh sách booking không hợp lệ.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
+
+            // Parse amount
+            if (!decimal.TryParse(amount, NumberStyles.Any, CultureInfo.InvariantCulture, out var paymentAmount))
+            {
+                // Fallback: tính từ session
+                try
+                {
+                    paymentAmount = ComputeAmountFromSession(bookingIdList);
+                }
+                catch
+                {
+                    TempData["ToastError"] = "Không thể xác định số tiền thanh toán.";
+                    return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+                }
+            }
+
+            // Lưu booking IDs vào session để dùng khi callback
+            var bookingIdsCsv = string.Join(",", bookingIdList.Select(id => id.ToString()));
+            HttpContext.Session.SetString("CHECKOUT_PENDING_BOOKING_IDS", bookingIdsCsv);
+
+            // Tạo PaymentInformationModel cho VNPay
+            var paymentModel = new PaymentInformationModel
+            {
+                Name = HttpContext.Session.GetString("FullName") ?? "Customer",
+                OrderType = "other", // Loại đơn hàng
+                Amount = (double)paymentAmount, // Convert decimal to double
+                OrderDescription = $"BOOKINGS:{bookingIdsCsv}" // Format để parse lại khi callback
+            };
+
+            // Tạo URL thanh toán VNPay và redirect
+            var url = _vnPayService.CreatePaymentUrl(paymentModel, HttpContext);
+            return Redirect(url);
+        }
+
+        /// <summary>
+        /// Start MoMo payment flow - được gọi từ BookingService sau khi place order
+        /// URL: /Customer/Payment/StartMoMo?bookingIds=...&amount=...
+        /// </summary>
+        [HttpGet]
+        public IActionResult StartMoMo([FromQuery] string? bookingIds, [FromQuery] string? amount)
+        {
+            // TODO: Implement MoMo payment integration
+            TempData["ToastError"] = "Thanh toán MoMo chưa được hỗ trợ. Vui lòng chọn phương thức thanh toán khác.";
+            return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+        }
 
         /// <summary>
         /// Tạo URL thanh toán VNPay và chuyển hướng người dùng đến cổng thanh toán

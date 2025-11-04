@@ -52,6 +52,8 @@ namespace VHS_frontend.Services.Customer
                             WardName = item.TryGetProperty("wardName", out var ward) ? ward.GetString() ?? "" : "",
                             DistrictName = item.TryGetProperty("districtName", out var district) ? district.GetString() ?? "" : "",
                             ProvinceName = item.TryGetProperty("provinceName", out var province) ? province.GetString() ?? "" : "",
+                            RecipientName = item.TryGetProperty("recipientName", out var recName) && recName.ValueKind != JsonValueKind.Null ? recName.GetString() : null,
+                            RecipientPhone = item.TryGetProperty("recipientPhone", out var recPhone) && recPhone.ValueKind != JsonValueKind.Null ? recPhone.GetString() : null,
                             // ✅ Lấy tọa độ từ API
                             Latitude = item.TryGetProperty("latitude", out var lat) && lat.ValueKind != JsonValueKind.Null ? lat.GetDouble() : null,
                             Longitude = item.TryGetProperty("longitude", out var lng) && lng.ValueKind != JsonValueKind.Null ? lng.GetDouble() : null
@@ -99,6 +101,8 @@ namespace VHS_frontend.Services.Customer
                         WardName = data.TryGetProperty("wardName", out var ward) ? ward.GetString() ?? "" : "",
                         DistrictName = data.TryGetProperty("districtName", out var district) ? district.GetString() ?? "" : "",
                         ProvinceName = data.TryGetProperty("provinceName", out var province) ? province.GetString() ?? "" : "",
+                        RecipientName = data.TryGetProperty("recipientName", out var recName) && recName.ValueKind != JsonValueKind.Null ? recName.GetString() : null,
+                        RecipientPhone = data.TryGetProperty("recipientPhone", out var recPhone) && recPhone.ValueKind != JsonValueKind.Null ? recPhone.GetString() : null,
                         // ✅ Lấy tọa độ từ API
                         Latitude = data.TryGetProperty("latitude", out var lat) && lat.ValueKind != JsonValueKind.Null ? lat.GetDouble() : null,
                         Longitude = data.TryGetProperty("longitude", out var lng) && lng.ValueKind != JsonValueKind.Null ? lng.GetDouble() : null
@@ -118,7 +122,8 @@ namespace VHS_frontend.Services.Customer
         /// Tạo địa chỉ mới
         /// </summary>
         public async Task<ProfileResponseDTO> CreateAddressAsync(string provinceName, string districtName, 
-            string wardName, string streetAddress, double? latitude, double? longitude, string jwt)
+            string wardName, string streetAddress, double? latitude, double? longitude, 
+            string? recipientName, string? recipientPhone, string jwt)
         {
             try
             {
@@ -128,6 +133,8 @@ namespace VHS_frontend.Services.Customer
                     DistrictName = districtName,
                     WardName = wardName,
                     StreetAddress = streetAddress,
+                    RecipientName = recipientName,
+                    RecipientPhone = recipientPhone,
                     Latitude = latitude,
                     Longitude = longitude
                 };
@@ -136,6 +143,61 @@ namespace VHS_frontend.Services.Customer
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var request = new HttpRequestMessage(HttpMethod.Post, "/api/UserAddress")
+                {
+                    Content = content
+                };
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", jwt);
+
+                var response = await _httpClient.SendAsync(request);
+                var jsonString = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new ProfileResponseDTO { Success = false, Message = jsonString };
+                }
+
+                var result = JsonSerializer.Deserialize<JsonElement>(jsonString);
+
+                return new ProfileResponseDTO
+                {
+                    Success = result.TryGetProperty("success", out var success) && success.GetBoolean(),
+                    Message = result.TryGetProperty("message", out var message) ? message.GetString() ?? "" : ""
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ProfileResponseDTO { Success = false, Message = $"Lỗi: {ex.Message}" };
+            }
+        }
+
+        /// <summary>
+        /// Cập nhật địa chỉ
+        /// </summary>
+        public async Task<ProfileResponseDTO> UpdateAddressAsync(Guid addressId, string provinceName, string districtName,
+            string wardName, string streetAddress, double? latitude, double? longitude,
+            string? recipientName, string? recipientPhone, string jwt)
+        {
+            try
+            {
+                // Convert empty string to null for optional fields
+                var finalDistrictName = string.IsNullOrWhiteSpace(districtName) ? null : districtName;
+                
+                var dto = new
+                {
+                    ProvinceName = provinceName,
+                    DistrictName = finalDistrictName,
+                    WardName = wardName,
+                    StreetAddress = streetAddress,
+                    RecipientName = recipientName,
+                    RecipientPhone = recipientPhone,
+                    Latitude = latitude,
+                    Longitude = longitude
+                };
+
+                var json = JsonSerializer.Serialize(dto);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var request = new HttpRequestMessage(HttpMethod.Put, $"/api/UserAddress/{addressId}")
                 {
                     Content = content
                 };
