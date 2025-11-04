@@ -4,118 +4,148 @@
     Layout = "~/Areas/Provider/Views/_ProviderLayout.cshtml";
 }
 
+<link rel="stylesheet" href="~/css/provider-notification.css" asp-append-version="true" />
+
 <div class="notification-page">
     <!-- Header Stats -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, var(--primary), var(--primary-light));">
+    <div class="notification-stats">
+        <div class="stat-card stat-total">
+            <div class="stat-icon-wrapper">
+                <div class="stat-icon">
                     <i class="bi bi-bell-fill"></i>
                 </div>
-                <div class="stat-content">
-                    <h3>@ViewBag.Total</h3>
-                    <p>Tổng thông báo</p>
-                </div>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">@ViewBag.Total</h3>
+                <p class="stat-label">Tổng thông báo</p>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, var(--warning), #fb923c);">
+        <div class="stat-card stat-unread">
+            <div class="stat-icon-wrapper">
+                <div class="stat-icon">
                     <i class="bi bi-exclamation-circle-fill"></i>
                 </div>
-                <div class="stat-content">
-                    <h3>@ViewBag.Unread</h3>
-                    <p>Chưa đọc</p>
-                </div>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">@ViewBag.Unread</h3>
+                <p class="stat-label">Chưa đọc</p>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="stat-card">
-                <div class="stat-icon" style="background: linear-gradient(135deg, var(--success), #34d399);">
+        <div class="stat-card stat-read">
+            <div class="stat-icon-wrapper">
+                <div class="stat-icon">
                     <i class="bi bi-check-circle-fill"></i>
                 </div>
-                <div class="stat-content">
-                    <h3>@ViewBag.Read</h3>
-                    <p>Đã đọc</p>
-                </div>
+            </div>
+            <div class="stat-content">
+                <h3 class="stat-number">@ViewBag.Read</h3>
+                <p class="stat-label">Đã đọc</p>
             </div>
         </div>
     </div>
 
     <!-- Notifications Card -->
-    <div class="card notification-page-card">
-        <div class="card-header">
-            <h4 class="mb-0">
-                <i class="bi bi-inbox-fill"></i>
-                Hộp thư đến
-            </h4>
+    <div class="notification-page-card">
+        <div class="card-header-wrapper">
+            <div class="card-header">
+                <div class="header-left">
+                    <div class="header-icon">
+                        <i class="bi bi-inbox-fill"></i>
+                    </div>
+                    <div>
+                        <h4 class="card-title">Hộp thư đến</h4>
+                        <p class="card-subtitle">Quản lý tất cả thông báo của bạn</p>
+                    </div>
+                </div>
+                @if (ViewBag.Unread > 0 && Model != null && Model.Any())
+                {
+                    <button class="btn-mark-all-read" onclick="markAllNotificationsRead()" title="Đánh dấu tất cả đã đọc">
+                        <i class="bi bi-check-all"></i>
+                        <span>Đánh dấu tất cả</span>
+                    </button>
+                }
+            </div>
         </div>
-        <div class="card-body">
+        <div class="card-body-wrapper">
             @if (Model == null || !Model.Any())
             {
                 <div class="empty-state">
-                    <i class="bi bi-inbox"></i>
-                    <p class="mt-3 mb-0">Không có thông báo nào</p>
+                    <div class="empty-icon">
+                        <i class="bi bi-inbox"></i>
+                    </div>
+                    <h5>Không có thông báo nào</h5>
+                    <p>Bạn chưa có thông báo nào trong hộp thư đến</p>
                 </div>
             }
             else
             {
-                <div class="list-group">
+                <div class="notifications-list">
                     @foreach (var notification in Model)
                     {
-                        <div class="list-group-item @(notification.IsRead == true ? "" : "list-group-item-info") notification-type-@(notification.NotificationType?.ToLower() ?? "system")">
-                            <div class="d-flex w-100 justify-content-between align-items-start">
-                                <div class="flex-grow-1">
-                                    <div class="notification-detail">
-                                        <div class="d-flex align-items-center gap-2 mb-2">
-                                            @if (notification.IsRead != true)
-                                            {
-                                                <span class="badge badge-new">
-                                                    <i class="bi bi-circle-fill" style="font-size: 0.5rem;"></i> Mới
-                                                </span>
-                                            }
-                                            @if (!string.IsNullOrEmpty(notification.NotificationType))
-                                            {
-                                                <span class="badge badge-@(notification.NotificationType.ToLower())">
-                                                    @notification.NotificationType
-                                                </span>
-                                            }
-                                            <small class="text-muted ms-auto">
-                                                <i class="bi bi-clock"></i>
-                                                @(notification.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")
-                                            </small>
-                                        </div>
-                                        <h6>@notification.Content</h6>
+                        <div class="notification-card @(notification.IsRead == true ? "read" : "unread") notification-type-@(notification.NotificationType?.ToLower() ?? "system")">
+                            @if (notification.IsRead != true)
+                            {
+                                <span class="notification-indicator"></span>
+                            }
+                            <div class="notification-card-content">
+                                <div class="notification-card-header">
+                                    <div class="notification-badges">
+                                        @if (notification.IsRead != true)
+                                        {
+                                            <span class="badge badge-new">
+                                                <i class="bi bi-circle-fill"></i> Mới
+                                            </span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(notification.NotificationType))
+                                        {
+                                            <span class="badge badge-@(notification.NotificationType.ToLower())">
+                                                @notification.NotificationType
+                                            </span>
+                                        }
                                     </div>
+                                    <span class="notification-time-text">
+                                        <i class="bi bi-clock"></i>
+                                        @{
+                                            var timeAgo = "";
+                                            if (notification.CreatedAt.HasValue)
+                                            {
+                                                var diff = DateTime.Now - notification.CreatedAt.Value;
+                                                if (diff.TotalMinutes < 1) timeAgo = "Vừa xong";
+                                                else if (diff.TotalMinutes < 60) timeAgo = $"{(int)diff.TotalMinutes} phút trước";
+                                                else if (diff.TotalHours < 24) timeAgo = $"{(int)diff.TotalHours} giờ trước";
+                                                else if (diff.TotalDays < 7) timeAgo = $"{(int)diff.TotalDays} ngày trước";
+                                                else timeAgo = notification.CreatedAt.Value.ToString("dd/MM/yyyy HH:mm");
+                                            }
+                                            else
+                                            {
+                                                timeAgo = "N/A";
+                                            }
+                                        }
+                                        @timeAgo
+                                    </span>
                                 </div>
-                                <div class="ms-3 d-flex gap-2">
-                                    @if (notification.IsRead != true)
-                                    {
-                                        <button class="btn btn-sm btn-outline-success" 
-                                                onclick="markNotificationRead('@notification.NotificationId')" 
-                                                title="Đánh dấu đã đọc">
-                                            <i class="bi bi-check2"></i>
-                                        </button>
-                                    }
-                                    <button class="btn btn-sm btn-outline-danger" 
-                                            onclick="deleteNotification('@notification.NotificationId')" 
-                                            title="Xóa">
-                                        <i class="bi bi-trash3"></i>
+                                <div class="notification-card-text">
+                                    <p>@notification.Content</p>
+                                </div>
+                            </div>
+                            <div class="notification-card-actions">
+                                @if (notification.IsRead != true)
+                                {
+                                    <button class="btn-action btn-mark-read"
+                                            onclick="markNotificationRead('@notification.NotificationId')"
+                                            title="Đánh dấu đã đọc">
+                                        <i class="bi bi-check2"></i>
                                     </button>
-                                </div>
+                                }
+                                <button class="btn-action btn-delete"
+                                        onclick="deleteNotification('@notification.NotificationId')"
+                                        title="Xóa">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
                             </div>
                         </div>
                     }
                 </div>
-                
-                @if (ViewBag.Unread > 0)
-                {
-                    <div class="text-center mt-4">
-                        <button class="btn btn-primary" onclick="markAllNotificationsRead()">
-                            <i class="bi bi-check-all me-2"></i>Đánh dấu tất cả đã đọc
-                        </button>
-                    </div>
-                }
             }
         </div>
     </div>
@@ -145,7 +175,7 @@
 
         async function deleteNotification(id) {
             if (!confirm('Bạn có chắc muốn xóa thông báo này?')) return;
-            
+
             try {
                 const res = await fetch(`/Provider/ProviderNotification/Delete/${id}`, {
                     method: 'POST',

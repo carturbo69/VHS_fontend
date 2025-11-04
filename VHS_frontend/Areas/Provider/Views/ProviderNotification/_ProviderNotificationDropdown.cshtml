@@ -2,9 +2,12 @@
 
 @if (Model == null || !Model.Any())
 {
-    <li class="text-center py-3" style="color: var(--muted-fg);">
-        <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.5;"></i>
-        <small>Không có thông báo nào</small>
+    <li class="notification-empty">
+        <div class="empty-dropdown">
+            <i class="bi bi-bell-slash"></i>
+            <p>Không có thông báo nào</p>
+            <small>Bạn đã đọc tất cả thông báo</small>
+        </div>
     </li>
 }
 else
@@ -12,56 +15,60 @@ else
     @foreach (var notification in Model)
     {
         <li class="notification-item @(notification.IsRead == true ? "read" : "unread")" data-notification-id="@notification.NotificationId">
-            <a href="#" class="d-block text-decoration-none px-2 py-2" onclick="markProviderRead('@notification.NotificationId'); return false;">
-                <div class="notification-content">
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        @if (notification.IsRead != true)
-                        {
-                            <i class="bi bi-circle-fill" style="font-size: 0.4rem; color: var(--primary);"></i>
-                        }
+            <a href="#" class="notification-link" onclick="markProviderRead('@notification.NotificationId'); return false;">
+                @if (notification.IsRead != true)
+                {
+                    <span class="notification-dot"></span>
+                }
+                <div class="notification-content-wrapper">
+                    <div class="notification-header">
                         @if (!string.IsNullOrEmpty(notification.NotificationType))
                         {
-                            <span class="badge badge-@(notification.NotificationType.ToLower())">@notification.NotificationType</span>
+                            <span class="notification-badge badge-@(notification.NotificationType.ToLower())">@notification.NotificationType</span>
                         }
+                        <span class="notification-time">
+                            <i class="bi bi-clock"></i>
+                            @{
+                                var timeAgo = "";
+                                if (notification.CreatedAt.HasValue)
+                                {
+                                    var diff = DateTime.Now - notification.CreatedAt.Value;
+                                    if (diff.TotalMinutes < 1) timeAgo = "Vừa xong";
+                                    else if (diff.TotalMinutes < 60) timeAgo = $"{(int)diff.TotalMinutes} phút trước";
+                                    else if (diff.TotalHours < 24) timeAgo = $"{(int)diff.TotalHours} giờ trước";
+                                    else if (diff.TotalDays < 7) timeAgo = $"{(int)diff.TotalDays} ngày trước";
+                                    else timeAgo = notification.CreatedAt.Value.ToString("dd/MM/yyyy");
+                                }
+                                else
+                                {
+                                    timeAgo = "N/A";
+                                }
+                            }
+                            @timeAgo
+                        </span>
                     </div>
                     <div class="notification-text">@notification.Content</div>
-                    <div class="notification-meta mt-1">
-                        <small>
-                            <i class="bi bi-clock" style="font-size: 0.75rem;"></i>
-                            @(notification.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")
-                        </small>
-                    </div>
                 </div>
+                <button class="notification-delete-btn" 
+                        title="Xóa" 
+                        onclick="deleteProviderNotification('@notification.NotificationId'); event.stopPropagation(); return false;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </a>
-            <button class="btn btn-sm" style="position: absolute; top: 8px; right: 8px; border: none; background: transparent; color: var(--danger); opacity: 0.6;" 
-                    title="Xóa" 
-                    onclick="deleteProviderNotification('@notification.NotificationId'); event.stopPropagation(); return false;"
-                    onmouseover="this.style.opacity='1'"
-                    onmouseout="this.style.opacity='0.6'">
-                <i class="bi bi-x-lg" style="font-size: 0.9rem;"></i>
-            </button>
         </li>
     }
     
-    <hr class="my-2" style="border-color: var(--border); opacity: 0.5;">
-    <li style="padding: 4px;">
-        <a href="#" class="d-block text-center text-decoration-none py-2 px-2" 
-           style="color: var(--primary); font-weight: 500; border-radius: 8px; transition: all 0.2s ease;"
-           onclick="markProviderAllRead(); return false;"
-           onmouseover="this.style.background='var(--muted)'"
-           onmouseout="this.style.background='transparent'">
-            <i class="bi bi-check-all me-1"></i>
-            Đánh dấu tất cả đã đọc
-        </a>
-    </li>
-    <li style="padding: 4px;">
-        <a href="/Provider/ProviderNotification/Index" class="d-block text-center text-decoration-none py-2 px-2" 
-           style="color: var(--fg); font-weight: 500; border-radius: 8px; transition: all 0.2s ease;"
-           onmouseover="this.style.background='var(--muted)'"
-           onmouseout="this.style.background='transparent'">
-            <i class="bi bi-inbox-fill me-1"></i>
-            Xem tất cả thông báo
-        </a>
+    <li class="notification-footer">
+        <div class="footer-actions">
+            <a href="#" class="footer-btn mark-all-read" onclick="markProviderAllRead(); return false;">
+                <i class="bi bi-check-all"></i>
+                <span>Đánh dấu tất cả đã đọc</span>
+            </a>
+            <a href="/Provider/ProviderNotification/Index" class="footer-btn view-all">
+                <i class="bi bi-inbox-fill"></i>
+                <span>Xem tất cả</span>
+            </a>
+        </div>
     </li>
 }
 

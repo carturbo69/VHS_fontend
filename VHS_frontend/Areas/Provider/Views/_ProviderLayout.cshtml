@@ -87,6 +87,11 @@
                 <i class="bi bi-person-gear"></i><span>Thông tin cá nhân</span>
             </a>
 
+            <a asp-area="Provider" asp-controller="ProviderNotification" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderNotification" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderNotification" ? "page" : null)">
+                <i class="bi bi-bell"></i><span>Thông báo</span>
+            </a>
         </nav>
     </aside>
 
@@ -108,6 +113,7 @@
             <div class="right">
 
                 <!-- Chat -->
+                <div>
                 <a asp-area="Provider" asp-controller="ChatProvider" asp-action="Index"
                    class="icon-btn chat-btn" aria-label="Chat">
                     <svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -118,7 +124,7 @@
                     </svg>
                     <span class="chat-badge" data-chat-count>0</span>
                 </a>
-
+                </div>
                 <!-- Notifications -->
                 <div class="notif">
                     <button id="notificationBtn" class="btn btn-link notif-btn" aria-expanded="false" aria-label="Notifications">
@@ -203,7 +209,7 @@
     updateProviderChatUnreadCount();            // gọi ngay khi load
     setInterval(updateProviderChatUnreadCount, 30000); // 30s/lần
   });
-        // =========================
+                // =========================
         // Sidebar: giữ trạng thái + chống giật khi load
         // =========================
         (function () {
@@ -275,22 +281,16 @@
         })();
 
         // =========================
-        // Notifications
+        // Notifications - Sử dụng API thật
         // =========================
         (function () {
-          const proxyBase = '/notification-proxy';
           const notifBtn   = document.getElementById('notificationBtn');
           const notifMenu  = document.getElementById('notificationMenu');
           const notifBadge = document.getElementById('notificationBadge');
 
           async function loadUnreadCount() {
             try {
-              const res = await fetch(`${proxyBase}/unread-count`);
-              if (!res.ok) {
-                // Service not available, hide notification badge
-                notifBadge.style.display = 'none';
-                return;
-              }
+              const res = await fetch('/Provider/ProviderNotification/GetUnreadCount');
               const dto = await res.json();
               if (dto.count > 0) {
                 notifBadge.textContent = dto.count;
@@ -298,82 +298,122 @@
               } else {
                 notifBadge.style.display = 'none';
               }
-            } catch (e) { 
-              // Silently fail - notification service not available
+            } catch (e) {
+              console.error('Error loading unread count:', e);
               notifBadge.style.display = 'none';
             }
           }
 
           async function loadNotifications() {
             try {
-              const res = await fetch(`${proxyBase}/unread-list`);
-              const list = await res.json();
-              notifMenu.innerHTML = '';
-              if (!list.length) {
-                notifMenu.innerHTML = '<li class="text-center text-muted py-2">No notifications</li>';
-                return;
-              }
-              list.forEach(n => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                  <a href="#" class="d-block text-decoration-none px-2 py-1" onclick="markRead('${n.notificationId}')">
-                    <div class="small text-muted">${new Date(n.createdAt).toLocaleString()}</div>
-                    <div>${n.content}</div>
-                    <div><strong>Booking Status:</strong> ${n.bookingStatus}</div>
-                  </a>`;
-                notifMenu.appendChild(li);
+              const res = await fetch('/Provider/ProviderNotification/GetNotificationsPartial');
+              const html = await res.text();
+              notifMenu.innerHTML = html;
+            } catch (e) {
+              console.error('Error loading notifications:', e);
+              notifMenu.innerHTML = '<li class="text-center text-muted py-2">Không thể tải thông báo</li>';
+            }
+          }
+
+          async function markProviderRead(id) {
+            try {
+              const res = await fetch(`/Provider/ProviderNotification/MarkAsRead/${id}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
               });
-              const hr = document.createElement('hr');
-              notifMenu.appendChild(hr);
-              const all = document.createElement('li');
-              all.innerHTML = `<a href="#" class="d-block text-center text-decoration-none py-1" onclick="markAllRead()">Mark all as read</a>`;
-              notifMenu.appendChild(all);
-            } catch (e) { console.error(e); }
-          }
-
-          async function markRead(id) {
-            try {
-              await fetch(`${proxyBase}/mark-read/${id}`, { method: 'PUT' });
-              await loadUnreadCount();
-              await loadNotifications();
-            } catch (e) { console.error(e); }
-          }
-
-          async function markAllRead() {
-            try {
-              const res = await fetch(`${proxyBase}/unread-list`);
-              const list = await res.json();
-              for (const n of list) {
-                await fetch(`${proxyBase}/mark-read/${n.notificationId}`, { method: 'PUT' });
+              const result = await res.json();
+              if (result.success) {
+                await loadUnreadCount();
+                await loadNotifications();
               }
-              await loadUnreadCount();
-              await loadNotifications();
-            } catch (e) { console.error(e); }
+            } catch (e) {
+              console.error('Error marking as read:', e);
+            }
+          }
+
+          async function markProviderAllRead() {
+            try {
+              const res = await fetch('/Provider/ProviderNotification/MarkAllAsRead', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+              const result = await res.json();
+              if (result.success) {
+                await loadUnreadCount();
+                await loadNotifications();
+              }
+            } catch (e) {
+              console.error('Error marking all as read:', e);
+            }
           }
 
           // Gắn vào window để onclick trong HTML dùng được
-          window.markRead = markRead;
-          window.markAllRead = markAllRead;
-
-          // Toggle popup
-          if (notifBtn && notifMenu) {
-            notifBtn.addEventListener('click', async (e) => {
-              e.stopPropagation();
-              const open = notifMenu.style.display === 'block';
-              if (open) {
-                notifMenu.style.display = 'none';
-                notifBtn.setAttribute('aria-expanded', 'false');
-              } else {
+          window.markProviderRead = markProviderRead;
+          window.markProviderAllRead = markProviderAllRead;
+          window.deleteProviderNotification = async function(id) {
+            try {
+              const res = await fetch(`/Provider/ProviderNotification/Delete/${id}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+              const result = await res.json();
+              if (result.success) {
+                await loadUnreadCount();
                 await loadNotifications();
-                notifMenu.style.display = 'block';
-                notifBtn.setAttribute('aria-expanded', 'true');
               }
+            } catch (e) {
+              console.error('Error deleting notification:', e);
+            }
+          }
+
+          // Toggle / Hover popup
+          function isOpen() {
+            return notifMenu.style.display === 'block';
+          }
+          async function openMenu() {
+            if (!isOpen()) {
+              await loadNotifications();
+              notifMenu.style.display = 'block';
+              notifBtn.setAttribute('aria-expanded', 'true');
+            }
+          }
+          function closeMenu() {
+            if (isOpen()) {
+              notifMenu.style.display = 'none';
+              notifBtn.setAttribute('aria-expanded', 'false');
+            }
+          }
+
+          if (notifBtn && notifMenu) {
+            // Hover to open/close
+            let hoverTimer;
+            notifBtn.addEventListener('mouseenter', async () => {
+              clearTimeout(hoverTimer);
+              await openMenu();
+            });
+            notifBtn.addEventListener('mouseleave', () => {
+              // Delay nhẹ để cho phép di chuột sang menu mà không đóng ngay
+              hoverTimer = setTimeout(() => {
+                if (!notifMenu.matches(':hover')) closeMenu();
+              }, 120);
+            });
+            notifMenu.addEventListener('mouseleave', () => {
+              closeMenu();
+            });
+            notifMenu.addEventListener('mouseenter', () => {
+              clearTimeout(hoverTimer);
             });
 
+            // Click outside để đóng (desktop/mobile)
             document.addEventListener('click', (e) => {
               if (!notifBtn.contains(e.target) && !notifMenu.contains(e.target)) {
-                notifMenu.style.display = 'none';
-                notifBtn.setAttribute('aria-expanded', 'false');
+                closeMenu();
               }
             });
           }
@@ -381,6 +421,7 @@
           // Khởi chạy
           document.addEventListener('DOMContentLoaded', () => {
             loadUnreadCount();
+            // Cập nhật mỗi 30 giây
             setInterval(loadUnreadCount, 30000);
           });
         })();
