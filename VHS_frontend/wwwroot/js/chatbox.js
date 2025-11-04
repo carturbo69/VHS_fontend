@@ -16,7 +16,6 @@ console.log('=== chatbox.js LOADED ===');
     // Initialize
     let jwt = null;
     let conversationId = null;
-    let isMinimized = false;
 
     // Generate unique session ID
     function generateSessionId() {
@@ -33,9 +32,39 @@ console.log('=== chatbox.js LOADED ===');
         input: document.getElementById('chatboxInput'),
         sendBtn: document.getElementById('chatboxSendBtn'),
         closeBtn: document.getElementById('chatboxClose'),
-        minimizeBtn: document.getElementById('chatboxMinimize'),
-        quickActions: document.getElementById('chatboxQuickActions')
+        quickActions: document.getElementById('chatboxQuickActions'),
+        header: document.querySelector('.chatbox-header')
     };
+    
+    // Drag and drop state
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+    let currentPosition = { bottom: 100, right: 30 };
+    
+    // Toggle button drag and drop state
+    let isToggleDragging = false;
+    let toggleDragOffset = { x: 0, y: 0 };
+    let togglePosition = { bottom: 30, right: 30 };
+
+    // Apply dark mode based on user's system preference or body class
+    function applyDarkMode() {
+        if (!elements.container) return;
+        
+        // Check if body or html has dark class
+        const isDarkMode = document.body.classList.contains('dark') || 
+                         document.documentElement.classList.contains('dark') ||
+                         document.body.classList.contains('dark-mode') ||
+                         (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        
+        if (isDarkMode) {
+            elements.container.classList.add('dark');
+            elements.container.classList.remove('light-mode');
+        } else {
+            elements.container.classList.remove('dark');
+        }
+        
+        console.log('[Chatbox] Dark mode:', isDarkMode ? 'ON' : 'OFF');
+    }
 
     // Initialize chatbox
     function init() {
@@ -48,14 +77,42 @@ console.log('=== chatbox.js LOADED ===');
             return;
         }
         
+        // Apply dark mode
+        applyDarkMode();
+        
+        // Watch for dark mode changes
+        if (window.matchMedia) {
+            const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            darkModeQuery.addEventListener('change', applyDarkMode);
+        }
+        
+        // Watch for body class changes (if user toggles dark mode)
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    applyDarkMode();
+                }
+            });
+        });
+        
+        if (document.body) {
+            observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        }
+        if (document.documentElement) {
+            observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        }
+        
         // Get JWT token from session or cookie
         jwt = getJWTToken();
         console.log('[Chatbox] JWT:', jwt ? 'Found' : 'Not found');
         
+        // Load saved positions
+        loadSavedPosition();
+        loadTogglePosition();
+        
         // Add event listeners
-        elements.toggle.addEventListener('click', toggleChatbox);
+        // Note: toggle button click is handled in initToggleDragAndDrop
         elements.closeBtn.addEventListener('click', closeChatbox);
-        elements.minimizeBtn.addEventListener('click', minimizeChatbox);
         elements.sendBtn.addEventListener('click', sendMessage);
         elements.input.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -63,6 +120,14 @@ console.log('=== chatbox.js LOADED ===');
                 sendMessage();
             }
         });
+        
+        // Drag and drop functionality for chatbox
+        if (elements.header) {
+            initDragAndDrop();
+        }
+        
+        // Drag and drop functionality for toggle button
+        initToggleDragAndDrop();
 
         console.log('[Chatbox] Event listeners attached');
 
@@ -108,8 +173,12 @@ console.log('=== chatbox.js LOADED ===');
 
     // Toggle chatbox
     function toggleChatbox() {
+        const isOpen = elements.container.classList.contains('open');
         elements.container.classList.toggle('open');
-        if (elements.container.classList.contains('open')) {
+        
+        if (!isOpen) {
+            // Chatbox is opening - ensure position is applied
+            applyPosition(currentPosition);
             loadConversation();
         }
     }
@@ -117,16 +186,279 @@ console.log('=== chatbox.js LOADED ===');
     // Close chatbox
     function closeChatbox() {
         elements.container.classList.remove('open');
-        isMinimized = false;
     }
-
-    // Minimize chatbox
-    function minimizeChatbox() {
-        isMinimized = !isMinimized;
-        if (isMinimized) {
-            elements.container.style.height = '60px';
+    
+    // Load saved position from localStorage
+    function loadSavedPosition() {
+        if (!elements.container) return;
+        
+        const saved = localStorage.getItem('chatbox_position');
+        if (saved) {
+            try {
+                const pos = JSON.parse(saved);
+                currentPosition = pos;
+                applyPosition(pos);
+                console.log('[Chatbox] Loaded saved position:', pos);
+            } catch (e) {
+                console.log('[Chatbox] Failed to load saved position:', e);
+            }
         } else {
-            elements.container.style.height = '500px';
+            // Apply default position
+            applyPosition(currentPosition);
+        }
+    }
+    
+    // Save position to localStorage
+    function savePosition() {
+        try {
+            localStorage.setItem('chatbox_position', JSON.stringify(currentPosition));
+            console.log('[Chatbox] Saved position:', currentPosition);
+        } catch (e) {
+            console.error('[Chatbox] Failed to save position:', e);
+        }
+    }
+    
+    // Apply position to container
+    function applyPosition(pos) {
+        if (!elements.container) return;
+        
+        // Always apply position, even when container is hidden
+        elements.container.style.bottom = pos.bottom + 'px';
+        elements.container.style.right = pos.right + 'px';
+        elements.container.style.top = 'auto';
+        elements.container.style.left = 'auto';
+    }
+    
+    // Initialize drag and drop
+    function initDragAndDrop() {
+        const header = elements.header;
+        const container = elements.container;
+        
+        header.addEventListener('mousedown', startDrag);
+        
+        function startDrag(e) {
+            // Don't drag if clicking on buttons or interactive elements
+            if (e.target.closest('.chatbox-btn') || e.target.closest('.chatbox-actions')) {
+                return;
+            }
+            
+            isDragging = true;
+            container.classList.add('dragging');
+            
+            const rect = container.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.right;
+            dragOffset.y = e.clientY - (window.innerHeight - rect.bottom);
+            
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', stopDrag);
+            
+            e.preventDefault();
+        }
+        
+        function onDrag(e) {
+            if (!isDragging) return;
+            
+            const containerRect = container.getBoundingClientRect();
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // Calculate new position
+            let newRight = windowWidth - e.clientX - dragOffset.x;
+            let newBottom = windowHeight - e.clientY - dragOffset.y;
+            
+            // Constrain to viewport
+            const minRight = 10;
+            const maxRight = windowWidth - containerRect.width - 10;
+            const minBottom = 10;
+            const maxBottom = windowHeight - containerRect.height - 10;
+            
+            newRight = Math.max(minRight, Math.min(maxRight, newRight));
+            newBottom = Math.max(minBottom, Math.min(maxBottom, newBottom));
+            
+            currentPosition.right = newRight;
+            currentPosition.bottom = newBottom;
+            
+            applyPosition(currentPosition);
+        }
+        
+        function stopDrag(e) {
+            if (isDragging) {
+                isDragging = false;
+                container.classList.remove('dragging');
+                
+                // Ensure position is updated before saving
+                const containerRect = container.getBoundingClientRect();
+                const windowWidth = window.innerWidth;
+                const windowHeight = window.innerHeight;
+                
+                let finalRight = windowWidth - containerRect.right;
+                let finalBottom = windowHeight - containerRect.bottom;
+                
+                // Constrain to viewport
+                const minRight = 10;
+                const maxRight = windowWidth - containerRect.width - 10;
+                const minBottom = 10;
+                const maxBottom = windowHeight - containerRect.height - 10;
+                
+                finalRight = Math.max(minRight, Math.min(maxRight, finalRight));
+                finalBottom = Math.max(minBottom, Math.min(maxBottom, finalBottom));
+                
+                currentPosition.right = finalRight;
+                currentPosition.bottom = finalBottom;
+                
+                applyPosition(currentPosition);
+                savePosition();
+                
+                console.log('[Chatbox] Drag stopped, position saved:', currentPosition);
+            }
+            
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+    }
+    
+    // Load saved toggle button position
+    function loadTogglePosition() {
+        if (!elements.toggle) return;
+        
+        const saved = localStorage.getItem('chatbox_toggle_position');
+        if (saved) {
+            try {
+                const pos = JSON.parse(saved);
+                togglePosition = pos;
+                applyTogglePosition(pos);
+                console.log('[Chatbox] Loaded saved toggle position:', pos);
+            } catch (e) {
+                console.log('[Chatbox] Failed to load saved toggle position:', e);
+            }
+        } else {
+            applyTogglePosition(togglePosition);
+        }
+    }
+    
+    // Save toggle button position
+    function saveTogglePosition() {
+        try {
+            localStorage.setItem('chatbox_toggle_position', JSON.stringify(togglePosition));
+            console.log('[Chatbox] Saved toggle position:', togglePosition);
+        } catch (e) {
+            console.error('[Chatbox] Failed to save toggle position:', e);
+        }
+    }
+    
+    // Apply toggle button position
+    function applyTogglePosition(pos) {
+        if (!elements.toggle) return;
+        elements.toggle.style.bottom = pos.bottom + 'px';
+        elements.toggle.style.right = pos.right + 'px';
+        elements.toggle.style.top = 'auto';
+        elements.toggle.style.left = 'auto';
+    }
+    
+    // Initialize toggle button drag and drop
+    function initToggleDragAndDrop() {
+        if (!elements.toggle) return;
+        
+        const toggle = elements.toggle;
+        let startX = 0, startY = 0;
+        let startRight = 0, startBottom = 0;
+        
+        toggle.addEventListener('mousedown', startToggleDrag);
+        
+        function startToggleDrag(e) {
+            // Prevent default to avoid text selection
+            e.preventDefault();
+            
+            // Get initial mouse position
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            // Get initial button position
+            const rect = toggle.getBoundingClientRect();
+            startRight = window.innerWidth - rect.right;
+            startBottom = window.innerHeight - rect.bottom;
+            
+            isToggleDragging = false;
+            
+            // Add listeners to document
+            document.addEventListener('mousemove', onToggleDrag);
+            document.addEventListener('mouseup', stopToggleDrag);
+        }
+        
+        function onToggleDrag(e) {
+            // Calculate how much mouse moved
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            const moved = Math.abs(deltaX) + Math.abs(deltaY);
+            
+            // Only start dragging if mouse moved more than 5px
+            if (!isToggleDragging) {
+                if (moved < 5) return; // Not dragging yet, just a click
+                isToggleDragging = true;
+                toggle.classList.add('dragging');
+                // Prevent click event when dragging
+                toggle.style.pointerEvents = 'none';
+            }
+            
+            // Calculate new position based on initial position + mouse movement
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            let newRight = startRight - deltaX; // Move left when mouse moves right
+            let newBottom = startBottom - deltaY; // Move up when mouse moves down
+            
+            // Constrain to viewport
+            const minRight = 10;
+            const maxRight = windowWidth - toggle.offsetWidth - 10;
+            const minBottom = 10;
+            const maxBottom = windowHeight - toggle.offsetHeight - 10;
+            
+            newRight = Math.max(minRight, Math.min(maxRight, newRight));
+            newBottom = Math.max(minBottom, Math.min(maxBottom, newBottom));
+            
+            togglePosition.right = newRight;
+            togglePosition.bottom = newBottom;
+            
+            applyTogglePosition(togglePosition);
+        }
+        
+        function stopToggleDrag(e) {
+            // Remove listeners
+            document.removeEventListener('mousemove', onToggleDrag);
+            document.removeEventListener('mouseup', stopToggleDrag);
+            
+            if (isToggleDragging) {
+                isToggleDragging = false;
+                toggle.classList.remove('dragging');
+                toggle.style.pointerEvents = '';
+                
+                // Final position adjustment
+                const rect = toggle.getBoundingClientRect();
+                const windowWidth = window.innerWidth;
+                const windowHeight = window.innerHeight;
+                
+                let finalRight = windowWidth - rect.right;
+                let finalBottom = windowHeight - rect.bottom;
+                
+                const minRight = 10;
+                const maxRight = windowWidth - toggle.offsetWidth - 10;
+                const minBottom = 10;
+                const maxBottom = windowHeight - toggle.offsetHeight - 10;
+                
+                finalRight = Math.max(minRight, Math.min(maxRight, finalRight));
+                finalBottom = Math.max(minBottom, Math.min(maxBottom, finalBottom));
+                
+                togglePosition.right = finalRight;
+                togglePosition.bottom = finalBottom;
+                
+                applyTogglePosition(togglePosition);
+                saveTogglePosition();
+                
+                console.log('[Chatbox] Toggle drag stopped, position saved:', togglePosition);
+            } else {
+                // It was just a click, toggle chatbox
+                toggleChatbox();
+            }
         }
     }
 
@@ -191,7 +523,7 @@ console.log('=== chatbox.js LOADED ===');
 
         welcomeMessages.forEach((msg, index) => {
             setTimeout(() => {
-                displayMessage(msg, 'AI', new Date());
+                displayMessage(msg, 'AI', getVietnamTime());
             }, index * 200);
         });
     }
@@ -206,7 +538,7 @@ console.log('=== chatbox.js LOADED ===');
         console.log('[Chatbox] ConversationId:', conversationId);
 
         // Display user message
-        displayMessage(content, 'User', new Date());
+        displayMessage(content, 'User', getVietnamTime());
         elements.input.value = '';
         elements.sendBtn.disabled = true;
 
@@ -253,9 +585,9 @@ console.log('=== chatbox.js LOADED ===');
                 const messageContent = data.Content || data.content || data.MessageContent || data.messageContent;
                 
                 if (messageContent) {
-                    displayMessage(messageContent, 'AI', new Date());
+                    displayMessage(messageContent, 'AI', getVietnamTime());
                 } else {
-                    displayMessage('Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.', 'AI', new Date());
+                    displayMessage('Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.', 'AI', getVietnamTime());
                     console.warn('[Chatbox] No message content found in response:', data);
                 }
 
@@ -268,12 +600,12 @@ console.log('=== chatbox.js LOADED ===');
                 const errorText = await response.text();
                 console.error('[Chatbox] Error response:', response.status, errorText);
                 hideTypingIndicator();
-                displayMessage('Xin lỗi, đã xảy ra lỗi (' + response.status + '). Vui lòng thử lại.', 'AI', new Date());
+                displayMessage('Xin lỗi, đã xảy ra lỗi (' + response.status + '). Vui lòng thử lại.', 'AI', getVietnamTime());
             }
         } catch (error) {
             console.error('[Chatbox] Error sending message:', error);
             hideTypingIndicator();
-            displayMessage('Không thể kết nối đến server. Vui lòng thử lại sau.', 'AI', new Date());
+            displayMessage('Không thể kết nối đến server. Vui lòng thử lại sau.', 'AI', getVietnamTime());
         } finally {
             elements.sendBtn.disabled = false;
         }
@@ -451,19 +783,57 @@ console.log('=== chatbox.js LOADED ===');
         elements.messages.scrollTop = elements.messages.scrollHeight;
     }
 
-    // Format time
+    // Get Vietnam time (UTC+7)
+    function getVietnamTime(date) {
+        if (!date) {
+            // Get current time in Vietnam timezone
+            const now = new Date();
+            const vietnamTimeString = now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
+            return new Date(vietnamTimeString);
+        }
+        if (typeof date === 'string') {
+            date = new Date(date);
+        }
+        // Convert to Vietnam time (UTC+7)
+        // Get the time string in Vietnam timezone
+        const vietnamTimeString = date.toLocaleString('en-US', { 
+            timeZone: 'Asia/Ho_Chi_Minh',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+        return new Date(vietnamTimeString);
+    }
+    
+    // Format time (Vietnam timezone)
     function formatTime(date) {
         if (typeof date === 'string') {
             date = new Date(date);
         }
-        const now = new Date();
-        const diffMs = now - date;
+        
+        // Get current Vietnam time
+        const now = getVietnamTime();
+        const messageTime = getVietnamTime(date);
+        
+        const diffMs = now - messageTime;
         const diffMins = Math.floor(diffMs / 60000);
 
         if (diffMins < 1) return 'Vừa xong';
         if (diffMins < 60) return `${diffMins} phút trước`;
         if (diffMins < 1440) return `${Math.floor(diffMins / 60)} giờ trước`;
-        return date.toLocaleDateString('vi-VN');
+        
+        // Format date in Vietnam locale
+        return messageTime.toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     }
 
     // Escape HTML
