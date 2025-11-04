@@ -45,10 +45,28 @@ namespace VHS_frontend.Services.Customer.Implementations
         {
             try
             {
-                return await _httpClient.GetFromJsonAsync<ServiceDetailDTOs>($"api/Services/{serviceId}");
+                var url = $"api/Services/{serviceId}";
+                Console.WriteLine($"[ServiceCustomerService] GET {url}");
+                var res = await _httpClient.GetAsync(url);
+                Console.WriteLine($"[ServiceCustomerService] Status: {res.StatusCode}");
+                if (!res.IsSuccessStatusCode)
+                {
+                    var err = await res.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[ServiceCustomerService] Error body: {err}");
+                    return null;
+                }
+                var dto = await res.Content.ReadFromJsonAsync<ServiceDetailDTOs>(_json);
+                Console.WriteLine($"[ServiceCustomerService] Parsed DTO: {(dto != null ? "OK" : "NULL")}");
+                return dto;
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException ex)
             {
+                Console.WriteLine($"[ServiceCustomerService] HttpRequestException: {ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ServiceCustomerService] Exception: {ex.Message}");
                 return null;
             }
         }

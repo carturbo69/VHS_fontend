@@ -1,0 +1,361 @@
+@model VHS_frontend.Areas.Provider.Models.Service.ServiceProviderUpdateDTO
+@{
+    ViewData["Title"] = "Chỉnh sửa Dịch vụ";
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+    var serviceId = ViewBag.ServiceId as string;
+    var currentImageUrl = ViewBag.CurrentImageUrl as string;
+    var categoryName = ViewBag.CategoryName as string;
+    var tags = ViewBag.Tags as List<VHS_frontend.Areas.Provider.Models.Service.TagDTO> ?? new List<VHS_frontend.Areas.Provider.Models.Service.TagDTO>();
+    var options = ViewBag.Options as List<VHS_frontend.Areas.Provider.Models.Service.OptionDTO> ?? new List<VHS_frontend.Areas.Provider.Models.Service.OptionDTO>();
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/service-management.css" asp-append-version="true" />
+}
+
+<div class="service-management-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>
+            <i class="bi bi-pencil me-2"></i>
+            Chỉnh sửa Dịch vụ
+        </h3>
+        <a asp-action="Index" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-1"></i>
+            Quay lại
+        </a>
+    </div>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">Thông tin Dịch vụ</h5>
+        </div>
+        <div class="card-body">
+            <form asp-action="Edit" asp-route-id="@serviceId" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+
+                <div class="row">
+                    <!-- Category (Read-only) -->
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Danh mục</label>
+                        <input type="text" class="form-control" value="@categoryName" readonly />
+                        <small class="form-text text-muted">Danh mục không thể thay đổi sau khi tạo.</small>
+                    </div>
+
+                    <!-- Title -->
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Title" class="form-label">Tên dịch vụ <span class="text-danger">*</span></label>
+                        <input asp-for="Title" class="form-control" placeholder="VD: Dọn dẹp nhà ở" required />
+                        <span asp-validation-for="Title" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label">Mô tả</label>
+                    <textarea asp-for="Description" class="form-control" rows="4" placeholder="Mô tả chi tiết về dịch vụ..."></textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+
+                <div class="row">
+                    <!-- Price -->
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="Price" class="form-label">Giá (VNĐ) <span class="text-danger">*</span></label>
+                        <input asp-for="Price" asp-format="{0:0}" type="number" class="form-control" min="0" step="1000" placeholder="0" required />
+                        <span asp-validation-for="Price" class="text-danger"></span>
+                    </div>
+
+                    <!-- Unit Type -->
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="UnitType" class="form-label">Đơn vị tính <span class="text-danger">*</span></label>
+                        <select asp-for="UnitType" class="form-select" required>
+                            <option value="">-- Chọn đơn vị --</option>
+                            <option value="Hour">Hour (Giờ)</option>
+                            <option value="Day">Day (Ngày)</option>
+                            <option value="Unit">Unit (Lần/Căn/Phòng)</option>
+                        </select>
+                        <span asp-validation-for="UnitType" class="text-danger"></span>
+                    </div>
+
+                    <!-- Base Unit -->
+                    <div class="col-md-4 mb-3">
+                        <label asp-for="BaseUnit" class="form-label">Đơn vị cơ bản <span class="text-danger">*</span></label>
+                        <input asp-for="BaseUnit" type="number" class="form-control" min="1" placeholder="1" required />
+                        <span asp-validation-for="BaseUnit" class="text-danger"></span>
+                        <small class="form-text text-muted">Số lượng tối thiểu</small>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div class="mb-3">
+                    <label asp-for="Status" class="form-label">Trạng thái</label>
+                    <select asp-for="Status" class="form-select">
+                        <option value="Active">Hoạt động</option>
+                        <option value="Inactive">Không hoạt động</option>
+                    </select>
+                    <span asp-validation-for="Status" class="text-danger"></span>
+                </div>
+
+                <!-- Images (Gộp avatar + ảnh mô tả) -->
+                <div class="mb-3">
+                    <label class="form-label">Hình ảnh dịch vụ</label>
+                    @{
+                        var imagesCsv = currentImageUrl ?? string.Empty;
+                        var imgs = imagesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                        var avatar = imgs.FirstOrDefault();
+                        var descImgs = imgs.Skip(1).ToList();
+                        string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
+                    }
+
+                    <!-- Hình ảnh hiện tại (gộp avatar + mô tả) -->
+                    <div class="mb-3">
+                        <div class="image-inline-gallery d-flex align-items-start gap-3 flex-wrap">
+                            <div class="avatar-block">
+                                @if (!string.IsNullOrEmpty(avatar))
+                                {
+                                    var avatarUrl = ToUrl(avatar);
+                                    <img src="@avatarUrl" alt="Avatar" class="img-thumbnail shadow-sm avatar-img"
+                                         onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Không thể tải ảnh</div>';" />
+                                }
+                                else
+                                {
+                                    <div class="no-image-placeholder-large"></div>
+                                }
+                            </div>
+                            <div class="thumbs d-flex flex-row flex-wrap gap-2">
+                                @if (descImgs.Any())
+                                {
+                                    @foreach (var p in descImgs)
+                                    {
+                                        var u = ToUrl(p);
+                                        <img src="@u" class="img-thumbnail thumb-img" alt="Desc"
+                                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning p-2\'>Lỗi ảnh</div>';" />
+                                    }
+                                }
+                            </div>
+                        </div>
+                        <input name="Images" type="file" class="form-control mt-3" accept="image/*" multiple />
+                        <span asp-validation-for="Images" class="text-danger"></span>
+                        <small class="form-text text-muted">Chọn 1 hoặc nhiều ảnh mới. Ảnh đầu tiên sẽ là ảnh đại diện; các ảnh còn lại là ảnh mô tả.</small>
+                    </div>
+                </div>
+
+                <!-- Tags Section -->
+                <div class="mb-3">
+                    <label class="form-label">Tags (Từ khóa)</label>
+                    <div class="border rounded p-3">
+                        @if (tags.Any())
+                        {
+                            <div class="row">
+                                @foreach (var tag in tags)
+                                {
+                                    var isChecked = Model.TagIds.Contains(tag.TagId);
+                                    <div class="col-md-4 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="TagIds" value="@tag.TagId" id="tag_@tag.TagId" @(isChecked ? "checked" : "") />
+                                            <label class="form-check-label" for="tag_@tag.TagId">
+                                                @tag.Name
+                                            </label>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted">Không có tags nào cho danh mục này.</p>
+                        }
+                    </div>
+                    <small class="form-text text-muted">Chọn các tags liên quan đến dịch vụ của bạn.</small>
+                </div>
+
+                <!-- Options Section -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label">Options (Lựa chọn bổ sung)</label>
+                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#createOptionModalEdit">
+                            <i class="bi bi-plus-circle me-1"></i> Tạo Option mới
+                        </button>
+                    </div>
+                    <div class="border rounded p-3">
+                        @if (options.Any())
+                        {
+                            <div class="row">
+                                @foreach (var option in options)
+                                {
+                                    var isChecked = Model.OptionIds.Contains(option.OptionId);
+                                    <div class="col-md-4 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="OptionIds" value="@option.OptionId" id="option_@option.OptionId" @(isChecked ? "checked" : "") />
+                                            <label class="form-check-label" for="option_@option.OptionId">
+                                                @option.OptionName
+                                                <br />
+                                                <small class="text-muted">@option.Description - @option.Price.ToString("N0") VNĐ/@option.UnitType</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted">Chưa có option nào.</p>
+                        }
+                    </div>
+                    <small class="form-text text-muted">Chọn các lựa chọn bổ sung cho dịch vụ.</small>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <a asp-action="Index" class="btn btn-secondary me-2">Hủy</a>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-save me-1"></i>
+                        Lưu thay đổi
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        // Image Preview Function
+        function previewImage(input) {
+            const preview = document.getElementById('imagePreview');
+            const previewImg = document.getElementById('previewImg');
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+        
+        // Create Option (Edit) handler
+        document.getElementById('createOptionFormEdit').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const optionData = {
+                OptionName: document.getElementById('optionNameEdit').value.trim(),
+                Description: document.getElementById('optionDescriptionEdit').value.trim(),
+                Price: parseFloat(document.getElementById('optionPriceEdit').value) || 0,
+                UnitType: document.getElementById('optionUnitTypeEdit').value
+            };
+
+            if (!optionData.OptionName) { alert('Vui lòng nhập tên option!'); return; }
+            if (!optionData.UnitType) { alert('Vui lòng chọn đơn vị!'); return; }
+            if (optionData.Price < 0) { alert('Giá phải >= 0!'); return; }
+
+            try {
+                const resp = await fetch('/Provider/ServiceManagement/CreateOption', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(optionData)
+                });
+                const result = await resp.json();
+                if (result && result.success) {
+                    const modalElement = document.getElementById('createOptionModalEdit');
+                    const modal = bootstrap.Modal.getInstance(modalElement) ?? new bootstrap.Modal(modalElement);
+                    modal.hide();
+                    this.reset();
+                    // Reload page to refresh options checkboxes quickly
+                    location.reload();
+                } else {
+                    alert(result?.message || 'Có lỗi xảy ra khi tạo option!');
+                }
+            } catch (err) {
+                alert('Có lỗi xảy ra khi tạo option!');
+            }
+        });
+    </script>
+    
+    <style>
+        .no-image-placeholder-large {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 0.5rem;
+            border: 2px dashed var(--bs-gray-400);
+            color: var(--bs-gray-600);
+        }
+        
+        .no-image-placeholder-large i {
+            font-size: 3rem;
+        }
+        
+        .no-image-placeholder-large p {
+            margin: 0;
+            font-size: 0.9rem;
+        }
+    </style>
+    
+    <!-- Create Option Modal (Edit) -->
+    <div class="modal fade" id="createOptionModalEdit" tabindex="-1" aria-labelledby="createOptionModalEditLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createOptionModalEditLabel">
+                        <i class="bi bi-gear me-2"></i>
+                        Tạo Option mới
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="createOptionFormEdit">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="optionNameEdit" class="form-label">Tên Option <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="optionNameEdit" required placeholder="VD: Thêm 2 giờ">
+                        </div>
+                        <div class="mb-3">
+                            <label for="optionDescriptionEdit" class="form-label">Mô tả</label>
+                            <textarea class="form-control" id="optionDescriptionEdit" rows="3" placeholder="Mô tả chi tiết về option..."></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="optionPriceEdit" class="form-label">Giá (VNĐ) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="optionPriceEdit" required min="0" step="1000" placeholder="100000">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="optionUnitTypeEdit" class="form-label">Đơn vị <span class="text-danger">*</span></label>
+                                <select class="form-select" id="optionUnitTypeEdit" required>
+                                    <option value="">-- Chọn đơn vị --</option>
+                                    <option value="Unit">Unit (Lần/Căn/Phòng)</option>
+                                    <option value="Day">Day (Ngày)</option>
+                                    <option value="Hour">Hour (Giờ)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle me-1"></i>
+                            Tạo Option
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+

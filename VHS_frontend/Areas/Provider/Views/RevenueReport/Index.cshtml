@@ -1,0 +1,511 @@
+@model VHS_frontend.Areas.Provider.Models.Dashboard.RevenueReportViewModel
+@{
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+    ViewData["Title"] = "Báo cáo doanh thu";
+    var selectedMonth = (int)ViewData["SelectedMonth"]!;
+    var selectedYear = (int)ViewData["SelectedYear"]!;
+}
+
+<div class="revenue-report-container">
+    <!-- Header Section với Filter -->
+    <div class="report-header mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h2 class="mb-0"><i class="bi bi-graph-up me-2"></i>Báo cáo doanh thu</h2>
+                <p class="text-muted mb-0">Từ @Model.FromDate.ToString("dd/MM/yyyy") đến @Model.ToDate.ToString("dd/MM/yyyy")</p>
+            </div>
+            <div class="col-md-6">
+                <form method="get" class="row g-2">
+                    <div class="col-md-5">
+                        <select name="month" class="form-select" onchange="this.form.submit()">
+                            @for (int i = 1; i <= 12; i++)
+                            {
+                                @if (i == selectedMonth)
+                                {
+                                    <option value="@i" selected>Tháng @i</option>
+                                }
+                                else
+                                {
+                                    <option value="@i">Tháng @i</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <select name="year" class="form-select" onchange="this.form.submit()">
+                            @for (int i = DateTime.Now.Year; i >= DateTime.Now.Year - 5; i--)
+                            {
+                                @if (i == selectedYear)
+                                {
+                                    <option value="@i" selected>@i</option>
+                                }
+                                else
+                                {
+                                    <option value="@i">@i</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card stat-card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Tổng doanh thu</h6>
+                            <h3 class="mb-0">@Model.TotalRevenue.ToString("N0") đ</h3>
+                            @if (Model.RevenueGrowthPercent.HasValue)
+                            {
+                                var growthClass = Model.RevenueGrowthPercent.Value >= 0 ? "text-success" : "text-danger";
+                                var growthIcon = Model.RevenueGrowthPercent.Value >= 0 ? "bi-arrow-up" : "bi-arrow-down";
+                                <small class="@growthClass">
+                                    <i class="bi @growthIcon"></i>
+                                    @Math.Abs(Model.RevenueGrowthPercent.Value).ToString("F1")% so với tháng trước
+                                </small>
+                            }
+                        </div>
+                        <div class="stat-icon">
+                            <i class="bi bi-currency-dollar"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="card stat-card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Đơn hàng hoàn thành</h6>
+                            <h3 class="mb-0">@Model.TotalCompletedBookings</h3>
+                            <small>Đơn hàng</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="card stat-card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Giá trị TB/đơn</h6>
+                            <h3 class="mb-0">@Model.AverageOrderValue.ToString("N0") đ</h3>
+                            <small>Trung bình</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="bi bi-graph-up-arrow"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="card stat-card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-white-50 mb-1">Doanh thu tháng trước</h6>
+                            <h3 class="mb-0">@((Model.PreviousRevenue ?? 0).ToString("N0")) đ</h3>
+                            <small>Để so sánh</small>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row g-4 mb-4">
+        <!-- Biểu đồ doanh thu theo ngày -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Biểu đồ doanh thu theo ngày</h5>
+                </div>
+                <div class="card-body" style="height: 500px;">
+                    <canvas id="dailyRevenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top 5 dịch vụ -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-trophy me-2"></i>Top 5 dịch vụ</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.TopServices.Any())
+                    {
+                        <div class="top-services-list">
+                            @foreach (var service in Model.TopServices)
+                            {
+                                <div class="top-service-item mb-3">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="fw-semibold">@service.ServiceName</span>
+                                        <span class="text-primary">@service.TotalRevenue.ToString("N0") đ</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">@service.BookingCount đơn</small>
+                                        <small class="text-success">@service.Percentage.ToString("F1")%</small>
+                                    </div>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div class="progress-bar" role="progressbar" style="width: @service.Percentage%"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center my-4">Chưa có dữ liệu</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Table -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-table me-2"></i>Chi tiết đơn hàng (@Model.Details.Count đơn)</h5>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.Details.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Mã đơn</th>
+                                <th>Khách hàng</th>
+                                <th>Dịch vụ</th>
+                                <th>Ngày đặt</th>
+                                <th>Ngày hoàn thành</th>
+                                <th>Phương thức</th>
+                                <th class="text-end">Số tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.Details)
+                            {
+                                <tr>
+                                    <td>
+                                        <a href="/Provider/Order/Details/@item.BookingId" class="text-decoration-none">
+                                            @item.BookingCode
+                                        </a>
+                                    </td>
+                                    <td>@item.CustomerName</td>
+                                    <td>@item.ServiceName</td>
+                                    <td>@item.BookingDate.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@item.CompletedDate.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>
+                                        <span class="badge bg-@GetPaymentMethodClass(item.PaymentMethod)">
+                                            @GetPaymentMethodText(item.PaymentMethod)
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-semibold text-success">@item.Amount.ToString("N0") đ</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th colspan="6" class="text-end">Tổng cộng:</th>
+                                <th class="text-end text-primary">@Model.TotalRevenue.ToString("N0") đ</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted"></i>
+                    <p class="text-muted mt-3">Không có đơn hàng nào trong tháng này</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .revenue-report-container {
+            padding: 20px;
+        }
+
+        .stat-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .stat-icon {
+            font-size: 2.5rem;
+            opacity: 0.3;
+        }
+
+        .top-service-item {
+            padding-bottom: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .top-service-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0 !important;
+        }
+
+        .card {
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            border-radius: 10px 10px 0 0 !important;
+        }
+
+        .table > :not(caption) > * > * {
+            padding: 1rem 0.75rem;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Biểu đồ doanh thu theo ngày
+            const ctx = document.getElementById('dailyRevenueChart');
+            if (ctx) {
+                const dailyData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DailyRevenues, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+                
+                console.log('Daily Data:', dailyData); // Debug
+                
+                const labels = dailyData.map(d => {
+                    const date = new Date(d.date);
+                    return date.getDate() + '/' + (date.getMonth() + 1);
+                });
+                
+                const revenues = dailyData.map(d => d.revenue);
+                const orders = dailyData.map(d => d.orderCount);
+                
+                console.log('Labels:', labels);
+                console.log('Revenues:', revenues);
+                console.log('Orders:', orders);
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Doanh thu (VND)',
+                            data: revenues,
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            yAxisID: 'y'
+                        }, {
+                            label: 'Số đơn hàng',
+                            data: orders,
+                            type: 'line',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 3,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            yAxisID: 'y1',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    font: {
+                                        size: 14,
+                                        weight: '600'
+                                    },
+                                    padding: 20,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle'
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                titleFont: {
+                                    size: 16,
+                                    weight: 'bold'
+                                },
+                                bodyFont: {
+                                    size: 14
+                                },
+                                padding: 15,
+                                cornerRadius: 8,
+                                displayColors: true,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.datasetIndex === 0) {
+                                            label += new Intl.NumberFormat('vi-VN').format(context.parsed.y) + ' VND';
+                                        } else {
+                                            label += context.parsed.y + ' đơn';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 13,
+                                        weight: '500'
+                                    },
+                                    color: '#6b7280'
+                                }
+                            },
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)',
+                                    lineWidth: 1
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 13,
+                                        weight: '500'
+                                    },
+                                    color: '#374151',
+                                    padding: 10,
+                                    callback: function(value) {
+                                        if (value >= 1000000) {
+                                            return (value / 1000000).toFixed(1) + 'M';
+                                        } else if (value >= 1000) {
+                                            return (value / 1000).toFixed(0) + 'K';
+                                        }
+                                        return new Intl.NumberFormat('vi-VN').format(value);
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Doanh thu (VND)',
+                                    font: {
+                                        size: 14,
+                                        weight: 'bold'
+                                    },
+                                    color: '#1f2937',
+                                    padding: 10
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                beginAtZero: true,
+                                grid: {
+                                    drawOnChartArea: false
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 13,
+                                        weight: '500'
+                                    },
+                                    color: '#374151',
+                                    padding: 10,
+                                    stepSize: 1
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Số đơn hàng',
+                                    font: {
+                                        size: 14,
+                                        weight: 'bold'
+                                    },
+                                    color: '#1f2937',
+                                    padding: 10
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+}
+
+@functions {
+    string GetPaymentMethodClass(string method)
+    {
+        return method switch
+        {
+            "VNPay" => "info",
+            "MoMo" => "warning",
+            "Cash" => "success",
+            _ => "secondary"
+        };
+    }
+
+    string GetPaymentMethodText(string method)
+    {
+        return method switch
+        {
+            "VNPay" => "VNPay",
+            "MoMo" => "MoMo",
+            "Cash" => "Tiền mặt",
+            _ => method
+        };
+    }
+}
+

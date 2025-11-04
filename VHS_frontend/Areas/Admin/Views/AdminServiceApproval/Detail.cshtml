@@ -1,0 +1,107 @@
+@model VHS_frontend.Services.Admin.AdminServiceApprovalService.ServiceDetail
+@{
+    ViewData["Title"] = "Chi tiết dịch vụ";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+    var imgs = (Model.Images ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    var avatar = imgs.FirstOrDefault();
+    var descImgs = imgs.Skip(1).ToList();
+    string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3><i class="bi bi-info-circle me-2"></i>Chi tiết dịch vụ</h3>
+        <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">Ảnh đại diện</div>
+                <div class="card-body text-center">
+                    @if (!string.IsNullOrEmpty(avatar))
+                    {
+                        <img src="@ToUrl(avatar)" class="img-fluid rounded" style="max-height:320px;object-fit:cover" />
+                    }
+                    else
+                    {
+                        <div class="text-muted">Không có ảnh</div>
+                    }
+                </div>
+            </div>
+            <div class="card mt-3">
+                <div class="card-header">Ảnh mô tả</div>
+                <div class="card-body">
+                    @if (descImgs.Any())
+                    {
+                        <div class="row g-2">
+                            @foreach (var p in descImgs)
+                            {
+                                <div class="col-4">
+                                    <img src="@ToUrl(p)" class="img-thumbnail" style="height:100px;object-fit:cover" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted">Không có ảnh mô tả</div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">Thông tin</div>
+                <div class="card-body">
+                    <h4 class="mb-1">@Model.Title</h4>
+                    <div class="text-muted mb-3">Danh mục: @Model.CategoryName</div>
+                    <p>@Model.Description</p>
+                    <hr />
+                    <div class="row">
+                        <div class="col-md-4"><strong>Giá:</strong> @Model.Price.ToString("N0") VNĐ</div>
+                        <div class="col-md-4"><strong>Đơn vị:</strong> @Model.UnitType</div>
+                        <div class="col-md-4"><strong>Cơ bản:</strong> @Model.BaseUnit</div>
+                    </div>
+                    <hr />
+                    <div class="mb-3">
+                        <strong>Tags:</strong>
+                        @if (Model.Tags.Any())
+                        {
+                            foreach (var t in Model.Tags)
+                            {
+                                <span class="badge bg-info text-dark me-1">@t.Name</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted">Không có</span>
+                        }
+                    </div>
+                    <div>
+                        <strong>Options:</strong>
+                        @if (Model.Options.Any())
+                        {
+                            <ul class="mt-2">
+                                @foreach (var o in Model.Options)
+                                {
+                                    <li>
+                                        <strong>@o.OptionName</strong>
+                                        <span class="text-muted"> — @o.Description</span>
+                                        <span class="ms-2">@o.Price.ToString("N0") VNĐ/@o.UnitType</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Không có</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+

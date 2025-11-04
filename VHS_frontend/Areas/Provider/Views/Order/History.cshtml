@@ -1,0 +1,335 @@
+@model VHS_frontend.Areas.Provider.Models.Booking.BookingListResultDTO
+@{
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+    ViewData["Title"] = "Lịch sử đơn hàng";
+}
+
+<div class="order-management-container">
+    <!-- Header with Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Lịch sử đơn hàng
+                </h5>
+                <div class="text-muted">
+                    <i class="bi bi-check-circle text-success"></i> Đã hoàn thành
+                    <span class="mx-2">|</span>
+                    <i class="bi bi-x-circle text-danger"></i> Đã hủy
+                </div>
+            </div>
+            
+            <form method="get" asp-action="History" id="filterForm">
+                <div class="row g-3 align-items-end">
+                    <!-- Status Filter - CHỈ Completed và Canceled -->
+                    <div class="col-md-2">
+                        <label class="form-label">Trạng thái</label>
+                        <select name="status" class="form-select" onchange="this.form.submit()">
+                            <option value="" selected="@(string.IsNullOrEmpty(ViewBag.CurrentStatus))">Tất cả</option>
+                            <option value="Completed" selected="@(ViewBag.CurrentStatus == "Completed")">Hoàn thành</option>
+                            <option value="Canceled" selected="@(ViewBag.CurrentStatus == "Canceled")">Đã hủy</option>
+                        </select>
+                    </div>
+
+                    <!-- Date Range -->
+                    <div class="col-md-2">
+                        <label class="form-label">Từ ngày</label>
+                        <input type="date" name="fromDate" class="form-control" value="@ViewBag.FromDate" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Đến ngày</label>
+                        <input type="date" name="toDate" class="form-control" value="@ViewBag.ToDate" />
+                    </div>
+
+                    <!-- Search -->
+                    <div class="col-md-4">
+                        <label class="form-label">Tìm kiếm</label>
+                        <input type="text" name="searchTerm" class="form-control" 
+                               placeholder="Tên khách hàng, dịch vụ..." value="@ViewBag.SearchTerm" />
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i> Lọc
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Quick Month Filters -->
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-calendar-month"></i> Lọc nhanh theo tháng:
+                        </label>
+                        <div class="btn-group flex-wrap" role="group">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="filterByMonth(0)">
+                                <i class="bi bi-calendar3"></i> Tháng này
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="filterByMonth(-1)">
+                                Tháng trước
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="filterByMonth(-2)">
+                                2 tháng trước
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="filterByMonth(-3)">
+                                3 tháng trước
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearDateFilter()">
+                                <i class="bi bi-x-circle"></i> Xóa lọc ngày
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            <i class="bi bi-info-circle"></i> 
+                            Ví dụ: "Tháng này" sẽ hiển thị tất cả đơn từ ngày 1 đến cuối tháng @DateTime.Now.ToString("MM/yyyy")
+                        </small>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Statistics Cards - THÁNG NÀY -->
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h6 class="mb-0">
+                <i class="bi bi-calendar-month"></i> Thống kê lịch sử tháng @DateTime.Now.ToString("MM/yyyy")
+            </h6>
+        </div>
+        <div class="card-body p-3">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="stat-card stat-completed">
+                        <div class="stat-icon"><i class="bi bi-check-circle-fill"></i></div>
+                        <div class="stat-info">
+                            <h3>@(ViewBag.MonthCompleted ?? 0)</h3>
+                            <p>Hoàn thành</p>
+                            <small class="text-muted d-block mt-1">
+                                Tháng @DateTime.Now.ToString("MM/yyyy")
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="stat-card stat-canceled">
+                        <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+                        <div class="stat-info">
+                            <h3>@(ViewBag.MonthCanceled ?? 0)</h3>
+                            <p>Đã hủy</p>
+                            <small class="text-muted d-block mt-1">
+                                Tháng @DateTime.Now.ToString("MM/yyyy")
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @{
+                int monthCompleted = ViewBag.MonthCompleted ?? 0;
+                int monthCanceled = ViewBag.MonthCanceled ?? 0;
+                var total = monthCompleted + monthCanceled;
+                var successRate = total > 0 ? ((double)monthCompleted / total * 100) : 0;
+            }
+            @if (total > 0)
+            {
+                <div class="mt-3 text-center">
+                    <div class="progress" style="height: 25px;">
+                        @if (successRate > 0)
+                        {
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: @successRate%"
+                                 aria-valuenow="@successRate" aria-valuemin="0" aria-valuemax="100">
+                                @successRate.ToString("F1")% Hoàn thành
+                            </div>
+                        }
+                        @if (successRate < 100)
+                        {
+                            <div class="progress-bar bg-danger" role="progressbar" 
+                                 style="width: @((100-successRate))%"
+                                 aria-valuenow="@(100-successRate)" aria-valuemin="0" aria-valuemax="100">
+                                @((100-successRate).ToString("F1"))% Hủy
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="mt-3 text-center">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> Chưa có dữ liệu lịch sử tháng này
+                    </small>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Bookings Table -->
+    <div class="card">
+        <div class="card-header bg-light">
+            <h6 class="mb-0">
+                Tổng số: <span class="badge bg-primary">@Model.TotalCount</span> đơn hàng
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.Items != null && Model.Items.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Mã đơn</th>
+                                <th>Khách hàng</th>
+                                <th>Dịch vụ</th>
+                                <th>Thời gian</th>
+                                <th>Số tiền</th>
+                                <th>Nhân viên</th>
+                                <th>Trạng thái</th>
+                                <th class="text-center">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var booking in Model.Items)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong class="text-primary">@booking.BookingCode</strong>
+                                        <br />
+                                        <small class="text-muted">@booking.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                    </td>
+                                    <td>
+                                        @booking.CustomerName
+                                        <br />
+                                        <small class="text-muted">
+                                            <i class="bi bi-telephone"></i> @booking.CustomerPhone
+                                        </small>
+                                    </td>
+                                    <td>
+                                        @booking.ServiceName
+                                        <br />
+                                        <small class="text-muted">
+                                            <i class="bi bi-geo-alt"></i> @booking.Address
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <i class="bi bi-calendar3"></i>
+                                        @booking.BookingTime.ToString("dd/MM/yyyy")
+                                        <br />
+                                        <i class="bi bi-clock"></i>
+                                        @booking.BookingTime.ToString("HH:mm")
+                                    </td>
+                                    <td>
+                                        <strong class="text-success">@booking.Amount.ToString("N0") VND</strong>
+                                        @if (!string.IsNullOrEmpty(booking.PaymentStatus))
+                                        {
+                                            <br />
+                                            <small class="badge bg-info">@booking.PaymentStatus</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(booking.StaffName))
+                                        {
+                                            <i class="bi bi-person-check text-success"></i>
+                                            @booking.StaffName
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @{
+                                            // 🐛 DEBUG: In ra Status thực tế
+                                            var statusDebug = booking.Status ?? "NULL";
+                                            Console.WriteLine($"[History View] BookingId={booking.BookingId}, Status='{statusDebug}'");
+                                        }
+                                        @if (booking.Status == "Completed")
+                                        {
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle"></i> Hoàn thành
+                                            </span>
+                                        }
+                                        else if (booking.Status == "Canceled")
+                                        {
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-x-circle"></i> Đã hủy
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <!-- 🐛 DEBUG: Hiển thị Status không match -->
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="bi bi-question-circle"></i> @booking.Status
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="@Url.Action("Details", "Order", new { id = booking.BookingId })" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i> Chi tiết
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                    <p class="text-muted mt-3">Chưa có lịch sử đơn hàng nào.</p>
+                    <small class="text-muted">Các đơn hàng đã hoàn thành hoặc đã hủy sẽ xuất hiện ở đây.</small>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script>
+        // Lọc nhanh theo tháng
+        function filterByMonth(monthOffset) {
+            const today = new Date();
+            const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+            
+            // Ngày đầu tháng
+            const fromDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+            const fromDateStr = fromDate.toISOString().split('T')[0];
+            
+            // Ngày cuối tháng
+            const toDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+            const toDateStr = toDate.toISOString().split('T')[0];
+            
+            // Set giá trị vào input
+            document.querySelector('input[name="fromDate"]').value = fromDateStr;
+            document.querySelector('input[name="toDate"]').value = toDateStr;
+            
+            // Log để debug
+            const monthName = targetDate.toLocaleString('vi-VN', { month: 'long', year: 'numeric' });
+            console.log(`[Filter by Month] ${monthName}: ${fromDateStr} → ${toDateStr}`);
+            
+            // Submit form
+            document.getElementById('filterForm').submit();
+        }
+        
+        // Xóa filter ngày
+        function clearDateFilter() {
+            document.querySelector('input[name="fromDate"]').value = '';
+            document.querySelector('input[name="toDate"]').value = '';
+            console.log('[Clear Date Filter] Cleared fromDate and toDate');
+            document.getElementById('filterForm').submit();
+        }
+        
+        // Log status của bookings để debug
+        console.log('[History View] Loaded');
+        document.querySelectorAll('.badge').forEach((badge, index) => {
+            const status = badge.textContent.trim();
+            console.log(`[History View] BookingId=${index}, Status='${status}'`);
+        });
+    </script>
+}
