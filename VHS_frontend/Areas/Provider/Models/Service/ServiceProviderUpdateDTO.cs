@@ -23,6 +23,7 @@ namespace VHS_frontend.Areas.Provider.Models.Service
 
         public IFormFile? Avatar { get; set; }
         public List<IFormFile>? Images { get; set; }
+        public List<string> RemoveImages { get; set; } = new List<string>();
 
         public string? Status { get; set; }
 

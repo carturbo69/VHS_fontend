@@ -252,12 +252,8 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 return View(model);
             }
 
-            // Gộp input hình ảnh: nếu chỉ upload qua Images (multi), tách ra Avatar + Images
-            if ((model.Avatar == null || model.Avatar.Length == 0) && model.Images != null && model.Images.Count > 0)
-            {
-                model.Avatar = model.Images.FirstOrDefault();
-                model.Images = model.Images.Skip(1).ToList();
-            }
+            // Không tự động nâng ảnh đầu tiên thành Avatar trong trang chỉnh sửa
+            // Ảnh mới sẽ được thêm vào cuối danh sách; Avatar chỉ thay khi người dùng chọn Avatar riêng
 
             var response = await _serviceManagementService.UpdateServiceAsync(id, model, token);
 

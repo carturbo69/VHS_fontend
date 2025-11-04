@@ -116,34 +116,38 @@
 
                     <!-- Hình ảnh hiện tại (gộp avatar + mô tả) -->
                     <div class="mb-3">
-                        <div class="image-inline-gallery d-flex align-items-start gap-3 flex-wrap">
-                            <div class="avatar-block">
-                                @if (!string.IsNullOrEmpty(avatar))
-                                {
-                                    var avatarUrl = ToUrl(avatar);
-                                    <img src="@avatarUrl" alt="Avatar" class="img-thumbnail shadow-sm avatar-img"
+                        <div class="image-inline-gallery">
+                            @if (!string.IsNullOrEmpty(avatar))
+                            {
+                                var avatarUrl = ToUrl(avatar);
+                                <div class="removable-image" data-path="@avatar">
+                                    <img src="@avatarUrl" alt="Avatar"
                                          onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Không thể tải ảnh</div>';" />
-                                }
-                                else
+                                    <button type="button" class="btn btn-sm btn-danger remove-image-btn" title="Xoá ảnh" aria-label="Xoá ảnh">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                            }
+                            @if (descImgs.Any())
+                            {
+                                foreach (var p in descImgs)
                                 {
-                                    <div class="no-image-placeholder-large"></div>
-                                }
-                            </div>
-                            <div class="thumbs d-flex flex-row flex-wrap gap-2">
-                                @if (descImgs.Any())
-                                {
-                                    @foreach (var p in descImgs)
-                                    {
-                                        var u = ToUrl(p);
-                                        <img src="@u" class="img-thumbnail thumb-img" alt="Desc"
+                                    var u = ToUrl(p);
+                                    <div class="removable-image" data-path="@p">
+                                        <img src="@u" alt="Desc"
                                              onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning p-2\'>Lỗi ảnh</div>';" />
-                                    }
+                                        <button type="button" class="btn btn-sm btn-danger remove-image-btn" title="Xoá ảnh" aria-label="Xoá ảnh">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
                                 }
-                            </div>
+                            }
                         </div>
+                        <!-- Hidden inputs for removed images -->
+                        <div id="removedImagesContainer"></div>
                         <input name="Images" type="file" class="form-control mt-3" accept="image/*" multiple />
                         <span asp-validation-for="Images" class="text-danger"></span>
-                        <small class="form-text text-muted">Chọn 1 hoặc nhiều ảnh mới. Ảnh đầu tiên sẽ là ảnh đại diện; các ảnh còn lại là ảnh mô tả.</small>
+                        <small class="form-text text-muted">Chọn 1 hoặc nhiều ảnh mới. Ảnh mới sẽ được thêm vào cuối; ảnh đại diện hiện tại không thay đổi trừ khi bạn chọn Avatar riêng.</small>
                     </div>
                 </div>
 
@@ -247,6 +251,23 @@
             }
         }
         
+        // Xoá ảnh và thêm input ẩn RemoveImages để submit
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.remove-image-btn');
+            if (!btn) return;
+            const wrap = btn.closest('.removable-image');
+            if (!wrap) return;
+            const path = wrap.getAttribute('data-path');
+            if (!path) return;
+            const container = document.getElementById('removedImagesContainer');
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'RemoveImages';
+            hidden.value = path;
+            container.appendChild(hidden);
+            wrap.remove();
+        });
+
         // Create Option (Edit) handler
         document.getElementById('createOptionFormEdit').addEventListener('submit', async function (e) {
             e.preventDefault();
@@ -285,6 +306,37 @@
     </script>
     
     <style>
+        /* Gallery ảnh: hiển thị ngang, tự wrap, khoảng cách đều */
+        .image-inline-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .removable-image {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            flex: 0 0 auto;
+        }
+
+        .removable-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: .5rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,.08);
+        }
+
+        .removable-image .remove-image-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            line-height: 1;
+            padding: 2px 6px;
+        }
+
         .no-image-placeholder-large {
             width: 200px;
             height: 200px;
