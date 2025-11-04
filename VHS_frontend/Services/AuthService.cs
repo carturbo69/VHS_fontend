@@ -83,5 +83,47 @@ namespace VHS_frontend.Services
             public string? Message { get; set; }
             public object? Data { get; set; }
         }
+
+        /// <summary>
+        /// Lấy ProviderId từ AccountId
+        /// </summary>
+        public async Task<string?> GetProviderIdByAccountIdAsync(string accountId, string token, CancellationToken ct = default)
+        {
+            try
+            {
+                // Set authorization header
+                _httpClient.DefaultRequestHeaders.Authorization = 
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+                var apiUrl = $"http://localhost:5154/api/Provider/get-id-by-account/{accountId}";
+                var response = await _httpClient.GetAsync(apiUrl, ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[GetProviderIdByAccountIdAsync] Failed: {response.StatusCode}");
+                    return null;
+                }
+
+                // API trả về Guid dạng plain text hoặc JSON
+                var content = await response.Content.ReadAsStringAsync(ct);
+                
+                // Remove quotes nếu có
+                content = content.Trim('"', ' ', '\n', '\r');
+                
+                // Validate Guid
+                if (Guid.TryParse(content, out _))
+                {
+                    return content;
+                }
+
+                Console.WriteLine($"[GetProviderIdByAccountIdAsync] Invalid Guid: {content}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetProviderIdByAccountIdAsync] Error: {ex.Message}");
+                return null;
+            }
+        }
     }
 }
