@@ -1,0 +1,303 @@
+@using VHS_frontend.Areas.Provider.Models.Staff
+@{
+    ViewData["Title"] = "Chi tiết nhân viên";
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+    var staff = ViewBag.Staff as StaffDTO;
+    var weekStart = (DateTime)ViewBag.WeekStart;
+    var weekEnd = (DateTime)ViewBag.WeekEnd;
+    var schedule = ViewBag.Schedule as List<StaffScheduleDTO> ?? new List<StaffScheduleDTO>();
+}
+
+<div class="container-fluid px-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user"></i> Thông tin nhân viên: @staff?.StaffName
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            @if (!string.IsNullOrEmpty(staff?.FaceImage))
+                            {
+                                <img src="@staff.FaceImage" alt="Ảnh nhân viên" class="img-thumbnail mb-3" style="max-width: 200px;">
+                            }
+                            else
+                            {
+                                <div class="bg-light p-5 mb-3">
+                                    <i class="fas fa-user fa-5x text-muted"></i>
+                                </div>
+                            }
+                        </div>
+                        <div class="col-md-9">
+                            <dl class="row">
+                                <dt class="col-sm-3">Mã nhân viên:</dt>
+                                <dd class="col-sm-9">@staff?.StaffId</dd>
+
+                                <dt class="col-sm-3">Họ tên:</dt>
+                                <dd class="col-sm-9">@staff?.StaffName</dd>
+
+                                <dt class="col-sm-3">CCCD:</dt>
+                                <dd class="col-sm-9">@staff?.CitizenID</dd>
+
+                                <dt class="col-sm-3">Trạng thái:</dt>
+                                <dd class="col-sm-9">
+                                    @if (staff?.IsLocked == false)
+                                    {
+                                        <span class="badge bg-success">Đang hoạt động</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Đã khóa</span>
+                                    }
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LỊCH TUẦN -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <h4 class="mb-0">
+                                <i class="fas fa-calendar-week"></i> Lịch làm việc tuần
+                            </h4>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="btn-group" role="group">
+                                <a href="@Url.Action("Details", "StaffManagement", new { id = staff?.StaffId, weekStart = weekStart.AddDays(-7).ToString("yyyy-MM-dd") })" 
+                                   class="btn btn-light btn-sm">
+                                    <i class="fas fa-chevron-left"></i> Tuần trước
+                                </a>
+                                <button type="button" class="btn btn-light btn-sm" disabled>
+                                    <strong>@weekStart.ToString("dd/MM/yyyy") - @weekEnd.AddDays(-1).ToString("dd/MM/yyyy")</strong>
+                                </button>
+                                <a href="@Url.Action("Details", "StaffManagement", new { id = staff?.StaffId, weekStart = weekStart.AddDays(7).ToString("yyyy-MM-dd") })" 
+                                   class="btn btn-light btn-sm">
+                                    Tuần sau <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="@Url.Action("Details", "StaffManagement", new { id = staff?.StaffId })" 
+                               class="btn btn-warning btn-sm">
+                                <i class="fas fa-calendar-day"></i> Tuần hiện tại
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm staff-calendar mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 80px;">Giờ</th>
+                                    <th>Thứ 2<br/><small>@weekStart.AddDays(1).ToString("dd/MM")</small></th>
+                                    <th>Thứ 3<br/><small>@weekStart.AddDays(2).ToString("dd/MM")</small></th>
+                                    <th>Thứ 4<br/><small>@weekStart.AddDays(3).ToString("dd/MM")</small></th>
+                                    <th>Thứ 5<br/><small>@weekStart.AddDays(4).ToString("dd/MM")</small></th>
+                                    <th>Thứ 6<br/><small>@weekStart.AddDays(5).ToString("dd/MM")</small></th>
+                                    <th>Thứ 7<br/><small>@weekStart.AddDays(6).ToString("dd/MM")</small></th>
+                                    <th>Chủ nhật<br/><small>@weekStart.ToString("dd/MM")</small></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int hour = 7; hour <= 21; hour++)
+                                {
+                                    <tr>
+                                        <td class="text-center align-middle"><strong>@hour:00</strong></td>
+                                        @for (int day = 1; day <= 7; day++)
+                                        {
+                                            var cellTime = weekStart.AddDays(day == 7 ? 0 : day);
+                                            var cellHour = cellTime.AddHours(hour);
+                                            
+                                            var booking = schedule.FirstOrDefault(b => 
+                                                b.StartTime.Date == cellTime.Date && 
+                                                b.StartTime.Hour == hour);
+
+                                            if (booking != null)
+                                            {
+                                                var cellClass = booking.Status switch
+                                                {
+                                                    "Completed" => "table-secondary", // Xám - Đã hoàn thành
+                                                    "InProgress" => "table-primary",  // Xanh dương - Đang thực hiện
+                                                    "Confirmed" => "table-warning",   // Vàng - Đã xác nhận
+                                                    _ => "table-danger"               // Đỏ - Mặc định
+                                                };
+                                                
+                                                var badgeClass = booking.Status switch
+                                                {
+                                                    "Completed" => "bg-secondary",
+                                                    "InProgress" => "bg-info",
+                                                    "Confirmed" => "bg-warning",
+                                                    _ => "bg-danger"
+                                                };
+                                                
+                                                <td class="@cellClass p-2" 
+                                                    title="@booking.ServiceName - @booking.CustomerName">
+                                                    <div class="booking-cell">
+                                                        <div><strong>@booking.ServiceName</strong></div>
+                                                        <small>👤 @booking.CustomerName</small><br/>
+                                                        <small>📍 @booking.Address</small><br/>
+                                                        <small class="badge @badgeClass">@booking.Status</small>
+                                                    </div>
+                                                </td>
+                                            }
+                                            else
+                                            {
+                                                <td class="table-success text-center align-middle">
+                                                    <span class="text-muted">-</span>
+                                                </td>
+                                            }
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="d-flex gap-2 flex-wrap align-items-center">
+                                <div>
+                                    <span class="badge bg-success me-1">Rảnh</span>
+                                    <small>Có thể nhận đơn</small>
+                                </div>
+                                <div class="vr"></div>
+                                <div>
+                                    <span class="badge bg-warning text-dark me-1">Confirmed</span>
+                                    <small>Đã xác nhận</small>
+                                </div>
+                                <div>
+                                    <span class="badge bg-info me-1">InProgress</span>
+                                    <small>Đang làm</small>
+                                </div>
+                                <div>
+                                    <span class="badge bg-secondary me-1">Completed</span>
+                                    <small>Đã xong</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="alert alert-info mb-0 py-2">
+                                <i class="fas fa-calendar-check"></i>
+                                <strong>Tổng số booking tuần này: @schedule.Count</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="@Url.Action("Index", "StaffManagement")" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Quay lại
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.staff-calendar {
+    font-size: 0.85rem;
+}
+
+.staff-calendar th {
+    text-align: center;
+    vertical-align: middle;
+    background-color: #f8f9fa;
+}
+
+.staff-calendar td {
+    min-width: 120px;
+    height: 80px;
+    vertical-align: middle;
+}
+
+.staff-calendar td.table-success {
+    background-color: #d4edda !important;
+}
+
+/* Booking colors theo status */
+.staff-calendar td.table-warning {
+    background-color: #fff3cd !important; /* Vàng - Confirmed */
+    cursor: help;
+    border-left: 4px solid #ffc107;
+}
+
+.staff-calendar td.table-primary {
+    background-color: #cfe2ff !important; /* Xanh dương - InProgress */
+    cursor: help;
+    border-left: 4px solid #0d6efd;
+}
+
+.staff-calendar td.table-secondary {
+    background-color: #e2e3e5 !important; /* Xám - Completed */
+    cursor: help;
+    border-left: 4px solid #6c757d;
+    opacity: 0.8;
+}
+
+.staff-calendar td.table-danger {
+    background-color: #f8d7da !important; /* Đỏ - Mặc định */
+    cursor: help;
+    border-left: 4px solid #dc3545;
+}
+
+.booking-cell {
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+.booking-cell div {
+    margin-bottom: 2px;
+}
+
+.booking-cell small {
+    display: block;
+}
+
+/* Week navigation buttons */
+.card-header .btn-group {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card-header .btn-light {
+    background-color: white;
+    border-color: white;
+    color: #333;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.card-header .btn-light:hover:not(:disabled) {
+    background-color: #f8f9fa;
+    transform: scale(1.05);
+}
+
+.card-header .btn-light:disabled {
+    background-color: white;
+    color: #333;
+    opacity: 1;
+    cursor: default;
+}
+
+.card-header .btn-warning {
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.card-header .btn-warning:hover {
+    transform: scale(1.05);
+}
+</style>
+

@@ -139,16 +139,25 @@
             </div>
             <div class="pane__body">
                 @{
-                    // ✅ Tính toán tất cả ảnh GPKD trước
-                    var allImages = new List<string>();
+                    // ✅ Tính toán tất cả ảnh GPKD trước (loại bỏ trùng lặp)
+                    var allImages = new HashSet<string>(); // Dùng HashSet để tự động loại bỏ trùng
                     if (Model.Certificates?.Any() == true)
                     {
+                        // Lấy ảnh từ tất cả certificates (vì tất cả đều có cùng ảnh do dùng chung)
+                        // HashSet sẽ tự động loại bỏ trùng lặp
                         foreach (var cert in Model.Certificates)
                         {
                             var imgs = ToImages(cert.Images);
-                            allImages.AddRange(imgs);
+                            foreach (var img in imgs)
+                            {
+                                if (!string.IsNullOrWhiteSpace(img))
+                                {
+                                    allImages.Add(img); // HashSet tự động loại bỏ trùng
+                                }
+                            }
                         }
                     }
+                    var uniqueImages = allImages.ToList(); // Convert về List để dễ dùng
 
                     // ✅ Kiểm tra có cho phép xóa không (chỉ khi status = Pending)
                     var canDelete = string.Equals(Model.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
@@ -231,16 +240,16 @@
                         </table>
                     </div>
 
-                    @* ✅ Hiển thị TẤT CẢ ảnh GPKD chung ở đây *@
-                    @if (allImages.Any())
+                    @* ✅ Hiển thị TẤT CẢ ảnh GPKD chung ở đây (đã loại bỏ trùng lặp) *@
+                    @if (uniqueImages.Any())
                     {
                         <div style="margin-top: 32px; padding-top: 24px; border-top: 2px solid #e2e8f0;">
                             <h6 style="color: #64748b; font-size: 14px; font-weight: 600; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
                                 <i class="bi bi-images" style="margin-right: 8px;"></i>
-                                Giấy phép kinh doanh (@allImages.Count ảnh)
+                                Giấy phép kinh doanh (@uniqueImages.Count ảnh)
                             </h6>
                             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px;">
-                                @foreach (var url in allImages)
+                                @foreach (var url in uniqueImages)
                                 {
                                     <figure style="margin: 0; cursor: pointer; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; transition: all 0.2s;" 
                                             onclick="enlargeCategoryImage(this)"

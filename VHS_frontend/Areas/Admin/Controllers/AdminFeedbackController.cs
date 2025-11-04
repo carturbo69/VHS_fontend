@@ -34,6 +34,25 @@ namespace VHS_frontend.Areas.Admin.Controllers
             return true;
         }
 
+
+        //[HttpGet]
+        //public async Task<IActionResult> UnreadTotal(CancellationToken ct)
+        //{
+        //    // Ép login nếu chưa có AccountID
+        //    if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
+
+        //    var jwt = GetJwtFromRequest();
+
+        //    var total = await _chatService.GetUnreadTotalAsync(
+        //        accountId: myId,
+        //        jwtToken: jwt,
+        //        ct: ct
+        //    );
+
+        //    return Ok(new { total });
+        //}
+
+
         public async Task<IActionResult> Index()
         {
             if (!PrepareAuth())

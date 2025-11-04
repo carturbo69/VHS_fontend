@@ -42,10 +42,29 @@ namespace VHS_frontend.Controllers
             Console.WriteLine($"[DEBUG] Login success: Token={result.Token}, Role={result.Role}, AccountID={result.AccountID}");
 
             HttpContext.Session.SetString("JWToken", result.Token);
+            HttpContext.Session.SetString("JWTToken", result.Token); // Thêm key này cho consistent
             HttpContext.Session.SetString("Role", result.Role ?? string.Empty);
             HttpContext.Session.SetString("AccountID", result.AccountID.ToString());
             // 🔥 Lưu thêm Username
             HttpContext.Session.SetString("Username", model.Username);
+
+            // ✨ Nếu là Provider, lấy ProviderId từ API
+            if (result.Role?.Trim().Equals("Provider", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                try
+                {
+                    var providerIdResult = await _authService.GetProviderIdByAccountIdAsync(result.AccountID.ToString(), result.Token);
+                    if (!string.IsNullOrEmpty(providerIdResult))
+                    {
+                        HttpContext.Session.SetString("ProviderId", providerIdResult);
+                        Console.WriteLine($"[DEBUG] ProviderId set in session: {providerIdResult}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ERROR] Failed to get ProviderId: {ex.Message}");
+                }
+            }
 
             TempData["ToastType"] = "success";
             TempData["ToastMessage"] = $"Đăng nhập thành công! Xin chào {(result.DisplayName ?? model.Username)} 👋";

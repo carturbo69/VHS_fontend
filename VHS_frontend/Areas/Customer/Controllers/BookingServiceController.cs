@@ -108,10 +108,13 @@ namespace VHS_frontend.Areas.Customer.Controllers
         {
             var jwt = HttpContext.Session.GetString("JWToken"); // 👈 kéo dòng này lên đầu để dùng cho cancel
 
+            // ✅ Luôn kiểm tra và xóa booking chưa thanh toán khi vào trang này
+            // (không chỉ khi refresh=1, để đảm bảo booking được dọn dẹp khi user quay lại)
+            await CancelPendingIfAnyAsync(jwt);
+
             if (refresh)
             {
                 HttpContext.Session.Remove("BookingBreakdownJson");
-                await CancelPendingIfAnyAsync(jwt);             // 👈 THÊM DÒNG NÀY
             }
 
             // ====== Helpers ======

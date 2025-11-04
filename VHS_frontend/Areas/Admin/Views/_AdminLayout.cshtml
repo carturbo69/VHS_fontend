@@ -65,9 +65,9 @@
                 <i class="bi bi-collection"></i><span>Quản lí danh mục</span>
             </a> 
 
-            <a asp-controller="Service" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Service" ? "active" : "")"
-               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Service" ? "page" : null)">
+            <a asp-controller="AdminServiceApproval" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminServiceApproval" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="AdminServiceApproval" ? "page" : null)">
                 <i class="bi bi-tools"></i><span>Quản lí dịch vụ</span>
             </a>
 
@@ -127,11 +127,24 @@
             </div>
 
             <div class="right">
+
+                <!-- Chat -->
+                <a asp-area="Admin" asp-controller="ChatAdmin" asp-action="Index"
+                   class="icon-btn chat-btn" aria-label="Chat">
+                    <svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 4h16v12H5.17L4 17.17V4z" fill="none" stroke="currentColor" stroke-width="2" />
+                        <circle cx="8" cy="10" r="1.5" />
+                        <circle cx="12" cy="10" r="1.5" />
+                        <circle cx="16" cy="10" r="1.5" />
+                    </svg>
+                    <span class="chat-badge" data-chat-count>0</span>
+                </a>
+
                 <!-- Notifications -->
                 <div class="notif">
                     <a href="/Admin/AdminNotification?tab=inbox" id="notificationBtn" class="btn btn-link notif-btn" aria-label="Notifications">
                         <i class="bi bi-bell fs-5"></i>
-                        <span id="notificationBadge" class="badge-dot" style="display:none">0</span>
+                        <span id="notificationBadge" class="badge-dot" style="display:none;">0</span>
                     </a>
                     <ul id="notificationMenu" class="notif-menu">
                         <li class="text-center text-muted py-2">Loading…</li>
@@ -212,6 +225,45 @@
           }
         })();
 
+                  async function updateAdminChatUnreadCount() {
+          try {
+            const url = '@Url.Action("UnreadTotal", "ChatAdmin", new { area = "Admin" })';
+            const resp = await fetch(url, { credentials: 'same-origin' });
+            if (!resp.ok || resp.redirected) return;
+
+            const contentType = resp.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) return;
+
+            const data = await resp.json();
+            const badge = document.querySelector('[data-chat-count]');
+
+                   if (badge) {
+          const total = Number(data?.total ?? 0);
+          // luôn hiển thị
+          badge.style.display = 'inline-flex';
+          // đổi màu theo trạng thái (ví dụ)
+          badge.classList.toggle('is-empty', total === 0);
+          badge.textContent = total;
+        }
+
+
+            if (badge) {
+              const total = Number(data?.total ?? 0);
+              badge.textContent = total;
+              badge.style.display = total > 0 ? 'inline-flex' : 'none';
+            }
+
+          } catch (e) {
+            console.error('Không thể tải số tin nhắn chưa đọc (Admin):', e);
+          }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+          updateAdminChatUnreadCount();
+          setInterval(updateAdminChatUnreadCount, 30000);
+        });
+
+
         // =========================
         // Theme sync + toggle
         // =========================
@@ -249,17 +301,59 @@
           const notifBadge = document.getElementById('notificationBadge');
 
           async function loadUnreadCount() {
+            if (!notifBadge) {
+              console.warn('Notification badge element not found');
+              return;
+            }
             try {
+              console.log('🔔 Loading unread count...');
               const res = await fetch('/Admin/AdminNotification/GetUnreadCount');
+              if (!res.ok) {
+                console.warn('❌ Failed to load unread count:', res.status, res.statusText);
+                notifBadge.style.display = 'none';
+                return;
+              }
               const dto = await res.json();
-              if (dto.count > 0) {
-                notifBadge.textContent = dto.count;
-                notifBadge.style.display = 'inline-flex';
+              console.log('📬 Unread count response:', dto);
+              
+              // Thử nhiều cách để lấy count
+              let count = 0;
+              if (typeof dto === 'number') {
+                count = dto;
+              } else if (dto?.count !== undefined) {
+                count = dto.count;
+              } else if (dto?.Count !== undefined) {
+                count = dto.Count;
+              } else if (dto?.data?.count !== undefined) {
+                count = dto.data.count;
+              }
+              
+              console.log('✅ Parsed count:', count);
+              
+              if (count > 0) {
+                notifBadge.textContent = count;
+                
+                // Force hiển thị badge - xóa tất cả style ẩn và thêm style hiển thị
+                notifBadge.style.removeProperty('display');
+                notifBadge.style.removeProperty('visibility');
+                notifBadge.style.removeProperty('opacity');
+                notifBadge.removeAttribute('hidden');
+                notifBadge.classList.remove('d-none');
+                
+                // Set style hiển thị với !important
+                notifBadge.style.setProperty('display', 'inline-flex', 'important');
+                notifBadge.style.setProperty('visibility', 'visible', 'important');
+                notifBadge.style.setProperty('opacity', '1', 'important');
+                
+                console.log('✅ Badge displayed with count:', count);
+                console.log('✅ Badge computed display:', window.getComputedStyle(notifBadge).display);
+                console.log('✅ Badge computed visibility:', window.getComputedStyle(notifBadge).visibility);
               } else {
                 notifBadge.style.display = 'none';
+                console.log('ℹ️ No unread notifications, badge hidden');
               }
             } catch (e) { 
-              console.error('Error loading unread count:', e);
+              console.error('❌ Error loading unread count:', e);
               notifBadge.style.display = 'none';
             }
           }
@@ -383,9 +477,11 @@
 
           // Khởi chạy
           document.addEventListener('DOMContentLoaded', () => {
-            loadUnreadCount();
-            // Cập nhật mỗi 30 giây
-            setInterval(loadUnreadCount, 30000);
+            if (notifBadge) {
+              loadUnreadCount();
+              // Cập nhật mỗi 30 giây
+              setInterval(loadUnreadCount, 30000);
+            }
           });
         })();
     </script>

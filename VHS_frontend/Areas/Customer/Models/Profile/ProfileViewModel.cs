@@ -79,9 +79,8 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
         public int GetProfileCompletionPercentage()
         {
             int completedFields = 0;
-            int totalFields = 5; // AccountName, Email, FullName, PhoneNumber, Address, Images
+            int totalFields = 4; // FullName, PhoneNumber, Address, Images (mỗi trường 25%)
 
-            // AccountName và Email luôn có (không tính)
             if (!string.IsNullOrEmpty(FullName)) completedFields++;
             if (!string.IsNullOrEmpty(PhoneNumber)) completedFields++;
             if (!string.IsNullOrEmpty(Address)) completedFields++;

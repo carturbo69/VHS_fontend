@@ -13,7 +13,7 @@
     <!-- Header Section -->
     <div class="profile-header">
         <div class="profile-avatar-section">
-            <div class="avatar-container">
+            <div class="avatar-container @(Model.HasProfileImage ? "has-image" : "no-image")">
                 <img id="profileAvatar" 
                      src="@Model.GetProfileImageUrl()" 
                      alt="@Model.GetDisplayName()" 
@@ -24,13 +24,13 @@
                     </button>
                 </div>
             </div>
-            <div class="avatar-actions">
+            <div class="avatar-actions" id="avatarActions">
                 <button type="button" class="btn btn-outline-primary btn-sm" onclick="openImageUpload()">
                     <i class="bi bi-camera me-1"></i>Đổi ảnh
                 </button>
                 @if (Model.HasProfileImage)
                 {
-                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteProfileImage()">
+                    <button type="button" id="deleteImageBtn" class="btn btn-outline-danger btn-sm" onclick="deleteProfileImage()">
                         <i class="bi bi-trash me-1"></i>Xóa ảnh
                     </button>
                 }
@@ -56,26 +56,34 @@
     <!-- Profile Completion -->
     <div class="profile-completion-card">
         <div class="completion-header">
-            <h3>Hoàn thiện hồ sơ</h3>
-            <span class="completion-percentage">@Model.GetProfileCompletionPercentage()%</span>
+            <h3><i class="bi bi-clipboard-check me-2"></i>Hoàn thiện hồ sơ</h3>
+            <span class="completion-percentage" id="completionPercentage">@Model.GetProfileCompletionPercentage()%</span>
         </div>
         <div class="completion-progress">
-            <div class="progress-bar" style="width: @Model.GetProfileCompletionPercentage()%"></div>
+            <div class="progress-bar" id="progressBar" style="width: @Model.GetProfileCompletionPercentage()%"></div>
         </div>
         <div class="completion-items">
-            <div class="completion-item @(string.IsNullOrEmpty(Model.FullName) ? "incomplete" : "complete")">
+            <div class="completion-item @(string.IsNullOrEmpty(Model.FullName) ? "incomplete" : "complete")" 
+                 data-field="fullname" 
+                 data-complete="@(string.IsNullOrEmpty(Model.FullName) ? "false" : "true")">
                 <i class="bi bi-@(string.IsNullOrEmpty(Model.FullName) ? "x-circle" : "check-circle")"></i>
                 <span>Họ và tên</span>
             </div>
-            <div class="completion-item @(string.IsNullOrEmpty(Model.PhoneNumber) ? "incomplete" : "complete")">
+            <div class="completion-item @(string.IsNullOrEmpty(Model.PhoneNumber) ? "incomplete" : "complete")" 
+                 data-field="phone" 
+                 data-complete="@(string.IsNullOrEmpty(Model.PhoneNumber) ? "false" : "true")">
                 <i class="bi bi-@(string.IsNullOrEmpty(Model.PhoneNumber) ? "x-circle" : "check-circle")"></i>
                 <span>Số điện thoại</span>
             </div>
-            <div class="completion-item @(string.IsNullOrEmpty(Model.Address) ? "incomplete" : "complete")">
+            <div class="completion-item @(string.IsNullOrEmpty(Model.Address) ? "incomplete" : "complete")" 
+                 data-field="address" 
+                 data-complete="@(string.IsNullOrEmpty(Model.Address) ? "false" : "true")">
                 <i class="bi bi-@(string.IsNullOrEmpty(Model.Address) ? "x-circle" : "check-circle")"></i>
                 <span>Địa chỉ</span>
             </div>
-            <div class="completion-item @(!Model.HasProfileImage ? "incomplete" : "complete")">
+            <div class="completion-item @(!Model.HasProfileImage ? "incomplete" : "complete")" 
+                 data-field="avatar" 
+                 data-complete="@(!Model.HasProfileImage ? "false" : "true")">
                 <i class="bi bi-@(!Model.HasProfileImage ? "x-circle" : "check-circle")"></i>
                 <span>Ảnh đại diện</span>
             </div>
@@ -94,24 +102,51 @@
             </div>
             <div class="card-body">
                 <div class="info-row">
-                    <label>Tên tài khoản</label>
+                    <label><i class="bi bi-person-circle me-2"></i>Tên tài khoản</label>
                     <span>@Model.AccountName</span>
                 </div>
                 <div class="info-row">
-                    <label>Email</label>
+                    <label><i class="bi bi-envelope-fill me-2"></i>Email</label>
                     <span>@Model.Email</span>
                 </div>
                 <div class="info-row">
-                    <label>Họ và tên</label>
-                    <span>@(string.IsNullOrEmpty(Model.FullName) ? "Chưa cập nhật" : Model.FullName)</span>
+                    <label><i class="bi bi-person-fill me-2"></i>Họ và tên</label>
+                    <span class="@(string.IsNullOrEmpty(Model.FullName) ? "text-muted" : "")">
+                        @if (string.IsNullOrEmpty(Model.FullName))
+                        {
+                            <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Chưa cập nhật</span>
+                        }
+                        else
+                        {
+                            @Model.FullName
+                        }
+                    </span>
                 </div>
                 <div class="info-row">
-                    <label>Số điện thoại</label>
-                    <span>@(string.IsNullOrEmpty(Model.PhoneNumber) ? "Chưa cập nhật" : Model.PhoneNumber)</span>
+                    <label><i class="bi bi-telephone-fill me-2"></i>Số điện thoại</label>
+                    <span class="@(string.IsNullOrEmpty(Model.PhoneNumber) ? "text-muted" : "")">
+                        @if (string.IsNullOrEmpty(Model.PhoneNumber))
+                        {
+                            <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Chưa cập nhật</span>
+                        }
+                        else
+                        {
+                            @Model.PhoneNumber
+                        }
+                    </span>
                 </div>
                 <div class="info-row">
-                    <label>Địa chỉ</label>
-                    <span>@(string.IsNullOrEmpty(Model.Address) ? "Chưa cập nhật" : Model.Address)</span>
+                    <label><i class="bi bi-geo-alt-fill me-2"></i>Địa chỉ</label>
+                    <span class="@(string.IsNullOrEmpty(Model.Address) ? "text-muted" : "")">
+                        @if (string.IsNullOrEmpty(Model.Address))
+                        {
+                            <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Chưa cập nhật</span>
+                        }
+                        else
+                        {
+                            @Model.Address
+                        }
+                    </span>
                 </div>
             </div>
         </div>
@@ -148,39 +183,39 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Account Statistics Card -->
-        <div class="detail-card">
-            <div class="card-header">
-                <h3><i class="bi bi-graph-up"></i> Thống kê tài khoản</h3>
+    <!-- Account Statistics Card -->
+    <div class="detail-card stats-card-full">
+        <div class="card-header">
+            <h3><i class="bi bi-graph-up"></i> Thống kê tài khoản</h3>
+        </div>
+        <div class="card-body stats-body">
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value">0</span>
+                    <span class="stat-label">Đơn hàng đã đặt</span>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="stat-item">
-                    <div class="stat-icon">
-                        <i class="bi bi-calendar-check"></i>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">0</span>
-                        <span class="stat-label">Đơn hàng đã đặt</span>
-                    </div>
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="bi bi-star"></i>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-icon">
-                        <i class="bi bi-star"></i>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">0</span>
-                        <span class="stat-label">Đánh giá đã viết</span>
-                    </div>
+                <div class="stat-info">
+                    <span class="stat-value">0</span>
+                    <span class="stat-label">Đánh giá đã viết</span>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-icon">
-                        <i class="bi bi-clock-history"></i>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">@((DateTime.Now - (Model.CreatedAt ?? DateTime.Now)).Days)</span>
-                        <span class="stat-label">Ngày tham gia</span>
-                    </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value">@((DateTime.Now - (Model.CreatedAt ?? DateTime.Now)).Days)</span>
+                    <span class="stat-label">Ngày tham gia</span>
                 </div>
             </div>
         </div>
@@ -410,6 +445,22 @@
                     if (result.success) {
                         alert('Xóa ảnh thành công!');
                         document.getElementById('profileAvatar').src = '/images/default-avatar.png';
+                        
+                        // Update avatar container class
+                        const avatarContainer = document.querySelector('.avatar-container');
+                        if (avatarContainer) {
+                            avatarContainer.classList.remove('has-image');
+                            avatarContainer.classList.add('no-image');
+                        }
+                        
+                        // Hide delete button
+                        toggleDeleteImageButton(false);
+                        
+                        // Update completion item
+                        updateCompletionItem('avatar', false);
+                        
+                        // Update percentage
+                        updateCompletionPercentage();
                     } else {
                         alert(result.message || 'Có lỗi xảy ra khi xóa ảnh');
                     }
@@ -459,6 +510,23 @@
                             fullImageUrl = 'http://localhost:5154' + fullImageUrl;
                         }
                         document.getElementById('profileAvatar').src = fullImageUrl;
+                        
+                        // Update avatar container class
+                        const avatarContainer = document.querySelector('.avatar-container');
+                        if (avatarContainer) {
+                            avatarContainer.classList.remove('no-image');
+                            avatarContainer.classList.add('has-image');
+                        }
+                        
+                        // Show delete button
+                        toggleDeleteImageButton(true);
+                        
+                        // Update completion item
+                        updateCompletionItem('avatar', true);
+                        
+                        // Update percentage
+                        updateCompletionPercentage();
+                        
                         bootstrap.Modal.getInstance(document.getElementById('imageUploadModal')).hide();
                         document.getElementById('imageUploadForm').reset();
                         document.getElementById('imagePreview').style.display = 'none';
@@ -486,6 +554,117 @@
                 });
             }
 
+            // Function to calculate and update completion percentage
+            function updateCompletionPercentage() {
+                const items = document.querySelectorAll('.completion-item');
+                let completedCount = 0;
+                const totalFields = 4;
+                
+                items.forEach(item => {
+                    const isComplete = item.getAttribute('data-complete') === 'true';
+                    if (isComplete) {
+                        completedCount++;
+                    }
+                });
+                
+                const percentage = Math.round((completedCount / totalFields) * 100);
+                
+                // Update percentage text
+                const percentageEl = document.getElementById('completionPercentage');
+                if (percentageEl) {
+                    percentageEl.textContent = percentage + '%';
+                }
+                
+                // Update progress bar
+                const progressBar = document.getElementById('progressBar');
+                if (progressBar) {
+                    progressBar.style.width = percentage + '%';
+                }
+                
+                return percentage;
+            }
+            
+            // Function to show/hide delete image button
+            function toggleDeleteImageButton(show) {
+                const avatarActions = document.getElementById('avatarActions');
+                if (!avatarActions) return;
+                
+                let deleteBtn = document.getElementById('deleteImageBtn');
+                
+                if (show) {
+                    // Show button if it doesn't exist
+                    if (!deleteBtn) {
+                        deleteBtn = document.createElement('button');
+                        deleteBtn.type = 'button';
+                        deleteBtn.id = 'deleteImageBtn';
+                        deleteBtn.className = 'btn btn-outline-danger btn-sm';
+                        deleteBtn.onclick = deleteProfileImage;
+                        deleteBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Xóa ảnh';
+                        avatarActions.appendChild(deleteBtn);
+                    } else {
+                        deleteBtn.style.display = '';
+                    }
+                } else {
+                    // Hide button
+                    if (deleteBtn) {
+                        deleteBtn.style.display = 'none';
+                    }
+                }
+            }
+            
+            // Function to update completion item status
+            function updateCompletionItem(fieldName, isComplete) {
+                const item = document.querySelector(`.completion-item[data-field="${fieldName}"]`);
+                if (item) {
+                    item.setAttribute('data-complete', isComplete ? 'true' : 'false');
+                    const icon = item.querySelector('i');
+                    if (icon) {
+                        if (isComplete) {
+                            item.classList.remove('incomplete');
+                            item.classList.add('complete');
+                            icon.className = 'bi bi-check-circle';
+                        } else {
+                            item.classList.remove('complete');
+                            item.classList.add('incomplete');
+                            icon.className = 'bi bi-x-circle';
+                        }
+                    }
+                }
+            }
+            
+            // Function to update profile info display
+            function updateProfileInfo(fieldName, value) {
+                if (!value || value.trim() === '') return;
+                
+                const infoRows = document.querySelectorAll('.info-row');
+                infoRows.forEach(row => {
+                    const label = row.querySelector('label');
+                    if (!label) return;
+                    
+                    const span = row.querySelector('span');
+                    if (!span) return;
+                    
+                    let shouldUpdate = false;
+                    if (fieldName === 'fullname' && label.textContent.includes('Họ và tên')) {
+                        shouldUpdate = true;
+                    } else if (fieldName === 'phone' && label.textContent.includes('Số điện thoại')) {
+                        shouldUpdate = true;
+                    } else if (fieldName === 'address' && label.textContent.includes('Địa chỉ')) {
+                        shouldUpdate = true;
+                    }
+                    
+                    if (shouldUpdate) {
+                        // Remove badge if exists
+                        const badge = span.querySelector('.badge');
+                        if (badge) {
+                            badge.remove();
+                        }
+                        span.innerHTML = value;
+                        span.classList.remove('text-muted');
+                    }
+                });
+            }
+            
             // Modal form handlers
             const editForm = document.getElementById('editProfileForm');
             if (editForm) {
@@ -500,8 +679,29 @@
                         const result = await response.json();
                         if (result.success) {
                             alert('Cập nhật thông tin thành công!');
+                            
+                            // Update completion items based on form data
+                            const fullName = formData.get('FullName');
+                            const phoneNumber = formData.get('PhoneNumber');
+                            const address = formData.get('Address');
+                            
+                            if (fullName) {
+                                updateCompletionItem('fullname', true);
+                                updateProfileInfo('fullname', fullName);
+                            }
+                            if (phoneNumber) {
+                                updateCompletionItem('phone', true);
+                                updateProfileInfo('phone', phoneNumber);
+                            }
+                            if (address) {
+                                updateCompletionItem('address', true);
+                                updateProfileInfo('address', address);
+                            }
+                            
+                            // Update percentage
+                            updateCompletionPercentage();
+                            
                             bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
-                            location.reload();
                         } else {
                             alert(result.message || 'Có lỗi xảy ra');
                         }

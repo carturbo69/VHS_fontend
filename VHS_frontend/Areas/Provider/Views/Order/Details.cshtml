@@ -1,0 +1,625 @@
+@model VHS_frontend.Areas.Provider.Models.Booking.BookingDetailDTO
+@{
+    Layout = "~/Areas/Provider/Views/Shared/_ProviderLayout.cshtml";
+    ViewData["Title"] = "Chi tiết đơn hàng";
+}
+
+<div class="order-detail-container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">Đơn hàng @Model.BookingCode</h4>
+            <p class="text-muted mb-0">
+                <i class="bi bi-calendar"></i> Tạo lúc: @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+            </p>
+        </div>
+        <div>
+            <a asp-action="Index" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Quay lại
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left Column -->
+        <div class="col-lg-8">
+            <!-- Customer Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person-circle me-2"></i>
+                        Thông tin khách hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Họ tên:</strong> @Model.CustomerName</p>
+                            <p><strong>Email:</strong> @Model.CustomerEmail</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Số điện thoại:</strong> @Model.CustomerPhone</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-briefcase me-2"></i>
+                        Thông tin dịch vụ
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex">
+                        @if (!string.IsNullOrEmpty(Model.ServiceImages))
+                        {
+                            var firstImage = Model.ServiceImages.Split(',').FirstOrDefault();
+                            <img src="@firstImage" alt="@Model.ServiceName" class="service-image me-3" />
+                        }
+                        <div class="flex-grow-1">
+                            <h5>@Model.ServiceName</h5>
+                            <p class="text-muted">@Model.ServiceDescription</p>
+                            <p><strong>Giá cơ bản:</strong> <span class="text-primary">@Model.ServicePrice.ToString("N0") VND</span></p>
+                            
+                            @if (Model.Options.Any())
+                            {
+                                <div class="mt-3">
+                                    <strong>Tùy chọn đã chọn:</strong>
+                                    <ul class="list-unstyled mt-2">
+                                        @foreach (var option in Model.Options)
+                                        {
+                                            <li class="mb-2">
+                                                <i class="bi bi-check-circle text-success"></i>
+                                                @option.OptionName
+                                                @if (!string.IsNullOrEmpty(option.Description))
+                                                {
+                                                    <span class="text-muted">(@option.Description)</span>
+                                                }
+                                                - <strong>@option.Price.ToString("N0") VND</strong>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Booking Info Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar-check me-2"></i>
+                        Thông tin đặt hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Thời gian thực hiện:</strong> @Model.BookingTime.ToString("dd/MM/yyyy HH:mm")</p>
+                    <p><strong>Địa chỉ:</strong> @Model.Address</p>
+                    @if (!string.IsNullOrEmpty(Model.VoucherCode))
+                    {
+                        <p>
+                            <strong>Mã giảm giá:</strong> 
+                            <span class="badge bg-success">@Model.VoucherCode</span>
+                        </p>
+                    }
+                </div>
+            </div>
+
+            <!-- Staff Assignment Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-people me-2"></i>
+                        Phân công nhân viên
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.StaffId.HasValue)
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-person-check-fill"></i>
+                            Đã phân công cho: <strong>@Model.StaffName</strong>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Chưa phân công nhân viên
+                        </div>
+                    }
+
+                    @if (ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
+                    {
+                        <div class="mt-3">
+                            <label class="form-label">Chọn nhân viên:</label>
+                            <div class="input-group">
+                                <select id="staffSelect" class="form-select">
+                                    <option value="">-- Chọn nhân viên --</option>
+                                    @foreach (var staff in (List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList)
+                                    {
+                                        var isSelected = Model.StaffId.HasValue && 
+                                                        Guid.TryParse(staff.StaffId, out var staffGuid) && 
+                                                        staffGuid == Model.StaffId.Value;
+                                        <option value="@staff.StaffId" selected="@isSelected">
+                                            @staff.StaffName
+                                        </option>
+                                    }
+                                </select>
+                                <button type="button" class="btn btn-primary" onclick="assignStaff()">
+                                    <i class="bi bi-check"></i> Phân công
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Checker Records -->
+            @if (Model.CheckerRecords.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-camera me-2"></i>
+                            Check-in/Check-out
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var record in Model.CheckerRecords)
+                        {
+                            <div class="checker-record mb-3 p-3 border rounded">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <strong>@record.ForStatus</strong>
+                                    <small class="text-muted">@record.UploadedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                                </div>
+                                @if (!string.IsNullOrEmpty(record.StaffName))
+                                {
+                                    <p class="mb-2"><small>Bởi: @record.StaffName</small></p>
+                                }
+                                @if (record.MediaType.Contains("image"))
+                                {
+                                    <img src="@record.FileUrl" alt="Checker media" class="img-fluid rounded" />
+                                }
+                                else if (record.MediaType.Contains("video"))
+                                {
+                                    <video controls class="w-100 rounded">
+                                        <source src="@record.FileUrl" type="video/mp4" />
+                                    </video>
+                                }
+                                @if (!string.IsNullOrEmpty(record.Description))
+                                {
+                                    <p class="mt-2 mb-0"><em>@record.Description</em></p>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-lg-4">
+            <!-- Status Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Trạng thái đơn hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <span class="status-badge-lg status-@Model.Status.ToLower()">
+                            @GetStatusText(Model.Status)
+                        </span>
+                    </div>
+
+                    @{ 
+                        var statusNorm = (Model.Status ?? string.Empty).Trim();
+                        bool isConfirmed = string.Equals(statusNorm, "Confirmed", StringComparison.OrdinalIgnoreCase);
+                        bool isCompleted = string.Equals(statusNorm, "Completed", StringComparison.OrdinalIgnoreCase);
+                        bool isCanceled  = string.Equals(statusNorm, "Canceled",  StringComparison.OrdinalIgnoreCase);
+                        // Hiển thị nút nếu đơn chưa ở các trạng thái cuối cùng
+                        bool canAct = !(isConfirmed || isCompleted || isCanceled);
+                    }
+                    @if (canAct)
+                    {
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-success btn-lg" onclick="updateStatus('Confirmed')">
+                                <i class="bi bi-check-circle"></i> Xác nhận đơn hàng
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="cancelOrder()">
+                                <i class="bi bi-x-circle"></i> Từ chối đơn hàng
+                            </button>
+                        </div>
+                    }
+                    else if (Model.Status == "Confirmed")
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Đơn hàng đã được xác nhận</strong>
+                            <p class="mb-0 mt-2 small">
+                                Nhân viên <strong>@(Model.StaffName ?? "chưa phân công")</strong> sẽ thực hiện công việc và cập nhật trạng thái qua ứng dụng Staff.
+                            </p>
+                        </div>
+                        <!-- Chỉ cho phép hủy nếu thực sự cần -->
+                        @* <button type="button" class="btn btn-outline-danger btn-sm" onclick="cancelOrder()">
+                            <i class="bi bi-x-circle"></i> Hủy đơn hàng (khẩn cấp)
+                        </button> *@
+                    }
+                    else if (Model.Status == "Completed")
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle-fill"></i>
+                            <strong>Đơn hàng đã hoàn thành</strong>
+                            <p class="mb-0 mt-2 small">
+                                Công việc đã được nhân viên hoàn thành.
+                            </p>
+                        </div>
+                    }
+                    else if (Model.Status == "Canceled")
+                    {
+                        <div class="alert alert-danger">
+                            <h5 class="alert-heading">
+                                <i class="bi bi-x-circle-fill"></i>
+                                <strong>Đơn hàng đã bị từ chối</strong>
+                            </h5>
+                            @if (!string.IsNullOrEmpty(Model.CancelReason))
+                            {
+                                <hr />
+                                <p class="mb-0">
+                                    <strong>Lý do từ chối:</strong><br />
+                                    <span class="text-dark">@Model.CancelReason</span>
+                                </p>
+                            }
+                            else
+                            {
+                                <hr />
+                                <p class="mb-0 text-muted">
+                                    <em>(Không có lý do cụ thể)</em>
+                                </p>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Payment Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-credit-card me-2"></i>
+                        Thanh toán
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="payment-summary">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Tổng tiền:</span>
+                            <strong class="text-primary">@Model.TotalAmount.ToString("N0") VND</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Phương thức:</span>
+                            <span>@(Model.PaymentMethod ?? "Chưa thanh toán")</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Trạng thái:</span>
+                            <span class="badge bg-@(Model.PaymentStatus == "Paid" ? "success" : "warning")">
+                                @(Model.PaymentStatus ?? "Chưa thanh toán")
+                            </span>
+                        </div>
+                        @if (Model.PaymentDate.HasValue)
+                        {
+                            <div class="d-flex justify-content-between mt-2">
+                                <span>Ngày thanh toán:</span>
+                                <span>@Model.PaymentDate.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script>
+        const bookingId = '@Model.BookingId';
+        console.log('Booking ID:', bookingId);
+
+        function updateStatus(newStatus) {
+            console.log('[DEBUG] updateStatus called with:', newStatus);
+            
+            const confirmMsg = newStatus === 'Confirmed' ? 'xác nhận' : 
+                              newStatus === 'Completed' ? 'hoàn thành' : 'cập nhật';
+            
+            if (!confirm(`Bạn có chắc chắn muốn ${confirmMsg} đơn hàng này?`)) {
+                console.log('[DEBUG] User cancelled');
+                return;
+            }
+
+            const payload = {
+                bookingId: bookingId,
+                newStatus: newStatus,
+                reason: null
+            };
+            
+            console.log('[DEBUG] Sending payload:', payload);
+
+            fetch('/Provider/Order/UpdateStatus', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                console.log('[DEBUG] Response status:', response.status);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('[ERROR] Response error:', text);
+                        throw new Error('HTTP ' + response.status + ': ' + text);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('[DEBUG] Response data:', data);
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    location.reload();
+                } else {
+                    alert('❌ Lỗi: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('[ERROR] Catch error:', error);
+                alert('❌ Có lỗi xảy ra: ' + error.message);
+            });
+        }
+
+        function updateCharCount() {
+            const textarea = document.getElementById('cancelReason');
+            const charCount = document.getElementById('charCount');
+            charCount.textContent = textarea.value.length;
+            
+            // Đổi màu nếu chưa đủ 10 ký tự
+            if (textarea.value.length < 10) {
+                charCount.classList.add('text-danger');
+                charCount.classList.remove('text-success');
+            } else {
+                charCount.classList.add('text-success');
+                charCount.classList.remove('text-danger');
+            }
+        }
+
+        function cancelOrder() {
+            console.log('[DEBUG] cancelOrder called');
+            
+            // Reset form
+            document.getElementById('cancelReason').value = '';
+            updateCharCount(); // Reset counter
+            
+            // Mở modal thay vì dùng prompt()
+            const modal = new bootstrap.Modal(document.getElementById('cancelReasonModal'));
+            modal.show();
+        }
+
+        function submitCancelReason() {
+            console.log('=== [SUBMIT CANCEL] START ===');
+            
+            const textarea = document.getElementById('cancelReason');
+            const reason = textarea.value.trim();
+            
+            console.log('[SUBMIT CANCEL] Reason length:', reason.length);
+            console.log('[SUBMIT CANCEL] Reason value:', reason);
+            
+            // Validation
+            if (!reason) {
+                alert('⚠️ Vui lòng nhập lý do từ chối đơn hàng!');
+                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Empty reason');
+                return;
+            }
+            
+            if (reason.length < 10) {
+                alert('⚠️ Lý do từ chối phải có ít nhất 10 ký tự! (Hiện tại: ' + reason.length + ' ký tự)');
+                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Too short');
+                return;
+            }
+            
+            if (reason.length > 500) {
+                alert('⚠️ Lý do từ chối không được quá 500 ký tự!');
+                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Too long');
+                return;
+            }
+
+            // Tạo payload
+            const payload = {
+                bookingId: bookingId,
+                newStatus: 'Canceled',
+                reason: reason  // ✨ LÝ DO Ở ĐÂY
+            };
+            
+            console.log('=== [SUBMIT CANCEL] PAYLOAD ===');
+            console.log(JSON.stringify(payload, null, 2));
+            console.log('===============================');
+
+            // Đóng modal
+            const modalElement = document.getElementById('cancelReasonModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+
+            // Gửi request
+            console.log('[SUBMIT CANCEL] Sending request to /Provider/Order/UpdateStatus...');
+            
+            fetch('/Provider/Order/UpdateStatus', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                console.log('[SUBMIT CANCEL] Response status:', response.status, response.statusText);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('[SUBMIT CANCEL] ERROR Response:', text);
+                        throw new Error('HTTP ' + response.status + ': ' + text);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('[SUBMIT CANCEL] SUCCESS Response:', data);
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    console.log('[SUBMIT CANCEL] Reloading page...');
+                    location.reload();
+                } else {
+                    alert('❌ Lỗi: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('[SUBMIT CANCEL] CATCH Error:', error);
+                alert('❌ Có lỗi xảy ra: ' + error.message);
+            });
+            
+            console.log('=== [SUBMIT CANCEL] END ===');
+        }
+
+        function assignStaff() {
+            console.log('[DEBUG] assignStaff called');
+            
+            const staffSelect = document.getElementById('staffSelect');
+            const staffId = staffSelect.value;
+            
+            console.log('[DEBUG] Selected staff ID:', staffId);
+            
+            if (!staffId || staffId === '') {
+                alert('⚠️ Vui lòng chọn nhân viên');
+                return;
+            }
+
+            const payload = {
+                bookingId: bookingId,
+                staffId: staffId
+            };
+            
+            console.log('[DEBUG] Assign staff payload:', payload);
+
+            fetch('/Provider/Order/AssignStaff', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                console.log('[DEBUG] Response status:', response.status);
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('[ERROR] Response error:', text);
+                        throw new Error('HTTP ' + response.status + ': ' + text);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('[DEBUG] Response data:', data);
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    location.reload();
+                } else {
+                    alert('❌ Lỗi: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('[ERROR] Catch error:', error);
+                alert('❌ Có lỗi xảy ra: ' + error.message);
+            });
+        }
+
+        // Test khi trang load xong
+        console.log('[DEBUG] Order details page loaded');
+        console.log('[DEBUG] Current status:', '@Model.Status');
+    </script>
+}
+
+<!-- Modal: Nhập lý do từ chối đơn hàng -->
+<div class="modal fade" id="cancelReasonModal" tabindex="-1" aria-labelledby="cancelReasonModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="cancelReasonModalLabel">
+                    <i class="bi bi-x-circle"></i> Từ chối đơn hàng
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Lưu ý:</strong> Hành động này sẽ từ chối đơn hàng và hoàn tiền cho khách hàng.
+                </div>
+                <div class="mb-3">
+                    <label for="cancelReason" class="form-label">
+                        <strong>Lý do từ chối: <span class="text-danger">*</span></strong>
+                    </label>
+                    <textarea 
+                        class="form-control" 
+                        id="cancelReason" 
+                        rows="4" 
+                        placeholder="Vui lòng nhập lý do từ chối đơn hàng (tối thiểu 10 ký tự)..."
+                        maxlength="500"
+                        oninput="updateCharCount()"
+                        required></textarea>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> Lý do này sẽ được gửi cho khách hàng.
+                        </small>
+                        <small class="text-muted">
+                            <span id="charCount">0</span>/500 ký tự
+                        </small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x"></i> Hủy
+                </button>
+                <button type="button" class="btn btn-danger" onclick="submitCancelReason()">
+                    <i class="bi bi-check-circle"></i> Xác nhận từ chối
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ xử lý",
+            "PendingPayment" => "Chờ xử lý",
+            "Processing" => "Chờ xử lý",
+            "Confirmed" => "Đã xác nhận",
+            "Completed" => "Hoàn thành",
+            "Canceled" => "Đã hủy",
+            _ => status
+        };
+    }
+}
+

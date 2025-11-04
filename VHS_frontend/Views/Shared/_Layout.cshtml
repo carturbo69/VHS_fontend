@@ -87,17 +87,29 @@
     <script>
         // Biến lưu trữ thông báo từ API
         let notifications = [];
-
-        // Hover để hiển thị dropdown
-        const btn = document.getElementById('notificationBtn');
-        const menu = document.getElementById('notificationMenu');
+        let menuRendered = false; // Flag để biết menu đã được render chưa
+        let btn = null;
+        let menu = null;
         let hoverTimeout;
 
-        if (btn && menu) {
+        // Khởi tạo sau khi DOM ready
+        function initNotificationMenu() {
+            btn = document.getElementById('notificationBtn');
+            menu = document.getElementById('notificationMenu');
+            
+            if (!btn || !menu) {
+                console.log('⚠️ Notification elements not found');
+                return;
+            }
+
             // Hover để hiển thị dropdown
-            btn.addEventListener('mouseenter', async () => {
+            btn.addEventListener('mouseenter', () => {
                 clearTimeout(hoverTimeout);
-                await loadNotifications();
+                // Chỉ render menu nếu chưa render hoặc đã có thay đổi
+                if (!menuRendered) {
+                    renderNotificationMenu();
+                    menuRendered = true;
+                }
                 menu.style.display = 'block';
             });
 
@@ -120,9 +132,58 @@
                     menu.style.display = 'none';
                 }, 100);
             });
-
-            // Click vào chuông sẽ chuyển trang (không prevent default)
-            // Link sẽ hoạt động bình thường
+        }
+        
+        // Render notification menu từ array notifications
+        function renderNotificationMenu() {
+            if (!menu) return;
+            
+            menu.innerHTML = '';
+            
+            // Add header
+            const header = document.createElement('div');
+            header.className = 'dropdown-header';
+            header.innerHTML = '<h3>Thông báo</h3>';
+            menu.appendChild(header);
+            
+            const unreadNotifications = notifications.filter(n => !n.isRead);
+            
+            if (unreadNotifications.length === 0) {
+                const empty = document.createElement('li');
+                empty.className = 'text-center text-muted py-2';
+                empty.innerHTML = '<i class="bi bi-bell-slash me-2"></i>Không có thông báo nào';
+                menu.appendChild(empty);
+                return;
+            }
+            
+            unreadNotifications.forEach(n => {
+                const li = document.createElement('li');
+                li.style.cursor = 'pointer';
+                
+                // Format time giống y trang thông báo
+                const formattedTime = formatVietnamTime(n.createdAt);
+                
+                li.innerHTML = `
+                    <div class="d-block text-decoration-none">
+                        <div class="small text-muted">${formattedTime}</div>
+                        <div>${n.content}</div>
+                        <div><strong>Loại:</strong> ${getNotificationTypeVN(n.notificationType)}</div>
+                    </div>`;
+                
+                // Sử dụng addEventListener thay vì onclick để tránh mất handler
+                li.addEventListener('click', function(e) {
+                    markAsReadFromDropdown(n.notificationId, e);
+                });
+                
+                menu.appendChild(li);
+            });
+            
+            // View all notifications button
+            const all = document.createElement('li');
+            all.innerHTML = `<a href="/Customer/Notification/Index" class="d-block text-center text-decoration-none">
+                <i class="bi bi-arrow-right me-2"></i>Xem tất cả thông báo
+            </a>`;
+            menu.appendChild(all);
         }
 
         // Đếm và hiển thị badge
@@ -192,53 +253,8 @@
                 notifications = [];
             }
             
-            menu.innerHTML = '';
-            
-            // Add header
-            const header = document.createElement('div');
-            header.className = 'dropdown-header';
-            header.innerHTML = '<h3>Thông báo</h3>';
-            menu.appendChild(header);
-            
-            const unreadNotifications = notifications.filter(n => !n.isRead);
-            
-            if (unreadNotifications.length === 0) {
-                const empty = document.createElement('li');
-                empty.className = 'text-center text-muted py-2';
-                empty.innerHTML = '<i class="bi bi-bell-slash me-2"></i>Không có thông báo nào';
-                menu.appendChild(empty);
-                return;
-            }
-            
-            unreadNotifications.forEach(n => {
-                const li = document.createElement('li');
-                li.style.cursor = 'pointer';
-                li.onclick = () => markAsReadFromDropdown(n.notificationId);
-                
-                // DEBUG: Log raw time từ API
-                console.log('🕐 Raw createdAt từ API:', n.createdAt);
-                
-                // Format time giống y trang thông báo
-                const formattedTime = formatVietnamTime(n.createdAt);
-                
-                // DEBUG: Log formatted time
-                console.log('🕐 Formatted time:', formattedTime);
-                
-                li.innerHTML = `
-                    <div class="d-block text-decoration-none">
-                        <div class="small text-muted">${formattedTime}</div>
-                        <div>${n.content}</div>
-                        <div><strong>Loại:</strong> ${getNotificationTypeVN(n.notificationType)}</div>
-                    </div>`;
-                menu.appendChild(li);
-            });
-            
-            // View all notifications button
-            const all = document.createElement('li');
-            all.innerHTML = `<a href="/Customer/Notification/Index" class="d-block text-center text-decoration-none">
-                <i class="bi bi-arrow-right me-2"></i>Xem tất cả thông báo
-            </a>`;
-            menu.appendChild(all);
+            // Reset flag để render lại menu lần sau
+            menuRendered = false;
         }
 
         // Helper function để convert NotificationType sang tiếng Việt
@@ -264,52 +280,74 @@
         }
 
         // Mark notification as read from dropdown
-        async function markAsReadFromDropdown(notificationId) {
+        async function markAsReadFromDropdown(notificationId, event) {
+            // Ngăn event bubbling để không trigger click trên dropdown
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
             try {
-                // Lấy CSRF token
-                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
-                if (!tokenInput) {
-                    console.error('CSRF token not found');
-                    // Vẫn chuyển trang để xem thông báo
-                    window.location.href = '/Customer/Notification/Index';
-                    return;
+                // Cập nhật badge ngay lập tức để UX tốt hơn
+                const badge = document.getElementById('notificationBadge');
+                if (badge && badge.style.display !== 'none') {
+                    const currentCount = parseInt(badge.textContent) || 0;
+                    if (currentCount > 1) {
+                        badge.textContent = currentCount - 1;
+                    } else {
+                        badge.style.display = 'none';
+                    }
                 }
                 
-                const formData = new FormData();
-                formData.append('__RequestVerificationToken', tokenInput.value);
+                // Đánh dấu notification đã đọc trong mảng local
+                const notificationIndex = notifications.findIndex(n => n.notificationId === notificationId);
+                if (notificationIndex !== -1) {
+                    notifications[notificationIndex].isRead = true;
+                }
                 
-                const response = await fetch(`/Customer/Notification/MarkRead/${notificationId}`, {
-                    method: 'POST',
-                    body: formData
-                });
+                // Xóa notification khỏi dropdown ngay lập tức
+                const clickedLi = event ? event.currentTarget : null;
+                if (clickedLi && clickedLi.parentNode === menu) {
+                    clickedLi.remove();
+                    
+                    // Nếu không còn notification nào, hiện thông báo "Không có"
+                    const remainingLis = menu.querySelectorAll('li');
+                    if (remainingLis.length === 1 && remainingLis[0].querySelector('a[href="/Customer/Notification/Index"]')) {
+                        menu.innerHTML = '';
+                        const header = document.createElement('div');
+                        header.className = 'dropdown-header';
+                        header.innerHTML = '<h3>Thông báo</h3>';
+                        menu.appendChild(header);
+                        const empty = document.createElement('li');
+                        empty.className = 'text-center text-muted py-2';
+                        empty.innerHTML = '<i class="bi bi-bell-slash me-2"></i>Không có thông báo nào';
+                        menu.appendChild(empty);
+                    }
+                }
                 
-                const result = await response.json();
-                
-                if (response.ok && result.success) {
-                    console.log('Marked as read successfully');
-                    // Reload notifications và chuyển trang
-                    await loadNotifications();
-                    loadUnreadCount();
-                    // Đợi một chút để cập nhật xong rồi mới chuyển trang
-                    setTimeout(() => {
-                        window.location.href = '/Customer/Notification/Index';
-                    }, 200);
-                } else {
-                    console.error('Failed to mark as read:', result.message || response.status);
-                    // Vẫn chuyển trang ngay cả khi lỗi
-                    window.location.href = '/Customer/Notification/Index';
+                // Gọi API để đánh dấu đã đọc và reset flag để load lại lần sau
+                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (tokenInput) {
+                    const formData = new FormData();
+                    formData.append('__RequestVerificationToken', tokenInput.value);
+                    fetch(`/Customer/Notification/MarkRead/${notificationId}`, {
+                        method: 'POST',
+                        body: formData
+                    }).then(() => {
+                        menuRendered = false; // Reset để render lại menu lần sau
+                    }).catch(error => {
+                        console.error('Error marking notification as read:', error);
+                    });
                 }
             } catch (error) {
-                console.error('Error marking notification as read:', error);
-                // Vẫn chuyển trang ngay cả khi lỗi
-                window.location.href = '/Customer/Notification/Index';
+                console.error('Error in markAsReadFromDropdown:', error);
             }
         }
 
-        // FORCE RELOAD - Version timestamp để browser load code mới
-        console.log('=== NOTIFICATION SCRIPT LOADED v2025-10-26-19:20-FIXED ===');
-        
         document.addEventListener('DOMContentLoaded', async () => {
+            console.log('📬 Notification system initialized');
+            // Khởi tạo menu event listeners
+            initNotificationMenu();
             // Load thông báo khi trang load
             await loadNotifications();
             loadUnreadCount();
@@ -320,6 +358,9 @@
                 loadUnreadCount();
             }, 30000);
         });
+        
+        // Log khi script được load
+        console.log('✅ Notification script loaded at:', new Date().toISOString());
     </script>
 
     @RenderSection("Scripts", required: false)

@@ -175,49 +175,98 @@ namespace VHS_frontend.Services.Admin
             }
         }
 
-        // GET: Lấy số lượng thông báo chưa đọc
+        // GET: Lấy số lượng thông báo chưa đọc (chỉ thông báo nhận được - ReceiverRole = Admin)
         public async Task<int> GetUnreadCountAsync()
         {
             try
             {
-                var response = await _http.GetFromJsonAsync<object>("/api/notification/unread-count");
-                // Parse response để lấy count
-                if (response != null)
+                AttachAuth();
+                // Lấy tất cả thông báo, sau đó filter trên client side giống như Index view
+                var url = "/api/notification/admin/all";
+                var res = await _http.GetAsync(url);
+                if (!res.IsSuccessStatusCode)
                 {
-                    var json = System.Text.Json.JsonSerializer.Serialize(response);
-                    var doc = System.Text.Json.JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("count", out var countElement))
-                    {
-                        return countElement.GetInt32();
-                    }
+                    Console.WriteLine($"Failed to get unread count: {res.StatusCode}");
+                    return 0;
                 }
+                
+                var json = await res.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                
+                // Lấy data array
+                if (doc.RootElement.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    // Deserialize để filter
+                    var notifications = System.Text.Json.JsonSerializer.Deserialize<List<AdminNotificationItemDTO>>(
+                        dataElement.GetRawText(),
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                    
+                    // Filter: ReceiverRole == "Admin" && IsRead != true (giống logic trong Index view)
+                    var unreadCount = notifications.Count(n => 
+                        n.ReceiverRole == "Admin" && (n.IsRead == null || n.IsRead == false));
+                    
+                    Console.WriteLine($"Found {unreadCount} unread notifications for Admin (Total: {notifications.Count})");
+                    return unreadCount;
+                }
+                
+                Console.WriteLine($"Warning: Could not find data array in response: {json}");
                 return 0;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting unread count: {ex.Message}");
+                Console.WriteLine($"StackTrace: {ex.StackTrace}");
                 return 0;
             }
         }
 
-        // GET: Lấy danh sách thông báo chưa đọc
+        // GET: Lấy danh sách thông báo chưa đọc (chỉ thông báo nhận được - ReceiverRole = Admin)
         public async Task<List<AdminNotificationDTO>> GetUnreadNotificationsAsync()
         {
             try
             {
-                var response = await _http.GetFromJsonAsync<object>("/api/notification/unread");
-                // Parse response để lấy danh sách notifications
-                if (response != null)
+                AttachAuth();
+                // Lấy tất cả thông báo, sau đó filter trên client side giống như Index view
+                var url = "/api/notification/admin/all";
+                var res = await _http.GetAsync(url);
+                if (!res.IsSuccessStatusCode)
                 {
-                    var json = System.Text.Json.JsonSerializer.Serialize(response);
-                    var doc = System.Text.Json.JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("data", out var dataElement))
-                    {
-                        return System.Text.Json.JsonSerializer.Deserialize<List<AdminNotificationDTO>>(
-                            dataElement.GetRawText(),
-                            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<AdminNotificationDTO>();
-                    }
+                    Console.WriteLine($"Failed to get unread notifications: {res.StatusCode}");
+                    return new List<AdminNotificationDTO>();
                 }
+                
+                var json = await res.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                
+                if (doc.RootElement.TryGetProperty("data", out var dataElement))
+                {
+                    // Deserialize sang AdminNotificationItemDTO trước
+                    var allNotifications = System.Text.Json.JsonSerializer.Deserialize<List<AdminNotificationItemDTO>>(
+                        dataElement.GetRawText(),
+                        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                    
+                    // Filter: ReceiverRole == "Admin" && IsRead != true
+                    var unreadNotifications = allNotifications
+                        .Where(n => n.ReceiverRole == "Admin" && (n.IsRead == null || n.IsRead == false))
+                        .OrderByDescending(n => n.CreatedAt)
+                        .Take(10) // Chỉ lấy 10 thông báo gần nhất cho dropdown
+                        .ToList();
+                    
+                    // Map sang AdminNotificationDTO
+                    return unreadNotifications.Select(n => new AdminNotificationDTO
+                    {
+                        NotificationId = n.NotificationId,
+                        AccountReceivedId = n.AccountReceivedId,
+                        ReceiverRole = n.ReceiverRole,
+                        NotificationType = n.NotificationType,
+                        Content = n.Content,
+                        IsRead = n.IsRead,
+                        CreatedAt = n.CreatedAt,
+                        ReceiverName = n.ReceiverName,
+                        ReceiverEmail = n.ReceiverEmail
+                    }).ToList();
+                }
+                
                 return new List<AdminNotificationDTO>();
             }
             catch (Exception ex)

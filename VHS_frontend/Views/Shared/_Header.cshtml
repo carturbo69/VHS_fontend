@@ -153,6 +153,32 @@
 </header>
 
 <script>
+
+     // --- 📨 Cập nhật tổng tin nhắn chưa đọc ---
+    async function updateChatUnreadCount() {
+        try {
+            const resp = await fetch('/Customer/ChatCustomer/UnreadTotal');
+            if (!resp.ok) return;
+
+            const data = await resp.json();
+            const badge = document.querySelector('[data-chat-count]');
+            if (badge) {
+                const total = data.total ?? 0;
+                badge.textContent = total;
+                badge.style.display = total > 0 ? 'inline-flex' : 'none';
+            }
+        } catch (e) {
+            console.error('Không thể tải số tin nhắn chưa đọc:', e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateCartCount();         // có sẵn rồi
+        updateChatUnreadCount();   // 👈 thêm dòng này
+        setInterval(updateCartCount, 30000);
+        setInterval(updateChatUnreadCount, 30000); // 30 giây cập nhật 1 lần
+    });
+
     // Hàm gọi API lấy tổng số dịch vụ trong giỏ hàng
     async function updateCartCount() {
         try {

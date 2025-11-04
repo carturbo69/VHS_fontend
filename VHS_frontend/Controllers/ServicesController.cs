@@ -87,8 +87,14 @@ namespace VHS_frontend.Controllers
         [HttpGet]
         public async Task<IActionResult> Details(Guid id)
         {
+            Console.WriteLine($"[ServicesController] Details requested: id={id}");
             ServiceDetailDTOs? dto = await _serviceCustomerService.GetServiceDetailAsync(id);
-            if (dto is null) return NotFound();
+            if (dto is null)
+            {
+                Console.WriteLine($"[ServicesController] Service not found: id={id}. Redirecting to Index.");
+                TempData["Error"] = "Không tìm thấy dịch vụ hoặc dịch vụ đã bị gỡ.";
+                return RedirectToAction(nameof(Index));
+            }
 
             var top = await _serviceCustomerService.GetTop05HighestRatedServicesAsync();
             ViewBag.TopRight = top?.Take(4) ?? Enumerable.Empty<ListServiceHomePageDTOs>();
