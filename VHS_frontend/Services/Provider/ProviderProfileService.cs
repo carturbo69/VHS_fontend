@@ -1,4 +1,5 @@
 using VHS_frontend.Areas.Provider.Models.Profile;
+using VHS_frontend.Areas.Admin.Models.RegisterProvider;
 using System.Text.Json;
 
 namespace VHS_frontend.Services.Provider
@@ -47,6 +48,46 @@ namespace VHS_frontend.Services.Provider
         {
             SetAuthHeader(token);
             return await _httpClient.PostAsJsonAsync($"/api/provider/change-password/{accountId}", changePasswordModel, _json, ct);
+        }
+
+        public async Task<UploadImageResultDTO?> UploadAvatarAsync(IFormFile imageFile, string? token = null, CancellationToken ct = default)
+        {
+            try
+            {
+                SetAuthHeader(token);
+                
+                using var stream = new MemoryStream();
+                await imageFile.CopyToAsync(stream);
+                stream.Position = 0;
+
+                var content = new MultipartFormDataContent();
+                content.Add(new StreamContent(stream), "IMAGE", imageFile.FileName);
+
+                var response = await _httpClient.PostAsync("/api/register-provider/media/avatar", content, ct);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var jsonString = await response.Content.ReadAsStringAsync(ct);
+                    return JsonSerializer.Deserialize<UploadImageResultDTO>(jsonString, _json);
+                }
+                else
+                {
+                    var errorString = await response.Content.ReadAsStringAsync(ct);
+                    return new UploadImageResultDTO 
+                    { 
+                        Success = false, 
+                        Message = $"Upload failed: {errorString}" 
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new UploadImageResultDTO 
+                { 
+                    Success = false, 
+                    Message = $"Error: {ex.Message}" 
+                };
+            }
         }
     }
 }
