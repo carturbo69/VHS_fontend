@@ -25,7 +25,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
 
             ViewBag.Username = HttpContext.Session.GetString("Username") ?? "Provider";
-            
+
             var token = HttpContext.Session.GetString("JWToken");
             if (!string.IsNullOrWhiteSpace(token))
                 _withdrawalService.SetBearerToken(token);
