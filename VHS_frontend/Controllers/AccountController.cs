@@ -104,8 +104,36 @@ namespace VHS_frontend.Controllers
                 return View(model);
             }
 
-            TempData["RegisterMessage"] = result.Message ?? "Đăng ký thành công";
-            return RedirectToAction("Login");
+            // Lưu email vào session để dùng cho OTP verification
+            HttpContext.Session.SetString("PendingActivationEmail", model.Email);
+            TempData["ShowOTPModal"] = true;
+            TempData["RegisterMessage"] = result.Message ?? "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP.";
+            
+            return View(model); // Giữ lại view để hiển thị modal OTP
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ActivateAccount([FromBody] VerifyOTPDTO dto)
+        {
+            var result = await _authService.ActivateAccountAsync(dto.Email, dto.OTP);
+            if (result?.Success == true)
+            {
+                HttpContext.Session.Remove("PendingActivationEmail");
+                TempData.Remove("ShowOTPModal"); // Xóa TempData để tránh hiển thị lại khi reload
+                return Json(new { success = true, message = result.Message });
+            }
+            return Json(new { success = false, message = result?.Message ?? "Kích hoạt thất bại." });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ResendOTP([FromBody] ResendOTPDTO dto)
+        {
+            var result = await _authService.ResendOTPAsync(dto.Email);
+            if (result?.Success == true)
+            {
+                return Json(new { success = true, message = result.Message });
+            }
+            return Json(new { success = false, message = result?.Message ?? "Gửi lại OTP thất bại." });
         }
 
         [HttpGet]

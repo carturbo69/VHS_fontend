@@ -6,6 +6,7 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/auth-polish.css" />
+    <link rel="stylesheet" href="~/css/otp-modal.css" asp-append-version="true" />
 }
 
 <section class="auth-wrap">
@@ -111,6 +112,25 @@
                     <button type="button" id="btnPrivacy" class="link link-btn">Chính sách bảo mật</button>.
                 </p>
 
+                <!-- Success message khi kích hoạt thành công -->
+                <div id="activationSuccessMessage" style="display: none; margin-top: 20px; padding: 20px; border-radius: 12px; background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border: 2px solid #16a085; box-shadow: 0 4px 12px rgba(26, 188, 156, 0.15);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <svg style="width: 24px; height: 24px; fill: white;" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                        </div>
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0 0 8px 0; color: #155724; font-size: 18px; font-weight: 600;">Tài khoản đã được kích hoạt thành công!</h4>
+                            <p style="margin: 0; color: #155724; font-size: 14px; line-height: 1.5;">
+                                Bạn có thể đăng nhập ngay bây giờ để sử dụng dịch vụ của chúng tôi.
+                            </p>
+                            <a asp-controller="Account" asp-action="Login" style="display: inline-block; margin-top: 12px; padding: 10px 24px; background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.3s; box-shadow: 0 2px 8px rgba(26, 188, 156, 0.3);">
+                                Đăng nhập ngay →
+                            </a>
+                        </div>
+                    </div>
+                </div>
                 
             </div>
         </div>
@@ -145,6 +165,67 @@
         </div>
         <div class="modal-foot">
             <button type="button" class="btn" onclick="closeModal('termsModal')">Đã hiểu</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Xác thực OTP -->
+<div id="otpModal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" style="max-width: 480px;">
+        <div class="modal-head">
+            <div style="text-align: center; margin-bottom: 8px;">
+                <div style="width: 64px; height: 64px; margin: 0 auto 16px; background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <svg style="width: 32px; height: 32px; fill: white;" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                </div>
+            </div>
+            <h3 class="modal-title" style="text-align: center; margin-bottom: 8px;">Xác thực tài khoản</h3>
+            <button type="button" class="btn-close" aria-label="Đóng" onclick="closeModal('otpModal')">×</button>
+        </div>
+        <div class="modal-body" style="padding: 24px;">
+            <p style="text-align: center; color: #666; margin-bottom: 24px; line-height: 1.6;">
+                Chúng tôi đã gửi mã OTP 6 số đến email của bạn.<br>
+                <strong id="otpEmailDisplay" style="color: #333;"></strong>
+            </p>
+            
+            <div class="field" style="margin-bottom: 20px;">
+                <label class="label" style="text-align: center; margin-bottom: 12px; font-weight: 600;">Nhập mã OTP</label>
+                <div id="otpInputs" style="display: flex; gap: 8px; justify-content: center; margin-bottom: 8px;">
+                    <input type="text" class="otp-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" />
+                    <input type="text" class="otp-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" />
+                    <input type="text" class="otp-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" />
+                    <input type="text" class="otp-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" />
+                    <input type="text" class="otp-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" />
+                    <input type="text" class="otp-digit" maxlength="1" pattern="[0-9]" inputmode="numeric" autocomplete="off" />
+                </div>
+                <input type="hidden" id="otpCode" />
+                <input type="hidden" id="otpEmail" />
+                <span id="otpError" class="text-danger" style="display: none; text-align: center; font-size: 14px; margin-top: 8px;"></span>
+                <div id="otpSuccess" class="text-success" style="display: none; text-align: center; font-size: 14px; margin-top: 8px;"></div>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="font-size: 14px; color: #666; margin-bottom: 8px;">
+                    Không nhận được mã?
+                </p>
+                <div id="otpTimer" style="font-size: 14px; color: #16a085; font-weight: 600; margin-bottom: 12px;">
+                    Mã OTP còn hiệu lực trong: <span id="otpCountdown" style="color: #1abc9c;">02:00</span>
+                </div>
+                <button type="button" class="btn btn-ghost" onclick="resendOTP()" id="btnResendOTP" disabled style="font-size: 14px; opacity: 0.5;">
+                    <svg style="width: 16px; height: 16px; margin-right: 6px; vertical-align: middle;" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                    </svg>
+                    <span id="btnResendText">Gửi lại mã OTP</span>
+                </button>
+            </div>
+        </div>
+        <div class="modal-foot" style="padding: 20px 24px; border-top: 1px solid #e9ecef; display: flex; gap: 12px; justify-content: flex-end;">
+            <button type="button" class="btn" onclick="closeModal('otpModal')" style="flex: 0 0 auto;">Đóng</button>
+            <button type="button" class="btn btn-primary" onclick="activateAccount()" id="btnActivate" disabled style="flex: 0 0 auto; min-width: 120px; opacity: 0.6;">
+                <span id="btnActivateText">Kích hoạt</span>
+                <span id="btnActivateLoader" style="display: none;">Đang xử lý...</span>
+            </button>
         </div>
     </div>
 </div>
@@ -222,8 +303,374 @@
                 return false;
               }
             });
+
+            // Hiển thị modal OTP nếu có TempData (chỉ khi vừa submit form thành công)
+            // Kiểm tra xem có phải là POST request mới không (tránh reload)
+            @if (TempData["ShowOTPModal"] != null && (bool)TempData["ShowOTPModal"])
+            {
+                <text>
+                // Chỉ mở modal nếu đây là lần đầu tiên (không phải reload)
+                const urlParams = new URLSearchParams(window.location.search);
+                const isFromSubmit = sessionStorage.getItem('otpModalShown') !== 'true';
+                
+                if (isFromSubmit) {
+                  sessionStorage.setItem('otpModalShown', 'true');
+                  const email = '@(Context.Session.GetString("PendingActivationEmail") ?? "")';
+                  if (email) {
+                    document.getElementById('otpEmail').value = email;
+                    document.getElementById('otpEmailDisplay').textContent = email;
+                    openModal('otpModal');
+                    
+                    // Bắt đầu countdown timer (2 phút = 120 giây)
+                    startOTPTimer(120);
+                    
+                    // Focus vào ô OTP đầu tiên
+                    setTimeout(() => {
+                      document.querySelector('.otp-digit')?.focus();
+                    }, 300);
+                  }
+                } else {
+                  // Nếu reload, xóa sessionStorage để lần submit tiếp theo có thể mở modal
+                  sessionStorage.removeItem('otpModalShown');
+                }
+                </text>
+            }
+
+            // Xử lý input OTP - tự động chuyển sang ô tiếp theo
+            const otpInputs = document.querySelectorAll('.otp-digit');
+            otpInputs.forEach((input, index) => {
+              input.addEventListener('input', function(e) {
+                const value = e.target.value.replace(/[^0-9]/g, '');
+                e.target.value = value;
+                
+                if (value && index < otpInputs.length - 1) {
+                  otpInputs[index + 1].focus();
+                }
+                
+                updateOTPCode();
+              });
+              
+              input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                  otpInputs[index - 1].focus();
+                }
+              });
+              
+              input.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const paste = (e.clipboardData || window.clipboardData).getData('text');
+                const digits = paste.replace(/[^0-9]/g, '').slice(0, 6);
+                
+                digits.split('').forEach((digit, i) => {
+                  if (otpInputs[i]) {
+                    otpInputs[i].value = digit;
+                    otpInputs[i].classList.add('filled');
+                  }
+                });
+                
+                if (digits.length === 6) {
+                  otpInputs[5].focus();
+                } else if (digits.length > 0) {
+                  otpInputs[digits.length].focus();
+                }
+                
+                updateOTPCode();
+              });
+            });
+            
+            function updateOTPCode() {
+              const code = Array.from(otpInputs).map(input => input.value).join('');
+              document.getElementById('otpCode').value = code;
+              
+              // Update button state
+              const btnActivate = document.getElementById('btnActivate');
+              if (code.length === 6) {
+                btnActivate.disabled = false;
+                btnActivate.style.opacity = '1';
+                btnActivate.classList.add('btn-primary');
+                // Update filled state
+                otpInputs.forEach(input => {
+                  if (input.value) {
+                    input.classList.add('filled');
+                  }
+                });
+              } else {
+                btnActivate.disabled = true;
+                btnActivate.style.opacity = '0.6';
+                btnActivate.classList.remove('btn-primary');
+                otpInputs.forEach(input => {
+                  if (!input.value) {
+                    input.classList.remove('filled');
+                  }
+                });
+              }
+            }
+            
+            // Initialize button state
+            updateOTPCode();
           } catch(_){}
         });
+
+        async function activateAccount() {
+          const email = document.getElementById('otpEmail').value;
+          const otp = document.getElementById('otpCode').value.trim();
+          const errorEl = document.getElementById('otpError');
+          const successEl = document.getElementById('otpSuccess');
+          const btnActivate = document.getElementById('btnActivate');
+          const btnActivateText = document.getElementById('btnActivateText');
+          const btnActivateLoader = document.getElementById('btnActivateLoader');
+          
+          if (!otp || otp.length !== 6) {
+            errorEl.textContent = 'Vui lòng nhập đầy đủ mã OTP 6 số.';
+            errorEl.style.display = 'block';
+            successEl.style.display = 'none';
+            return;
+          }
+
+          errorEl.style.display = 'none';
+          successEl.style.display = 'none';
+          
+          // Disable button và hiển thị loading
+          btnActivate.disabled = true;
+          btnActivateText.style.display = 'none';
+          btnActivateLoader.style.display = 'inline';
+          
+          try {
+            const response = await fetch('@Url.Action("ActivateAccount", "Account")', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+              },
+              body: JSON.stringify({ email: email, otp: otp })
+            });
+
+            let result;
+            try {
+              result = await response.json();
+            } catch (e) {
+              console.error('Failed to parse JSON:', e);
+              errorEl.textContent = 'Lỗi xử lý phản hồi từ server.';
+              errorEl.style.display = 'block';
+              btnActivate.disabled = false;
+              btnActivateText.style.display = 'inline';
+              btnActivateLoader.style.display = 'none';
+              return;
+            }
+            
+            console.log('Activate account result:', result);
+            console.log('Response status:', response.status);
+            console.log('Result success:', result?.success);
+            
+            // Kiểm tra success - có thể là success hoặc Success
+            const isSuccess = response.ok && result && (result.success === true || result.Success === true);
+            
+            if (isSuccess) {
+              // Ẩn error message nếu có
+              errorEl.style.display = 'none';
+              
+              // Hiển thị success message trong modal với style rõ ràng
+              successEl.innerHTML = '<div style="display: flex; align-items: center; gap: 8px; color: #16a085; font-weight: 600;"><svg style="width: 20px; height: 20px; fill: #16a085;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Tài khoản đã được kích hoạt thành công!</div>';
+              successEl.style.display = 'block';
+              successEl.style.padding = '12px';
+              successEl.style.background = '#e8f5f1';
+              successEl.style.borderRadius = '8px';
+              successEl.style.border = '1px solid #16a085';
+              
+              // Ẩn OTP inputs và các button
+              document.getElementById('otpInputs').style.display = 'none';
+              document.getElementById('btnActivate').style.display = 'none';
+              document.getElementById('btnResendOTP').style.display = 'none';
+              
+              // Re-enable button để hiển thị đúng (nếu cần)
+              btnActivate.disabled = false;
+              btnActivateText.style.display = 'inline';
+              btnActivateLoader.style.display = 'none';
+              
+              // Hiển thị thông báo thành công 0.8 giây rồi chuyển trang ngay
+              setTimeout(() => {
+                closeModal('otpModal');
+                sessionStorage.removeItem('otpModalShown');
+                // Redirect đến trang login ngay lập tức
+                window.location.href = '@Url.Action("Login", "Account")?activated=true';
+              }, 800);
+            } else {
+              // Hiển thị lỗi
+              errorEl.textContent = result.message || 'OTP không hợp lệ hoặc đã hết hạn.';
+              errorEl.style.display = 'block';
+              
+              // Clear OTP inputs
+              document.querySelectorAll('.otp-digit').forEach(input => {
+                input.value = '';
+                input.classList.remove('filled');
+              });
+              document.getElementById('otpCode').value = '';
+              document.querySelector('.otp-digit')?.focus();
+              
+              // Re-enable button
+              btnActivate.disabled = false;
+              btnActivateText.style.display = 'inline';
+              btnActivateLoader.style.display = 'none';
+            }
+          } catch (error) {
+            errorEl.textContent = 'Đã xảy ra lỗi. Vui lòng thử lại.';
+            errorEl.style.display = 'block';
+            console.error('Activate account error:', error);
+            
+            // Re-enable button
+            btnActivate.disabled = false;
+            btnActivateText.style.display = 'inline';
+            btnActivateLoader.style.display = 'none';
+          }
+        }
+
+        // Biến để lưu timer interval
+        let otpTimerInterval = null;
+        let otpTimeLeft = 0;
+
+        function startOTPTimer(seconds) {
+          otpTimeLeft = seconds;
+          const countdownEl = document.getElementById('otpCountdown');
+          const timerEl = document.getElementById('otpTimer');
+          const btnResend = document.getElementById('btnResendOTP');
+          const otpInputs = document.querySelectorAll('.otp-digit');
+          
+          // Clear timer cũ nếu có
+          if (otpTimerInterval) {
+            clearInterval(otpTimerInterval);
+          }
+          
+          // Enable button ban đầu
+          btnResend.disabled = true;
+          btnResend.style.opacity = '0.5';
+          
+          // Update countdown ngay lập tức
+          updateCountdownDisplay();
+          
+          // Start timer
+          otpTimerInterval = setInterval(() => {
+            otpTimeLeft--;
+            updateCountdownDisplay();
+            
+            if (otpTimeLeft <= 0) {
+              clearInterval(otpTimerInterval);
+              otpTimerInterval = null;
+              
+              // Hết thời gian - disable inputs và enable resend button
+              countdownEl.textContent = '00:00';
+              timerEl.innerHTML = '<span style="color: #dc3545; font-weight: 600;">Mã OTP đã hết hạn. Vui lòng gửi lại mã mới.</span>';
+              
+              // Disable OTP inputs
+              otpInputs.forEach(input => {
+                input.disabled = true;
+                input.style.opacity = '0.5';
+                input.style.cursor = 'not-allowed';
+              });
+              
+              // Enable resend button
+              btnResend.disabled = false;
+              btnResend.style.opacity = '1';
+            }
+          }, 1000);
+        }
+        
+        function updateCountdownDisplay() {
+          const countdownEl = document.getElementById('otpCountdown');
+          const minutes = Math.floor(otpTimeLeft / 60);
+          const seconds = otpTimeLeft % 60;
+          countdownEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+          
+          // Đổi màu khi sắp hết thời gian (dưới 30 giây)
+          if (otpTimeLeft <= 30) {
+            countdownEl.style.color = '#dc3545';
+          } else {
+            countdownEl.style.color = '#1abc9c';
+          }
+        }
+
+        async function resendOTP() {
+          const email = document.getElementById('otpEmail').value;
+          const errorEl = document.getElementById('otpError');
+          const successEl = document.getElementById('otpSuccess');
+          const btnResend = document.getElementById('btnResendOTP');
+          const btnResendText = document.getElementById('btnResendText');
+          const timerEl = document.getElementById('otpTimer');
+          const otpInputs = document.querySelectorAll('.otp-digit');
+          
+          if (!email) {
+            errorEl.textContent = 'Email không hợp lệ.';
+            errorEl.style.display = 'block';
+            successEl.style.display = 'none';
+            return;
+          }
+
+          errorEl.style.display = 'none';
+          successEl.style.display = 'none';
+          
+          // Disable button
+          const originalText = btnResendText.textContent;
+          btnResend.disabled = true;
+          btnResend.style.opacity = '0.5';
+          btnResendText.textContent = 'Đang gửi...';
+          
+          try {
+            const response = await fetch('@Url.Action("ResendOTP", "Account")', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+              },
+              body: JSON.stringify({ email: email })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+              successEl.textContent = '✓ Mã OTP mới đã được gửi đến email của bạn.';
+              successEl.style.display = 'block';
+              
+              // Clear OTP inputs
+              otpInputs.forEach(input => {
+                input.value = '';
+                input.classList.remove('filled');
+                input.disabled = false;
+                input.style.opacity = '1';
+                input.style.cursor = 'text';
+              });
+              document.getElementById('otpCode').value = '';
+              document.querySelector('.otp-digit')?.focus();
+              
+              // Reset timer và UI
+              timerEl.innerHTML = 'Mã OTP còn hiệu lực trong: <span id="otpCountdown" style="color: #1abc9c;">02:00</span>';
+              // Gọi startOTPTimer sau một chút để đảm bảo element đã được tạo lại
+              setTimeout(() => {
+                startOTPTimer(120); // Reset về 2 phút
+              }, 50);
+              
+              // Re-enable button sau 2 giây
+              setTimeout(() => {
+                btnResend.disabled = true; // Vẫn disabled cho đến khi hết thời gian
+                btnResend.style.opacity = '0.5';
+                btnResendText.textContent = originalText;
+              }, 2000);
+            } else {
+              errorEl.textContent = result.message || 'Không thể gửi lại OTP.';
+              errorEl.style.display = 'block';
+              
+              btnResend.disabled = false;
+              btnResend.style.opacity = '1';
+              btnResendText.textContent = originalText;
+            }
+          } catch (error) {
+            errorEl.textContent = 'Đã xảy ra lỗi. Vui lòng thử lại.';
+            errorEl.style.display = 'block';
+            console.error('Resend OTP error:', error);
+            
+            btnResend.disabled = false;
+            btnResend.style.opacity = '1';
+            btnResendText.textContent = originalText;
+          }
+        }
 
         function openModal(id){
           const el = document.getElementById(id);
@@ -255,6 +702,13 @@
         function closeModal(id){
           const el = document.getElementById(id);
           if (!el) return;
+          
+          // Nếu đóng OTP modal, clear timer
+          if (id === 'otpModal' && otpTimerInterval) {
+            clearInterval(otpTimerInterval);
+            otpTimerInterval = null;
+          }
+          
           try { el.classList.remove('show'); } catch(_){}
           document.body.style.overflow = '';
           // wait for transition end then hide

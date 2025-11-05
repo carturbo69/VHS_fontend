@@ -84,6 +84,69 @@ namespace VHS_frontend.Services
             public object? Data { get; set; }
         }
 
+        public async Task<bool> VerifyOTPAsync(string email, string otp, CancellationToken ct = default)
+        {
+            var dto = new { Email = email, OTP = otp };
+            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}verify-otp", dto, ct);
+            return res.IsSuccessStatusCode;
+        }
+
+        public async Task<RegisterRespondDTO?> ActivateAccountAsync(string email, string otp, CancellationToken ct = default)
+        {
+            var dto = new { Email = email, OTP = otp };
+            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}activate-account", dto, ct);
+            
+            var responseText = await res.Content.ReadAsStringAsync(ct);
+            
+            if (!res.IsSuccessStatusCode)
+            {
+                try
+                {
+                    var errorObj = JsonSerializer.Deserialize<JsonElement>(responseText);
+                    var message = errorObj.TryGetProperty("Message", out var msgProp) ? msgProp.GetString() : responseText;
+                    return new RegisterRespondDTO { Success = false, Message = message ?? responseText };
+                }
+                catch
+                {
+                    return new RegisterRespondDTO { Success = false, Message = responseText };
+                }
+            }
+
+            try
+            {
+                var result = JsonSerializer.Deserialize<JsonElement>(responseText);
+                var success = result.TryGetProperty("success", out var successProp) && successProp.GetBoolean();
+                var message = result.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : 
+                             (result.TryGetProperty("Message", out var msgProp2) ? msgProp2.GetString() : "Tài khoản đã được kích hoạt thành công.");
+                
+                return new RegisterRespondDTO 
+                { 
+                    Success = success, 
+                    Message = message ?? "Tài khoản đã được kích hoạt thành công." 
+                };
+            }
+            catch (Exception ex)
+            {
+                // Nếu không parse được JSON, coi như thành công nếu status code là 200
+                return new RegisterRespondDTO { Success = true, Message = "Tài khoản đã được kích hoạt thành công." };
+            }
+        }
+
+        public async Task<RegisterRespondDTO?> ResendOTPAsync(string email, CancellationToken ct = default)
+        {
+            var dto = new { Email = email };
+            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}resend-otp", dto, ct);
+            
+            if (!res.IsSuccessStatusCode)
+            {
+                var errText = await res.Content.ReadAsStringAsync(ct);
+                return new RegisterRespondDTO { Success = false, Message = errText };
+            }
+
+            var result = await res.Content.ReadFromJsonAsync<RegisterRespondDTO>(cancellationToken: ct);
+            return result ?? new RegisterRespondDTO { Success = true, Message = "OTP đã được gửi lại." };
+        }
+
         /// <summary>
         /// Lấy ProviderId từ AccountId
         /// </summary>
