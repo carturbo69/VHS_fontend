@@ -9,7 +9,7 @@ namespace VHS_frontend.Services.Provider
     {
         private readonly HttpClient _http;
         private string? _bearer;
-        
+
         public ProviderWithdrawalService(HttpClient http) => _http = http;
         public void SetBearerToken(string token) => _bearer = token;
 
@@ -40,7 +40,7 @@ namespace VHS_frontend.Services.Provider
             AttachAuth();
             var res = await _http.GetAsync("/api/PaymentManagement/provider/balance", ct);
             await HandleErrorAsync(res, ct);
-            
+
             var json = await res.Content.ReadAsStringAsync(ct);
             var response = JsonSerializer.Deserialize<ApiResponse<ProviderBalanceDTO>>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -50,13 +50,13 @@ namespace VHS_frontend.Services.Provider
         public async Task<bool> RequestWithdrawalAsync(ProviderWithdrawalRequestDTO request, CancellationToken ct = default)
         {
             AttachAuth();
-            
+
             var json = JsonSerializer.Serialize(request);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            
+
             var res = await _http.PostAsync("/api/PaymentManagement/provider/withdrawal/request", content, ct);
             await HandleErrorAsync(res, ct);
-            
+
             var responseJson = await res.Content.ReadAsStringAsync(ct);
             var response = JsonSerializer.Deserialize<ApiResponse<object>>(responseJson,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -68,7 +68,7 @@ namespace VHS_frontend.Services.Provider
             AttachAuth();
             var res = await _http.GetAsync("/api/PaymentManagement/provider/withdrawals", ct);
             await HandleErrorAsync(res, ct);
-            
+
             var json = await res.Content.ReadAsStringAsync(ct);
             var response = JsonSerializer.Deserialize<ApiResponse<List<ProviderWithdrawalDTO>>>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -83,7 +83,3 @@ namespace VHS_frontend.Services.Provider
         }
     }
 }
-
-
-
-

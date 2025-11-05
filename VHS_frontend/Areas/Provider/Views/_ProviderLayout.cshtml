@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/provider.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/provider-profile.css" asp-append-version="true" />
 
     @RenderSection("Styles", required: false)
 </head>
@@ -39,21 +40,27 @@
                 <i class="bi bi-house-door"></i><span>Tổng quan</span>
             </a>
 
-            <a asp-area="Provider" asp-controller="Service" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Service" ? "active" : "")"
-               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Service" ? "page" : null)">
+            <a asp-area="Provider" asp-controller="ServiceManagement" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ServiceManagement" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ServiceManagement" ? "page" : null)">
                 <i class="bi bi-tools"></i><span>Quản lí dịch vụ</span>
             </a>
 
             <a asp-area="Provider" asp-controller="Order" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" ? "active" : "")"
-               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" ? "page" : null)">
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" && ViewContext.RouteData.Values["action"]?.ToString()=="Index" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" && ViewContext.RouteData.Values["action"]?.ToString()=="Index" ? "page" : null)">
                 <i class="bi bi-receipt"></i><span>Quản lí đơn hàng</span>
             </a>
 
-            <a asp-area="Provider" asp-controller="Staff" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Staff" ? "active" : "")"
-               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Staff" ? "page" : null)">
+            <a asp-area="Provider" asp-controller="Order" asp-action="History"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" && ViewContext.RouteData.Values["action"]?.ToString()=="History" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Order" && ViewContext.RouteData.Values["action"]?.ToString()=="History" ? "page" : null)">
+                <i class="bi bi-clock-history"></i><span>Lịch sử đơn hàng</span>
+            </a>
+
+            <a asp-area="Provider" asp-controller="StaffManagement" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="StaffManagement" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="StaffManagement" ? "page" : null)">
                 <i class="bi bi-people"></i><span>Quản lí nhân viên</span>
             </a>
 
@@ -69,9 +76,9 @@
                 <i class="bi bi-chat-dots"></i><span>Phản hồi khách hàng</span>
             </a>
 
-            <a asp-area="Provider" asp-controller="Revenue" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Revenue" ? "active" : "")"
-               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Revenue" ? "page" : null)">
+            <a asp-area="Provider" asp-controller="RevenueReport" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="RevenueReport" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="RevenueReport" ? "page" : null)">
                 <i class="bi bi-graph-up"></i><span>Báo cáo doanh thu</span>
             </a>
 
@@ -81,9 +88,9 @@
                 <i class="bi bi-bank"></i><span>Rút tiền</span>
             </a>
 
-            <a asp-area="Provider" asp-controller="Profile" asp-action="Index"
-               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Profile" ? "active" : "")"
-               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="Profile" ? "page" : null)">
+            <a asp-area="Provider" asp-controller="ProviderProfile" asp-action="Index"
+               class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderProfile" ? "active" : "")"
+               aria-current="@(ViewContext.RouteData.Values["controller"]?.ToString()=="ProviderProfile" ? "page" : null)">
                 <i class="bi bi-person-gear"></i><span>Thông tin cá nhân</span>
             </a>
 
@@ -127,10 +134,11 @@
                 </div>
                 <!-- Notifications -->
                 <div class="notif">
-                    <button id="notificationBtn" class="btn btn-link notif-btn" aria-expanded="false" aria-label="Notifications">
+                    <a asp-area="Provider" asp-controller="ProviderNotification" asp-action="Index" 
+                       id="notificationBtn" class="btn btn-link notif-btn" aria-expanded="false" aria-label="Notifications">
                         <i class="bi bi-bell fs-5"></i>
                         <span id="notificationBadge" class="badge-dot" style="display:none">0</span>
-                    </button>
+                    </a>
                     <ul id="notificationMenu" class="notif-menu">
                         <li class="text-center text-muted py-2">Loading…</li>
                     </ul>
@@ -391,9 +399,9 @@
           }
 
           if (notifBtn && notifMenu) {
-            // Hover to open/close
+            // Hover to open/close menu
             let hoverTimer;
-            notifBtn.addEventListener('mouseenter', async () => {
+            notifBtn.addEventListener('mouseenter', async (e) => {
               clearTimeout(hoverTimer);
               await openMenu();
             });
@@ -408,6 +416,13 @@
             });
             notifMenu.addEventListener('mouseenter', () => {
               clearTimeout(hoverTimer);
+            });
+
+            // Click vào chuông thì chuyển đến trang thông báo
+            // (Link sẽ tự động chuyển trang, không cần preventDefault)
+            // Chỉ preventDefault khi click vào menu để không chuyển trang
+            notifMenu.addEventListener('click', (e) => {
+              e.stopPropagation();
             });
 
             // Click outside để đóng (desktop/mobile)
@@ -426,6 +441,9 @@
           });
         })();
     </script>
+
+    <!-- Staff Management CSS -->
+    <link rel="stylesheet" href="~/css/staff-management.css" asp-append-version="true" />
 
     @RenderSection("Scripts", required: false)
 </body>

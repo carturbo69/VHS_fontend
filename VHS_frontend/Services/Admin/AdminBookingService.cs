@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using VHS_frontend.Areas.Admin.Models.Booking;
+using VHS_frontend.Areas.Provider.Models.Booking;
 
 namespace VHS_frontend.Services.Admin
 {
@@ -113,6 +115,59 @@ namespace VHS_frontend.Services.Admin
             var previous = await GetStatisticsAsync(previousStart, previousEnd, ct);
 
             return (current, previous);
+        }
+
+        /// <summary>
+        /// Lấy danh sách tất cả bookings cho admin (không filter theo provider)
+        /// </summary>
+        public async Task<BookingListResultDTO?> GetAllBookingsAsync(AdminBookingFilterDTO filter, CancellationToken ct = default)
+        {
+            try
+            {
+                AttachAuth();
+
+                var json = JsonSerializer.Serialize(filter);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _http.PostAsync("/api/admin/bookings/list", content, ct);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync(ct);
+                    return JsonSerializer.Deserialize<BookingListResultDTO>(responseContent, _json);
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Lấy chi tiết booking cho admin
+        /// </summary>
+        public async Task<BookingDetailDTO?> GetBookingDetailAsync(Guid bookingId, CancellationToken ct = default)
+        {
+            try
+            {
+                AttachAuth();
+
+                var response = await _http.GetAsync($"/api/admin/bookings/{bookingId}", ct);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync(ct);
+                    return JsonSerializer.Deserialize<BookingDetailDTO>(responseContent, _json);
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
