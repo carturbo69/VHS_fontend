@@ -43,7 +43,8 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
         /// <summary>
         /// Lấy URL của ảnh đại diện, nếu không có thì trả về ảnh mặc định
         /// </summary>
-        public string GetProfileImageUrl()
+        /// <param name="baseUrl">Base URL của API (optional, nếu không có sẽ trả về path tương đối)</param>
+        public string GetProfileImageUrl(string? baseUrl = null)
         {
             if (string.IsNullOrEmpty(Images))
             {
@@ -56,8 +57,15 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
                 return Images;
             }
             
-            // Nếu Images là đường dẫn tương đối, thêm backend URL
-            return $"http://localhost:5154{Images}";
+            // Nếu có baseUrl, kết hợp với path
+            if (!string.IsNullOrEmpty(baseUrl))
+            {
+                string normalizedPath = Images.StartsWith("/") ? Images : "/" + Images;
+                return $"{baseUrl.TrimEnd('/')}{normalizedPath}";
+            }
+            
+            // Nếu không có baseUrl, trả về path tương đối (để view xử lý với ImageHelper)
+            return Images;
         }
 
         /// <summary>
