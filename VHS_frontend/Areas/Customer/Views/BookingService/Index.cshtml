@@ -75,6 +75,43 @@
         </div>
     </div>
 
+    <!-- Toast notification cho error/success messages -->
+    @if (TempData["ToastSuccess"] != null || TempData["ToastError"] != null)
+    {
+        <div class="custom-alert @(TempData["ToastSuccess"] != null ? "alert-success" : "alert-danger")" role="alert" style="margin: 1rem 0; padding: 1rem; border-radius: 8px; display: flex; align-items: center; gap: 0.75rem; animation: slideIn 0.3s ease-out;">
+            <i class="bi @(TempData["ToastSuccess"] != null ? "bi-check-circle-fill" : "bi-exclamation-circle-fill")"></i>
+            <div class="alert-content" style="flex: 1;">
+                @(TempData["ToastSuccess"] ?? TempData["ToastError"])
+            </div>
+            <button type="button" class="alert-close" onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer; padding: 0.25rem; color: inherit; opacity: 0.7;">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        
+        <style>
+            .alert-success {
+                background-color: #d4edda;
+                border: 1px solid #c3e6cb;
+                color: #155724;
+            }
+            .alert-danger {
+                background-color: #f8d7da;
+                border: 1px solid #f5c6cb;
+                color: #721c24;
+            }
+            @@keyframes slideIn {
+                from {
+                    transform: translateY(-20px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+            }
+        </style>
+    }
+
     <!-- Địa chỉ nhận hàng -->
     <div class="address-card">
         <div class="addr-title">
@@ -82,7 +119,12 @@
             <button type="button" class="btn" onclick="openAddressModal()">Thay đổi</button>
         </div>
         <div class="addr-body">
-            <div><strong>@Model.RecipientFullName</strong> (@Model.RecipientPhone)</div>
+            <div id="currentRecipientInfo">
+                <strong>
+                    @(!string.IsNullOrEmpty(Model.Address.RecipientName) ? Model.Address.RecipientName : Model.RecipientFullName)
+                </strong> 
+                (@(!string.IsNullOrEmpty(Model.Address.RecipientPhone) ? Model.Address.RecipientPhone : Model.RecipientPhone))
+            </div>
             <!-- ✅ thêm id để JS cập nhật khi chọn trong modal -->
             <div id="currentAddressText">@Model.Address.ToDisplayString()</div>
         </div>
@@ -189,7 +231,10 @@
                                    form="@placeOrderFormId"
                                    name="Items[@i].BookingTime"
                                    value="@it.BookingTime.ToString("yyyy-MM-ddTHH:mm")"
-                                   class="booking-input" />
+                                   class="booking-input"
+                                   data-provider-id="@it.ProviderId"
+                                   onchange="validateBookingTime(this, @i)" />
+                            <div id="booking-time-error-@i" class="booking-time-error" style="display: none; color: #d00; margin-top: 5px; font-size: 0.9em;"></div>
                         </div>
 
                         i++;
@@ -387,10 +432,17 @@
                              data-province="@addr.ProvinceName"
                              data-district="@addr.DistrictName"
                              data-ward="@addr.WardName"
-                             data-street="@addr.StreetAddress">
+                             data-street="@addr.StreetAddress"
+                             data-recipientname="@(addr.RecipientName ?? "")"
+                             data-recipientphone="@(addr.RecipientPhone ?? "")"
+                             data-latitude="@(addr.Latitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                             data-longitude="@(addr.Longitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
                             <input type="radio" name="addressChoice" value="@addr.AddressId" @isChecked style="margin-top:3px" />
                             <div style="flex:1">
-                                <div><strong>@Model.RecipientFullName</strong> (@Model.RecipientPhone)</div>
+                                <div>
+                                    <strong>@(!string.IsNullOrEmpty(addr.RecipientName) ? addr.RecipientName : Model.RecipientFullName)</strong> 
+                                    (@(!string.IsNullOrEmpty(addr.RecipientPhone) ? addr.RecipientPhone : Model.RecipientPhone))
+                                </div>
                                 <div class="muted">@addr.ToDisplayString()</div>
                             </div>
 
@@ -475,6 +527,17 @@
             <!-- Hidden field để gửi districtName (optional) -->
             <input type="hidden" id="districtName" name="districtName" />
 
+            <div class="form-grid-2">
+                <div class="form-row">
+                    <label for="recipientName">Tên người đặt</label>
+                    <input type="text" id="recipientName" name="recipientName" placeholder="Nhập tên người đặt" />
+                </div>
+                <div class="form-row">
+                    <label for="recipientPhone">Số điện thoại người đặt</label>
+                    <input type="tel" id="recipientPhone" name="recipientPhone" placeholder="Nhập số điện thoại" />
+                </div>
+            </div>
+
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
                 <button type="button" class="btn" onclick="closeUpsertModal()">Hủy</button>
                 <button type="submit" class="btn primary" id="btnSaveAddress">Lưu</button>
@@ -497,8 +560,10 @@
             const lat = document.getElementById('Latitude')?.value.trim() || '';
             const lng = document.getElementById('Longitude')?.value.trim() || '';
             const district = document.getElementById('districtName')?.value.trim() || '';
+            const recipientName = document.getElementById('recipientName')?.value.trim() || '';
+            const recipientPhone = document.getElementById('recipientPhone')?.value.trim() || '';
             
-            console.log('Form values:', { street, ward, province, lat, lng, district });
+            console.log('Form values:', { street, ward, province, lat, lng, district, recipientName, recipientPhone });
             
             if (!street || !ward || !province) {
               e.preventDefault();
@@ -661,10 +726,29 @@
           const parts = [row.dataset.street, row.dataset.ward, row.dataset.district, row.dataset.province]
                         .filter(s => s && s.trim() !== '');
           const text = parts.join(', ');
+          
+          // Cập nhật địa chỉ
           const hidden = document.getElementById('AddressText');
           const view = document.getElementById('currentAddressText');
           if(hidden) hidden.value = text;
           if(view) view.textContent = text;
+          
+          // Cập nhật tên và số điện thoại người đặt
+          const recipientInfo = document.getElementById('currentRecipientInfo');
+          if(recipientInfo) {
+            const recipientName = row.dataset.recipientname || '';
+            const recipientPhone = row.dataset.recipientphone || '';
+            
+            // Lấy giá trị mặc định từ data attributes của modal hoặc từ Model (nếu có)
+            const defaultName = '@(Model.RecipientFullName ?? "")';
+            const defaultPhone = '@(Model.RecipientPhone ?? "")';
+            
+            // Nếu có thông tin từ địa chỉ, dùng nó; nếu không, dùng giá trị mặc định
+            const name = recipientName || defaultName;
+            const phone = recipientPhone || defaultPhone;
+            recipientInfo.innerHTML = `<strong>${name}</strong> (${phone})`;
+          }
+          
           closeAddressModal();
         }
 
@@ -678,6 +762,8 @@
           document.getElementById('wardName').value = '';
           document.getElementById('provinceName').value = '';
           document.getElementById('districtName').value = '';
+          document.getElementById('recipientName').value = '';
+          document.getElementById('recipientPhone').value = '';
           document.getElementById('Latitude').value = '';
           document.getElementById('Longitude').value = '';
           
@@ -850,13 +936,50 @@
         });
         function openEditAddressForm(btn){
           const row = btn.closest('.addr-item');
+          console.log('=== openEditAddressForm called ===');
+          console.log('Row dataset:', row.dataset);
+          
           document.getElementById('upsertTitle').innerText = 'Sửa địa chỉ';
-          document.getElementById('AddressId').value = row.dataset.id;
-          document.getElementById('streetAddress').value = row.dataset.street;
-          document.getElementById('wardName').value = row.dataset.ward;
-          document.getElementById('districtName').value = row.dataset.district;
-          document.getElementById('provinceName').value = row.dataset.province;
+          document.getElementById('AddressId').value = row.dataset.id || '';
+          document.getElementById('streetAddress').value = row.dataset.street || '';
+          document.getElementById('wardName').value = row.dataset.ward || '';
+          document.getElementById('districtName').value = row.dataset.district || '';
+          document.getElementById('provinceName').value = row.dataset.province || '';
+          
+          // Set tên và số điện thoại
+          const recipientName = row.dataset.recipientname || '';
+          const recipientPhone = row.dataset.recipientphone || '';
+          document.getElementById('recipientName').value = recipientName;
+          document.getElementById('recipientPhone').value = recipientPhone;
+          
+          console.log('Set values - RecipientName:', recipientName, 'RecipientPhone:', recipientPhone);
+          console.log('Form fields after setting:', {
+            recipientName: document.getElementById('recipientName').value,
+            recipientPhone: document.getElementById('recipientPhone').value
+          });
+          
+          // Set tọa độ nếu có
+          const lat = row.dataset.latitude || '';
+          const lng = row.dataset.longitude || '';
+          document.getElementById('Latitude').value = lat;
+          document.getElementById('Longitude').value = lng;
+          
+          // Mở modal và khởi tạo bản đồ với tọa độ (nếu có)
           document.getElementById('addressUpsertModal').classList.add('open');
+          
+          // Khởi tạo bản đồ với tọa độ đã có
+          setTimeout(() => {
+            if (lat && lng) {
+              initAddressPickerMap();
+              // Set marker tại vị trí đã có
+              if (addressPickerMap && addressPickerMarker) {
+                addressPickerMap.setView([parseFloat(lat), parseFloat(lng)], 15);
+                addressPickerMarker.setLatLng([parseFloat(lat), parseFloat(lng)]);
+              }
+            } else {
+              initAddressPickerMap();
+            }
+          }, 300);
         }
         function closeUpsertModal(){ document.getElementById('addressUpsertModal').classList.remove('open'); }
 
@@ -1193,5 +1316,221 @@
           submitBtn.disabled = !allOk;
         }
         document.addEventListener('DOMContentLoaded', updatePlaceOrderButtonState);
+
+        /* ========= Validate Booking Time với Provider Schedule ========= */
+        const API_BASE_URL = 'http://localhost:5154/api';
+        const bookingTimeValidations = new Map(); // Track validation state for each input
+
+        async function validateBookingTime(input, index) {
+            const providerId = input.dataset.providerId;
+            const dateTimeValue = input.value;
+            
+            if (!dateTimeValue || !providerId) {
+                hideBookingTimeError(index);
+                return true;
+            }
+
+            // Parse datetime-local value
+            // datetime-local format: "yyyy-MM-ddTHH:mm" (24-hour format, no timezone)
+            // Example: "2025-11-06T12:30" means 12:30 PM (noon)
+            // Example: "2025-11-06T00:30" means 12:30 AM (midnight + 30 min)
+            
+            // Parse directly from string format "yyyy-MM-ddTHH:mm" to avoid timezone issues
+            let date, time;
+            if (dateTimeValue.includes('T')) {
+                const [datePart, timePart] = dateTimeValue.split('T');
+                date = datePart; // Already in yyyy-MM-dd format
+                time = timePart; // Already in HH:mm format (24-hour)
+            } else {
+                // Fallback: parse using Date object
+                const dateTime = new Date(dateTimeValue);
+                const year = dateTime.getFullYear();
+                const month = String(dateTime.getMonth() + 1).padStart(2, '0');
+                const day = String(dateTime.getDate()).padStart(2, '0');
+                date = `${year}-${month}-${day}`;
+                
+                const hours = String(dateTime.getHours()).padStart(2, '0');
+                const minutes = String(dateTime.getMinutes()).padStart(2, '0');
+                time = `${hours}:${minutes}`;
+            }
+            
+            console.log('Validating booking time:', { 
+                dateTimeValue, 
+                date, 
+                time, 
+                providerId,
+                parsedHours: time.split(':')[0],
+                parsedMinutes: time.split(':')[1]
+            });
+
+            const errorDiv = document.getElementById(`booking-time-error-${index}`);
+            if (!errorDiv) return true;
+
+            // Show loading state
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = 'Đang kiểm tra...';
+            errorDiv.style.color = '#666';
+
+            try {
+                const url = `${API_BASE_URL}/ProviderAvailability/${providerId}?date=${date}&time=${time}`;
+                console.log('Calling API:', url);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                console.log('Response status:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    // HTTP error (4xx, 5xx)
+                    let errorMessage = `Lỗi kết nối (${response.status})`;
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.Message || errorData.message) {
+                            errorMessage = errorData.Message || errorData.message;
+                        } else if (errorData.Detail || errorData.detail) {
+                            errorMessage = errorData.Detail || errorData.detail;
+                        }
+                    } catch (e) {
+                        const errorText = await response.text();
+                        if (errorText) {
+                            errorMessage = errorText;
+                        }
+                    }
+                    console.error('API Error:', response.status, errorMessage);
+                    errorDiv.style.display = 'block';
+                    errorDiv.style.color = '#d00';
+                    errorDiv.textContent = errorMessage;
+                    input.classList.add('booking-input-error');
+                    bookingTimeValidations.set(index, false);
+                    return false;
+                }
+                
+                const result = await response.json();
+                console.log('API Response:', result);
+                console.log('API Response keys:', Object.keys(result));
+                console.log('result.Success:', result.Success);
+                console.log('result.success:', result.success);
+                console.log('result.Data:', result.Data);
+                console.log('result.data:', result.data);
+
+                // Handle both Success and success (case-insensitive)
+                const isSuccess = result.Success === true || result.success === true;
+                const data = result.Data || result.data;
+                
+                if (isSuccess && data) {
+                    const availability = data;
+                    console.log('Availability data:', availability);
+                    console.log('Availability keys:', Object.keys(availability));
+                    console.log('IsAvailable:', availability.IsAvailable, 'isAvailable:', availability.isAvailable);
+                    console.log('UnavailableReason:', availability.UnavailableReason, 'unavailableReason:', availability.unavailableReason);
+                    
+                    // Handle both PascalCase and camelCase property names
+                    const isAvailable = availability.IsAvailable !== undefined ? availability.IsAvailable : availability.isAvailable;
+                    const unavailableReason = availability.UnavailableReason || availability.unavailableReason;
+                    
+                    console.log('Final isAvailable:', isAvailable, 'unavailableReason:', unavailableReason);
+                    
+                    if (isAvailable === true) {
+                        hideBookingTimeError(index);
+                        bookingTimeValidations.set(index, true);
+                        return true;
+                    } else {
+                        // Show error with reason
+                        errorDiv.style.display = 'block';
+                        errorDiv.style.color = '#d00';
+                        errorDiv.textContent = unavailableReason || 'Không thể đặt dịch vụ vào thời gian này';
+                        input.classList.add('booking-input-error');
+                        bookingTimeValidations.set(index, false);
+                        return false;
+                    }
+                } else {
+                    // API returned but Success = false or no Data
+                    console.warn('API returned false or no data:', result);
+                    console.warn('isSuccess:', isSuccess, 'data:', data);
+                    errorDiv.style.display = 'block';
+                    errorDiv.style.color = '#d00';
+                    const errorMsg = result.Message || result.message || result.Detail || result.detail || 'Không thể kiểm tra tính khả dụng';
+                    errorDiv.textContent = errorMsg;
+                    input.classList.add('booking-input-error');
+                    bookingTimeValidations.set(index, false);
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking availability:', error);
+                console.error('Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
+                errorDiv.style.display = 'block';
+                errorDiv.style.color = '#d00';
+                errorDiv.textContent = `Lỗi khi kiểm tra tính khả dụng: ${error.message || 'Vui lòng thử lại'}`;
+                input.classList.add('booking-input-error');
+                bookingTimeValidations.set(index, false);
+                return false;
+            }
+        }
+
+        function hideBookingTimeError(index) {
+            const errorDiv = document.getElementById(`booking-time-error-${index}`);
+            const input = document.getElementById(`booking-time-${index}`);
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+            }
+            if (input) {
+                input.classList.remove('booking-input-error');
+            }
+            bookingTimeValidations.set(index, true);
+        }
+
+        // Validate all booking times before submit
+        async function validateAllBookingTimes() {
+            const inputs = document.querySelectorAll('input[type="datetime-local"].booking-input');
+            const promises = [];
+            
+            for (let i = 0; i < inputs.length; i++) {
+                const input = inputs[i];
+                const index = parseInt(input.id.replace('booking-time-', ''));
+                if (!isNaN(index) && input.value) {
+                    promises.push(validateBookingTime(input, index));
+                }
+            }
+            
+            const results = await Promise.all(promises);
+            return results.every(r => r === true);
+        }
+
+        // Override form submit to validate booking times
+        document.addEventListener('DOMContentLoaded', function() {
+            const placeOrderForm = document.getElementById('@placeOrderFormId');
+            if (placeOrderForm) {
+                placeOrderForm.addEventListener('submit', async function(e) {
+                    // Wait for all validations to complete
+                    const validationPromises = [];
+                    const inputs = document.querySelectorAll('input[type="datetime-local"].booking-input');
+                    
+                    for (let i = 0; i < inputs.length; i++) {
+                        const input = inputs[i];
+                        const index = parseInt(input.id.replace('booking-time-', ''));
+                        if (!isNaN(index) && input.value) {
+                            validationPromises.push(validateBookingTime(input, index));
+                        }
+                    }
+                    
+                    const results = await Promise.all(validationPromises);
+                    const allValid = results.every(r => r === true);
+                    
+                    if (!allValid) {
+                        e.preventDefault();
+                        alert('Vui lòng kiểm tra lại thời gian đặt dịch vụ. Có một số thời gian không khả dụng.');
+                        return false;
+                    }
+                });
+            }
+        });
     </script>
 }

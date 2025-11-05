@@ -67,8 +67,41 @@ namespace VHS_frontend.Services.Customer
             // Trả lỗi rõ ràng cho 400
             if (resp.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
-                var msg = await resp.Content.ReadAsStringAsync(cancellationToken);
-                throw new HttpRequestException(string.IsNullOrWhiteSpace(msg) ? "BadRequest" : msg);
+                var content = await resp.Content.ReadAsStringAsync(cancellationToken);
+                
+                // Try to parse JSON error response
+                string errorMessage = "Không thể tạo đơn hàng. Vui lòng thử lại.";
+                try
+                {
+                    // Backend might return: { error: "...", message: "..." } or { message: "..." }
+                    using var jsonDoc = System.Text.Json.JsonDocument.Parse(content);
+                    if (jsonDoc.RootElement.TryGetProperty("message", out var messageProp))
+                    {
+                        errorMessage = messageProp.GetString() ?? errorMessage;
+                    }
+                    else if (jsonDoc.RootElement.TryGetProperty("error", out var errorProp))
+                    {
+                        errorMessage = errorProp.GetString() ?? errorMessage;
+                    }
+                    else if (jsonDoc.RootElement.TryGetProperty("Message", out var messageProp2))
+                    {
+                        errorMessage = messageProp2.GetString() ?? errorMessage;
+                    }
+                    else if (jsonDoc.RootElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                    {
+                        errorMessage = jsonDoc.RootElement.GetString() ?? errorMessage;
+                    }
+                }
+                catch
+                {
+                    // If not JSON, use raw content or default message
+                    if (!string.IsNullOrWhiteSpace(content))
+                    {
+                        errorMessage = content;
+                    }
+                }
+                
+                throw new HttpRequestException(errorMessage);
             }
 
             resp.EnsureSuccessStatusCode();

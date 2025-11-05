@@ -8,6 +8,7 @@ console.log('=== chatbox.js LOADED ===');
     // Configuration
     const CONFIG = {
         apiBaseUrl: 'http://localhost:5154/api/ChatboxAI',
+        signalRUrl: 'http://localhost:5154/hubs/chat',
         sessionId: localStorage.getItem('chatbox_session_id') || generateSessionId(),
         language: 'vi',
         conversationId: null
@@ -16,6 +17,9 @@ console.log('=== chatbox.js LOADED ===');
     // Initialize
     let jwt = null;
     let conversationId = null;
+    let isMinimized = false;
+    let connection = null; // SignalR connection
+    let isConnected = false;
 
     // Generate unique session ID
     function generateSessionId() {
@@ -131,6 +135,9 @@ console.log('=== chatbox.js LOADED ===');
 
         console.log('[Chatbox] Event listeners attached');
 
+        // Initialize SignalR connection
+        initSignalR();
+
         // Load conversation if user is authenticated
         if (jwt) {
             console.log('[Chatbox] User authenticated, loading conversation...');
@@ -138,6 +145,140 @@ console.log('=== chatbox.js LOADED ===');
         } else {
             console.log('[Chatbox] No JWT, showing welcome message');
             showWelcomeMessage();
+        }
+    }
+
+    // Initialize SignalR connection
+    async function initSignalR() {
+        try {
+            // Import SignalR client (using CDN)
+            if (typeof signalR === 'undefined') {
+                // Load SignalR from CDN if not already loaded
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js';
+                script.onload = () => {
+                    console.log('[Chatbox] SignalR loaded, connecting...');
+                    connectSignalR();
+                };
+                document.head.appendChild(script);
+            } else {
+                connectSignalR();
+            }
+        } catch (error) {
+            console.error('[Chatbox] Error initializing SignalR:', error);
+        }
+    }
+
+    // Connect to SignalR Hub
+    function connectSignalR() {
+        try {
+            const urlOptions = {
+                transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling
+            };
+            
+            // Add JWT token if available
+            if (jwt) {
+                urlOptions.accessTokenFactory = () => jwt;
+            }
+            
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl(CONFIG.signalRUrl, urlOptions)
+                .withAutomaticReconnect({
+                    nextRetryDelayInMilliseconds: retryContext => {
+                        if (retryContext.elapsedMilliseconds < 60000) {
+                            return 2000; // Retry after 2 seconds
+                        }
+                        return 5000; // Retry after 5 seconds
+                    }
+                })
+                .configureLogging(signalR.LogLevel.Information)
+                .build();
+
+            // Connection event handlers
+            connection.onclose(() => {
+                console.log('[Chatbox] SignalR connection closed');
+                isConnected = false;
+            });
+
+            connection.onreconnecting(() => {
+                console.log('[Chatbox] SignalR reconnecting...');
+            });
+
+            connection.onreconnected(() => {
+                console.log('[Chatbox] SignalR reconnected');
+                isConnected = true;
+                if (conversationId) {
+                    connection.invoke('JoinConversation', conversationId);
+                }
+            });
+
+            // Message handlers
+            connection.on('MessageReceived', (data) => {
+                console.log('[Chatbox] Message received via SignalR:', data);
+                hideTypingIndicator();
+                
+                const message = data.Message || data.message || data;
+                if (message) {
+                    const content = message.Content || message.content || message.MessageContent || message.messageContent;
+                    const senderType = message.SenderType || message.senderType || 'AI';
+                    
+                    // Only display AI messages (user messages are already displayed locally)
+                    if (senderType === 'AI' && content) {
+                        displayMessage(content, 'AI', new Date(message.CreatedAt || message.createdAt || new Date()));
+                        
+                        // Show quick actions if available
+                        const quickActions = message.QuickActions || message.quickActions;
+                        if (quickActions && quickActions.length > 0) {
+                            showQuickActions(quickActions);
+                        }
+                    }
+                }
+            });
+
+            connection.on('TypingIndicator', (data) => {
+                if (data.IsTyping && data.UserId !== getUserId()) {
+                    showTypingIndicator();
+                } else {
+                    hideTypingIndicator();
+                }
+            });
+
+            connection.on('MessageError', (data) => {
+                console.error('[Chatbox] Message error:', data);
+                hideTypingIndicator();
+                displayMessage('Xin lỗi, đã xảy ra lỗi. Vui lòng thử lại.', 'AI', new Date());
+            });
+
+            // Start connection
+            connection.start()
+                .then(() => {
+                    console.log('[Chatbox] SignalR connected');
+                    isConnected = true;
+                    
+                    // Join conversation if exists
+                    if (conversationId) {
+                        connection.invoke('JoinConversation', conversationId);
+                    }
+                })
+                .catch(err => {
+                    console.error('[Chatbox] SignalR connection error:', err);
+                    isConnected = false;
+                });
+
+        } catch (error) {
+            console.error('[Chatbox] Error connecting to SignalR:', error);
+            isConnected = false;
+        }
+    }
+
+    // Get user ID from JWT (helper function)
+    function getUserId() {
+        if (!jwt) return null;
+        try {
+            const payload = JSON.parse(atob(jwt.split('.')[1]));
+            return payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || null;
+        } catch {
+            return null;
         }
     }
 
@@ -475,9 +616,16 @@ console.log('=== chatbox.js LOADED ===');
 
             if (response.ok) {
                 const data = await response.json();
-                if (data.conversationId) {
-                    conversationId = data.conversationId;
-                    loadMessageHistory(data.conversationId);
+                const convId = data.conversationId || data.ConversationId;
+                if (convId) {
+                    conversationId = convId;
+                    
+                    // Join conversation via SignalR if connected
+                    if (isConnected && connection) {
+                        await connection.invoke('JoinConversation', conversationId);
+                    }
+                    
+                    loadMessageHistory(conversationId);
                 } else {
                     showWelcomeMessage();
                 }
@@ -528,13 +676,13 @@ console.log('=== chatbox.js LOADED ===');
         });
     }
 
-    // Send message
+    // Send message (using SignalR real-time)
     async function sendMessage() {
         const content = elements.input.value.trim();
         if (!content) return;
 
         console.log('[Chatbox] Sending message:', content);
-        console.log('[Chatbox] JWT exists:', !!jwt);
+        console.log('[Chatbox] SignalR connected:', isConnected);
         console.log('[Chatbox] ConversationId:', conversationId);
 
         // Display user message
@@ -551,9 +699,101 @@ console.log('=== chatbox.js LOADED ===');
                 console.log('[Chatbox] Creating new conversation...');
                 await createConversation();
                 console.log('[Chatbox] Conversation created:', conversationId);
+                
+                // Join conversation via SignalR
+                if (isConnected && conversationId) {
+                    await connection.invoke('JoinConversation', conversationId);
+                }
             }
 
-            // Send message
+            // Send message via SignalR if connected, otherwise fallback to HTTP
+            if (isConnected && connection && conversationId) {
+                console.log('[Chatbox] Sending via SignalR...');
+                
+                // Send typing indicator
+                await connection.invoke('SendTypingIndicator', conversationId, true);
+                
+                // Send message
+                await connection.invoke('SendMessage', conversationId, content, 'Text');
+                
+                // Hide typing indicator after a delay
+                setTimeout(() => {
+                    if (connection && isConnected) {
+                        connection.invoke('SendTypingIndicator', conversationId, false);
+                    }
+                }, 1000);
+                
+            } else {
+                // Fallback to HTTP API
+                console.log('[Chatbox] SignalR not connected, using HTTP fallback...');
+                await sendMessageHttp(content);
+            }
+        } catch (error) {
+            console.error('[Chatbox] Error sending message:', error);
+            hideTypingIndicator();
+            
+            // Fallback to HTTP if SignalR fails
+            if (isConnected) {
+                try {
+                    await sendMessageHttp(content);
+                } catch (httpError) {
+                    displayMessage('Không thể kết nối đến server. Vui lòng thử lại sau.', 'AI', new Date());
+                }
+            } else {
+                displayMessage('Không thể kết nối đến server. Vui lòng thử lại sau.', 'AI', new Date());
+            }
+        } finally {
+            elements.sendBtn.disabled = false;
+        }
+    }
+
+    // Fallback: Send message via HTTP API
+    async function sendMessageHttp(content) {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        if (jwt) {
+            headers['Authorization'] = `Bearer ${jwt}`;
+        }
+
+        const response = await fetch(`${CONFIG.apiBaseUrl}/message`, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                content: content,
+                sessionId: CONFIG.sessionId,
+                language: CONFIG.language
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            hideTypingIndicator();
+            
+            const messageContent = data.Content || data.content || data.MessageContent || data.messageContent;
+            
+            if (messageContent) {
+                displayMessage(messageContent, 'AI', new Date());
+            } else {
+                displayMessage('Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.', 'AI', new Date());
+            }
+
+            const quickActions = data.QuickActions || data.quickActions;
+            if (quickActions && quickActions.length > 0) {
+                showQuickActions(quickActions);
+            }
+        } else {
+            const errorText = await response.text();
+            console.error('[Chatbox] HTTP Error response:', response.status, errorText);
+            hideTypingIndicator();
+            displayMessage('Xin lỗi, đã xảy ra lỗi (' + response.status + '). Vui lòng thử lại.', 'AI', new Date());
+        }
+    }
+
+    // Create conversation
+    async function createConversation() {
+        try {
             const headers = {
                 'Content-Type': 'application/json'
             };
@@ -561,10 +801,8 @@ console.log('=== chatbox.js LOADED ===');
             if (jwt) {
                 headers['Authorization'] = `Bearer ${jwt}`;
             }
-
-            console.log('[Chatbox] Sending POST to:', `${CONFIG.apiBaseUrl}/message`);
-
-            const response = await fetch(`${CONFIG.apiBaseUrl}/message`, {
+            
+            const response = await fetch(`${CONFIG.apiBaseUrl}/conversation`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify({
@@ -628,7 +866,12 @@ console.log('=== chatbox.js LOADED ===');
 
             if (response.ok) {
                 const data = await response.json();
-                conversationId = data.conversationId;
+                conversationId = data.conversationId || data.ConversationId;
+                
+                // Join conversation via SignalR if connected
+                if (isConnected && connection && conversationId) {
+                    await connection.invoke('JoinConversation', conversationId);
+                }
             }
         } catch (error) {
             console.error('Error creating conversation:', error);
