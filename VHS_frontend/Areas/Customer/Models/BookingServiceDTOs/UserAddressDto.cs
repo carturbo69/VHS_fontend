@@ -8,6 +8,10 @@
         public string WardName { get; set; } = null!;
         public string StreetAddress { get; set; } = null!;
         
+        public string? RecipientName { get; set; }
+        
+        public string? RecipientPhone { get; set; }
+        
         // Tọa độ GPS
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }

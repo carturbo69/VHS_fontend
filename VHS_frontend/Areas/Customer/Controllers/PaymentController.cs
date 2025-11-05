@@ -5,6 +5,7 @@ using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 using VHS_frontend.Services.Customer;
 using VHS_frontend.Services.Customer.Interfaces;
 using VHS_frontend.Models.Payment;
+using Microsoft.AspNetCore.Http;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
