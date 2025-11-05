@@ -10,6 +10,6 @@ namespace VHS_frontend.Models.Account
         public string AccountName { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string? Role { get; set; }
-        public bool? Deleted { get; set; } // nếu cho admin xoá mềm
+        public bool? IsDeleted { get; set; } // nếu cho admin xoá mềm
     }
 }

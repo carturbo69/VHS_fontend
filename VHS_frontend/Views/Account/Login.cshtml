@@ -75,10 +75,10 @@
                     </div>
 
                     <div class="form-row">
-                        <label class="check">
+                        <!-- <label class="check">
                             <input type="checkbox" name="remember" />
                             <span>Ghi nhớ đăng nhập</span>
-                        </label>
+                        </label> -->
                         <a asp-controller="Account" asp-action="ForgotPassword" class="link">Quên mật khẩu?</a>
                     </div>
 
@@ -98,12 +98,72 @@
 
                 <p class="terms">
                     Khi tiếp tục, bạn đồng ý với
-                    <a href="#" class="link">Điều khoản</a> & <a href="#" class="link">Chính sách</a>.
+                    <button type="button" id="btnTermsLogin" class="link link-btn">Điều khoản</button>
+                    &
+                    <button type="button" id="btnPrivacyLogin" class="link link-btn">Chính sách bảo mật</button>.
                 </p>
             </div>
         </div>
     </div>
 </section>
+
+<!-- Modals for Login page -->
+<div id="termsModal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-head">
+            <h3 class="modal-title">Chính sách và Điều khoản chung</h3>
+            <button type="button" class="btn-close" aria-label="Đóng" onclick="closeModal('termsModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <h6>1. Giới thiệu</h6>
+            <p>Chào mừng bạn đến với VHS Platform. Khi tiếp tục sử dụng, bạn đồng ý tuân thủ các điều khoản dưới đây.</p>
+            <h6>2. Quyền và Nghĩa vụ của Người dùng</h6>
+            <ul>
+                <li>Cung cấp thông tin chính xác và cập nhật.</li>
+                <li>Không lạm dụng hệ thống, không vi phạm pháp luật.</li>
+                <li>Bảo mật thông tin đăng nhập của bạn.</li>
+            </ul>
+            <h6>3. Chính sách Hủy và Hoàn tiền</h6>
+            <p>Tuân thủ chính sách hủy và hoàn tiền của hệ thống khi đặt dịch vụ.</p>
+            <h6>4. Phí dịch vụ và Thanh toán</h6>
+            <p>Các khoản phí (nếu có) sẽ được hiển thị rõ trước khi thanh toán.</p>
+            <h6>5. Chấm dứt tài khoản</h6>
+            <p>VHS có thể tạm ngưng hoặc chấm dứt tài khoản nếu có hành vi vi phạm.</p>
+            <h6>6. Thay đổi Điều khoản</h6>
+            <p>Điều khoản có thể thay đổi và sẽ được thông báo trước tối thiểu 7 ngày.</p>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn" onclick="closeModal('termsModal')">Đã hiểu</button>
+        </div>
+    </div>
+</div>
+
+<div id="privacyModal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-head">
+            <h3 class="modal-title">Chính sách bảo mật thông tin</h3>
+            <button type="button" class="btn-close" aria-label="Đóng" onclick="closeModal('privacyModal')">×</button>
+        </div>
+        <div class="modal-body">
+            <h6>1. Thu thập và sử dụng</h6>
+            <p>Chúng tôi chỉ thu thập dữ liệu cần thiết để cung cấp dịch vụ.</p>
+            <h6>2. Lưu trữ và bảo vệ</h6>
+            <p>Dữ liệu được lưu trữ an toàn và áp dụng các biện pháp bảo mật phù hợp.</p>
+            <h6>3. Chia sẻ với bên thứ ba</h6>
+            <p>Chỉ chia sẻ khi cần thiết để cung cấp dịch vụ hoặc theo yêu cầu pháp luật.</p>
+            <h6>4. Quyền của bạn</h6>
+            <ul>
+                <li>Truy cập, chỉnh sửa, xoá dữ liệu cá nhân.</li>
+                <li>Rút lại sự đồng ý xử lý dữ liệu.</li>
+            </ul>
+            <h6>5. Liên hệ</h6>
+            <p>Nếu có câu hỏi về bảo mật, vui lòng liên hệ đội ngũ hỗ trợ của VHS.</p>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn" onclick="closeModal('privacyModal')">Đã hiểu</button>
+        </div>
+    </div>
+</div>
 
 @section Scripts {
     <script>
@@ -132,5 +192,31 @@
             svg.innerHTML = '<path d="M12 5c5.5 0 9.5 4.5 10.5 6-1 1.5-5 6-10.5 6S2.5 12.5 1.5 11C2.5 9.5 6.5 5 12 5zm0 3.5A4.5 4.5 0 1 0 12 17a4.5 4.5 0 0 0 0-8.5zm0 2A2.5 2.5 0 1 1 12 15a2.5 2.5 0 0 1 0-5z"/>';
           }
         }
+
+        // Modal helpers for Login page
+        function openModal(id){
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.removeAttribute('hidden');
+          el.classList.add('show');
+          document.body.style.overflow = 'hidden';
+          el.addEventListener('click', function onBg(e){ if (e.target === el) { el.removeEventListener('click', onBg); closeModal(id); } });
+          el._escHandler = function(e){ if (e.key === 'Escape') { closeModal(id); } };
+          document.addEventListener('keydown', el._escHandler);
+        }
+        function closeModal(id){
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.classList.remove('show');
+          document.body.style.overflow = '';
+          setTimeout(()=>{ try { el.setAttribute('hidden',''); } catch(_){} }, 180);
+          if (el._escHandler) { document.removeEventListener('keydown', el._escHandler); el._escHandler = null; }
+        }
+
+        // Wire login links
+        document.addEventListener('DOMContentLoaded', function(){
+          document.getElementById('btnTermsLogin')?.addEventListener('click', function(e){ e.preventDefault(); openModal('termsModal'); });
+          document.getElementById('btnPrivacyLogin')?.addEventListener('click', function(e){ e.preventDefault(); openModal('privacyModal'); });
+        });
     </script>
 }
