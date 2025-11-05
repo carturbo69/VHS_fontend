@@ -12,7 +12,6 @@ namespace VHS_frontend.Services
     {
         private readonly HttpClient _httpClient;
         private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly string _baseUrl = "http://localhost:5154/api/auth/";
 
         public AuthService(HttpClient httpClient, IHttpContextAccessor httpContextAccessor)
         {
@@ -22,7 +21,7 @@ namespace VHS_frontend.Services
 
         public async Task<LoginRespondDTO?> LoginAsync(LoginDTO dto, CancellationToken ct = default)
         {
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}login", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/login", dto, ct);
             if (!res.IsSuccessStatusCode) return null;
 
             return await res.Content.ReadFromJsonAsync<LoginRespondDTO>(cancellationToken: ct);
@@ -40,7 +39,7 @@ namespace VHS_frontend.Services
 
         public async Task<RegisterRespondDTO?> RegisterAsync(RegisterDTO dto, CancellationToken ct = default)
         {
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}register", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/register", dto, ct);
 
             // Nếu không 2xx: log & trả object lỗi
             if (!res.IsSuccessStatusCode)
@@ -87,14 +86,14 @@ namespace VHS_frontend.Services
         public async Task<bool> VerifyOTPAsync(string email, string otp, CancellationToken ct = default)
         {
             var dto = new { Email = email, OTP = otp };
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}verify-otp", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/verify-otp", dto, ct);
             return res.IsSuccessStatusCode;
         }
 
         public async Task<RegisterRespondDTO?> ActivateAccountAsync(string email, string otp, CancellationToken ct = default)
         {
             var dto = new { Email = email, OTP = otp };
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}activate-account", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/activate-account", dto, ct);
             
             var responseText = await res.Content.ReadAsStringAsync(ct);
             
@@ -135,7 +134,7 @@ namespace VHS_frontend.Services
         public async Task<RegisterRespondDTO?> ResendOTPAsync(string email, CancellationToken ct = default)
         {
             var dto = new { Email = email };
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}resend-otp", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/resend-otp", dto, ct);
             
             if (!res.IsSuccessStatusCode)
             {
@@ -158,7 +157,7 @@ namespace VHS_frontend.Services
                 _httpClient.DefaultRequestHeaders.Authorization = 
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-                var apiUrl = $"http://localhost:5154/api/Provider/get-id-by-account/{accountId}";
+                var apiUrl = $"/api/Provider/get-id-by-account/{accountId}";
                 var response = await _httpClient.GetAsync(apiUrl, ct);
 
                 if (!response.IsSuccessStatusCode)
