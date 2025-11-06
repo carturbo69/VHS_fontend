@@ -103,14 +103,16 @@
                     <div class="or"><span>hoặc</span></div>
 
                     <div class="socials">
-                        <button type="button" class="btn btn-google w-full" aria-label="Tiếp tục với Google">
-                            <svg class="g-ico" viewBox="0 0 24 24" aria-hidden="true">
-                                <path
-                                    d="M21.35 11.1h-9v2.9h5.2c-.23 1.48-1.57 4.33-5.2 4.33-3.13 0-5.68-2.6-5.68-5.8s2.55-5.8 5.68-5.8c1.78 0 2.97.75 3.65 1.4l2.5-2.42C16.98 4.1 15.02 3.2 12.35 3.2 7.6 3.2 3.8 7.02 3.8 11.8s3.8 8.6 8.55 8.6c4.94 0 8.2-3.47 8.2-8.35 0-.56-.07-1-.2-1.95Z" />
-                            </svg>
-                            Tiếp tục với Google
-                        </button>
+                        <div id="g_id_onload"
+                            data-client_id="1011562344003-vjmoi74tpfbsetd8vo68202vm9l8rkrd.apps.googleusercontent.com"
+                            data-callback="handleGoogleResponse" data-auto_prompt="false" data-ux_mode="popup">
+                        </div>
+
+                        <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline"
+                            data-text="continue_with" data-shape="rectangular" data-logo_alignment="left">
+                        </div>
                     </div>
+
                 </form>
 
                 <p class="terms">
@@ -252,50 +254,24 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script>
-
-        document.addEventListener("DOMContentLoaded", function () {
-            const googleBtn = document.querySelector(".btn-google");
-            if (!googleBtn) return;
-
-            googleBtn.addEventListener("click", function () {
-                google.accounts.id.initialize({
-                    client_id: "1011562344003-vjmoi74tpfbsetd8vo68202vm9l8rkrd.apps.googleusercontent.com", // 🔧 thay bằng clientId thật
-                    callback: handleGoogleResponse,
-                    ux_mode: "popup"
-                });
-                googleBtn.addEventListener("click", () => google.accounts.id.prompt()); // hiển thị popup chọn tài khoản
-            });
-        });
-
-        async function handleGoogleResponse(response) {
-            const idToken = response.credential;
-            const res = await fetch('/Account/GoogleLogin', {
+        function handleGoogleResponse(response) {
+            console.log("Google token:", response.credential);
+            fetch('/Account/GoogleLogin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken })
-            });
-
-            if (!res.ok) {
-                alert('Đăng nhập Google thất bại');
-                return;
-            }
-
-            const data = await res.json();
-            if (data.success) {
-                window.location.href = data.redirectUrl; // ✅ redirect theo Role
-            } else {
-                alert(data.message || 'Đăng nhập thất bại');
-            }
+                body: JSON.stringify({ idToken: response.credential })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) window.location.href = data.redirectUrl;
+                    else alert(data.message || "Đăng nhập Google thất bại");
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Có lỗi khi đăng nhập Google");
+                });
         }
     </script>
-    <script>
-        function onSignIn(googleUser) {
-            var profile = googleUser.getBasicProfile();
-            console.log('ID: ' + profile.getId()); // Do not send to your backend! Use an ID token instead.
-            console.log('Name: ' + profile.getName());
-            console.log('Image URL: ' + profile.getImageUrl());
-            console.log('Email: ' + profile.getEmail()); // This is null if the 'email' scope is not present.
-        }
-    </script>
+
 
 }
