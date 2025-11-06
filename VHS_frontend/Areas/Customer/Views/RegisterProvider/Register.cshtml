@@ -1221,16 +1221,55 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               }
               
               // GỬI ĐẾN MVC CONTROLLER - Controller sẽ gọi service
-              const res = await fetch(form.action, { 
-                method: 'POST', 
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }, 
-                body: fd 
-              });
+              console.log('=== SENDING REGISTRATION REQUEST ===');
+              console.log('Form action:', form.action);
+              console.log('FormData entries:', Array.from(fd.entries()).map(([k, v]) => [k, v instanceof File ? `File(${v.name}, ${v.size} bytes)` : v]));
+              
+              let res;
+              try {
+                res = await fetch(form.action, { 
+                  method: 'POST', 
+                  headers: { 'X-Requested-With': 'XMLHttpRequest' }, 
+                  body: fd 
+                });
+                console.log('Response received - Status:', res.status, res.statusText);
+              } catch (fetchError) {
+                console.error('=== FETCH ERROR ===');
+                console.error('Error type:', fetchError.name);
+                console.error('Error message:', fetchError.message);
+                console.error('Full error:', fetchError);
+                
+                // Network error hoặc CORS error
+                let errorMsg = 'Không thể kết nối đến server. ';
+                if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError')) {
+                  errorMsg += 'Vui lòng kiểm tra kết nối mạng và thử lại.';
+                } else if (fetchError.message.includes('CORS')) {
+                  errorMsg += 'Lỗi CORS. Vui lòng liên hệ quản trị viên.';
+                } else {
+                  errorMsg += `Chi tiết: ${fetchError.message}`;
+                }
+                
+                showToast(errorMsg, 'error');
+                return;
+              }
 
+              // Kiểm tra response status
               if (res.status === 200) {
-                const ok = await res.json(); // { ok: true, providerId, status, refresh } OR { ok:false,... }
+                let ok;
+                try {
+                  const responseText = await res.text();
+                  console.log('Response body:', responseText);
+                  ok = JSON.parse(responseText);
+                } catch (parseError) {
+                  console.error('=== JSON PARSE ERROR ===');
+                  console.error('Parse error:', parseError);
+                  showToast('Lỗi xử lý phản hồi từ server. Vui lòng thử lại.', 'error');
+                  return;
+                }
+                
                 if (!ok || ok.ok !== true) {
-                  alert(ok?.message || 'Đăng ký thất bại.');
+                  const errorMessage = ok?.message || ok?.Message || 'Đăng ký thất bại.';
+                  showToast(errorMessage, 'error');
                 } else if (ok.refresh) {
                   localStorage.removeItem('myProvider');
                   window.location.reload();
@@ -1240,30 +1279,47 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 return;
               }
 
-              // lỗi 409 hoặc 400
-              let err; try { err = await res.json(); } catch { err = { Message: 'Đăng ký thất bại.' }; }
-              const msg = err?.Message || err?.message || 'Đăng ký thất bại.';
+              // Xử lý lỗi từ server (400, 401, 409, 500, etc.)
+              let err;
+              let responseText = '';
+              try {
+                responseText = await res.text();
+                console.log('Error response body:', responseText);
+                err = JSON.parse(responseText);
+              } catch (parseError) {
+                console.error('=== ERROR RESPONSE PARSE ERROR ===');
+                console.error('Parse error:', parseError);
+                console.error('Response text:', responseText);
+                err = { 
+                  Message: responseText || `Lỗi server (${res.status}): ${res.statusText}`,
+                  message: responseText || `Lỗi server (${res.status}): ${res.statusText}`
+                };
+              }
+              
+              const msg = err?.Message || err?.message || `Đăng ký thất bại (${res.status}).`;
               const detail = err?.Detail || err?.detail;
               const errorType = err?.Type || '';
               
               // Log chi tiết để debug
               console.error('=== REGISTRATION ERROR ===');
               console.error('Status:', res.status);
+              console.error('Status Text:', res.statusText);
               console.error('Message:', msg);
               console.error('Detail:', detail);
               console.error('Type:', errorType);
               console.error('Full error:', err);
               
-              // Hiển thị lỗi trong validation summary
+              // Hiển thị lỗi bằng toast thay vì alert
+              const fullMessage = detail ? `${msg}\n${detail}` : msg;
+              showToast(fullMessage, 'error');
+              
+              // Scroll đến phần có lỗi nếu có
               const validationSummary = document.querySelector('.validation-summary-errors ul') || 
                                        document.querySelector('.alert.alert-danger');
               if (validationSummary && validationSummary.tagName === 'UL') {
                 validationSummary.innerHTML = `<li>${msg}${detail ? ` - ${detail}` : ''}</li>`;
                 validationSummary.closest('.validation-summary-errors')?.classList.remove('d-none');
                 validationSummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              } else {
-                // Fallback: show alert if no validation summary
-                alert(detail ? `${msg}\n\nChi tiết: ${detail}` : msg);
               }
 
               // map Errors[].Field
@@ -1288,10 +1344,23 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 if (el && el.focus) el.focus();
               }
             } catch (ex) {
-              alert('Không thể gửi đăng ký. Vui lòng thử lại.');
+              console.error('=== UNEXPECTED ERROR ===');
+              console.error('Error type:', ex.name);
+              console.error('Error message:', ex.message);
+              console.error('Error stack:', ex.stack);
+              console.error('Full error:', ex);
+              
+              let errorMsg = 'Không thể gửi đăng ký. ';
+              if (ex.message) {
+                errorMsg += `Chi tiết: ${ex.message}`;
+              } else {
+                errorMsg += 'Vui lòng thử lại sau.';
+              }
+              
+              showToast(errorMsg, 'error');
             } finally {
               btnSubmit.disabled = false;
-              btnSubmit.textContent = oldText || 'Đăng ký Provider';
+              btnSubmit.textContent = oldText || 'Đăng ký nhà cung cấp';
             }
           });
 
