@@ -207,6 +207,12 @@ builder.Services.AddHttpClient<ChatboxService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });
 
+// HttpClient cho GoogleAuthService
+builder.Services.AddHttpClient<GoogleAuthService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); 
+});
+
 builder.Services.AddControllersWithViews();
 
 
