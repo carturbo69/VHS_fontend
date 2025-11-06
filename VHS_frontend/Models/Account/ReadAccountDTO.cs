@@ -11,6 +11,7 @@ namespace VHS_frontend.Models.Account
         public string AccountName { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string Role { get; set; } = null!;
+        public bool IsDeleted { get; set; }           // map từ IsDeleted của backend
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
     }

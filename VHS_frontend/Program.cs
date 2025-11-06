@@ -106,6 +106,18 @@ builder.Services.AddHttpClient<AdminNotificationService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+builder.Services.AddHttpClient<ProviderNotificationService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+builder.Services.AddHttpClient<PaymentManagementService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
+builder.Services.AddHttpClient<ProviderWithdrawalService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 
 // HttpClient cho Admin Booking Service
 builder.Services.AddHttpClient<AdminBookingService>(client =>
@@ -172,7 +184,11 @@ builder.Services.AddHttpClient<OptionManagementService>(client =>
 });
 
 // HttpClient cho AuthService
-builder.Services.AddHttpClient<AuthService>();
+builder.Services.AddHttpClient<AuthService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
 builder.Services.AddHttpClient<StaffManagementService>(client => { 
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); 
 });

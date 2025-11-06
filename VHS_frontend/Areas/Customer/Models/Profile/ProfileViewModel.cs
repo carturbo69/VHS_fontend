@@ -40,10 +40,17 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
         [Display(Name = "Hoàn thiện profile")]
         public bool IsProfileComplete { get; set; }
 
+        [Display(Name = "Số đơn hàng đã hoàn thành")]
+        public int CompletedOrdersCount { get; set; }
+
+        [Display(Name = "Số đánh giá đã viết")]
+        public int ReviewsCount { get; set; }
+
         /// <summary>
         /// Lấy URL của ảnh đại diện, nếu không có thì trả về ảnh mặc định
         /// </summary>
-        public string GetProfileImageUrl()
+        /// <param name="baseUrl">Base URL của API (optional, nếu không có sẽ trả về path tương đối)</param>
+        public string GetProfileImageUrl(string? baseUrl = null)
         {
             if (string.IsNullOrEmpty(Images))
             {
@@ -56,8 +63,15 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
                 return Images;
             }
             
-            // Nếu Images là đường dẫn tương đối, thêm backend URL
-            return $"http://localhost:5154{Images}";
+            // Nếu có baseUrl, kết hợp với path
+            if (!string.IsNullOrEmpty(baseUrl))
+            {
+                string normalizedPath = Images.StartsWith("/") ? Images : "/" + Images;
+                return $"{baseUrl.TrimEnd('/')}{normalizedPath}";
+            }
+            
+            // Nếu không có baseUrl, trả về path tương đối (để view xử lý với ImageHelper)
+            return Images;
         }
 
         /// <summary>
@@ -79,9 +93,8 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
         public int GetProfileCompletionPercentage()
         {
             int completedFields = 0;
-            int totalFields = 5; // AccountName, Email, FullName, PhoneNumber, Address, Images
+            int totalFields = 4; // FullName, PhoneNumber, Address, Images (mỗi trường 25%)
 
-            // AccountName và Email luôn có (không tính)
             if (!string.IsNullOrEmpty(FullName)) completedFields++;
             if (!string.IsNullOrEmpty(PhoneNumber)) completedFields++;
             if (!string.IsNullOrEmpty(Address)) completedFields++;

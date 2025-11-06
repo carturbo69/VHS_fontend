@@ -153,8 +153,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     TempData["ToastMessage"] = "Đã thêm vào giỏ hàng.";
                 }
 
-                // Điều hướng về trang giỏ (tuỳ ý bạn đổi nơi quay lại)
-                return RedirectToAction(nameof(Index));
+                // Quay lại trang detail của service
+                return RedirectToAction("Details", "Services", new { area = "", id = serviceId });
             }
             catch (UnauthorizedAccessException)
             {
@@ -167,7 +167,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 TempData["ToastType"] = "error";
                 TempData["ToastMessage"] = $"Không thể thêm vào giỏ: {ex.Message}";
-                return RedirectToAction(nameof(Index));
+                // Quay lại trang detail của service
+                return RedirectToAction("Details", "Services", new { area = "", id = serviceId });
             }
         }
 

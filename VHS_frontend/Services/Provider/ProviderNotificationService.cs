@@ -20,6 +20,7 @@ namespace VHS_frontend.Services.Provider
 
         private void AttachAuth()
         {
+            _http.DefaultRequestHeaders.Authorization = null;
             if (!string.IsNullOrWhiteSpace(_bearer))
                 _http.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue("Bearer", _bearer);

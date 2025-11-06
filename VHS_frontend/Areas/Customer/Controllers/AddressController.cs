@@ -16,11 +16,20 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Upsert(Guid? AddressId, string streetAddress, string wardName, 
-            string provinceName, double? Latitude, double? Longitude, string districtName = "")
+        public async Task<IActionResult> Upsert(
+            [FromForm] Guid? AddressId, 
+            [FromForm] string streetAddress, 
+            [FromForm] string wardName, 
+            [FromForm] string provinceName, 
+            [FromForm] double? Latitude, 
+            [FromForm] double? Longitude, 
+            [FromForm] string districtName = "", 
+            [FromForm] string? recipientName = null, 
+            [FromForm] string? recipientPhone = null)
         {
             Console.WriteLine("=== AddressController.Upsert called ===");
             Console.WriteLine($"Parameters: AddressId={AddressId}, streetAddress={streetAddress}, wardName={wardName}, provinceName={provinceName}, districtName={districtName}");
+            Console.WriteLine($"RecipientName={recipientName}, RecipientPhone={recipientPhone}");
             
             var jwt = HttpContext.Session.GetString("JWToken");
             Console.WriteLine($"JWT exists: {!string.IsNullOrWhiteSpace(jwt)}");
@@ -45,9 +54,38 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 if (AddressId.HasValue && AddressId != Guid.Empty)
                 {
-                    // TODO: Update address - Backend chưa có API update
-                    TempData["ToastError"] = "Tính năng sửa địa chỉ đang được phát triển";
-                    return RedirectToAction("Index", "BookingService");
+                    Console.WriteLine("Updating address...");
+                    // Convert empty string to null để tránh validation issues
+                    var finalDistrictName = string.IsNullOrWhiteSpace(districtName) ? null : districtName;
+                    var finalRecipientName = string.IsNullOrWhiteSpace(recipientName) ? null : recipientName;
+                    var finalRecipientPhone = string.IsNullOrWhiteSpace(recipientPhone) ? null : recipientPhone;
+                    
+                    Console.WriteLine($"Final values - DistrictName: '{finalDistrictName}', RecipientName: '{finalRecipientName}', RecipientPhone: '{finalRecipientPhone}'");
+                    
+                    // Cập nhật địa chỉ
+                    var result = await _userAddressService.UpdateAddressAsync(
+                        addressId: AddressId.Value,
+                        provinceName: provinceName,
+                        districtName: finalDistrictName ?? "",
+                        wardName: wardName,
+                        streetAddress: streetAddress,
+                        latitude: Latitude,
+                        longitude: Longitude,
+                        recipientName: finalRecipientName,
+                        recipientPhone: finalRecipientPhone,
+                        jwt: jwt
+                    );
+
+                    Console.WriteLine($"Update result: Success={result.Success}, Message={result.Message}");
+                    
+                    if (result.Success)
+                    {
+                        TempData["ToastSuccess"] = result.Message ?? "Cập nhật địa chỉ thành công!";
+                    }
+                    else
+                    {
+                        TempData["ToastError"] = result.Message ?? "Không thể cập nhật địa chỉ";
+                    }
                 }
                 else
                 {
@@ -60,6 +98,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         streetAddress: streetAddress,
                         latitude: Latitude,
                         longitude: Longitude,
+                        recipientName: recipientName,
+                        recipientPhone: recipientPhone,
                         jwt: jwt
                     );
 

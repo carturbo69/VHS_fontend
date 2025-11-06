@@ -1,3 +1,6 @@
+@using VHS_frontend.Helpers
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
 
 @model VHS_frontend.Areas.Customer.Models.Profile.ProfileViewModel
 @{
@@ -9,13 +12,16 @@
     <link rel="stylesheet" href="~/css/profile.css" asp-append-version="true" />
 }
 
+<!-- Toast Container -->
+<div class="profile-toast-container" id="profileToastContainer"></div>
+
 <div class="profile-container">
     <!-- Header Section -->
     <div class="profile-header">
         <div class="profile-avatar-section">
-            <div class="avatar-container">
+            <div class="avatar-container @(Model.HasProfileImage ? "has-image" : "no-image")">
                 <img id="profileAvatar" 
-                     src="@Model.GetProfileImageUrl()" 
+                     src="@ImageHelper.GetImageUrl(Model.GetProfileImageUrl(), Configuration)" 
                      alt="@Model.GetDisplayName()" 
                      class="profile-avatar" />
                 <div class="avatar-overlay">
@@ -24,13 +30,13 @@
                     </button>
                 </div>
             </div>
-            <div class="avatar-actions">
+            <div class="avatar-actions" id="avatarActions">
                 <button type="button" class="btn btn-outline-primary btn-sm" onclick="openImageUpload()">
                     <i class="bi bi-camera me-1"></i>Đổi ảnh
                 </button>
                 @if (Model.HasProfileImage)
                 {
-                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteProfileImage()">
+                    <button type="button" id="deleteImageBtn" class="btn btn-outline-danger btn-sm" onclick="deleteProfileImage()">
                         <i class="bi bi-trash me-1"></i>Xóa ảnh
                     </button>
                 }
@@ -56,26 +62,34 @@
     <!-- Profile Completion -->
     <div class="profile-completion-card">
         <div class="completion-header">
-            <h3>Hoàn thiện hồ sơ</h3>
-            <span class="completion-percentage">@Model.GetProfileCompletionPercentage()%</span>
+            <h3><i class="bi bi-clipboard-check me-2"></i>Hoàn thiện hồ sơ</h3>
+            <span class="completion-percentage" id="completionPercentage">@Model.GetProfileCompletionPercentage()%</span>
         </div>
         <div class="completion-progress">
-            <div class="progress-bar" style="width: @Model.GetProfileCompletionPercentage()%"></div>
+            <div class="progress-bar" id="progressBar" style="width: @Model.GetProfileCompletionPercentage()%"></div>
         </div>
         <div class="completion-items">
-            <div class="completion-item @(string.IsNullOrEmpty(Model.FullName) ? "incomplete" : "complete")">
+            <div class="completion-item @(string.IsNullOrEmpty(Model.FullName) ? "incomplete" : "complete")" 
+                 data-field="fullname" 
+                 data-complete="@(string.IsNullOrEmpty(Model.FullName) ? "false" : "true")">
                 <i class="bi bi-@(string.IsNullOrEmpty(Model.FullName) ? "x-circle" : "check-circle")"></i>
                 <span>Họ và tên</span>
             </div>
-            <div class="completion-item @(string.IsNullOrEmpty(Model.PhoneNumber) ? "incomplete" : "complete")">
+            <div class="completion-item @(string.IsNullOrEmpty(Model.PhoneNumber) ? "incomplete" : "complete")" 
+                 data-field="phone" 
+                 data-complete="@(string.IsNullOrEmpty(Model.PhoneNumber) ? "false" : "true")">
                 <i class="bi bi-@(string.IsNullOrEmpty(Model.PhoneNumber) ? "x-circle" : "check-circle")"></i>
                 <span>Số điện thoại</span>
             </div>
-            <div class="completion-item @(string.IsNullOrEmpty(Model.Address) ? "incomplete" : "complete")">
+            <div class="completion-item @(string.IsNullOrEmpty(Model.Address) ? "incomplete" : "complete")" 
+                 data-field="address" 
+                 data-complete="@(string.IsNullOrEmpty(Model.Address) ? "false" : "true")">
                 <i class="bi bi-@(string.IsNullOrEmpty(Model.Address) ? "x-circle" : "check-circle")"></i>
                 <span>Địa chỉ</span>
             </div>
-            <div class="completion-item @(!Model.HasProfileImage ? "incomplete" : "complete")">
+            <div class="completion-item @(!Model.HasProfileImage ? "incomplete" : "complete")" 
+                 data-field="avatar" 
+                 data-complete="@(!Model.HasProfileImage ? "false" : "true")">
                 <i class="bi bi-@(!Model.HasProfileImage ? "x-circle" : "check-circle")"></i>
                 <span>Ảnh đại diện</span>
             </div>
@@ -94,24 +108,51 @@
             </div>
             <div class="card-body">
                 <div class="info-row">
-                    <label>Tên tài khoản</label>
+                    <label><i class="bi bi-person-circle me-2"></i>Tên tài khoản</label>
                     <span>@Model.AccountName</span>
                 </div>
                 <div class="info-row">
-                    <label>Email</label>
+                    <label><i class="bi bi-envelope-fill me-2"></i>Email</label>
                     <span>@Model.Email</span>
                 </div>
                 <div class="info-row">
-                    <label>Họ và tên</label>
-                    <span>@(string.IsNullOrEmpty(Model.FullName) ? "Chưa cập nhật" : Model.FullName)</span>
+                    <label><i class="bi bi-person-fill me-2"></i>Họ và tên</label>
+                    <span class="@(string.IsNullOrEmpty(Model.FullName) ? "text-muted" : "")">
+                        @if (string.IsNullOrEmpty(Model.FullName))
+                        {
+                            <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Chưa cập nhật</span>
+                        }
+                        else
+                        {
+                            @Model.FullName
+                        }
+                    </span>
                 </div>
                 <div class="info-row">
-                    <label>Số điện thoại</label>
-                    <span>@(string.IsNullOrEmpty(Model.PhoneNumber) ? "Chưa cập nhật" : Model.PhoneNumber)</span>
+                    <label><i class="bi bi-telephone-fill me-2"></i>Số điện thoại</label>
+                    <span class="@(string.IsNullOrEmpty(Model.PhoneNumber) ? "text-muted" : "")">
+                        @if (string.IsNullOrEmpty(Model.PhoneNumber))
+                        {
+                            <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Chưa cập nhật</span>
+                        }
+                        else
+                        {
+                            @Model.PhoneNumber
+                        }
+                    </span>
                 </div>
                 <div class="info-row">
-                    <label>Địa chỉ</label>
-                    <span>@(string.IsNullOrEmpty(Model.Address) ? "Chưa cập nhật" : Model.Address)</span>
+                    <label><i class="bi bi-geo-alt-fill me-2"></i>Địa chỉ</label>
+                    <span class="@(string.IsNullOrEmpty(Model.Address) ? "text-muted" : "")">
+                        @if (string.IsNullOrEmpty(Model.Address))
+                        {
+                            <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Chưa cập nhật</span>
+                        }
+                        else
+                        {
+                            @Model.Address
+                        }
+                    </span>
                 </div>
             </div>
         </div>
@@ -148,39 +189,39 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Account Statistics Card -->
-        <div class="detail-card">
-            <div class="card-header">
-                <h3><i class="bi bi-graph-up"></i> Thống kê tài khoản</h3>
+    <!-- Account Statistics Card -->
+    <div class="detail-card stats-card-full">
+        <div class="card-header">
+            <h3><i class="bi bi-graph-up"></i> Thống kê tài khoản</h3>
+        </div>
+        <div class="card-body stats-body">
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value">@Model.CompletedOrdersCount</span>
+                    <span class="stat-label">Đơn hàng đã hoàn thành</span>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="stat-item">
-                    <div class="stat-icon">
-                        <i class="bi bi-calendar-check"></i>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">0</span>
-                        <span class="stat-label">Đơn hàng đã đặt</span>
-                    </div>
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="bi bi-star"></i>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-icon">
-                        <i class="bi bi-star"></i>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">0</span>
-                        <span class="stat-label">Đánh giá đã viết</span>
-                    </div>
+                <div class="stat-info">
+                    <span class="stat-value">@Model.ReviewsCount</span>
+                    <span class="stat-label">Đánh giá đã viết</span>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-icon">
-                        <i class="bi bi-clock-history"></i>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value">@((DateTime.Now - (Model.CreatedAt ?? DateTime.Now)).Days)</span>
-                        <span class="stat-label">Ngày tham gia</span>
-                    </div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-icon">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-value">@((DateTime.Now - (Model.CreatedAt ?? DateTime.Now)).Days)</span>
+                    <span class="stat-label">Ngày tham gia</span>
                 </div>
             </div>
         </div>
@@ -297,7 +338,7 @@
                             <label class="form-label">Mật khẩu mới</label>
                             <input type="password" class="form-control" name="NewPassword" 
                                    pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
-                                   title="Phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số" required />
+                               required />
                             <small class="text-muted">Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường và số</small>
                         </div>
 
@@ -376,11 +417,19 @@
     </div>
 
 @section Scripts {
+    <script src="~/js/image-helper.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         $(document).ready(function() {
             console.log('Profile page script loaded');
+            
+            // Xóa tất cả tooltip (title attribute)
+            $('[title]').removeAttr('title');
+            
+            // Xóa tooltip từ Bootstrap nếu có
+            $('[data-bs-toggle="tooltip"]').removeAttr('data-bs-toggle').removeAttr('data-bs-title');
+            $('[data-toggle="tooltip"]').removeAttr('data-toggle').removeAttr('title');
             
             // Make functions global
             window.openImageUpload = function() {
@@ -395,8 +444,6 @@
             };
 
             window.deleteProfileImage = async function() {
-                if (!confirm('Bạn có chắc chắn muốn xóa ảnh đại diện?')) return;
-                
                 try {
                     const response = await fetch('@Url.Action("DeleteImage")', {
                         method: 'POST',
@@ -408,13 +455,29 @@
                     
                     const result = await response.json();
                     if (result.success) {
-                        alert('Xóa ảnh thành công!');
+                        showToast('Xóa ảnh thành công!', 'success');
                         document.getElementById('profileAvatar').src = '/images/default-avatar.png';
+                        
+                        // Update avatar container class
+                        const avatarContainer = document.querySelector('.avatar-container');
+                        if (avatarContainer) {
+                            avatarContainer.classList.remove('has-image');
+                            avatarContainer.classList.add('no-image');
+                        }
+                        
+                        // Hide delete button
+                        toggleDeleteImageButton(false);
+                        
+                        // Update completion item
+                        updateCompletionItem('avatar', false);
+                        
+                        // Update percentage
+                        updateCompletionPercentage();
                     } else {
-                        alert(result.message || 'Có lỗi xảy ra khi xóa ảnh');
+                        showToast(result.message || 'Có lỗi xảy ra khi xóa ảnh', 'error');
                     }
                 } catch (error) {
-                    alert('Có lỗi xảy ra khi xóa ảnh');
+                    showToast('Có lỗi xảy ra khi xóa ảnh', 'error');
                 }
             };
 
@@ -423,18 +486,18 @@
                 const file = fileInput.files[0];
                 
                 if (!file) {
-                    alert('Vui lòng chọn ảnh để tải lên');
+                    showToast('Vui lòng chọn ảnh để tải lên', 'error');
                     return;
                 }
 
                 if (file.size > 5 * 1024 * 1024) {
-                    alert('Kích thước file không được vượt quá 5MB');
+                    showToast('Kích thước file không được vượt quá 5MB', 'error');
                     return;
                 }
 
                 const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
                 if (!allowedTypes.includes(file.type)) {
-                    alert('Chỉ chấp nhận file ảnh JPG, PNG, GIF, BMP, WEBP');
+                    showToast('Chỉ chấp nhận file ảnh JPG, PNG, GIF, BMP, WEBP', 'error');
                     return;
                 }
 
@@ -452,21 +515,43 @@
                     
                     const result = await response.json();
                     if (result.success) {
-                        alert('Tải ảnh lên thành công!');
+                        showToast('Tải ảnh lên thành công!', 'success');
                         // Thêm backend URL nếu imageUrl là đường dẫn tương đối
                         let fullImageUrl = result.imageUrl;
                         if (fullImageUrl && !fullImageUrl.startsWith('http://') && !fullImageUrl.startsWith('https://')) {
                             fullImageUrl = 'http://localhost:5154' + fullImageUrl;
                         }
+                        alert('Tải ảnh lên thành công!');
+                        // Dùng helper function để lấy URL đầy đủ
+                        let fullImageUrl = typeof getImageUrl !== 'undefined' 
+                            ? getImageUrl(result.imageUrl) 
+                            : result.imageUrl;
                         document.getElementById('profileAvatar').src = fullImageUrl;
+                        
+                        // Update avatar container class
+                        const avatarContainer = document.querySelector('.avatar-container');
+                        if (avatarContainer) {
+                            avatarContainer.classList.remove('no-image');
+                            avatarContainer.classList.add('has-image');
+                        }
+                        
+                        // Show delete button
+                        toggleDeleteImageButton(true);
+                        
+                        // Update completion item
+                        updateCompletionItem('avatar', true);
+                        
+                        // Update percentage
+                        updateCompletionPercentage();
+                        
                         bootstrap.Modal.getInstance(document.getElementById('imageUploadModal')).hide();
                         document.getElementById('imageUploadForm').reset();
                         document.getElementById('imagePreview').style.display = 'none';
                     } else {
-                        alert(result.message || 'Có lỗi xảy ra khi tải ảnh lên');
+                        showToast(result.message || 'Có lỗi xảy ra khi tải ảnh lên', 'error');
                     }
                 } catch (error) {
-                    alert('Có lỗi xảy ra khi tải ảnh lên');
+                    showToast('Có lỗi xảy ra khi tải ảnh lên', 'error');
                 }
             };
 
@@ -486,6 +571,117 @@
                 });
             }
 
+            // Function to calculate and update completion percentage
+            function updateCompletionPercentage() {
+                const items = document.querySelectorAll('.completion-item');
+                let completedCount = 0;
+                const totalFields = 4;
+                
+                items.forEach(item => {
+                    const isComplete = item.getAttribute('data-complete') === 'true';
+                    if (isComplete) {
+                        completedCount++;
+                    }
+                });
+                
+                const percentage = Math.round((completedCount / totalFields) * 100);
+                
+                // Update percentage text
+                const percentageEl = document.getElementById('completionPercentage');
+                if (percentageEl) {
+                    percentageEl.textContent = percentage + '%';
+                }
+                
+                // Update progress bar
+                const progressBar = document.getElementById('progressBar');
+                if (progressBar) {
+                    progressBar.style.width = percentage + '%';
+                }
+                
+                return percentage;
+            }
+            
+            // Function to show/hide delete image button
+            function toggleDeleteImageButton(show) {
+                const avatarActions = document.getElementById('avatarActions');
+                if (!avatarActions) return;
+                
+                let deleteBtn = document.getElementById('deleteImageBtn');
+                
+                if (show) {
+                    // Show button if it doesn't exist
+                    if (!deleteBtn) {
+                        deleteBtn = document.createElement('button');
+                        deleteBtn.type = 'button';
+                        deleteBtn.id = 'deleteImageBtn';
+                        deleteBtn.className = 'btn btn-outline-danger btn-sm';
+                        deleteBtn.onclick = deleteProfileImage;
+                        deleteBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Xóa ảnh';
+                        avatarActions.appendChild(deleteBtn);
+                    } else {
+                        deleteBtn.style.display = '';
+                    }
+                } else {
+                    // Hide button
+                    if (deleteBtn) {
+                        deleteBtn.style.display = 'none';
+                    }
+                }
+            }
+            
+            // Function to update completion item status
+            function updateCompletionItem(fieldName, isComplete) {
+                const item = document.querySelector(`.completion-item[data-field="${fieldName}"]`);
+                if (item) {
+                    item.setAttribute('data-complete', isComplete ? 'true' : 'false');
+                    const icon = item.querySelector('i');
+                    if (icon) {
+                        if (isComplete) {
+                            item.classList.remove('incomplete');
+                            item.classList.add('complete');
+                            icon.className = 'bi bi-check-circle';
+                        } else {
+                            item.classList.remove('complete');
+                            item.classList.add('incomplete');
+                            icon.className = 'bi bi-x-circle';
+                        }
+                    }
+                }
+            }
+            
+            // Function to update profile info display
+            function updateProfileInfo(fieldName, value) {
+                if (!value || value.trim() === '') return;
+                
+                const infoRows = document.querySelectorAll('.info-row');
+                infoRows.forEach(row => {
+                    const label = row.querySelector('label');
+                    if (!label) return;
+                    
+                    const span = row.querySelector('span');
+                    if (!span) return;
+                    
+                    let shouldUpdate = false;
+                    if (fieldName === 'fullname' && label.textContent.includes('Họ và tên')) {
+                        shouldUpdate = true;
+                    } else if (fieldName === 'phone' && label.textContent.includes('Số điện thoại')) {
+                        shouldUpdate = true;
+                    } else if (fieldName === 'address' && label.textContent.includes('Địa chỉ')) {
+                        shouldUpdate = true;
+                    }
+                    
+                    if (shouldUpdate) {
+                        // Remove badge if exists
+                        const badge = span.querySelector('.badge');
+                        if (badge) {
+                            badge.remove();
+                        }
+                        span.innerHTML = value;
+                        span.classList.remove('text-muted');
+                    }
+                });
+            }
+            
             // Modal form handlers
             const editForm = document.getElementById('editProfileForm');
             if (editForm) {
@@ -499,14 +695,35 @@
                         });
                         const result = await response.json();
                         if (result.success) {
-                            alert('Cập nhật thông tin thành công!');
+                            showToast('Cập nhật thông tin thành công!', 'success');
+                            
+                            // Update completion items based on form data
+                            const fullName = formData.get('FullName');
+                            const phoneNumber = formData.get('PhoneNumber');
+                            const address = formData.get('Address');
+                            
+                            if (fullName) {
+                                updateCompletionItem('fullname', true);
+                                updateProfileInfo('fullname', fullName);
+                            }
+                            if (phoneNumber) {
+                                updateCompletionItem('phone', true);
+                                updateProfileInfo('phone', phoneNumber);
+                            }
+                            if (address) {
+                                updateCompletionItem('address', true);
+                                updateProfileInfo('address', address);
+                            }
+                            
+                            // Update percentage
+                            updateCompletionPercentage();
+                            
                             bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
-                            location.reload();
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra');
+                            showToast(result.message || 'Có lỗi xảy ra', 'error');
                         }
                     } catch (error) {
-                        alert('Có lỗi xảy ra khi cập nhật thông tin');
+                        showToast('Có lỗi xảy ra khi cập nhật thông tin', 'error');
                     }
                 });
             }
@@ -529,7 +746,7 @@
                         
                         const result = await response.json();
                         if (result.success) {
-                            alert('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email.');
+                            showToast('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email.', 'success');
                             this.innerHTML = '<i class="bi bi-check-circle me-1"></i>Đã gửi';
                             // Countdown timer
                             let countdown = 60;
@@ -544,13 +761,13 @@
                                 }
                             }, 1000);
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra khi gửi OTP');
+                            showToast(result.message || 'Có lỗi xảy ra khi gửi OTP', 'error');
                             this.disabled = false;
                             this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
                         }
                     } catch (error) {
                         console.error('Error requesting OTP:', error);
-                        alert('Có lỗi xảy ra khi gửi OTP');
+                        showToast('Có lỗi xảy ra khi gửi OTP', 'error');
                         this.disabled = false;
                         this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
                     }
@@ -569,14 +786,14 @@
                         });
                         const result = await response.json();
                         if (result.success) {
-                            alert('Đổi mật khẩu thành công!');
+                            showToast('Đổi mật khẩu thành công!', 'success');
                             bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
                             this.reset();
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra');
+                            showToast(result.message || 'Có lỗi xảy ra', 'error');
                         }
                     } catch (error) {
-                        alert('Có lỗi xảy ra khi đổi mật khẩu');
+                        showToast('Có lỗi xảy ra khi đổi mật khẩu', 'error');
                     }
                 });
             }
@@ -599,7 +816,7 @@
                         
                         const result = await response.json();
                         if (result.success) {
-                            alert('Mã OTP đã được gửi đến email hiện tại của bạn. Vui lòng kiểm tra email.');
+                            showToast('Mã OTP đã được gửi đến email hiện tại của bạn. Vui lòng kiểm tra email.', 'success');
                             this.innerHTML = '<i class="bi bi-check-circle me-1"></i>Đã gửi';
                             // Countdown timer
                             let countdown = 60;
@@ -614,13 +831,13 @@
                                 }
                             }, 1000);
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra khi gửi OTP');
+                            showToast(result.message || 'Có lỗi xảy ra khi gửi OTP', 'error');
                             this.disabled = false;
                             this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
                         }
                     } catch (error) {
                         console.error('Error requesting email OTP:', error);
-                        alert('Có lỗi xảy ra khi gửi OTP');
+                        showToast('Có lỗi xảy ra khi gửi OTP', 'error');
                         this.disabled = false;
                         this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
                     }
@@ -639,17 +856,53 @@
                         });
                         const result = await response.json();
                         if (result.success) {
-                            alert('Đổi email thành công!');
+                            showToast('Đổi email thành công!', 'success');
                             bootstrap.Modal.getInstance(document.getElementById('changeEmailModal')).hide();
                             location.reload();
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra');
+                            showToast(result.message || 'Có lỗi xảy ra', 'error');
                         }
                     } catch (error) {
-                        alert('Có lỗi xảy ra khi đổi email');
+                        showToast('Có lỗi xảy ra khi đổi email', 'error');
                     }
                 });
             }
+
+            // Toast notification function
+            function showToast(message, type = 'info') {
+                const container = document.getElementById('profileToastContainer');
+                if (!container) return;
+
+                const toast = document.createElement('div');
+                toast.className = `profile-toast profile-toast-${type}`;
+
+                const icons = {
+                    success: '✓',
+                    error: '✕',
+                    info: 'ℹ'
+                };
+
+                toast.innerHTML = `
+                    <span class="profile-toast-icon">${icons[type] || icons.info}</span>
+                    <span class="profile-toast-message">${message}</span>
+                    <button type="button" class="profile-toast-close" onclick="this.parentElement.remove()">×</button>
+                `;
+
+                container.appendChild(toast);
+
+                // Auto remove after 3 seconds
+                setTimeout(() => {
+                    toast.classList.add('slide-out');
+                    setTimeout(() => {
+                        if (toast.parentElement) {
+                            toast.remove();
+                        }
+                    }, 300);
+                }, 3000);
+            }
+
+            // Make showToast global
+            window.showToast = showToast;
 
             console.log('All handlers attached');
         });
