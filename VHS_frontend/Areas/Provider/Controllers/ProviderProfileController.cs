@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Services.Provider;
 using VHS_frontend.Areas.Provider.Models.Profile;
+using Microsoft.AspNetCore.Http;
 
 namespace VHS_frontend.Areas.Provider.Controllers
 {
@@ -125,7 +126,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     return RedirectToAction("Login", "Account", new { area = "" });
                 }
 
-                // Xử lý file upload
+                // Xử lý file upload - gửi trực tiếp đến API backend
                 if (model.ImageFile != null && model.ImageFile.Length > 0)
                 {
                     // Kiểm tra kích thước file (5MB)
@@ -143,27 +144,30 @@ namespace VHS_frontend.Areas.Provider.Controllers
                         return View(model);
                     }
 
-                    // Tạo tên file unique
-                    var fileName = $"{Guid.NewGuid()}_{model.ImageFile.FileName}";
-                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "provider-images");
-                    
-                    // Tạo thư mục nếu chưa tồn tại
-                    if (!Directory.Exists(uploadsFolder))
+                    // Upload ảnh lên Google Cloud Storage qua API backend
+                    try
                     {
-                        Directory.CreateDirectory(uploadsFolder);
+                        var uploadToken = HttpContext.Session.GetString("JWToken");
+                        var uploadResult = await _providerProfileService.UploadAvatarAsync(model.ImageFile, uploadToken);
+                        
+                        if (uploadResult != null && uploadResult.Success && !string.IsNullOrEmpty(uploadResult.ImagePath))
+                        {
+                            // Cập nhật URL hình ảnh từ GCS
+                            model.Images = uploadResult.ImagePath;
+                            Console.WriteLine($"[DEBUG] File uploaded to GCS: {model.Images}");
+                        }
+                        else
+                        {
+                            ModelState.AddModelError("ImageFile", uploadResult?.Message ?? "Lỗi khi upload ảnh");
+                            return View(model);
+                        }
                     }
-
-                    var filePath = Path.Combine(uploadsFolder, fileName);
-                    
-                    // Lưu file
-                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    catch (Exception ex)
                     {
-                        await model.ImageFile.CopyToAsync(stream);
+                        Console.WriteLine($"[DEBUG] Exception uploading image: {ex.Message}");
+                        ModelState.AddModelError("ImageFile", $"Lỗi khi upload ảnh: {ex.Message}");
+                        return View(model);
                     }
-
-                    // Cập nhật URL hình ảnh
-                    model.Images = $"/uploads/provider-images/{fileName}";
-                    Console.WriteLine($"[DEBUG] File uploaded: {model.Images}");
                 }
                 else
                 {

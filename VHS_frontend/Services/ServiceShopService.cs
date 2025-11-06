@@ -674,9 +674,34 @@ namespace VHS_frontend.Services
         /// </summary>
         private ServiceItem MapToServiceItem(ServiceProviderReadDTO dto, List<CategoryDTO>? categories = null, object? ratingInfo = null)
         {
-            var images = !string.IsNullOrEmpty(dto.Images)
-                ? dto.Images.Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim()
-                : null;
+            // Parse ảnh từ dto.Images (có thể là JSON array hoặc comma-separated string)
+            string? images = null;
+            if (!string.IsNullOrWhiteSpace(dto.Images))
+            {
+                try
+                {
+                    // Thử parse JSON array trước
+                    var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(dto.Images);
+                    if (arr != null && arr.Count > 0)
+                    {
+                        images = arr[0].Trim();
+                    }
+                }
+                catch
+                {
+                    // Nếu không phải JSON, thử split bằng dấu phẩy
+                    if (dto.Images.Contains(','))
+                    {
+                        images = dto.Images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                           .FirstOrDefault()?.Trim();
+                    }
+                    else
+                    {
+                        // Nếu không có dấu phẩy, dùng nguyên chuỗi
+                        images = dto.Images.Trim();
+                    }
+                }
+            }
 
             // Map categoryId
             var mappedCategoryId = 0;
@@ -741,6 +766,7 @@ namespace VHS_frontend.Services
                 Description = dto.Description ?? "",
                 Image = images ?? "/images/VeSinh.jpg",
                 ImageUrl = images ?? "/images/VeSinh.jpg",
+                Unit = dto.UnitType ?? "/giờ", // Map UnitType từ DTO sang Unit
                 Price = dto.Price,
                 Rating = rating,
                 RatingCount = ratingCount,

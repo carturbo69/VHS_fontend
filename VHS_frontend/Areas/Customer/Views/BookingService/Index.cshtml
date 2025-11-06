@@ -33,7 +33,12 @@
             
             // Thêm marker
             const marker = L.marker([lat, lng]).addTo(map);
-            marker.bindPopup('@Html.Raw(Model.Address.ToDisplayString())').openPopup();
+            marker.bindPopup('@Html.Raw(Model.Address.ToDisplayString())', {
+                autoPan: true,
+                autoPanPadding: [20, 20],
+                maxWidth: 250,
+                className: 'address-popup'
+            }).openPopup();
         }
         
         // Khởi tạo bản đồ khi trang load
@@ -75,50 +80,31 @@
         </div>
     </div>
 
-    <!-- Toast notification cho error/success messages -->
-    @if (TempData["ToastSuccess"] != null || TempData["ToastError"] != null)
-    {
-        <div class="custom-alert @(TempData["ToastSuccess"] != null ? "alert-success" : "alert-danger")" role="alert" style="margin: 1rem 0; padding: 1rem; border-radius: 8px; display: flex; align-items: center; gap: 0.75rem; animation: slideIn 0.3s ease-out;">
-            <i class="bi @(TempData["ToastSuccess"] != null ? "bi-check-circle-fill" : "bi-exclamation-circle-fill")"></i>
-            <div class="alert-content" style="flex: 1;">
-                @(TempData["ToastSuccess"] ?? TempData["ToastError"])
-            </div>
-            <button type="button" class="alert-close" onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer; padding: 0.25rem; color: inherit; opacity: 0.7;">
-                <i class="bi bi-x"></i>
-            </button>
-        </div>
-        
-        <style>
-            .alert-success {
-                background-color: #d4edda;
-                border: 1px solid #c3e6cb;
-                color: #155724;
-            }
-            .alert-danger {
-                background-color: #f8d7da;
-                border: 1px solid #f5c6cb;
-                color: #721c24;
-            }
-            @@keyframes slideIn {
-                from {
-                    transform: translateY(-20px);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateY(0);
-                    opacity: 1;
-                }
-            }
-        </style>
-    }
+    <!-- Toast notification đã được bỏ - chỉ hiển thị validation errors inline -->
 
     <!-- Địa chỉ nhận hàng -->
-    <div class="address-card">
+    @{
+        // Kiểm tra địa chỉ hợp lệ: có AddressId hoặc có đầy đủ thông tin địa chỉ
+        var addressDisplay = Model.Address?.ToDisplayString() ?? "";
+        var hasAddressId = Model.Address?.AddressId != null && Model.Address.AddressId != Guid.Empty;
+        var hasValidAddressParts = !string.IsNullOrWhiteSpace(Model.Address?.StreetAddress) &&
+                                   !string.IsNullOrWhiteSpace(Model.Address?.ProvinceName) &&
+                                   !string.IsNullOrWhiteSpace(Model.Address?.DistrictName);
+        // Loại trừ các giá trị không hợp lệ như "0", "...", hoặc chỉ có dấu phẩy
+        var isValidDisplay = !string.IsNullOrWhiteSpace(addressDisplay) && 
+                            addressDisplay.Trim() != "0" && 
+                            addressDisplay.Trim() != "..." &&
+                            addressDisplay.Trim().Length > 5; // Địa chỉ hợp lệ phải có ít nhất 5 ký tự
+        var hasAddress = hasAddressId || (hasValidAddressParts && isValidDisplay);
+    }
+    <div class="address-card" id="addressCardSection">
         <div class="addr-title">
-            <span>📍 Địa Chỉ Nhận Hàng</span>
-            <button type="button" class="btn" onclick="openAddressModal()">Thay đổi</button>
+            <span>📍 Địa Chỉ Đặt Dịch Vụ</span>
+            <button type="button" class="btn" onclick="openAddressModal()">@(hasAddress ? "Thay đổi" : "Chọn địa chỉ")</button>
         </div>
         <div class="addr-body">
+            @if (hasAddress)
+            {
             <div id="currentRecipientInfo">
                 <strong>
                     @(!string.IsNullOrEmpty(Model.Address.RecipientName) ? Model.Address.RecipientName : Model.RecipientFullName)
@@ -127,13 +113,26 @@
             </div>
             <!-- ✅ thêm id để JS cập nhật khi chọn trong modal -->
             <div id="currentAddressText">@Model.Address.ToDisplayString()</div>
-        </div>
         
         <!-- Bản đồ hiển thị vị trí -->
         @if (Model.Address.Latitude.HasValue && Model.Address.Longitude.HasValue)
         {
             <div id="addressMap" style="width: 100%; height: 250px; margin-top: 1rem; border-radius: 8px; overflow: hidden;"></div>
         }
+            }
+            else
+            {
+                <div id="currentRecipientInfo" style="display: none;"></div>
+                <div id="currentAddressText" class="address-empty-state">
+                    <div class="empty-state-icon">
+                        <i class="bi bi-geo-alt"></i>
+                    </div>
+                    <p class="empty-state-title">Bạn chưa chọn địa chỉ đặt dịch vụ</p>
+                    <p class="empty-state-desc">Vui lòng chọn địa chỉ để tiếp tục đặt dịch vụ</p>
+                </div>
+            }
+        </div>
+        <div id="addressError" class="validation-error" style="display: none;"></div>
     </div>
 
     <div class="grid">
@@ -191,7 +190,6 @@
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="cartItemId" value="@key" />
                                                         <input type="hidden" name="optionId" value="@a.OptionId" />
-                                                        <button class="opt-remove" type="submit">Bỏ</button>
                                                     </form>
                                                 </div>
                                             </div>
@@ -219,6 +217,7 @@
                         <input type="hidden" form="@placeOrderFormId" name="Items[@i].CartItemId" value="@it.CartItemId" />
                         <input type="hidden" form="@placeOrderFormId" name="Items[@i].ServiceId" value="@it.ServiceId" />
                         <input type="hidden" form="@placeOrderFormId" name="Items[@i].ProviderId" value="@it.ProviderId" />
+                        <input type="hidden" form="@placeOrderFormId" name="Items[@i].ServiceName" value="@it.ServiceName" />
 
                         <!-- Giờ đặt -->
                         <div class="booking-time">
@@ -234,7 +233,7 @@
                                    class="booking-input"
                                    data-provider-id="@it.ProviderId"
                                    onchange="validateBookingTime(this, @i)" />
-                            <div id="booking-time-error-@i" class="booking-time-error" style="display: none; color: #d00; margin-top: 5px; font-size: 0.9em;"></div>
+                            <div id="booking-time-error-@i" class="booking-time-error" style="display: none;"></div>
                         </div>
 
                         i++;
@@ -270,6 +269,7 @@
                                value="false"
                                form="@placeOrderFormId" />
                     </div>
+                    <div class="tos-error validation-error" data-provider-id="@providerId" style="display: none;"></div>
                 </div>
             }
 
@@ -294,8 +294,8 @@
                 <input type="hidden" id="voucherMaxAmount" value="@Model.VoucherMaxAmount" />
             </div>
 
-            <!-- Panel voucher (PORTAL) -->
-            <div id="opt_voucher" class="opt-panel" hidden aria-label="Danh sách voucher" role="dialog" aria-modal="true">
+            <!-- Panel voucher (PORTAL) - Ẩn đi, dùng modal thay thế -->
+            <div id="opt_voucher" class="opt-panel" hidden aria-label="Danh sách voucher" role="dialog" aria-modal="true" style="display:none;">
                 <div class="opt-card">
                     <div class="opt-head">
                         <h3>Voucher của bạn</h3>
@@ -303,11 +303,6 @@
                     </div>
 
                     <div class="opt-body">
-                        @* <div class="voucher-toolbar">
-                            <input id="voucherInput" class="input" placeholder="Nhập mã voucher..." />
-                            <button id="btnApplyTyped" class="btn" type="button">Áp dụng</button>
-                        </div> *@
-
                         <div id="voucherList" class="voucher-list"></div>
                         <div class="tiny muted">* Chỉ voucher còn hiệu lực và còn lượt dùng mới có thể áp dụng.</div>
                     </div>
@@ -315,7 +310,7 @@
             </div>
 
             <!-- Phương thức thanh toán -->
-            <div class="shop-block">
+            <div class="shop-block" id="paymentSection">
                 <div class="shop-head">Phương thức thanh toán</div>
                 <div style="padding:12px 16px">
                     <div class="pm-list">
@@ -358,6 +353,7 @@
       *@
                     </div>
                 </div>
+                <div id="paymentError" class="validation-error" style="display: none;"></div>
             </div>
 
         </div>
@@ -392,13 +388,13 @@
                     </div>
 
                     <hr />
+                    <div id="voucherBreakdown" class="muted tiny" style="margin-bottom: var(--s-4);" hidden>
+                        <div id="voucherAppliedInfo"></div>
+                    </div>
+
                     <div class="row" style="font-size:20px">
                         <span>Tổng thanh toán</span>
                         <strong style="color:#ee4d2d" data-total data-raw="@Model.Total">@Money(Model.Total)</strong>
-                    </div>
-
-                    <div id="voucherBreakdown" class="muted tiny" style="margin-top:6px" hidden>
-                        <div id="voucherAppliedInfo"></div>
                     </div>
 
                     <div class="summary-actions">
@@ -415,13 +411,16 @@
 <div class="modal" id="addressModal">
     <div class="modal-card">
         <div style="display:flex;justify-content:space-between;align-items:center">
-            <h3 style="margin:0">Chọn địa chỉ nhận hàng</h3>
+            <h3 style="margin:0">Chọn địa chỉ đặt dịch vụ</h3>
             <button class="btn" type="button" onclick="closeAddressModal()">✕</button>
         </div>
 
         <!-- ✅ KHÔNG submit nữa, chỉ để chọn và xác nhận -->
         <div style="margin-top:8px">
-            <div class="addr-list">
+            <!-- Vùng hiển thị thông báo trong modal -->
+            <div id="addressModalAlert" style="display: none; margin-bottom: 12px;"></div>
+            
+            <div class="addr-list" id="addressListContainer">
                 @if (Model.Addresses?.Any() == true)
                 {
                     foreach (var addr in Model.Addresses)
@@ -448,11 +447,10 @@
 
                             <div style="display:flex;flex-direction:column;gap:4px">
                                 <button type="button" class="btn small" onclick="openEditAddressForm(this)">📝</button>
-                                <button type="submit"
+                                <button type="button"
                                         class="btn small"
                                         style="color:#d00"
-                                        form="del-@addr.AddressId"
-                                        onclick="return confirm('Xóa địa chỉ này?')">
+                                        onclick="deleteAddress('@addr.AddressId', this)">
                                     🗑️
                                 </button>
                             </div>
@@ -465,12 +463,14 @@
                 }
             </div>
 
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
-                <button type="button" class="btn" onclick="closeAddressModal()">Hủy</button>
-                <div style="display:flex;gap:8px">
-                    <button type="button" class="btn" onclick="openCreateAddressForm()">➕ Thêm địa chỉ</button>
-                    <!-- ✅ xác nhận chọn địa chỉ, cập nhật AddressText + UI -->
-                    <button type="button" class="btn primary" onclick="applySelectedAddress()">Xác nhận</button>
+            <div class="address-modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeAddressModal()">Hủy</button>
+                <div class="footer-actions">
+                    <button type="button" class="btn btn-secondary" onclick="openCreateAddressForm()">
+                        <span class="btn-icon">➕</span>
+                        <span>Thêm địa chỉ</span>
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="applySelectedAddress()">Xác nhận</button>
                 </div>
             </div>
         </div>
@@ -486,13 +486,13 @@
 
 <!-- Modal Upsert địa chỉ -->
 <div class="modal" id="addressUpsertModal">
-    <div class="modal-card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-            <h3 id="upsertTitle" style="margin:0">Thêm địa chỉ</h3>
-            <button class="btn" type="button" onclick="closeUpsertModal()">✕</button>
+    <div class="modal-card upsert-modal-card">
+        <div class="upsert-modal-header">
+            <h3 id="upsertTitle">Thêm địa chỉ</h3>
+            <button class="btn-upsert-close" type="button" onclick="closeUpsertModal()" aria-label="Đóng">✕</button>
         </div>
 
-        <form id="addressUpsertForm" asp-area="Customer" asp-controller="Address" asp-action="Upsert" method="post" style="margin-top:12px">
+        <form id="addressUpsertForm" asp-area="Customer" asp-controller="Address" asp-action="Upsert" method="post" class="upsert-form">
             @Html.AntiForgeryToken()
             <input type="hidden" name="AddressId" id="AddressId" />
             <!-- Hidden fields để lưu tọa độ -->
@@ -501,27 +501,30 @@
 
             <!-- Bản đồ để chọn vị trí -->
             <div class="form-row">
-                <label>📍 Chọn vị trí trên bản đồ (nhấn vào bản đồ)</label>
-                <div id="addressMapPicker" style="width: 100%; height: 300px; border-radius: 8px; border: 2px solid #e0e0e0; cursor: pointer;"></div>
-                <small style="color: #666; margin-top: 4px;">Nhấn vào bản đồ để chọn vị trí chính xác</small>
+                <label class="form-label">📍 Chọn vị trí trên bản đồ (nhấn vào bản đồ)</label>
+                <div id="addressMapPicker" class="map-picker"></div>
+                <small class="form-hint">Nhấn vào bản đồ để chọn vị trí chính xác</small>
             </div>
 
             <div class="form-row">
-                <label for="streetAddress">Địa chỉ</label>
-                <input type="text" id="streetAddress" name="streetAddress" required placeholder="Nhập địa chỉ hoặc chọn trên bản đồ" />
-                <button type="button" id="btnGeocode" class="btn btn-sm" style="margin-top: 4px;" title="Lấy địa chỉ từ tọa độ đã chọn">
-                    🔍 Lấy địa chỉ từ vị trí đã chọn
+                <div class="form-label-row">
+                    <label for="streetAddress" class="form-label">Địa chỉ</label>
+                    <button type="button" id="btnGeocode" class="btn-geocode" title="Lấy địa chỉ từ tọa độ đã chọn">
+                        <span class="btn-icon">🔍</span>
+                        <span>Lấy địa chỉ từ vị trí đã chọn</span>
                 </button>
+                </div>
+                <input type="text" id="streetAddress" name="streetAddress" required placeholder="Nhập địa chỉ hoặc chọn trên bản đồ" class="form-input" />
             </div>
 
             <div class="form-grid-2">
                 <div class="form-row">
-                    <label for="wardName">Phường/Xã</label>
-                    <input type="text" id="wardName" name="wardName" required />
+                    <label for="wardName" class="form-label">Phường/Xã</label>
+                    <input type="text" id="wardName" name="wardName" required class="form-input" placeholder="Nhập phường/xã" />
                 </div>
                 <div class="form-row">
-                    <label for="provinceName">Tỉnh/Thành</label>
-                    <input type="text" id="provinceName" name="provinceName" required />
+                    <label for="provinceName" class="form-label">Tỉnh/Thành</label>
+                    <input type="text" id="provinceName" name="provinceName" required class="form-input" placeholder="Nhập tỉnh/thành" />
                 </div>
             </div>
             <!-- Hidden field để gửi districtName (optional) -->
@@ -529,30 +532,94 @@
 
             <div class="form-grid-2">
                 <div class="form-row">
-                    <label for="recipientName">Tên người đặt</label>
-                    <input type="text" id="recipientName" name="recipientName" placeholder="Nhập tên người đặt" />
+                    <label for="recipientName" class="form-label">Tên người đặt</label>
+                    <input type="text" id="recipientName" name="recipientName" placeholder="Nhập tên người đặt" class="form-input" />
                 </div>
                 <div class="form-row">
-                    <label for="recipientPhone">Số điện thoại người đặt</label>
-                    <input type="tel" id="recipientPhone" name="recipientPhone" placeholder="Nhập số điện thoại" />
+                    <label for="recipientPhone" class="form-label">Số điện thoại người đặt</label>
+                    <input type="tel" id="recipientPhone" name="recipientPhone" placeholder="Nhập số điện thoại (VD: 0901234567)" class="form-input" />
+                    <small class="phone-error-message" id="recipientPhoneError" style="display: none; color: var(--danger); margin-top: 4px; font-size: 0.875rem;"></small>
                 </div>
             </div>
 
-            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
-                <button type="button" class="btn" onclick="closeUpsertModal()">Hủy</button>
-                <button type="submit" class="btn primary" id="btnSaveAddress">Lưu</button>
+            <div id="upsertFormError" class="validation-error" style="display: none; margin-top: 12px;"></div>
+
+            <div class="upsert-form-footer">
+                <button type="button" class="btn-upsert-cancel" onclick="closeUpsertModal()">Hủy</button>
+                <button type="submit" class="btn-upsert-save" id="btnSaveAddress">Lưu</button>
             </div>
         </form>
         <script>
-        // Validate form trước khi submit
+        // Hàm validate số điện thoại Việt Nam
+        function validateVietnamesePhone(phone) {
+          if (!phone) return true; // Cho phép để trống (optional field)
+          
+          // Loại bỏ khoảng trắng, dấu gạch ngang, dấu ngoặc
+          const cleaned = phone.replace(/[\s\-\(\)]/g, '');
+          
+          // Kiểm tra chỉ chứa số
+          if (!/^\d+$/.test(cleaned)) {
+            return false;
+          }
+          
+          // Số điện thoại Việt Nam:
+          // - 10 số: bắt đầu bằng 0 (VD: 0901234567, 0912345678)
+          // - 11 số: bắt đầu bằng 84 (VD: 84901234567)
+          // - Các đầu số hợp lệ: 03, 05, 07, 08, 09 (sau số 0)
+          
+          if (cleaned.length === 10 && cleaned.startsWith('0')) {
+            // Kiểm tra đầu số hợp lệ (03, 05, 07, 08, 09)
+            const validPrefixes = ['03', '05', '07', '08', '09'];
+            const prefix = cleaned.substring(0, 2);
+            return validPrefixes.includes(prefix);
+          } else if (cleaned.length === 11 && cleaned.startsWith('84')) {
+            // Kiểm tra đầu số hợp lệ sau khi bỏ 84 (03, 05, 07, 08, 09)
+            const validPrefixes = ['03', '05', '07', '08', '09'];
+            const prefix = cleaned.substring(2, 4);
+            return validPrefixes.includes(prefix);
+          }
+          
+          return false;
+        }
+        
+        // Validate và submit form bằng AJAX
         (function() {
           const form = document.getElementById('addressUpsertForm');
           if (!form) return;
           
-          form.addEventListener('submit', function(e) {
-            console.log('=== Form submit triggered ===');
-            console.log('Form action:', form.action);
-            console.log('Form method:', form.method);
+          // Real-time validation cho số điện thoại
+          const phoneInput = document.getElementById('recipientPhone');
+          const phoneError = document.getElementById('recipientPhoneError');
+          
+          if (phoneInput && phoneError) {
+            // Validate khi blur (rời khỏi input)
+            phoneInput.addEventListener('blur', function() {
+              const phone = this.value.trim();
+              if (phone && !validateVietnamesePhone(phone)) {
+                this.classList.add('input-error');
+                phoneError.textContent = '⚠️ Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại 10 số (bắt đầu bằng 0) hoặc 11 số (bắt đầu bằng 84)';
+                phoneError.style.display = 'block';
+              } else {
+                this.classList.remove('input-error');
+                phoneError.style.display = 'none';
+              }
+            });
+            
+            // Xóa lỗi khi bắt đầu nhập lại
+            phoneInput.addEventListener('input', function() {
+              if (this.classList.contains('input-error')) {
+                const phone = this.value.trim();
+                if (!phone || validateVietnamesePhone(phone)) {
+                  this.classList.remove('input-error');
+                  phoneError.style.display = 'none';
+                }
+              }
+            });
+          }
+          
+          form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             
             const street = document.getElementById('streetAddress')?.value.trim() || '';
             const ward = document.getElementById('wardName')?.value.trim() || '';
@@ -562,75 +629,329 @@
             const district = document.getElementById('districtName')?.value.trim() || '';
             const recipientName = document.getElementById('recipientName')?.value.trim() || '';
             const recipientPhone = document.getElementById('recipientPhone')?.value.trim() || '';
-            
-            console.log('Form values:', { street, ward, province, lat, lng, district, recipientName, recipientPhone });
+            const addressId = document.getElementById('AddressId')?.value.trim() || '';
             
             if (!street || !ward || !province) {
-              e.preventDefault();
-              e.stopPropagation();
-              alert('Vui lòng điền đầy đủ thông tin địa chỉ (Địa chỉ, Phường/Xã, Tỉnh/Thành)');
+              const errorEl = document.getElementById('upsertFormError');
+              if (errorEl) {
+                errorEl.textContent = '⚠️ Vui lòng điền đầy đủ thông tin địa chỉ (Địa chỉ, Phường/Xã, Tỉnh/Thành)';
+                errorEl.style.display = 'block';
+                errorEl.style.visibility = 'visible';
+                errorEl.style.opacity = '1';
+                // Scroll đến thông báo lỗi
+                setTimeout(() => {
+                  errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+                // Tự động ẩn sau 3 giây
+                setTimeout(() => {
+                  errorEl.style.display = 'none';
+                  errorEl.style.visibility = 'hidden';
+                  errorEl.style.opacity = '0';
+                }, 3000);
+              }
               return false;
             }
             
-            if (!lat || !lng) {
-              console.warn('Missing coordinates, but allowing submission');
-              // Không chặn nếu thiếu tọa độ, chỉ cảnh báo
+            // Validate số điện thoại nếu có nhập
+            if (recipientPhone && !validateVietnamesePhone(recipientPhone)) {
+              const phoneInput = document.getElementById('recipientPhone');
+              const phoneError = document.getElementById('recipientPhoneError');
+              if (phoneInput && phoneError) {
+                phoneInput.classList.add('input-error');
+                phoneError.textContent = '⚠️ Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại 10 số (bắt đầu bằng 0) hoặc 11 số (bắt đầu bằng 84)';
+                phoneError.style.display = 'block';
+                phoneInput.focus();
+                phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+              return false;
             }
             
-            // Nếu mọi thứ OK, form sẽ submit bình thường
-            console.log('Form validation passed, submitting...');
-            console.log('Form action URL:', form.action);
-            return true;
-          });
-          
-          // Không cần xử lý gì, để form submit tự nhiên
-          const btnSave = document.getElementById('btnSaveAddress');
-          if (btnSave) {
-            console.log('Save button found');
+            // Kiểm tra trùng lặp địa chỉ (chỉ khi tạo mới, không phải edit)
+            if (!addressId || addressId === '') {
+              // Lấy tất cả địa chỉ hiện có từ DOM
+              const existingAddresses = document.querySelectorAll('.addr-item');
+              const normalizedPhone = recipientPhone ? recipientPhone.replace(/[\s\-\(\)]/g, '') : '';
+              const normalizedName = recipientName ? recipientName.trim().toLowerCase() : '';
+              const normalizedAddress = [street, ward, district, province]
+                .filter(s => s && s.trim() !== '')
+                .map(s => s.trim().toLowerCase())
+                .join(', ');
+              
+              for (const addrItem of existingAddresses) {
+                const existingId = addrItem.getAttribute('data-id');
+                // Bỏ qua địa chỉ đang edit (nếu có)
+                if (existingId === addressId) continue;
+                
+                const existingName = (addrItem.getAttribute('data-recipientname') || '').trim().toLowerCase();
+                const existingPhone = (addrItem.getAttribute('data-recipientphone') || '').replace(/[\s\-\(\)]/g, '');
+                const existingStreet = (addrItem.getAttribute('data-street') || '').trim().toLowerCase();
+                const existingWard = (addrItem.getAttribute('data-ward') || '').trim().toLowerCase();
+                const existingDistrict = (addrItem.getAttribute('data-district') || '').trim().toLowerCase();
+                const existingProvince = (addrItem.getAttribute('data-province') || '').trim().toLowerCase();
+                
+                const existingAddress = [existingStreet, existingWard, existingDistrict, existingProvince]
+                  .filter(s => s && s !== '')
+                  .join(', ');
+                
+                // So sánh: tên, địa chỉ, số điện thoại
+                // Chỉ so sánh nếu cả hai đều có giá trị
+                const nameMatch = normalizedName && existingName && 
+                                  normalizedName === existingName;
+                const addressMatch = normalizedAddress === existingAddress;
+                const phoneMatch = normalizedPhone && existingPhone && 
+                                  normalizedPhone === existingPhone;
+                
+                // Đếm số lượng trùng khớp
+                let matchCount = 0;
+                if (nameMatch) matchCount++;
+                if (addressMatch) matchCount++;
+                if (phoneMatch) matchCount++;
+                
+                // Nếu trùng cả 3 thì không cho tạo
+                // Nếu chỉ có 2 trường được điền và trùng cả 2 thì cũng không cho tạo
+                const totalFields = (normalizedName ? 1 : 0) + 1 + (normalizedPhone ? 1 : 0); // name + address + phone
+                if (matchCount === totalFields && totalFields >= 2) {
+                  const errorEl = document.getElementById('upsertFormError');
+                  if (errorEl) {
+                    errorEl.textContent = '⚠️ Địa chỉ này đã tồn tại! Vui lòng kiểm tra lại tên, địa chỉ và số điện thoại.';
+                    errorEl.style.display = 'block';
+                    errorEl.style.visibility = 'visible';
+                    errorEl.style.opacity = '1';
+                    // Scroll đến thông báo lỗi
+                    setTimeout(() => {
+                      errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                    // Tự động ẩn sau 5 giây
+                    setTimeout(() => {
+                      errorEl.style.display = 'none';
+                      errorEl.style.visibility = 'hidden';
+                      errorEl.style.opacity = '0';
+                    }, 3000);
+                  }
+                  // Re-enable button
+                  const btnSave = document.getElementById('btnSaveAddress');
+                  if (btnSave) {
+                    btnSave.disabled = false;
+                    btnSave.textContent = 'Lưu';
+                  }
+                  return false;
+                }
+              }
+            }
+            
+            // Disable button và hiển thị loading
+            const btnSave = document.getElementById('btnSaveAddress');
+            const originalText = btnSave.textContent;
+            btnSave.disabled = true;
+            btnSave.textContent = 'Đang lưu...';
+            
+            try {
+              // Tạo FormData
+              const formData = new FormData(form);
+              
+              // Gửi AJAX request
+              const response = await fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+              });
+              
+              if (response.ok) {
+                // Parse response (có thể là JSON hoặc redirect)
+                const contentType = response.headers.get('content-type');
+                let result;
+                
+                if (contentType && contentType.includes('application/json')) {
+                  result = await response.json();
           } else {
-            console.error('Save button NOT found!');
-          }
-          
-          // Debug: Log khi form loaded
-          console.log('Address form initialized');
-          console.log('Form element:', form);
-          console.log('Save button:', btnSave);
+                  // Nếu là redirect hoặc HTML, thử parse response text
+                  const text = await response.text();
+                  // Kiểm tra xem có TempData success message không
+                  if (text.includes('ToastSuccess') || response.url) {
+                    result = { success: true };
+                  } else {
+                    throw new Error('Không thể xử lý phản hồi từ server');
+                  }
+                }
+                
+                // Reset lỗi trước khi đóng modal
+                const phoneInput = document.getElementById('recipientPhone');
+                const phoneError = document.getElementById('recipientPhoneError');
+                if (phoneInput) {
+                  phoneInput.classList.remove('input-error');
+                }
+                if (phoneError) {
+                  phoneError.style.display = 'none';
+                  phoneError.textContent = '';
+                }
+                
+                // Đóng modal
+                closeUpsertModal();
+                
+                // Cập nhật address card ngay lập tức
+                const addressParts = [street, ward, district, province].filter(s => s && s.trim() !== '');
+                const addressText = addressParts.join(', ');
+                
+                // Cập nhật hidden input
+                const hidden = document.getElementById('AddressText');
+                if (hidden) hidden.value = addressText;
+                
+                // Cập nhật UI
+                const view = document.getElementById('currentAddressText');
+                const isEmptyState = view && view.classList.contains('address-empty-state');
+                
+                if (isEmptyState) {
+                  // Thay thế empty state
+                  const addrBody = view.parentElement;
+                  view.remove();
+                  
+                  // Tạo lại structure
+                  const recipientInfo = document.getElementById('currentRecipientInfo');
+                  if (recipientInfo) {
+                    const name = recipientName || '@(Model.RecipientFullName ?? "")';
+                    const phone = recipientPhone || '@(Model.RecipientPhone ?? "")';
+                    recipientInfo.innerHTML = `<strong>${name}</strong> (${phone})`;
+                    recipientInfo.style.display = 'block';
+                  }
+                  
+                  const newAddressText = document.createElement('div');
+                  newAddressText.id = 'currentAddressText';
+                  newAddressText.textContent = addressText;
+                  if (addrBody) {
+                    addrBody.appendChild(newAddressText);
+                  }
+                } else {
+                  // Chỉ cập nhật text
+                  if (view) view.textContent = addressText;
+                  
+                  const recipientInfo = document.getElementById('currentRecipientInfo');
+                  if (recipientInfo) {
+                    const name = recipientName || '@(Model.RecipientFullName ?? "")';
+                    const phone = recipientPhone || '@(Model.RecipientPhone ?? "")';
+                    recipientInfo.innerHTML = `<strong>${name}</strong> (${phone})`;
+                    recipientInfo.style.display = 'block';
+                  }
+                }
+                
+                // Cập nhật map nếu có tọa độ
+                if (lat && lng && typeof L !== 'undefined') {
+                  let mapContainer = document.getElementById('addressMap');
+                  if (!mapContainer) {
+                    const addrBody = document.querySelector('.addr-body');
+                    if (addrBody) {
+                      mapContainer = document.createElement('div');
+                      mapContainer.id = 'addressMap';
+                      mapContainer.style.cssText = 'width: 100%; height: 250px; margin-top: 1rem; border-radius: 8px; overflow: hidden;';
+                      addrBody.appendChild(mapContainer);
+                    }
+                  }
+                  if (mapContainer && typeof L !== 'undefined' && L.map) {
+                    setTimeout(() => {
+                      if (window.existingMap) {
+                        window.existingMap.remove();
+                      }
+                      window.existingMap = L.map('addressMap').setView([parseFloat(lat), parseFloat(lng)], 15);
+                      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors'
+                      }).addTo(window.existingMap);
+                      const marker = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(window.existingMap);
+                      marker.bindPopup(addressText, {
+                          autoPan: true,
+                          autoPanPadding: [20, 20],
+                          maxWidth: 250,
+                          className: 'address-popup'
+                      }).openPopup();
+                    }, 100);
+                  }
+                }
+                
+                // Cập nhật nút
+                const btn = document.querySelector('.address-card .addr-title .btn');
+                if (btn) btn.textContent = 'Thay đổi';
+                
+                // Hiển thị thông báo thành công trong modal địa chỉ (nếu đang mở)
+                if (document.getElementById('addressModal').classList.contains('open')) {
+                  showAddressModalAlert('Địa chỉ đã được thêm thành công!', 'success');
+                  // Reload danh sách địa chỉ trong modal
+                  reloadAddressList();
+                } else {
+                  showToast('Địa chỉ đã được thêm thành công!', 'success');
+                }
+                
+              } else {
+                // Error handling
+                const errorText = await response.text();
+                const errorEl = document.getElementById('upsertFormError');
+                if (errorEl) {
+                  errorEl.textContent = '⚠️ Không thể lưu địa chỉ. Vui lòng thử lại.';
+                  errorEl.style.display = 'block';
+                  errorEl.style.visibility = 'visible';
+                  errorEl.style.opacity = '1';
+                  setTimeout(() => {
+                    errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                  setTimeout(() => {
+                    errorEl.style.display = 'none';
+                    errorEl.style.visibility = 'hidden';
+                    errorEl.style.opacity = '0';
+                  }, 3000);
+                }
+              }
+              
+            } catch (error) {
+              console.error('Lỗi khi lưu địa chỉ:', error);
+              const errorEl = document.getElementById('upsertFormError');
+              if (errorEl) {
+                errorEl.textContent = '⚠️ Có lỗi xảy ra khi lưu địa chỉ. Vui lòng thử lại.';
+                errorEl.style.display = 'block';
+                errorEl.style.visibility = 'visible';
+                errorEl.style.opacity = '1';
+                setTimeout(() => {
+                  errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+                setTimeout(() => {
+                  errorEl.style.display = 'none';
+                  errorEl.style.visibility = 'hidden';
+                  errorEl.style.opacity = '0';
+                }, 3000);
+              }
+            } finally {
+              btnSave.disabled = false;
+              btnSave.textContent = originalText;
+            }
+            
+            return false;
+          });
         })();
+        
+        // Auto-hide thông báo từ TempData đã được bỏ
+        
+        // Hàm hiển thị toast notification
+        function showToast(message, type) {
+          const toast = document.createElement('div');
+          toast.className = `custom-alert alert-${type === 'success' ? 'success' : 'danger'}`;
+          toast.setAttribute('role', 'alert');
+          toast.innerHTML = `
+            <i class="bi ${type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill'}"></i>
+            <div class="alert-content">${message}</div>
+            <button type="button" class="alert-close" onclick="const el = this.parentElement; el.style.transition = 'none'; el.remove();" aria-label="Đóng thông báo">
+              <i class="bi bi-x"></i>
+            </button>
+          `;
+          document.body.appendChild(toast);
+          
+          // Auto remove sau 2.5 giây
+          setTimeout(() => {
+            if (toast.parentElement) {
+              toast.style.transition = 'none'; // Bỏ transition để resize ngay lập tức
+              toast.remove();
+            }
+          }, 2500);
+        }
         </script>
     </div>
 </div>
 
-<style>
-/* Form grid styles */
-.form-grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-.form-row {
-    display: flex;
-    flex-direction: column;
-}
-
-.form-row label {
-    margin-bottom: 0.25rem;
-    font-weight: 500;
-    color: #333;
-}
-
-.form-row input {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-@@media (max-width: 768px) {
-    .form-grid-2 {
-        grid-template-columns: 1fr;
-    }
-}
-</style>
 
 <!-- Modal Điều khoản dịch vụ -->
 <div class="modal" id="tosModal">
@@ -641,6 +962,20 @@
         </div>
         <div id="tosModalBody" style="margin-top:12px; max-height:65vh; overflow:auto">
             <!-- Nội dung nạp qua AJAX -->
+        </div>
+    </div>
+</div>
+
+<!-- Modal Voucher -->
+<div class="modal" id="voucherModal">
+    <div class="modal-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3 style="margin:0">🏷️ Voucher của bạn</h3>
+            <button class="btn" type="button" onclick="closeVoucherModal()">✕</button>
+        </div>
+        <div id="voucherModalBody">
+            <div id="voucherModalList" class="voucher-list"></div>
+            <div class="tiny muted" style="margin-top: var(--s-4);">* Chỉ voucher còn hiệu lực và còn lượt dùng mới có thể áp dụng.</div>
         </div>
     </div>
 </div>
@@ -680,43 +1015,215 @@
         })();
 
         /* ========= Validate trước khi submit: phải có Payment + TOS + Địa chỉ ========= */
-        (function validateBeforeSubmit(){
-          const form = document.getElementById('@placeOrderFormId');
-          if(!form) return;
-
-          function allTosAccepted(){
-            const allChecks = Array.from(document.querySelectorAll('.tos-check'));
-            return allChecks.length === 0 || allChecks.every(x => x.checked);
-          }
-          function hasAddress(){
-            const v = (document.getElementById('AddressText')?.value || '').trim();
-            return v.length > 0;
-          }
-
-          form.addEventListener('submit', function(e){
-            const chosen = document.querySelector('input.pm-radio[name="SelectedPaymentCode"]:checked');
-            if(!chosen){
-              e.preventDefault();
-              alert('Vui lòng chọn phương thức thanh toán.');
-              return;
-            }
-            if(!allTosAccepted()){
-              e.preventDefault();
-              alert('Vui lòng đồng ý điều khoản của tất cả nhà cung cấp.');
-              return;
-            }
-            if(!hasAddress()){
-              e.preventDefault();
-              alert('Vui lòng chọn địa chỉ nhận hàng.');
-              return;
-            }
-            // Cho submit bình thường -> Controller PlaceOrder -> switch-case redirect
-          });
-        })();
+        // Đã được thay thế bằng validation mới ở dòng 2107 với thông báo inline
+        // Phần này đã được loại bỏ để tránh duplicate validation và alert popup
 
         /* ========= Modal chọn địa chỉ ========= */
-        function openAddressModal(){ document.getElementById('addressModal').classList.add('open'); }
-        function closeAddressModal(){ document.getElementById('addressModal').classList.remove('open'); }
+        function openAddressModal(){ 
+          document.getElementById('addressModal').classList.add('open');
+          // Ẩn thông báo khi mở modal
+          const alert = document.getElementById('addressModalAlert');
+          if (alert) {
+            alert.style.display = 'none';
+            alert.innerHTML = '';
+          }
+        }
+        function closeAddressModal(){ 
+          document.getElementById('addressModal').classList.remove('open');
+          // Ẩn thông báo khi đóng modal
+          const alert = document.getElementById('addressModalAlert');
+          if (alert) {
+            alert.style.display = 'none';
+            alert.innerHTML = '';
+          }
+        }
+        
+        /* ========= Xóa địa chỉ bằng AJAX ========= */
+        async function deleteAddress(addressId, button) {
+          // Disable button
+          button.disabled = true;
+          const originalText = button.innerHTML;
+          button.innerHTML = '⏳';
+          
+          // Lấy form và token
+          const form = document.getElementById('del-' + addressId);
+          if (!form) {
+            showAddressModalAlert('⚠️ Không tìm thấy form xóa địa chỉ', 'danger');
+            button.disabled = false;
+            button.innerHTML = originalText;
+              return;
+            }
+          
+          const formData = new FormData(form);
+          
+          try {
+            const response = await fetch(form.action, {
+              method: 'POST',
+              body: formData,
+              credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+              // Hiển thị thông báo thành công trong modal
+              showAddressModalAlert('Địa chỉ đã được xóa thành công!', 'success');
+              
+              // Xóa phần tử khỏi DOM
+              const addrItem = button.closest('.addr-item');
+              if (addrItem) {
+                addrItem.style.transition = 'opacity 0.3s';
+                addrItem.style.opacity = '0';
+                setTimeout(() => {
+                  addrItem.remove();
+                  
+                  // Kiểm tra xem còn địa chỉ nào không
+                  const addrList = document.getElementById('addressListContainer');
+                  const remainingItems = addrList.querySelectorAll('.addr-item');
+                  if (remainingItems.length === 0) {
+                    addrList.innerHTML = '<div style="padding:16px" class="muted">Bạn chưa có địa chỉ nào.</div>';
+                  }
+                }, 300);
+              }
+              
+              // Kiểm tra xem địa chỉ đang được chọn có bị xóa không
+              const currentAddressId = '@(Model.Address?.AddressId.ToString() ?? "")';
+              if (currentAddressId === addressId) {
+                // Reset address card về empty state
+                setTimeout(() => {
+                  resetAddressCard();
+                }, 500);
+              }
+              
+              // Reload danh sách địa chỉ trong modal
+              reloadAddressList();
+              
+            } else {
+              // Hiển thị thông báo lỗi trong modal
+              const errorText = await response.text();
+              showAddressModalAlert('Không thể xóa địa chỉ. Vui lòng thử lại.', 'danger');
+              button.disabled = false;
+              button.innerHTML = originalText;
+            }
+            
+          } catch (error) {
+            console.error('Lỗi khi xóa địa chỉ:', error);
+            showAddressModalAlert('Có lỗi xảy ra khi xóa địa chỉ. Vui lòng thử lại.', 'danger');
+            button.disabled = false;
+            button.innerHTML = originalText;
+          }
+        }
+        
+        /* ========= Hiển thị thông báo trong modal địa chỉ ========= */
+        function showAddressModalAlert(message, type) {
+          const alertDiv = document.getElementById('addressModalAlert');
+          if (!alertDiv) return;
+          
+          alertDiv.className = `custom-alert alert-${type === 'success' ? 'success' : 'danger'}`;
+          alertDiv.innerHTML = `
+            <i class="bi ${type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-circle-fill'}"></i>
+            <div class="alert-content">${message}</div>
+            <button type="button" class="alert-close" onclick="const el = this.parentElement; el.style.transition = 'none'; el.style.display = 'none'; el.innerHTML = '';" aria-label="Đóng thông báo">
+              <i class="bi bi-x"></i>
+            </button>
+          `;
+          alertDiv.style.display = 'flex';
+          
+          // Auto hide sau 2.5 giây - ẩn ngay lập tức không có transition
+          setTimeout(() => {
+            if (alertDiv.style.display !== 'none') {
+              alertDiv.style.transition = 'none'; // Bỏ transition để resize ngay lập tức
+              alertDiv.style.display = 'none';
+              alertDiv.innerHTML = '';
+            }
+          }, 2500);
+        }
+        
+        /* ========= Reload danh sách địa chỉ trong modal ========= */
+        async function reloadAddressList() {
+          try {
+            // Fetch lại trang để lấy danh sách địa chỉ mới
+            const response = await fetch(window.location.href, {
+              method: 'GET',
+              credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+              const html = await response.text();
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(html, 'text/html');
+              
+              // Lấy danh sách địa chỉ mới từ response
+              const newAddrList = doc.querySelector('.addr-list');
+              const newForms = doc.querySelectorAll('form[id^="del-"]');
+              
+              if (newAddrList) {
+                const container = document.getElementById('addressListContainer');
+                if (container) {
+                  container.innerHTML = newAddrList.innerHTML;
+                }
+              }
+              
+              // Cập nhật các form xóa
+              const oldForms = document.querySelectorAll('form[id^="del-"]');
+              oldForms.forEach(form => form.remove());
+              
+              newForms.forEach(form => {
+                document.body.appendChild(form);
+              });
+            }
+          } catch (error) {
+            console.error('Lỗi khi reload danh sách địa chỉ:', error);
+          }
+        }
+        
+        /* ========= Reset address card về empty state ========= */
+        function resetAddressCard() {
+          const view = document.getElementById('currentAddressText');
+          const recipientInfo = document.getElementById('currentRecipientInfo');
+          const hidden = document.getElementById('AddressText');
+          const mapContainer = document.getElementById('addressMap');
+          
+          // Reset hidden input
+          if (hidden) hidden.value = '';
+          
+          // Thay thế nội dung bằng empty state
+          if (view) {
+            const addrBody = view.parentElement;
+            view.remove();
+            
+            const emptyState = document.createElement('div');
+            emptyState.id = 'currentAddressText';
+            emptyState.className = 'address-empty-state';
+            emptyState.innerHTML = `
+              <div class="empty-state-icon">
+                <i class="bi bi-geo-alt"></i>
+              </div>
+              <p class="empty-state-title">Bạn chưa chọn địa chỉ nhận hàng</p>
+              <p class="empty-state-desc">Vui lòng chọn địa chỉ để tiếp tục đặt dịch vụ</p>
+            `;
+            if (addrBody) {
+              addrBody.appendChild(emptyState);
+            }
+          }
+          
+          // Ẩn recipient info
+          if (recipientInfo) {
+            recipientInfo.style.display = 'none';
+            recipientInfo.innerHTML = '';
+          }
+          
+          // Xóa map
+          if (mapContainer) {
+            if (window.existingMap) {
+              window.existingMap.remove();
+              window.existingMap = null;
+            }
+            mapContainer.remove();
+          }
+          
+          // Cập nhật nút
+          const btn = document.querySelector('.address-card .addr-title .btn');
+          if (btn) btn.textContent = 'Chọn địa chỉ';
+        }
 
         /* ✅ Áp địa chỉ đang chọn trong modal vào hidden + UI */
         function applySelectedAddress(){
@@ -731,7 +1238,34 @@
           const hidden = document.getElementById('AddressText');
           const view = document.getElementById('currentAddressText');
           if(hidden) hidden.value = text;
-          if(view) view.textContent = text;
+          
+          // Kiểm tra xem đang ở empty state hay không
+          const isEmptyState = view && view.classList.contains('address-empty-state');
+          
+          if(view) {
+            if(isEmptyState) {
+              // Thay thế empty state bằng nội dung địa chỉ đơn giản
+              const addrBody = view.parentElement; // .addr-body
+              view.remove(); // Xóa empty state
+              
+              // Tạo lại structure đúng
+              const recipientInfo = document.getElementById('currentRecipientInfo');
+              if(recipientInfo) {
+                recipientInfo.style.display = 'block';
+              }
+              
+              // Tạo div address text mới
+              const newAddressText = document.createElement('div');
+              newAddressText.id = 'currentAddressText';
+              newAddressText.textContent = text;
+              if(addrBody) {
+                addrBody.appendChild(newAddressText);
+              }
+            } else {
+              // Chỉ cập nhật text nếu đã có structure
+              view.textContent = text;
+            }
+          }
           
           // Cập nhật tên và số điện thoại người đặt
           const recipientInfo = document.getElementById('currentRecipientInfo');
@@ -747,7 +1281,53 @@
             const name = recipientName || defaultName;
             const phone = recipientPhone || defaultPhone;
             recipientInfo.innerHTML = `<strong>${name}</strong> (${phone})`;
+            recipientInfo.style.display = 'block';
           }
+          
+          // Cập nhật map nếu có tọa độ
+          const lat = row.dataset.latitude || '';
+          const lng = row.dataset.longitude || '';
+          if(lat && lng) {
+            // Kiểm tra map container
+            let mapContainer = document.getElementById('addressMap');
+            if(!mapContainer) {
+              // Tạo map container nếu chưa có
+              const addrBody = document.querySelector('.addr-body');
+              if(addrBody) {
+                mapContainer = document.createElement('div');
+                mapContainer.id = 'addressMap';
+                mapContainer.style.cssText = 'width: 100%; height: 250px; margin-top: 1rem; border-radius: 8px; overflow: hidden;';
+                addrBody.appendChild(mapContainer);
+              }
+            }
+            // Khởi tạo map với tọa độ mới
+            if(mapContainer && typeof L !== 'undefined') {
+              setTimeout(() => {
+                if(typeof L !== 'undefined' && L.map) {
+                  // Destroy old map if exists
+                  if(window.existingMap) {
+                    window.existingMap.remove();
+                  }
+                  // Create new map
+                  window.existingMap = L.map('addressMap').setView([parseFloat(lat), parseFloat(lng)], 15);
+                  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                  }).addTo(window.existingMap);
+                  const marker = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(window.existingMap);
+                  marker.bindPopup(text, {
+                      autoPan: true,
+                      autoPanPadding: [20, 20],
+                      maxWidth: 250,
+                      className: 'address-popup'
+                  }).openPopup();
+                }
+              }, 100);
+            }
+          }
+          
+          // Cập nhật nút "Thay đổi"
+          const btn = document.querySelector('.address-card .addr-title .btn');
+          if(btn) btn.textContent = 'Thay đổi';
           
           closeAddressModal();
         }
@@ -766,6 +1346,26 @@
           document.getElementById('recipientPhone').value = '';
           document.getElementById('Latitude').value = '';
           document.getElementById('Longitude').value = '';
+          
+          // Reset thông báo lỗi
+          const formError = document.getElementById('upsertFormError');
+          if (formError) {
+            formError.style.display = 'none';
+            formError.style.visibility = 'hidden';
+            formError.style.opacity = '0';
+            formError.textContent = '';
+          }
+          
+          // Reset lỗi số điện thoại
+          const phoneInput = document.getElementById('recipientPhone');
+          const phoneError = document.getElementById('recipientPhoneError');
+          if (phoneInput) {
+            phoneInput.classList.remove('input-error');
+          }
+          if (phoneError) {
+            phoneError.style.display = 'none';
+            phoneError.textContent = '';
+          }
           
           // Khởi tạo bản đồ cho modal
           setTimeout(() => {
@@ -822,20 +1422,47 @@
         }
         
         // Nút "Lấy địa chỉ từ vị trí đã chọn" - Reverse Geocoding
-        document.addEventListener('click', function(e) {
-          if (e.target && e.target.id === 'btnGeocode') {
-            const lat = document.getElementById('Latitude').value;
-            const lng = document.getElementById('Longitude').value;
+        // Sử dụng event delegation tốt hơn và immediate feedback
+        const btnGeocode = document.getElementById('btnGeocode');
+        if (btnGeocode) {
+          btnGeocode.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             
-            if (!lat || !lng) {
-              alert('Vui lòng chọn vị trí trên bản đồ trước');
+            // Kiểm tra nếu đang loading thì không làm gì
+            if (this.disabled || this.classList.contains('loading')) {
               return;
             }
             
-            // Hiển thị loading
-            const btn = e.target;
+            const lat = document.getElementById('Latitude')?.value;
+            const lng = document.getElementById('Longitude')?.value;
+            
+            if (!lat || !lng) {
+              const errorEl = document.getElementById('upsertFormError');
+              if (errorEl) {
+                errorEl.textContent = '⚠️ Vui lòng chọn vị trí trên bản đồ trước';
+                errorEl.style.display = 'block';
+                errorEl.style.visibility = 'visible';
+                errorEl.style.opacity = '1';
+                setTimeout(() => {
+                  errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+                setTimeout(() => {
+                  errorEl.style.display = 'none';
+                  errorEl.style.visibility = 'hidden';
+                  errorEl.style.opacity = '0';
+                }, 3000);
+              }
+              return;
+            }
+            
+            // Immediate feedback - disable và loading state ngay lập tức
+            const btn = this;
+            const originalText = btn.innerHTML;
             btn.disabled = true;
-            btn.textContent = 'Đang tải...';
+            btn.classList.add('loading');
+            btn.style.pointerEvents = 'none';
+            btn.innerHTML = '<span class="btn-icon">⏳</span><span>Đang tải...</span>';
             
             // Gọi API Nominatim để lấy địa chỉ từ tọa độ
             fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=vi`)
@@ -916,24 +1543,77 @@
                   
                   console.log('Final mapped:', { street, ward, district, province });
                   
+                  // Reset button state
                   btn.disabled = false;
-                  btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
+                  btn.classList.remove('loading');
+                  btn.style.pointerEvents = '';
+                  btn.innerHTML = originalText;
                   
                   if (!ward && !district && !province) {
-                    alert('Không thể tự động điền. Vui lòng kiểm tra console (F12) để xem dữ liệu từ API.');
+                    const errorEl = document.getElementById('upsertFormError');
+                    if (errorEl) {
+                      errorEl.textContent = '⚠️ Không thể tự động điền. Vui lòng nhập thủ công.';
+                      errorEl.style.display = 'block';
+                      errorEl.style.visibility = 'visible';
+                      errorEl.style.opacity = '1';
+                      setTimeout(() => {
+                        errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 100);
+                      setTimeout(() => {
+                        errorEl.style.display = 'none';
+                        errorEl.style.visibility = 'hidden';
+                        errorEl.style.opacity = '0';
+                      }, 3000);
+                    }
                   }
                 } else {
-                  alert('Không tìm thấy địa chỉ tại vị trí này. Vui lòng thử lại.');
+                  const errorEl = document.getElementById('upsertFormError');
+                  if (errorEl) {
+                    errorEl.textContent = '⚠️ Không tìm thấy địa chỉ tại vị trí này. Vui lòng thử lại.';
+                    errorEl.style.display = 'block';
+                    errorEl.style.visibility = 'visible';
+                    errorEl.style.opacity = '1';
+                    setTimeout(() => {
+                      errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                    setTimeout(() => {
+                      errorEl.style.display = 'none';
+                      errorEl.style.visibility = 'hidden';
+                      errorEl.style.opacity = '0';
+                    }, 3000);
+                  }
+                  // Reset button state
+                  btn.disabled = false;
+                  btn.classList.remove('loading');
+                  btn.style.pointerEvents = '';
+                  btn.innerHTML = originalText;
                 }
               })
               .catch(error => {
                 console.error('Geocoding error:', error);
-                alert('Không thể lấy địa chỉ từ vị trí đã chọn');
+                const errorEl = document.getElementById('upsertFormError');
+                if (errorEl) {
+                  errorEl.textContent = '⚠️ Không thể lấy địa chỉ từ vị trí đã chọn';
+                  errorEl.style.display = 'block';
+                  errorEl.style.visibility = 'visible';
+                  errorEl.style.opacity = '1';
+                  setTimeout(() => {
+                    errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                  setTimeout(() => {
+                    errorEl.style.display = 'none';
+                    errorEl.style.visibility = 'hidden';
+                    errorEl.style.opacity = '0';
+                  }, 3000);
+                }
+                // Reset button state
                 btn.disabled = false;
-                btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
+                btn.classList.remove('loading');
+                btn.style.pointerEvents = '';
+                btn.innerHTML = originalText;
               });
-          }
-        });
+          });
+        }
         function openEditAddressForm(btn){
           const row = btn.closest('.addr-item');
           console.log('=== openEditAddressForm called ===');
@@ -964,6 +1644,26 @@
           document.getElementById('Latitude').value = lat;
           document.getElementById('Longitude').value = lng;
           
+          // Reset thông báo lỗi
+          const formError = document.getElementById('upsertFormError');
+          if (formError) {
+            formError.style.display = 'none';
+            formError.style.visibility = 'hidden';
+            formError.style.opacity = '0';
+            formError.textContent = '';
+          }
+          
+          // Reset lỗi số điện thoại
+          const phoneInput = document.getElementById('recipientPhone');
+          const phoneError = document.getElementById('recipientPhoneError');
+          if (phoneInput) {
+            phoneInput.classList.remove('input-error');
+          }
+          if (phoneError) {
+            phoneError.style.display = 'none';
+            phoneError.textContent = '';
+          }
+          
           // Mở modal và khởi tạo bản đồ với tọa độ (nếu có)
           document.getElementById('addressUpsertModal').classList.add('open');
           
@@ -981,7 +1681,30 @@
             }
           }, 300);
         }
-        function closeUpsertModal(){ document.getElementById('addressUpsertModal').classList.remove('open'); }
+            function closeUpsertModal(){ 
+              const modal = document.getElementById('addressUpsertModal');
+              if (modal) modal.classList.remove('open');
+              
+              // Reset lỗi số điện thoại
+              const phoneInput = document.getElementById('recipientPhone');
+              const phoneError = document.getElementById('recipientPhoneError');
+              if (phoneInput) {
+                phoneInput.classList.remove('input-error');
+              }
+              if (phoneError) {
+                phoneError.style.display = 'none';
+                phoneError.textContent = '';
+              }
+              
+              // Reset lỗi form
+              const formError = document.getElementById('upsertFormError');
+              if (formError) {
+                formError.style.display = 'none';
+                formError.style.visibility = 'hidden';
+                formError.style.opacity = '0';
+                formError.textContent = '';
+              }
+            }
 
         /* ========= Lock submit button nhỏ ========= */
         function lockBtn(form){
@@ -1024,7 +1747,8 @@
           const panel   = document.getElementById('opt_voucher');
           const btnOpen = document.getElementById('btnOpenVoucher');
           const btnClose= document.getElementById('btnCloseVoucher');
-          const listEl  = document.getElementById('voucherList');
+          // Sử dụng voucherModalList trong modal thay vì voucherList trong panel cũ
+          const listEl  = document.getElementById('voucherModalList') || document.getElementById('voucherList');
           const voucherIdInput = document.getElementById('voucherId');
           const voucherHint = document.getElementById('voucherHint');
 
@@ -1107,7 +1831,7 @@
           async function fetchVouchers(){
             try{
               const res = await fetch('@Url.Action("GetCartVouchers", "BookingService", new { area = "Customer" })', { credentials: 'same-origin' });
-              if(!res.ok) throw new Error('Fetch vouchers failed');
+              if(!res.ok) throw new Error('Không thể tải danh sách voucher');
               const data = await res.json();
               return Array.isArray(data) ? data : (data?.data ?? []);
             }catch(e){
@@ -1117,19 +1841,84 @@
           }
 
           async function openPanel(){
-            btnOpen.setAttribute('aria-expanded','true');
-            panel.hidden = false;
-            panel.classList.add('open');
+            // Mở modal thay vì panel
+            const modal = document.getElementById('voucherModal');
+            if (modal) {
+              modal.classList.add('open');
+              // Đảm bảo render vào modal list
+              const modalListEl = document.getElementById('voucherModalList');
+              if (modalListEl) {
+                // Tạm thời override listEl để render vào modal
+                const originalListEl = listEl;
+                // Sử dụng modalListEl thay vì listEl
+                if(VOUCHERS === null){
+                  VOUCHERS = await fetchVouchers();
+                }
+                // Render trực tiếp vào modalListEl
+                renderListToElement(VOUCHERS, modalListEl);
+              } else {
+                // Fallback: sử dụng listEl cũ
             if(VOUCHERS === null){
               VOUCHERS = await fetchVouchers();
               renderList(VOUCHERS);
             }
+              }
+            }
+            btnOpen.setAttribute('aria-expanded','true');
+          }
+          
+          // Hàm helper để render vào element cụ thể
+          function renderListToElement(vouchers, targetEl){
+            if (!targetEl) return;
+            targetEl.innerHTML = '';
+            const arr = (vouchers||[]).map(normalizeVoucher);
+            if(arr.length === 0){
+              targetEl.innerHTML = `<div class="muted">Bạn chưa có voucher nào phù hợp.</div>`;
+              return;
+            }
+            arr.forEach(v => {
+              const usable = canUse(v);
+              const end = v.EndDate ? new Date(v.EndDate).toLocaleDateString('vi-VN') : null;
+              const remain = v.RemainingUses ?? ((v.UsageLimit ?? null) && isFinite(v.UsageLimit) ? (v.UsageLimit - (v.UsedCount||0)) : null);
+
+              const item = document.createElement('div');
+              item.className = 'voucher-item';
+              item.innerHTML = `
+                <div class="left">
+                  <div class="title">
+                    ${v.Code || '(Không có mã)'}
+                    <span class="badge ${usable?'ok':(v.IsExpired?'danger':'warn')}">
+                      ${usable ? 'Dùng được' : (v.IsExpired ? 'Hết hạn' : 'Chưa đến hạn / đã hết lượt')}
+                    </span>
+                  </div>
+                  <div class="desc">${v.Description || 'Không có mô tả'}</div>
+                  <div class="meta">
+                    Giảm ${v.DiscountPercent}%${v.DiscountMaxAmount?` • Tối đa ${VND(v.DiscountMaxAmount)}`:''}
+                    ${end?` • HSD: ${end}`:''}
+                    ${remain!=null?` • Còn lượt: ${remain}`:''}
+                  </div>
+                </div>
+                <div class="right">
+                  <button class="apply"${usable?'':' disabled'}>Áp dụng</button>
+                </div>
+              `;
+              item.querySelector('.apply')?.addEventListener('click', () => applyVoucher(v));
+              targetEl.appendChild(item);
+            });
           }
           function closePanel(){
+            // Đóng modal
+            const modal = document.getElementById('voucherModal');
+            if (modal) {
+              modal.classList.remove('open');
+            }
             btnOpen.setAttribute('aria-expanded','false');
-            panel.classList.remove('open');
-            panel.hidden = true;
           }
+          
+          // Hàm đóng modal voucher (gọi từ nút X) - đưa ra global scope
+          window.closeVoucherModal = function(){
+            closePanel();
+          };
 
           function renderList(vouchers){
             listEl.innerHTML = '';
@@ -1263,7 +2052,7 @@
                   };
                 }
               } catch (e) {
-                console.error('Failed to load voucher details:', e);
+                console.error('Không thể tải chi tiết voucher:', e);
                 // Fallback
                 CURRENT_VOUCHER = { 
                   VoucherId: firstId, 
@@ -1309,11 +2098,8 @@
           updatePlaceOrderButtonState();
         }
         function updatePlaceOrderButtonState(){
-          const submitBtn = document.querySelector('#@placeOrderFormId button[type="submit"]');
-          if(!submitBtn) return;
-          const allChecks = Array.from(document.querySelectorAll('.tos-check'));
-          const allOk = allChecks.every(x => x.checked);
-          submitBtn.disabled = !allOk;
+          // Bỏ disabled state - không làm mờ nút nữa
+          // Validation sẽ được thực hiện khi submit
         }
         document.addEventListener('DOMContentLoaded', updatePlaceOrderButtonState);
 
@@ -1368,8 +2154,10 @@
 
             // Show loading state
             errorDiv.style.display = 'block';
-            errorDiv.textContent = 'Đang kiểm tra...';
-            errorDiv.style.color = '#666';
+            errorDiv.textContent = '⏳ Đang kiểm tra tính khả dụng...';
+            errorDiv.style.borderLeftColor = '#0ea5e9';
+            errorDiv.style.background = 'linear-gradient(135deg, color-mix(in oklab, #0ea5e9 12%, transparent), color-mix(in oklab, #0ea5e9 8%, transparent))';
+            errorDiv.style.color = '#0284c7';
 
             try {
                 const url = `${API_BASE_URL}/ProviderAvailability/${providerId}?date=${date}&time=${time}`;
@@ -1401,8 +2189,11 @@
                     }
                     console.error('API Error:', response.status, errorMessage);
                     errorDiv.style.display = 'block';
-                    errorDiv.style.color = '#d00';
-                    errorDiv.textContent = errorMessage;
+                    errorDiv.textContent = `❌ ${errorMessage}`;
+                    // Reset loading styles and apply error styles
+                    errorDiv.style.borderLeftColor = '';
+                    errorDiv.style.background = '';
+                    errorDiv.style.color = '';
                     input.classList.add('booking-input-error');
                     bookingTimeValidations.set(index, false);
                     return false;
@@ -1440,7 +2231,6 @@
                     } else {
                         // Show error with reason
                         errorDiv.style.display = 'block';
-                        errorDiv.style.color = '#d00';
                         errorDiv.textContent = unavailableReason || 'Không thể đặt dịch vụ vào thời gian này';
                         input.classList.add('booking-input-error');
                         bookingTimeValidations.set(index, false);
@@ -1451,7 +2241,6 @@
                     console.warn('API returned false or no data:', result);
                     console.warn('isSuccess:', isSuccess, 'data:', data);
                     errorDiv.style.display = 'block';
-                    errorDiv.style.color = '#d00';
                     const errorMsg = result.Message || result.message || result.Detail || result.detail || 'Không thể kiểm tra tính khả dụng';
                     errorDiv.textContent = errorMsg;
                     input.classList.add('booking-input-error');
@@ -1466,7 +2255,6 @@
                     stack: error.stack
                 });
                 errorDiv.style.display = 'block';
-                errorDiv.style.color = '#d00';
                 errorDiv.textContent = `Lỗi khi kiểm tra tính khả dụng: ${error.message || 'Vui lòng thử lại'}`;
                 input.classList.add('booking-input-error');
                 bookingTimeValidations.set(index, false);
@@ -1509,26 +2297,189 @@
             const placeOrderForm = document.getElementById('@placeOrderFormId');
             if (placeOrderForm) {
                 placeOrderForm.addEventListener('submit', async function(e) {
-                    // Wait for all validations to complete
-                    const validationPromises = [];
+                    e.preventDefault();
+                    
+                    // Hàm hiển thị thông báo lỗi
+                    function showValidationError(elementId, message) {
+                        const errorEl = document.getElementById(elementId);
+                        if (errorEl) {
+                            errorEl.textContent = '⚠️ ' + message;
+                            errorEl.style.display = 'block';
+                            // Tự động ẩn sau 5 giây
+                            setTimeout(() => {
+                                errorEl.style.display = 'none';
+                            }, 3000);
+                        }
+                    }
+                    
+                    // Hàm ẩn tất cả thông báo lỗi
+                    function hideAllValidationErrors() {
+                        document.querySelectorAll('.validation-error').forEach(el => {
+                            el.style.display = 'none';
+                        });
+                    }
+                    
+                    // Hàm highlight section
+                    function highlightSection(section, duration = 3000) {
+                        if (section) {
+                            section.style.border = '2px solid #ef4444';
+                            section.style.boxShadow = '0 0 0 4px color-mix(in oklab, #ef4444 20%, transparent)';
+                            setTimeout(() => {
+                                section.style.border = '';
+                                section.style.boxShadow = '';
+                            }, duration);
+                        }
+                    }
+                    
+                    // Ẩn tất cả lỗi cũ trước khi validate
+                    hideAllValidationErrors();
+                    
+                    // Mảng lưu tất cả các lỗi
+                    const errors = [];
+                    let firstErrorElement = null;
+                    
+                    // 1. Kiểm tra địa chỉ
+                    const addressCard = document.getElementById('addressCardSection');
+                    const currentAddressText = document.getElementById('currentAddressText');
+                    const addressText = document.getElementById('AddressText')?.value?.trim() || '';
+                    const hasAddressDisplay = currentAddressText && !currentAddressText.classList.contains('address-empty-state');
+                    const hasAddressValue = addressText && addressText.length > 5 && addressText !== '0' && addressText !== '...';
+                    
+                    if (!hasAddressDisplay || !hasAddressValue) {
+                        errors.push({
+                            type: 'address',
+                            element: addressCard,
+                            errorId: 'addressError',
+                            message: 'Vui lòng chọn địa chỉ đặt dịch vụ để tiếp tục.'
+                        });
+                        if (!firstErrorElement) firstErrorElement = addressCard;
+                    }
+                    
+                    // 2. Kiểm tra phương thức thanh toán
+                    const selectedPayment = document.querySelector('input.pm-radio[name="SelectedPaymentCode"]:checked');
+                    if (!selectedPayment) {
+                        errors.push({
+                            type: 'payment',
+                            element: document.getElementById('paymentSection'),
+                            errorId: 'paymentError',
+                            message: 'Vui lòng chọn phương thức thanh toán.'
+                        });
+                        if (!firstErrorElement) firstErrorElement = document.getElementById('paymentSection');
+                    }
+                    
+                    // 3. Kiểm tra điều khoản dịch vụ
+                    const allTosChecks = Array.from(document.querySelectorAll('.tos-check'));
+                    const uncheckedTos = allTosChecks.filter(x => !x.checked);
+                    if (uncheckedTos.length > 0) {
+                        uncheckedTos.forEach(unchecked => {
+                            const providerId = unchecked.getAttribute('data-provider-id');
+                            errors.push({
+                                type: 'tos',
+                                element: unchecked.closest('.shop-block'),
+                                errorId: `tos-error-${providerId}`,
+                                message: 'Vui lòng đồng ý điều khoản dịch vụ của nhà cung cấp này.',
+                                providerId: providerId
+                            });
+                            if (!firstErrorElement) firstErrorElement = unchecked.closest('.shop-block');
+                        });
+                    }
+                    
+                    // 4. Kiểm tra thời gian đặt dịch vụ
                     const inputs = document.querySelectorAll('input[type="datetime-local"].booking-input');
+                    const validationPromises = [];
+                    const inputIndexMap = new Map(); // Map để track index của input trong results
                     
                     for (let i = 0; i < inputs.length; i++) {
                         const input = inputs[i];
                         const index = parseInt(input.id.replace('booking-time-', ''));
-                        if (!isNaN(index) && input.value) {
+                        
+                        // Kiểm tra nếu chưa chọn thời gian
+                        if (!input.value) {
+                            errors.push({
+                                type: 'bookingTime',
+                                element: input.closest('.booking-time') || input,
+                                errorId: `booking-time-error-${index}`,
+                                message: 'Vui lòng chọn thời gian thực hiện dịch vụ.'
+                            });
+                            if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
+                        } else if (!isNaN(index)) {
+                            // Validate thời gian đã chọn
+                            const promiseIndex = validationPromises.length;
+                            inputIndexMap.set(promiseIndex, { input, index });
                             validationPromises.push(validateBookingTime(input, index));
                         }
                     }
                     
+                    // Chờ tất cả validation hoàn thành
                     const results = await Promise.all(validationPromises);
-                    const allValid = results.every(r => r === true);
                     
-                    if (!allValid) {
-                        e.preventDefault();
-                        alert('Vui lòng kiểm tra lại thời gian đặt dịch vụ. Có một số thời gian không khả dụng.');
+                    // Kiểm tra kết quả validation
+                    results.forEach((result, promiseIndex) => {
+                        if (result !== true) {
+                            const { input, index } = inputIndexMap.get(promiseIndex);
+                            const errorDiv = document.getElementById(`booking-time-error-${index}`);
+                            // Kiểm tra xem error đã được hiển thị chưa (từ validateBookingTime)
+                            if (errorDiv && errorDiv.style.display !== 'none') {
+                                errors.push({
+                                    type: 'bookingTime',
+                                    element: input.closest('.booking-time') || input,
+                                    errorId: `booking-time-error-${index}`,
+                                    message: errorDiv.textContent || 'Thời gian đặt dịch vụ không hợp lệ.'
+                                });
+                                if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
+                            }
+                        }
+                    });
+                    
+                    // Hiển thị tất cả các lỗi cùng lúc
+                    if (errors.length > 0) {
+                        errors.forEach(error => {
+                            if (error.type === 'tos') {
+                                // TOS error sử dụng class selector
+                                const tosError = document.querySelector(`.tos-error[data-provider-id="${error.providerId}"]`);
+                                if (tosError) {
+                                    tosError.textContent = '⚠️ ' + error.message;
+                                    tosError.style.display = 'block';
+                                    setTimeout(() => {
+                                        tosError.style.display = 'none';
+                                    }, 3000);
+                                }
+                            } else if (error.type === 'bookingTime') {
+                                // Booking time error - hiển thị trong error div
+                                const errorDiv = document.getElementById(error.errorId);
+                                if (errorDiv) {
+                                    errorDiv.textContent = '⚠️ ' + error.message;
+                                    errorDiv.style.display = 'block';
+                                    setTimeout(() => {
+                                        errorDiv.style.display = 'none';
+                                    }, 3000);
+                                }
+                            } else {
+                                // Các lỗi khác sử dụng ID
+                                showValidationError(error.errorId, error.message);
+                            }
+                            
+                            // Highlight section
+                            if (error.element) {
+                                highlightSection(error.element);
+                            }
+                        });
+                        
+                        // Scroll đến lỗi đầu tiên
+                        if (firstErrorElement) {
+                            firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            // Focus vào input nếu có
+                            const input = firstErrorElement.querySelector('input, select, textarea');
+                            if (input) {
+                                setTimeout(() => input.focus(), 300);
+                            }
+                        }
+                        
                         return false;
                     }
+                    
+                    // Tất cả validation đều pass - submit form
+                    placeOrderForm.submit();
                 });
             }
         });

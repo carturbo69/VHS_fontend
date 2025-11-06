@@ -1,3 +1,6 @@
+@using VHS_frontend.Helpers
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
 
 @model VHS_frontend.Areas.Customer.Models.Profile.ProfileViewModel
 @{
@@ -9,13 +12,16 @@
     <link rel="stylesheet" href="~/css/profile.css" asp-append-version="true" />
 }
 
+<!-- Toast Container -->
+<div class="profile-toast-container" id="profileToastContainer"></div>
+
 <div class="profile-container">
     <!-- Header Section -->
     <div class="profile-header">
         <div class="profile-avatar-section">
             <div class="avatar-container @(Model.HasProfileImage ? "has-image" : "no-image")">
                 <img id="profileAvatar" 
-                     src="@Model.GetProfileImageUrl()" 
+                     src="@ImageHelper.GetImageUrl(Model.GetProfileImageUrl(), Configuration)" 
                      alt="@Model.GetDisplayName()" 
                      class="profile-avatar" />
                 <div class="avatar-overlay">
@@ -196,8 +202,8 @@
                     <i class="bi bi-calendar-check"></i>
                 </div>
                 <div class="stat-info">
-                    <span class="stat-value">0</span>
-                    <span class="stat-label">Đơn hàng đã đặt</span>
+                    <span class="stat-value">@Model.CompletedOrdersCount</span>
+                    <span class="stat-label">Đơn hàng đã hoàn thành</span>
                 </div>
             </div>
             <div class="stat-item">
@@ -205,7 +211,7 @@
                     <i class="bi bi-star"></i>
                 </div>
                 <div class="stat-info">
-                    <span class="stat-value">0</span>
+                    <span class="stat-value">@Model.ReviewsCount</span>
                     <span class="stat-label">Đánh giá đã viết</span>
                 </div>
             </div>
@@ -332,7 +338,7 @@
                             <label class="form-label">Mật khẩu mới</label>
                             <input type="password" class="form-control" name="NewPassword" 
                                    pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
-                                   title="Phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số" required />
+                               required />
                             <small class="text-muted">Tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường và số</small>
                         </div>
 
@@ -411,11 +417,19 @@
     </div>
 
 @section Scripts {
+    <script src="~/js/image-helper.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         $(document).ready(function() {
             console.log('Profile page script loaded');
+            
+            // Xóa tất cả tooltip (title attribute)
+            $('[title]').removeAttr('title');
+            
+            // Xóa tooltip từ Bootstrap nếu có
+            $('[data-bs-toggle="tooltip"]').removeAttr('data-bs-toggle').removeAttr('data-bs-title');
+            $('[data-toggle="tooltip"]').removeAttr('data-toggle').removeAttr('title');
             
             // Make functions global
             window.openImageUpload = function() {
@@ -430,8 +444,6 @@
             };
 
             window.deleteProfileImage = async function() {
-                if (!confirm('Bạn có chắc chắn muốn xóa ảnh đại diện?')) return;
-                
                 try {
                     const response = await fetch('@Url.Action("DeleteImage")', {
                         method: 'POST',
@@ -443,7 +455,7 @@
                     
                     const result = await response.json();
                     if (result.success) {
-                        alert('Xóa ảnh thành công!');
+                        showToast('Xóa ảnh thành công!', 'success');
                         document.getElementById('profileAvatar').src = '/images/default-avatar.png';
                         
                         // Update avatar container class
@@ -462,10 +474,10 @@
                         // Update percentage
                         updateCompletionPercentage();
                     } else {
-                        alert(result.message || 'Có lỗi xảy ra khi xóa ảnh');
+                        showToast(result.message || 'Có lỗi xảy ra khi xóa ảnh', 'error');
                     }
                 } catch (error) {
-                    alert('Có lỗi xảy ra khi xóa ảnh');
+                    showToast('Có lỗi xảy ra khi xóa ảnh', 'error');
                 }
             };
 
@@ -474,18 +486,18 @@
                 const file = fileInput.files[0];
                 
                 if (!file) {
-                    alert('Vui lòng chọn ảnh để tải lên');
+                    showToast('Vui lòng chọn ảnh để tải lên', 'error');
                     return;
                 }
 
                 if (file.size > 5 * 1024 * 1024) {
-                    alert('Kích thước file không được vượt quá 5MB');
+                    showToast('Kích thước file không được vượt quá 5MB', 'error');
                     return;
                 }
 
                 const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
                 if (!allowedTypes.includes(file.type)) {
-                    alert('Chỉ chấp nhận file ảnh JPG, PNG, GIF, BMP, WEBP');
+                    showToast('Chỉ chấp nhận file ảnh JPG, PNG, GIF, BMP, WEBP', 'error');
                     return;
                 }
 
@@ -503,12 +515,17 @@
                     
                     const result = await response.json();
                     if (result.success) {
-                        alert('Tải ảnh lên thành công!');
+                        showToast('Tải ảnh lên thành công!', 'success');
                         // Thêm backend URL nếu imageUrl là đường dẫn tương đối
                         let fullImageUrl = result.imageUrl;
                         if (fullImageUrl && !fullImageUrl.startsWith('http://') && !fullImageUrl.startsWith('https://')) {
                             fullImageUrl = 'http://localhost:5154' + fullImageUrl;
                         }
+                        alert('Tải ảnh lên thành công!');
+                        // Dùng helper function để lấy URL đầy đủ
+                        let fullImageUrl = typeof getImageUrl !== 'undefined' 
+                            ? getImageUrl(result.imageUrl) 
+                            : result.imageUrl;
                         document.getElementById('profileAvatar').src = fullImageUrl;
                         
                         // Update avatar container class
@@ -531,10 +548,10 @@
                         document.getElementById('imageUploadForm').reset();
                         document.getElementById('imagePreview').style.display = 'none';
                     } else {
-                        alert(result.message || 'Có lỗi xảy ra khi tải ảnh lên');
+                        showToast(result.message || 'Có lỗi xảy ra khi tải ảnh lên', 'error');
                     }
                 } catch (error) {
-                    alert('Có lỗi xảy ra khi tải ảnh lên');
+                    showToast('Có lỗi xảy ra khi tải ảnh lên', 'error');
                 }
             };
 
@@ -678,7 +695,7 @@
                         });
                         const result = await response.json();
                         if (result.success) {
-                            alert('Cập nhật thông tin thành công!');
+                            showToast('Cập nhật thông tin thành công!', 'success');
                             
                             // Update completion items based on form data
                             const fullName = formData.get('FullName');
@@ -703,10 +720,10 @@
                             
                             bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra');
+                            showToast(result.message || 'Có lỗi xảy ra', 'error');
                         }
                     } catch (error) {
-                        alert('Có lỗi xảy ra khi cập nhật thông tin');
+                        showToast('Có lỗi xảy ra khi cập nhật thông tin', 'error');
                     }
                 });
             }
@@ -729,7 +746,7 @@
                         
                         const result = await response.json();
                         if (result.success) {
-                            alert('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email.');
+                            showToast('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email.', 'success');
                             this.innerHTML = '<i class="bi bi-check-circle me-1"></i>Đã gửi';
                             // Countdown timer
                             let countdown = 60;
@@ -744,13 +761,13 @@
                                 }
                             }, 1000);
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra khi gửi OTP');
+                            showToast(result.message || 'Có lỗi xảy ra khi gửi OTP', 'error');
                             this.disabled = false;
                             this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
                         }
                     } catch (error) {
                         console.error('Error requesting OTP:', error);
-                        alert('Có lỗi xảy ra khi gửi OTP');
+                        showToast('Có lỗi xảy ra khi gửi OTP', 'error');
                         this.disabled = false;
                         this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
                     }
@@ -769,14 +786,14 @@
                         });
                         const result = await response.json();
                         if (result.success) {
-                            alert('Đổi mật khẩu thành công!');
+                            showToast('Đổi mật khẩu thành công!', 'success');
                             bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
                             this.reset();
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra');
+                            showToast(result.message || 'Có lỗi xảy ra', 'error');
                         }
                     } catch (error) {
-                        alert('Có lỗi xảy ra khi đổi mật khẩu');
+                        showToast('Có lỗi xảy ra khi đổi mật khẩu', 'error');
                     }
                 });
             }
@@ -799,7 +816,7 @@
                         
                         const result = await response.json();
                         if (result.success) {
-                            alert('Mã OTP đã được gửi đến email hiện tại của bạn. Vui lòng kiểm tra email.');
+                            showToast('Mã OTP đã được gửi đến email hiện tại của bạn. Vui lòng kiểm tra email.', 'success');
                             this.innerHTML = '<i class="bi bi-check-circle me-1"></i>Đã gửi';
                             // Countdown timer
                             let countdown = 60;
@@ -814,13 +831,13 @@
                                 }
                             }, 1000);
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra khi gửi OTP');
+                            showToast(result.message || 'Có lỗi xảy ra khi gửi OTP', 'error');
                             this.disabled = false;
                             this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
                         }
                     } catch (error) {
                         console.error('Error requesting email OTP:', error);
-                        alert('Có lỗi xảy ra khi gửi OTP');
+                        showToast('Có lỗi xảy ra khi gửi OTP', 'error');
                         this.disabled = false;
                         this.innerHTML = '<i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP';
                     }
@@ -839,17 +856,53 @@
                         });
                         const result = await response.json();
                         if (result.success) {
-                            alert('Đổi email thành công!');
+                            showToast('Đổi email thành công!', 'success');
                             bootstrap.Modal.getInstance(document.getElementById('changeEmailModal')).hide();
                             location.reload();
                         } else {
-                            alert(result.message || 'Có lỗi xảy ra');
+                            showToast(result.message || 'Có lỗi xảy ra', 'error');
                         }
                     } catch (error) {
-                        alert('Có lỗi xảy ra khi đổi email');
+                        showToast('Có lỗi xảy ra khi đổi email', 'error');
                     }
                 });
             }
+
+            // Toast notification function
+            function showToast(message, type = 'info') {
+                const container = document.getElementById('profileToastContainer');
+                if (!container) return;
+
+                const toast = document.createElement('div');
+                toast.className = `profile-toast profile-toast-${type}`;
+
+                const icons = {
+                    success: '✓',
+                    error: '✕',
+                    info: 'ℹ'
+                };
+
+                toast.innerHTML = `
+                    <span class="profile-toast-icon">${icons[type] || icons.info}</span>
+                    <span class="profile-toast-message">${message}</span>
+                    <button type="button" class="profile-toast-close" onclick="this.parentElement.remove()">×</button>
+                `;
+
+                container.appendChild(toast);
+
+                // Auto remove after 3 seconds
+                setTimeout(() => {
+                    toast.classList.add('slide-out');
+                    setTimeout(() => {
+                        if (toast.parentElement) {
+                            toast.remove();
+                        }
+                    }, 300);
+                }, 3000);
+            }
+
+            // Make showToast global
+            window.showToast = showToast;
 
             console.log('All handlers attached');
         });

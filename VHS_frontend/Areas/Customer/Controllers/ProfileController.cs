@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using VHS_frontend.Areas.Customer.Models.Profile;
 using VHS_frontend.Services.Customer;
+using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
@@ -9,10 +10,17 @@ namespace VHS_frontend.Areas.Customer.Controllers
     public class ProfileController : Controller
     {
         private readonly ProfileServiceCustomer _profileService;
+        private readonly BookingServiceCustomer _bookingServiceCustomer;
+        private readonly ReviewServiceCustomer _reviewServiceCustomer;
 
-        public ProfileController(ProfileServiceCustomer profileService)
+        public ProfileController(
+            ProfileServiceCustomer profileService,
+            BookingServiceCustomer bookingServiceCustomer,
+            ReviewServiceCustomer reviewServiceCustomer)
         {
             _profileService = profileService;
+            _bookingServiceCustomer = bookingServiceCustomer;
+            _reviewServiceCustomer = reviewServiceCustomer;
         }
 
         /// <summary>
@@ -44,6 +52,39 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     return RedirectToAction("Index", "Home", new { area = "" });
                 }
 
+                // Lấy số đơn hàng đã hoàn thành
+                int completedOrdersCount = 0;
+                try
+                {
+                    var bookingHistory = await _bookingServiceCustomer.GetHistoryByAccountAsync(accountId, jwtToken);
+                    if (bookingHistory?.Items != null)
+                    {
+                        completedOrdersCount = bookingHistory.Items.Count(b => 
+                            b.Status != null && 
+                            (b.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) ||
+                             b.Status.Equals("Hoàn thành", StringComparison.OrdinalIgnoreCase)));
+                    }
+                }
+                catch
+                {
+                    // Nếu lỗi thì giữ giá trị mặc định 0
+                }
+
+                // Lấy số đánh giá đã viết
+                int reviewsCount = 0;
+                try
+                {
+                    var (success, reviews, _) = await _reviewServiceCustomer.GetMyReviewsAsync(accountId, jwtToken);
+                    if (success && reviews != null)
+                    {
+                        reviewsCount = reviews.Count;
+                    }
+                }
+                catch
+                {
+                    // Nếu lỗi thì giữ giá trị mặc định 0
+                }
+
                 var viewModel = new ProfileViewModel
                 {
                     UserId = profile.UserId,
@@ -57,7 +98,9 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     Address = profile.Address ?? "",
                     CreatedAt = profile.CreatedAt,
                     UpdatedAt = profile.UpdatedAt,
-                    IsProfileComplete = profile.IsProfileComplete
+                    IsProfileComplete = profile.IsProfileComplete,
+                    CompletedOrdersCount = completedOrdersCount,
+                    ReviewsCount = reviewsCount
                 };
 
                 return View(viewModel);
