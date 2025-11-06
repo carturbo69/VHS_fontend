@@ -18,7 +18,50 @@
 
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 
+    // Helper để lấy ảnh đầu tiên từ ServiceImages (có thể là JSON array hoặc comma-separated string)
+    string? FirstImageOrDefault(string? images)
+    {
+        if (string.IsNullOrWhiteSpace(images)) return null;
 
+        try
+        {
+            // Thử parse JSON array trước
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+            if (arr != null && arr.Count > 0) return arr[0];
+        }
+        catch { /* ignore JSON parse error */ }
+
+        // Nếu không phải JSON, thử split bằng dấu phẩy
+        if (images.Contains(','))
+        {
+            var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
+        
+        // Nếu không có dấu phẩy, trả về nguyên chuỗi
+        return images;
+    }
+
+    // Helper để lấy ảnh service (backend đã thêm domain prefix)
+    string GetServiceImage(string? serviceImages)
+    {
+        if (string.IsNullOrWhiteSpace(serviceImages))
+            return fallbackImg;
+        
+        var img = FirstImageOrDefault(serviceImages);
+        return !string.IsNullOrWhiteSpace(img) ? img : fallbackImg;
+    }
+
+    // Helper để lấy logo provider (backend đã thêm domain prefix, giống ServiceShop/Index.cshtml)
+    string GetProviderLogo(string? providerImages)
+    {
+        if (string.IsNullOrWhiteSpace(providerImages))
+            return "/images/VeSinh.jpg"; // Fallback logo
+        
+        var logo = FirstImageOrDefault(providerImages);
+        return !string.IsNullOrWhiteSpace(logo) ? logo : "/images/VeSinh.jpg";
+    }
 
 }
 
@@ -30,23 +73,11 @@
     <!-- Page Header -->
     <div class="page-header">
         <h1 class="page-title">
+            <span class="page-title-icon">📦</span>
             Lịch sử đơn dịch vụ
         </h1>
         <p class="page-subtitle">Quản lý và theo dõi tất cả các đơn dịch vụ của bạn</p>
     </div>
-    <!-- Toast kết quả (tuỳ chọn) -->
-    @if (TempData["ToastSuccess"] != null || TempData["ToastError"] != null)
-    {
-        <div class="custom-alert @(TempData["ToastSuccess"] != null ? "alert-success" : "alert-danger")" role="alert">
-            <i class="bi @(TempData["ToastSuccess"] != null ? "bi-check-circle-fill" : "bi-exclamation-circle-fill")"></i>
-            <div class="alert-content">
-                @(TempData["ToastSuccess"] ?? TempData["ToastError"])
-            </div>
-            <button type="button" class="alert-close" onclick="this.parentElement.remove()">
-                <i class="bi bi-x"></i>
-            </button>
-        </div>
-    }
 
     <!-- Tabs trạng thái (data-status = code EN, text = VI) -->
     <ul class="nav nav-tabs border-0 nav-status">
@@ -81,7 +112,19 @@
             // Chuẩn hóa code trạng thái về EN để lọc/tô màu nhất quán; chấp nhận cả VI và EN từ backend
             var stRaw = (o.Status ?? "").Trim();
             string stCode = stRaw; // fallback
-            if (stRaw.Equals("Pending", StringComparison.OrdinalIgnoreCase)
+            
+            // Kiểm tra Cancelled/Canceled TRƯỚC để đảm bảo bắt được tất cả các biến thể
+            if (stRaw.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Canceled", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Đã huỷ", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Contains("hủy", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Contains("huy", StringComparison.OrdinalIgnoreCase))
+            {
+                stCode = "Cancelled";
+                statusText = statusViMap["Cancelled"];
+            }
+            else if (stRaw.Equals("Pending", StringComparison.OrdinalIgnoreCase)
                 || stRaw.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase)
                 || stRaw.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase)
                 || stRaw.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase))
@@ -109,27 +152,19 @@
                 stCode = "Completed";
                 statusText = statusViMap["Completed"];
             }
-            else if (stRaw.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Canceled", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Đã huỷ", StringComparison.OrdinalIgnoreCase))
-            {
-                stCode = "Cancelled";
-                statusText = statusViMap["Cancelled"];
-            }
             var isReviewed = o.HasReview; // đã có review hay chưa
 
             <div class="shop-row order-card" data-status="@stCode" data-title="@o.ServiceTitle @o.ProviderName">
                 <!-- Header -->
                 <div class="shop-head">
-                    <img src="/images/shop-badge.svg" width="24" height="24" alt="shop" />
+                    <img src="@GetProviderLogo(o.ProviderImages)" width="24" height="24" alt="@o.ProviderName" class="shop-logo" style="object-fit:cover;border-radius:4px;" onerror="this.src='/images/VeSinh.jpg';" />
                     <div class="shop-name">@o.ProviderName</div>
                     <button type="button"
                             class="btn btn-sm btn-outline-danger ms-2"
                             onclick="window.location.href='@Url.Action("WithProvider", "ChatCustomer", new { area = "Customer", providerId = o.ProviderId })'">
                         <i class="bi bi-chat-dots me-1"></i> Chat
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary">Xem Shop</button>
+                    <a asp-area="" asp-controller="ServiceShop" asp-action="Index" asp-route-providerId="@o.ProviderId" class="btn btn-sm btn-outline-secondary">Xem Shop</a>
 
                     <div class="ms-auto d-flex align-items-center gap-3">
                         <div class="status-pill">
@@ -166,7 +201,7 @@
                 <!-- Body -->
                 <div class="item-body">
                     <img class="order-cover"
-                         src="@(o.ServiceImages ?? fallbackImg)"
+                         src="@GetServiceImage(o.ServiceImages)"
                          onerror="this.onerror=null;this.src='@fallbackImg';" />
                     <div class="flex-grow-1">
                         <div class="order-title">@o.ServiceTitle</div>
@@ -239,7 +274,19 @@
 
                     @if (isDone) // Completed
                     {
-                        <button class="btn btn-danger">Đặt lại</button>
+                        <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="bookingId" value="@o.BookingId" />
+                            <input type="hidden" name="serviceId" value="@o.ServiceId" />
+                            @if (o.Options?.Any() == true)
+                            {
+                                @foreach (var opt in o.Options)
+                                {
+                                    <input type="hidden" name="optionIds" value="@opt.OptionId" />
+                                }
+                            }
+                            <button type="submit" class="btn btn-danger">Đặt lại</button>
+                        </form>
                         <a asp-area="Customer"
                            asp-controller="BookingService"
                            asp-action="ReportService"
@@ -272,8 +319,19 @@
                     }
                     else if (st.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
                     {
-                        <button class="btn btn-outline-secondary">Lý do hủy</button>
-                        <button class="btn btn-danger">Đặt lại</button>
+                        <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="bookingId" value="@o.BookingId" />
+                            <input type="hidden" name="serviceId" value="@o.ServiceId" />
+                            @if (o.Options?.Any() == true)
+                            {
+                                @foreach (var opt in o.Options)
+                                {
+                                    <input type="hidden" name="optionIds" value="@opt.OptionId" />
+                                }
+                            }
+                            <button type="submit" class="btn btn-danger">Đặt lại</button>
+                        </form>
                     }
                 </div>
 
@@ -307,7 +365,7 @@
                                 <input type="hidden" name="Rating" id="rating-@o.BookingId" value="0" min="1" />
 
                                 <div class="d-flex align-items-center gap-3 mb-3">
-                                    <img src="@(o.ServiceImages ?? fallbackImg)" width="60" height="60" style="object-fit:cover;border-radius:4px;border:1px solid #eee" />
+                                    <img src="@GetServiceImage(o.ServiceImages)" width="60" height="60" style="object-fit:cover;border-radius:4px;border:1px solid #eee" />
                                     <div>
                                         <div class="fw-bold">@o.ServiceTitle</div>
                                         <small class="text-muted">@o.ProviderName</small>
@@ -418,9 +476,14 @@
 
             function applyFilter(statusCode) {
                 const q = (input.value || '').toLowerCase();
+                const targetStatus = (statusCode || '').trim().toLowerCase();
+                
                 cards().forEach(c => {
                     const status = (c.dataset.status || '').trim().toLowerCase();
-                    const okStatus = (statusCode === 'All') || (status === statusCode.trim().toLowerCase());
+                    // Debug log để kiểm tra
+                    // console.log('Card status:', status, 'Target:', targetStatus, 'Match:', status === targetStatus || targetStatus === 'all');
+                    
+                    const okStatus = (targetStatus === 'all') || (status === targetStatus);
                     const okQuery  = (c.dataset.title || '').toLowerCase().includes(q);
                     c.style.display = (okStatus && okQuery) ? '' : 'none';
                 });

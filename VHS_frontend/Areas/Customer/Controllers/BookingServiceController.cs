@@ -662,10 +662,40 @@ namespace VHS_frontend.Areas.Customer.Controllers
         // Areas/Customer/Controllers/BookingServiceController.cs
 
 
-        [HttpGet]
+        /// <summary>
+        /// Đặt lại dịch vụ từ booking (đặt trực tiếp, không qua cart)
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ReorderBooking(Guid bookingId, Guid serviceId, List<Guid>? optionIds)
+        {
+            if (serviceId == Guid.Empty)
+            {
+                TempData["ToastError"] = "Dịch vụ không hợp lệ.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+
+            // Lưu thông tin vào session để đặt trực tiếp (giống StartDirect)
+            var payload = new DirectCheckoutPayload(
+                serviceId,
+                (optionIds ?? new()).Where(x => x != Guid.Empty).Distinct().ToList()
+            );
+
+            HttpContext.Session.SetString(
+                SS_CHECKOUT_DIRECT,
+                System.Text.Json.JsonSerializer.Serialize(payload)
+            );
+
+            // Dọn dấu vết flow qua giỏ (để chắc chắn không lẫn)
+            HttpContext.Session.Remove(SS_SELECTED_IDS);
+
+            // Redirect đến trang booking
+            return RedirectToAction(nameof(Index));
+        }
+
         public async Task<IActionResult> ListHistoryBooking(CancellationToken ct)
         {
-            var statusOrder = new[] { "Pending", "Confirmed", "InProgress", "Completed", "Cancelled", "All" };
+            var statusOrder = new[] { "All", "Pending", "Confirmed", "InProgress", "Completed", "Cancelled" };
 
             var statusViMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -696,7 +726,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (HttpRequestException ex)
             {
-                TempData["ToastError"] = "Không tải được dữ liệu lịch sử đơn. " + ex.Message;
                 vm = new ListHistoryBookingServiceDTOs { Items = new() };
             }
 
@@ -725,13 +754,11 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 if (string.IsNullOrWhiteSpace(jwtToken))
                 {
-                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
-                    return RedirectToAction("Login", "Account", new { area = "" });
+                    return RedirectToAction(nameof(ListHistoryBooking));
                 }
                 var accountId = GetAccountId();
                 if (accountId == Guid.Empty)
                 {
-                    TempData["ToastError"] = "Không tìm thấy thông tin tài khoản.";
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
                 var createRefundReq = new {
@@ -823,8 +850,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
-                TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return RedirectToAction(nameof(ListHistoryBooking));
             }
 
             try
@@ -854,7 +880,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (Exception ex)
             {
-                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
         }
@@ -882,8 +907,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 if (string.IsNullOrWhiteSpace(jwtToken))
                 {
-                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn.";
-                    return RedirectToAction("Login", "Account", new { area = "" });
+                    return RedirectToAction(nameof(ListHistoryBooking));
                 }
 
                 var createDto = new CreateReportDTO
@@ -911,8 +935,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                TempData["ToastError"] = $"Bạn cần đăng nhập lại: {ex.Message}";
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return RedirectToAction(nameof(ListHistoryBooking));
             }
             catch (HttpRequestException ex)
             {
@@ -921,15 +944,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 {
                     TempData["DuplicateReportError"] = "Booking đã được báo cáo trước đó. Mỗi đơn hàng chỉ được báo cáo 1 lần.";
                 }
-                else
-                {
-                    TempData["ToastError"] = $"Không thể gửi báo cáo: {ex.Message}";
-                }
                 return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
             }
             catch (Exception ex)
             {
-                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
                 return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
             }
         }
@@ -1095,8 +1113,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
-                TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return RedirectToAction(nameof(ListHistoryBooking));
             }
 
             try
@@ -1104,8 +1121,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 if (string.IsNullOrWhiteSpace(jwtToken))
                 {
-                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn.";
-                    return RedirectToAction("Login", "Account", new { area = "" });
+                    return RedirectToAction(nameof(ListHistoryBooking));
                 }
 
                 var report = await _reportService.GetReportByIdAsync(reportId, jwtToken, ct);
@@ -1119,12 +1135,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (UnauthorizedAccessException)
             {
-                TempData["ToastError"] = "Bạn cần đăng nhập lại.";
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return RedirectToAction(nameof(ListHistoryBooking));
             }
             catch (Exception ex)
             {
-                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
         }
