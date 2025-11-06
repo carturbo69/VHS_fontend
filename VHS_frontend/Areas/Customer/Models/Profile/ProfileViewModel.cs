@@ -40,6 +40,12 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
         [Display(Name = "Hoàn thiện profile")]
         public bool IsProfileComplete { get; set; }
 
+        [Display(Name = "Số đơn hàng đã hoàn thành")]
+        public int CompletedOrdersCount { get; set; }
+
+        [Display(Name = "Số đánh giá đã viết")]
+        public int ReviewsCount { get; set; }
+
         /// <summary>
         /// Lấy URL của ảnh đại diện, nếu không có thì trả về ảnh mặc định
         /// </summary>

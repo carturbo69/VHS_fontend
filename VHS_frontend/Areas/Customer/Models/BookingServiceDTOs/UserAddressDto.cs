@@ -16,8 +16,24 @@
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
 
-        // Hiển thị dạng 1 dòng
+        // Hiển thị dạng 1 dòng - loại bỏ dấu phẩy dư
         public string ToDisplayString()
-            => $"{StreetAddress}, {WardName}, {DistrictName}, {ProvinceName}";
+        {
+            var parts = new List<string>();
+            
+            if (!string.IsNullOrWhiteSpace(StreetAddress))
+                parts.Add(StreetAddress.Trim());
+            
+            if (!string.IsNullOrWhiteSpace(WardName))
+                parts.Add(WardName.Trim());
+            
+            if (!string.IsNullOrWhiteSpace(DistrictName))
+                parts.Add(DistrictName.Trim());
+            
+            if (!string.IsNullOrWhiteSpace(ProvinceName))
+                parts.Add(ProvinceName.Trim());
+            
+            return string.Join(", ", parts);
+        }
     }
 }
