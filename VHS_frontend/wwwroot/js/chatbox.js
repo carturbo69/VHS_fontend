@@ -5,10 +5,40 @@ console.log('=== chatbox.js LOADED ===');
     'use strict';
     console.log('=== chatbox.js IIFE STARTED ===');
 
-    // Configuration
+    // Configuration - Tự động lấy từ backend
+    // Nếu frontend và backend cùng domain, dùng relative paths
+    // Nếu khác domain, có thể cấu hình trong appsettings và tạo endpoint trả về config
+    const getBaseUrl = () => {
+        // Thử lấy từ meta tag nếu có (backend có thể inject)
+        const metaApiUrl = document.querySelector('meta[name="api-base-url"]')?.getAttribute('content');
+        if (metaApiUrl) return metaApiUrl;
+        
+        // Fallback: dùng relative path (nếu cùng domain) hoặc localhost cho development
+        // Trong production, nên dùng relative path: '/api/ChatboxAI'
+        const isProduction = window.location.hostname !== 'localhost';
+        if (isProduction) {
+            return '/api/ChatboxAI'; // Relative path cho production
+        }
+        return 'http://localhost:5154/api/ChatboxAI'; // Development
+    };
+    
+    const getSignalRUrl = () => {
+        // Thử lấy từ meta tag nếu có
+        const metaSignalRUrl = document.querySelector('meta[name="signalr-url"]')?.getAttribute('content');
+        if (metaSignalRUrl) return metaSignalRUrl;
+        
+        // Fallback
+        const isProduction = window.location.hostname !== 'localhost';
+        if (isProduction) {
+            // Dùng cùng origin với frontend
+            return `${window.location.origin}/hubs/chat`;
+        }
+        return 'http://localhost:5154/hubs/chat'; // Development
+    };
+
     const CONFIG = {
-        apiBaseUrl: 'http://localhost:5154/api/ChatboxAI',
-        signalRUrl: 'http://localhost:5154/hubs/chat',
+        apiBaseUrl: getBaseUrl(),
+        signalRUrl: getSignalRUrl(),
         sessionId: localStorage.getItem('chatbox_session_id') || generateSessionId(),
         language: 'vi',
         conversationId: null
