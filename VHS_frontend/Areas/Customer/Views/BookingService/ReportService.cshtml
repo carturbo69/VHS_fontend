@@ -11,12 +11,22 @@
 <link href="~/css/report-service.css" rel="stylesheet" />
 
 <div class="container my-4 complaint-container">
-    @if (TempData["ToastSuccess"] != null || TempData["ToastError"] != null)
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+        <h1 class="page-title">
+            <span class="page-title-icon">📋</span>
+            Báo cáo dịch vụ
+        </h1>
+        <p class="page-subtitle">Báo cáo vấn đề cho dịch vụ đã đặt</p>
+    </div>
+
+    @if (TempData["ToastError"] != null)
     {
-        <div class="alert @(TempData["ToastSuccess"] != null ? "alert-success" : "alert-danger")" role="alert">
-            @(TempData["ToastSuccess"] ?? TempData["ToastError"])
+        <div class="alert alert-danger" role="alert">
+            @TempData["ToastError"]
         </div>
     }
+    @* Không hiển thị ToastSuccess ở đây vì có thể chứa thông báo VNPAY không liên quan *@
 
     @* Modal thông báo lỗi duplicate report *@
     @if (TempData["DuplicateReportError"] != null)
@@ -59,22 +69,140 @@
         </div>
     }
 
-    <!-- Sản phẩm đã chọn -->
+    @{
+        var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+        
+        // Helper để lấy ảnh đầu tiên từ images (có thể là JSON array hoặc comma-separated string)
+        string? FirstImageOrDefault(string? images)
+        {
+            if (string.IsNullOrWhiteSpace(images)) return null;
+            try
+            {
+                var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+                if (arr != null && arr.Count > 0) return arr[0];
+            }
+            catch { }
+            if (images.Contains(','))
+            {
+                var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(first)) return first;
+            }
+            return images;
+        }
+
+        // Helper để lấy logo provider
+        string GetProviderLogo(string? providerImages)
+        {
+            if (string.IsNullOrWhiteSpace(providerImages))
+                return "/images/VeSinh.jpg";
+            var logo = FirstImageOrDefault(providerImages);
+            return !string.IsNullOrWhiteSpace(logo) ? logo : "/images/VeSinh.jpg";
+        }
+
+        // Helper để lấy ảnh service
+        string GetServiceImage(string? serviceImages)
+        {
+            if (string.IsNullOrWhiteSpace(serviceImages))
+                return fallbackImg;
+            var img = FirstImageOrDefault(serviceImages);
+            return !string.IsNullOrWhiteSpace(img) ? img : fallbackImg;
+        }
+
+        string toCurrency(decimal v) => v.ToString("N0") + "đ";
+    }
+
+    <!-- Provider Info & Dịch vụ -->
     <div class="card-block mb-3">
-        <h5 class="fw-bold mb-3">Sản phẩm đã chọn</h5>
-        <div class="product">
-            <img class="product-cover" src="@Model.ServiceImage" alt="service"
-                 onerror="this.onerror=null;this.src='/images/placeholder.png';" />
-            <div class="flex-grow-1">
-                <div class="fw-bold product-title">@Model.ServiceTitle</div>
-                <div class="text-muted">@Model.ProviderName</div>
+        <!-- Provider Info -->
+        <div class="d-flex align-items-center gap-3 mb-3 pb-3" style="border-bottom: 2px solid var(--border);">
+            <img src="@GetProviderLogo(Model?.ProviderImages)" 
+                 width="60" 
+                 height="60" 
+                 alt="@Model.ProviderName" 
+                 class="rounded" 
+                 style="object-fit:cover;border:2px solid var(--border);" 
+                 onerror="this.src='/images/VeSinh.jpg';" />
+            <div>
+                <h5 class="fw-bold mb-0">@Model.ProviderName</h5>
+                <small class="text-muted">Nhà cung cấp dịch vụ</small>
             </div>
-            <div class="text-end">
-                @if (Model.OriginalPrice > 0 && Model.OriginalPrice > Model.Price)
+        </div>
+        
+        <!-- Dịch vụ -->
+        <div class="item-body">
+            <img class="order-cover"
+                 src="@GetServiceImage(Model?.ServiceImages ?? Model?.ServiceImage)"
+                 onerror="this.onerror=null;this.src='@fallbackImg';" />
+            <div class="flex-grow-1">
+                <div class="order-title">@Model.ServiceTitle</div>
+                @if (Model.Options?.Any() == true)
                 {
-                    <div class="text-strike">@Model.OriginalPrice.ToString("N0") đ</div>
+                    <div class="mt-1">
+                        @foreach (var opt in Model.Options)
+                        {
+                            <span class="option-badge" title="@opt.Description">
+                                @opt.OptionName • @opt.Price.ToString("N0") @opt.UnitType
+                            </span>
+                        }
+                    </div>
                 }
-                <div class="price-now">@Model.Price.ToString("N0") đ</div>
+            </div>
+
+            <!-- Cột giá bên phải: tóm tắt gọn -->
+            <div class="price-summary">
+                <div class="price-row">
+                    <span class="price-label">Giá dịch vụ:</span>
+                    <span class="price-value">@toCurrency(Model.ServicePrice)</span>
+                </div>
+                @if (Model.OptionTotal > 0)
+                {
+                    <div class="price-row">
+                        <span class="price-label">Tuỳ chọn:</span>
+                        <span class="price-value">@toCurrency(Model.OptionTotal)</span>
+                    </div>
+                }
+                <div class="price-row subtotal">
+                    <span class="price-label">Tổng cộng:</span>
+                    <span class="price-value">@toCurrency(Model.SubTotal)</span>
+                </div>
+                @if (Model.VoucherDiscount > 0)
+                {
+                    <div class="price-row discount">
+                        <span class="price-label">Giảm giá:</span>
+                        <span class="price-value">-@toCurrency(Model.VoucherDiscount)</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Tổng tiền -->
+        <div class="price-line">
+            <div class="d-flex flex-column align-items-end gap-2">
+                <div>Thành tiền: <span class="fw-bold price-now">@toCurrency(Model.GrandTotal)</span></div>
+                @{
+                    var statusClass = "text-warning";
+                    var statusIcon = "bi-clock-history";
+                    var paymentStatus = Model.PaymentStatus ?? string.Empty;
+                    if (paymentStatus == "Đã thanh toán")
+                    {
+                        statusClass = "text-success";
+                        statusIcon = "bi-check-circle-fill";
+                    }
+                    else if (paymentStatus == "Đã hoàn tiền")
+                    {
+                        statusClass = "text-info";
+                        statusIcon = "bi-arrow-counterclockwise";
+                    }
+                    else if (paymentStatus == "Chờ thanh toán")
+                    {
+                        statusClass = "text-warning";
+                        statusIcon = "bi-hourglass-split";
+                    }
+                }
+                <span class="payment-status @statusClass">
+                    <i class="bi @statusIcon"></i>
+                    @Model.PaymentStatus
+                </span>
             </div>
         </div>
     </div>
@@ -136,7 +264,7 @@
                 <div id="file-preview" class="d-flex flex-wrap gap-2"></div>
             </div>
 
-            <div class="d-flex justify-content-end gap-2">
+            <div class="d-flex justify-content-center gap-2">
                 <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left"></i> Quay lại
                 </a>

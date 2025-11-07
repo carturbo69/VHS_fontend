@@ -1,3 +1,6 @@
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+
 @model VHS_frontend.Areas.Customer.Models.Profile.ProfileViewModel
 @{
     ViewData["Title"] = "Thông tin cá nhân";
@@ -17,7 +20,7 @@
         <div class="profile-avatar-section">
             <div class="avatar-container @(Model.HasProfileImage ? "has-image" : "no-image")">
                 <img id="profileAvatar" 
-                     src="@Model.GetProfileImageUrl()" 
+                     src="@Model.GetProfileImageUrl(Configuration["Apis:Backend"])" 
                      alt="@Model.GetDisplayName()" 
                      class="profile-avatar" />
                 <div class="avatar-overlay">
@@ -413,6 +416,7 @@
     </div>
 
 @section Scripts {
+    <script src="~/js/image-helper.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -516,6 +520,11 @@
                         if (fullImageUrl && !fullImageUrl.startsWith('http://') && !fullImageUrl.startsWith('https://')) {
                             fullImageUrl = 'http://localhost:5154' + fullImageUrl;
                         }
+                        alert('Tải ảnh lên thành công!');
+                        // Dùng helper function để lấy URL đầy đủ
+                        let fullImageUrl = typeof getImageUrl !== 'undefined' 
+                            ? getImageUrl(result.imageUrl) 
+                            : result.imageUrl;
                         document.getElementById('profileAvatar').src = fullImageUrl;
                         
                         // Update avatar container class

@@ -26,7 +26,43 @@
         string NameOf(ReadCartItemDTOs it)
             => string.IsNullOrWhiteSpace(it?.ServiceName) ? "(Không có tên)" : it.ServiceName;
 
-        string ImageOf(ReadCartItemDTOs it) => it?.ServiceImage ?? "";
+        // Helper để lấy ảnh đầu tiên từ images (có thể là JSON array hoặc comma-separated string)
+        string? FirstImageOrDefault(string? images)
+        {
+            if (string.IsNullOrWhiteSpace(images)) return null;
+            try
+            {
+                var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+                if (arr != null && arr.Count > 0) return arr[0];
+            }
+            catch { }
+            if (images.Contains(','))
+            {
+                var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(first)) return first;
+            }
+            return images;
+        }
+
+        // Helper để lấy logo provider
+        string GetProviderLogo(string? providerImages, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(providerImages))
+                return fallback;
+            var logo = FirstImageOrDefault(providerImages);
+            return !string.IsNullOrWhiteSpace(logo) ? logo : fallback;
+        }
+
+        // Helper để lấy ảnh service
+        string GetServiceImage(string? serviceImages, string? fallbackImage, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(serviceImages))
+                return !string.IsNullOrWhiteSpace(fallbackImage) ? fallbackImage : fallback;
+            var img = FirstImageOrDefault(serviceImages);
+            return !string.IsNullOrWhiteSpace(img) ? img : (!string.IsNullOrWhiteSpace(fallbackImage) ? fallbackImage : fallback);
+        }
+
+        string ImageOf(ReadCartItemDTOs it, string fallback) => GetServiceImage(it?.ServiceImage, null, fallback);
 
         decimal PriceOf(ReadCartItemDTOs it) => it?.ServicePrice ?? 0m;
 
@@ -122,9 +158,20 @@
                         {
                             var g = groups[gi]; var gId = $"g_{gi}";
                             <section class="provider-block" data-group="@gId">
+                                @{
+                                    var firstShopItem = g.FirstOrDefault();
+                                    var providerImages = firstShopItem?.ProviderImages;
+                                }
                                 <div class="provider-head">
                                     <label class="chk">
                                         <input class="chk-prov" type="checkbox" data-group="@gId" />
+                                        <img src="@GetProviderLogo(providerImages, fallbackImg)" 
+                                             width="24" 
+                                             height="24" 
+                                             alt="@g.Key" 
+                                             class="shop-logo" 
+                                             style="object-fit:cover;border-radius:4px;margin-right:8px;" 
+                                             onerror="this.src='@fallbackImg';" />
                                         <span class="prov-name">@g.Key</span>
                                     </label>
                                 </div>
@@ -134,12 +181,12 @@
                                     var key = KeyOf(it);
                                     var name = NameOf(it);
 
-                                    var rawImage = ImageOf(it);
+                                    var rawImage = ImageOf(it, fallbackImg);
                                     var image = string.IsNullOrWhiteSpace(rawImage)
                                     ? fallbackImg
                                     : (rawImage.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                                     ? rawImage
-                                    : Url.Content(rawImage));
+                                    : Url.Content(rawImage.StartsWith("/") ? rawImage : "/" + rawImage));
 
                                     var unitPrice = PriceOf(it);
                                     var options = it?.Options ?? new List<CartItemOptionReadDto>();
