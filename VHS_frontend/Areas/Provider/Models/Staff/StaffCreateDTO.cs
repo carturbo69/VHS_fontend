@@ -29,5 +29,12 @@ namespace VHS_frontend.Areas.Provider.Models.Staff
         // CCCD back image
         [Required(ErrorMessage = "Phải tải lên ảnh mặt sau CCCD")]
         public IFormFile? CitizenIDBackImage { get; set; }
+
+        [StringLength(500, ErrorMessage = "Địa chỉ không được vượt quá 500 ký tự")]
+        public string? Address { get; set; }
+
+        [StringLength(20, ErrorMessage = "Số điện thoại không được vượt quá 20 ký tự")]
+        [RegularExpression(@"^[0-9]{10,11}$", ErrorMessage = "Số điện thoại không hợp lệ")]
+        public string? PhoneNumber { get; set; }
     }
 }

@@ -24,7 +24,7 @@
                     <!-- Status Filter - CHỈ Completed và Canceled -->
                     <div class="col-md-2">
                         <label class="form-label">Trạng thái</label>
-                        <select name="status" class="form-select" onchange="this.form.submit()">
+                        <select name="status" class="form-select form-select-filter" onchange="this.form.submit()">
                             <option value="" selected="@(string.IsNullOrEmpty(ViewBag.CurrentStatus))">Tất cả</option>
                             <option value="Completed" selected="@(ViewBag.CurrentStatus == "Completed")">Hoàn thành</option>
                             <option value="Canceled" selected="@(ViewBag.CurrentStatus == "Canceled")">Đã hủy</option>
@@ -91,7 +91,7 @@
 
     <!-- Statistics Cards - THÁNG NÀY -->
     <div class="card mb-4">
-        <div class="card-header bg-info text-white">
+        <div class="card-header">
             <h6 class="mb-0">
                 <i class="bi bi-calendar-month"></i> Thống kê lịch sử tháng @DateTime.Now.ToString("MM/yyyy")
             </h6>
@@ -165,7 +165,7 @@
 
     <!-- Bookings Table -->
     <div class="card">
-        <div class="card-header bg-light">
+        <div class="card-header">
             <h6 class="mb-0">
                 Tổng số: <span class="badge bg-primary">@Model.TotalCount</span> đơn hàng
             </h6>
@@ -175,7 +175,7 @@
             {
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th>Mã đơn</th>
                                 <th>Khách hàng</th>
@@ -222,7 +222,7 @@
                                         @if (!string.IsNullOrEmpty(booking.PaymentStatus))
                                         {
                                             <br />
-                                            <small class="badge bg-info">@booking.PaymentStatus</small>
+                                            <small class="badge bg-info">@GetPaymentStatusText(booking.PaymentStatus)</small>
                                         }
                                     </td>
                                     <td>
@@ -231,9 +231,13 @@
                                             <i class="bi bi-person-check text-success"></i>
                                             @booking.StaffName
                                         }
-                                        else
+                                        else if (booking.Status == "Canceled" || booking.Status == "Cancelled")
                                         {
                                             <span class="text-muted">-</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Chưa phân công</span>
                                         }
                                     </td>
                                     <td>
@@ -277,7 +281,7 @@
             else
             {
                 <div class="text-center py-5">
-                    <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                    <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
                     <p class="text-muted mt-3">Chưa có lịch sử đơn hàng nào.</p>
                     <small class="text-muted">Các đơn hàng đã hoàn thành hoặc đã hủy sẽ xuất hiện ở đây.</small>
                 </div>
@@ -288,6 +292,20 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
+}
+
+@functions {
+    string GetPaymentStatusText(string paymentStatus)
+    {
+        var statusLower = paymentStatus?.ToLower() ?? "";
+        return statusLower switch
+        {
+            "paid" => "Đã thanh toán",
+            "unpaid" => "Chưa thanh toán",
+            "pending" => "Chờ thanh toán",
+            _ => paymentStatus ?? "Chưa xác định"
+        };
+    }
 }
 
 @section Scripts {
