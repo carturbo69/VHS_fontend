@@ -59,12 +59,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('Image URL:', imageUrl);
                     
                     if (imageUrl) {
-                        // Nếu là relative path, thêm base URL
+                        // Nếu là GCS URL (đã có http/https), dùng trực tiếp
+                        // Nếu là relative path, thêm base URL (backward compatibility)
                         if (!imageUrl.startsWith('http')) {
+                            // Nếu là path cũ từ wwwroot, vẫn hỗ trợ
                             if (imageUrl.startsWith('/wwwroot/')) {
                                 imageUrl = 'http://localhost:5154' + imageUrl;
                             } else {
-                                imageUrl = 'http://localhost:5154/wwwroot' + imageUrl;
+                                // Nếu là relative path, thêm base URL
+                                imageUrl = 'http://localhost:5154' + (imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl);
                             }
                         }
                         
