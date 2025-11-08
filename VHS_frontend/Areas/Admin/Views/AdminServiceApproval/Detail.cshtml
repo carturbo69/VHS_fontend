@@ -2,96 +2,434 @@
 @{
     ViewData["Title"] = "Chi tiết dịch vụ";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
-    var imgs = (Model.Images ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-    var avatar = imgs.FirstOrDefault();
-    var descImgs = imgs.Skip(1).ToList();
-    string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
+    
+    // Xác định có pending update không
+    var isPendingUpdate = Model.Status == "PendingUpdate" && !string.IsNullOrEmpty(Model.PendingTitle);
+    
+    // Phân tích ảnh để hiển thị
+    var currentImgs = string.IsNullOrEmpty(Model.CurrentImages) 
+        ? new List<string>() 
+        : Model.CurrentImages.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.Trim())
+            .ToList();
+    
+    var pendingImgs = string.IsNullOrEmpty(Model.PendingImages) 
+        ? new List<string>() 
+        : Model.PendingImages.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.Trim())
+            .ToList();
+    
+    // Xác định avatar và desc images
+    var pendingAvatar = pendingImgs.FirstOrDefault();
+    var currentAvatar = currentImgs.FirstOrDefault();
+    var pendingDescImgs = pendingImgs.Skip(1).ToList();
+    var currentDescImgs = currentImgs.Skip(1).ToList();
+    
+    // Avatar để hiển thị (ưu tiên pending nếu có)
+    var avatar = isPendingUpdate && !string.IsNullOrEmpty(pendingAvatar) ? pendingAvatar : currentAvatar;
+    var descImgs = isPendingUpdate && pendingDescImgs.Any() ? pendingDescImgs : currentDescImgs;
+    
+    // Xác định dữ liệu để hiển thị
+    var displayTitle = isPendingUpdate && !string.IsNullOrEmpty(Model.PendingTitle) ? Model.PendingTitle : Model.Title;
+    var displayDescription = isPendingUpdate && !string.IsNullOrEmpty(Model.PendingDescription) ? Model.PendingDescription : Model.Description;
+    var displayPrice = isPendingUpdate && Model.PendingPrice.HasValue ? Model.PendingPrice.Value : Model.Price;
+    var displayUnitType = isPendingUpdate && !string.IsNullOrEmpty(Model.PendingUnitType) ? Model.PendingUnitType : Model.UnitType;
+    var displayBaseUnit = isPendingUpdate && Model.PendingBaseUnit.HasValue ? Model.PendingBaseUnit.Value : Model.BaseUnit;
+    // Tags và Options để hiển thị (ưu tiên pending nếu có)
+    var displayTagsList = new List<string>();
+    if (isPendingUpdate && Model.PendingTags != null && Model.PendingTags.Any())
+    {
+        // Nếu có pending tags, dùng pending tags
+        displayTagsList = Model.PendingTags.Select(t => t.Name).ToList();
+    }
+    else if (Model.Tags != null && Model.Tags.Any())
+    {
+        // Nếu không có pending, dùng tags hiện tại
+        displayTagsList = Model.Tags.Select(t => t.Name).ToList();
+    }
+    
+    var displayOptions = isPendingUpdate && Model.PendingOptions != null && Model.PendingOptions.Any() 
+        ? Model.PendingOptions 
+        : Model.Options;
+    
+    // Hàm chuyển đổi path thành full URL
+    string ToUrl(string? p)
+    {
+        if (string.IsNullOrEmpty(p)) return string.Empty;
+        if (p.StartsWith("http")) return p;
+        var backendBase = ViewBag.BackendBase as string ?? "http://localhost:5154";
+        var path = p.TrimStart('/');
+        return $"{backendBase.TrimEnd('/')}/{path}";
+    }
+    
+    // Hàm chuyển đổi UnitType sang tiếng Việt
+    string GetUnitTypeVietnamese(string? unitType)
+    {
+        if (string.IsNullOrEmpty(unitType)) return unitType ?? "";
+        return unitType switch
+        {
+            "Hour" => "Giờ",
+            "Day" => "Ngày",
+            "Visit" => "Lần",
+            "Apartment" => "Căn",
+            "Room" => "Phòng",
+            "SquareMeter" => "Mét vuông (m²)",
+            "Person" => "Người",
+            "Package" => "Gói",
+            "Event" => "Sự kiện",
+            _ => unitType
+        };
+    }
 }
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3><i class="bi bi-info-circle me-2"></i>Chi tiết dịch vụ</h3>
-        <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+        @if (!string.IsNullOrWhiteSpace(ViewBag.ReturnUrl as string))
+        {
+            <a href="@ViewBag.ReturnUrl" class="btn btn-secondary">Quay lại</a>
+        }
+        else
+        {
+            <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+        }
     </div>
 
     <div class="row g-4">
         <div class="col-lg-4">
-            <div class="card">
-                <div class="card-header">Ảnh đại diện</div>
-                <div class="card-body text-center">
-                    @if (!string.IsNullOrEmpty(avatar))
-                    {
-                        <img src="@ToUrl(avatar)" class="img-fluid rounded" style="max-height:320px;object-fit:cover" />
-                    }
-                    else
-                    {
-                        <div class="text-muted">Không có ảnh</div>
-                    }
-                </div>
-            </div>
-            <div class="card mt-3">
-                <div class="card-header">Ảnh mô tả</div>
-                <div class="card-body">
-                    @if (descImgs.Any())
-                    {
-                        <div class="row g-2">
-                            @foreach (var p in descImgs)
+            @if (isPendingUpdate && !string.IsNullOrEmpty(Model.PendingImages))
+            {
+                <!-- Hiển thị ảnh với so sánh khi có pending update -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="badge bg-info me-2">Mới (chờ duyệt)</span>
+                        Ảnh đại diện
+                    </div>
+                    <div class="card-body text-center">
+                        @if (!string.IsNullOrEmpty(pendingAvatar))
+                        {
+                            var isNewAvatar = string.IsNullOrEmpty(currentAvatar) || !string.Equals(pendingAvatar, currentAvatar, StringComparison.OrdinalIgnoreCase);
+                            <div class="position-relative">
+                                <img src="@ToUrl(pendingAvatar)" class="img-fluid rounded @(isNewAvatar ? "border border-success border-3" : "")" style="max-height:320px;object-fit:cover" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-danger\'>Không thể tải ảnh</div>';" />
+                                @if (isNewAvatar)
+                                {
+                                    <span class="badge bg-success position-absolute top-0 start-0 m-2">
+                                        <i class="bi bi-plus-circle me-1"></i>Mới
+                                    </span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrEmpty(currentAvatar) && isNewAvatar)
                             {
-                                <div class="col-4">
-                                    <img src="@ToUrl(p)" class="img-thumbnail" style="height:100px;object-fit:cover" />
+                                <div class="mt-3">
+                                    <small class="text-muted d-block mb-2">
+                                        <i class="bi bi-arrow-down me-1"></i>
+                                        <strong>Ảnh cũ (sẽ bị thay thế):</strong>
+                                    </small>
+                                    <div class="position-relative" style="opacity: 0.6; border: 2px dashed #ccc; border-radius: 0.5rem; padding: 4px;">
+                                        <img src="@ToUrl(currentAvatar)" class="img-fluid rounded" style="max-height:200px;object-fit:cover;filter: grayscale(50%);" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-danger small\'>Lỗi ảnh</div>';" />
+                                        <span class="badge bg-secondary position-absolute top-0 start-0 m-2">
+                                            <i class="bi bi-x-circle me-1"></i>Cũ
+                                        </span>
+                                        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(220,53,69,0.2) 10px, rgba(220,53,69,0.2) 20px); pointer-events: none; border-radius: 0.375rem;"></div>
+                                    </div>
                                 </div>
                             }
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="text-muted">Không có ảnh mô tả</div>
-                    }
+                        }
+                        else if (!string.IsNullOrEmpty(currentAvatar))
+                        {
+                            <div class="position-relative">
+                                <img src="@ToUrl(currentAvatar)" class="img-fluid rounded" style="max-height:320px;object-fit:cover" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-danger\'>Không thể tải ảnh</div>';" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">Không có ảnh</div>
+                        }
+                    </div>
                 </div>
-            </div>
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <span class="badge bg-info me-2">Mới (chờ duyệt)</span>
+                        Ảnh mô tả
+                    </div>
+                    <div class="card-body">
+                        @if (pendingDescImgs.Any())
+                        {
+                            <div class="row g-2">
+                                @foreach (var p in pendingDescImgs)
+                                {
+                                    var isNewImg = !currentDescImgs.Contains(p, StringComparer.OrdinalIgnoreCase);
+                                    <div class="col-4 position-relative">
+                                        <img src="@ToUrl(p)" class="img-thumbnail @(isNewImg ? "border border-success border-3" : "")" style="height:100px;object-fit:cover" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-danger small\'>Lỗi ảnh</div>';" />
+                                        @if (isNewImg)
+                                        {
+                                            <span class="badge bg-success position-absolute top-0 start-0 m-1" style="font-size: 0.7rem;">
+                                                <i class="bi bi-plus-circle"></i> Mới
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                            @if (currentDescImgs.Any())
+                            {
+                                var oldDescImgs = currentDescImgs.Where(c => !pendingDescImgs.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
+                                @if (oldDescImgs.Any())
+                                {
+                                    <div class="mt-3">
+                                        <small class="text-muted d-block mb-2">
+                                            <i class="bi bi-arrow-down me-1"></i>
+                                            <strong>Ảnh mô tả cũ (sẽ bị xóa):</strong>
+                                        </small>
+                                        <div class="row g-2">
+                                            @foreach (var oldImg in oldDescImgs)
+                                            {
+                                                <div class="col-4 position-relative" style="opacity: 0.6; border: 2px dashed #ccc; border-radius: 0.375rem; padding: 4px;">
+                                                    <img src="@ToUrl(oldImg)" class="img-thumbnail" style="height:100px;object-fit:cover;filter: grayscale(50%);" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-danger small\'>Lỗi ảnh</div>';" />
+                                                    <span class="badge bg-secondary position-absolute top-0 start-0 m-1" style="font-size: 0.7rem;">
+                                                        <i class="bi bi-x-circle"></i> Cũ
+                                                    </span>
+                                                    <div style="position: absolute; top: 4px; left: 4px; right: 4px; bottom: 4px; background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(220,53,69,0.2) 5px, rgba(220,53,69,0.2) 10px); pointer-events: none; border-radius: 0.25rem;"></div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        }
+                        else if (currentDescImgs.Any())
+                        {
+                            <div class="row g-2">
+                                @foreach (var p in currentDescImgs)
+                                {
+                                    <div class="col-4">
+                                        <img src="@ToUrl(p)" class="img-thumbnail" style="height:100px;object-fit:cover" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-danger small\'>Lỗi ảnh</div>';" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">Không có ảnh mô tả</div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Hiển thị ảnh bình thường khi không có pending update -->
+                <div class="card">
+                    <div class="card-header">Ảnh đại diện</div>
+                    <div class="card-body text-center">
+                        @if (!string.IsNullOrEmpty(avatar))
+                        {
+                            <img src="@ToUrl(avatar)" class="img-fluid rounded" style="max-height:320px;object-fit:cover" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-danger\'>Không thể tải ảnh</div>';" />
+                        }
+                        else
+                        {
+                            <div class="text-muted">Không có ảnh</div>
+                        }
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-header">Ảnh mô tả</div>
+                    <div class="card-body">
+                        @if (descImgs.Any())
+                        {
+                            <div class="row g-2">
+                                @foreach (var p in descImgs)
+                                {
+                                    <div class="col-4">
+                                        <img src="@ToUrl(p)" class="img-thumbnail" style="height:100px;object-fit:cover" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-danger small\'>Lỗi ảnh</div>';" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">Không có ảnh mô tả</div>
+                        }
+                    </div>
+                </div>
+            }
         </div>
         <div class="col-lg-8">
+            @if (isPendingUpdate)
+            {
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Dịch vụ đang chờ duyệt chỉnh sửa</strong>
+                    @if (Model.PendingUpdatedAt.HasValue)
+                    {
+                        <br />
+                        <small>Cập nhật lúc: @Model.PendingUpdatedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                    }
+                </div>
+            }
+            
             <div class="card">
-                <div class="card-header">Thông tin</div>
+                <div class="card-header">
+                    @if (isPendingUpdate)
+                    {
+                        <span class="badge bg-info me-2">Nội dung mới (chờ duyệt)</span>
+                    }
+                    Thông tin
+                </div>
                 <div class="card-body">
-                    <h4 class="mb-1">@Model.Title</h4>
+                    <h4 class="mb-1">
+                        @displayTitle
+                        @if (isPendingUpdate && !string.IsNullOrEmpty(Model.CurrentTitle) && Model.CurrentTitle != displayTitle)
+                        {
+                            <br />
+                            <small class="text-muted">
+                                <del>@Model.CurrentTitle</del>
+                            </small>
+                        }
+                    </h4>
                     <div class="text-muted mb-3">Danh mục: @Model.CategoryName</div>
-                    <p>@Model.Description</p>
+                    <p>
+                        @displayDescription
+                        @if (isPendingUpdate && !string.IsNullOrEmpty(Model.CurrentDescription) && Model.CurrentDescription != displayDescription)
+                        {
+                            <br />
+                            <small class="text-muted">
+                                <del>@Model.CurrentDescription</del>
+                            </small>
+                        }
+                    </p>
                     <hr />
                     <div class="row">
-                        <div class="col-md-4"><strong>Giá:</strong> @Model.Price.ToString("N0") VNĐ</div>
-                        <div class="col-md-4"><strong>Đơn vị:</strong> @Model.UnitType</div>
-                        <div class="col-md-4"><strong>Cơ bản:</strong> @Model.BaseUnit</div>
+                        <div class="col-md-4">
+                            <strong>Giá:</strong>
+                            <span class="@(isPendingUpdate && Model.CurrentPrice.HasValue && Model.CurrentPrice.Value != displayPrice ? "text-success fw-bold" : "")">
+                                @displayPrice.ToString("N0") VNĐ
+                            </span>
+                            @if (isPendingUpdate && Model.CurrentPrice.HasValue && Model.CurrentPrice.Value != displayPrice)
+                            {
+                                <br />
+                                <small class="text-muted">
+                                    <del>@Model.CurrentPrice.Value.ToString("N0") VNĐ</del>
+                                </small>
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Đơn vị:</strong>
+                            <span class="@(isPendingUpdate && !string.IsNullOrEmpty(Model.CurrentUnitType) && Model.CurrentUnitType != displayUnitType ? "text-success fw-bold" : "")">
+                                @GetUnitTypeVietnamese(displayUnitType)
+                            </span>
+                            @if (isPendingUpdate && !string.IsNullOrEmpty(Model.CurrentUnitType) && Model.CurrentUnitType != displayUnitType)
+                            {
+                                <br />
+                                <small class="text-muted">
+                                    <del>@GetUnitTypeVietnamese(Model.CurrentUnitType)</del>
+                                </small>
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Cơ bản:</strong>
+                            <span class="@(isPendingUpdate && Model.CurrentBaseUnit.HasValue && Model.CurrentBaseUnit.Value != displayBaseUnit ? "text-success fw-bold" : "")">
+                                @displayBaseUnit
+                            </span>
+                            @if (isPendingUpdate && Model.CurrentBaseUnit.HasValue && Model.CurrentBaseUnit.Value != displayBaseUnit)
+                            {
+                                <br />
+                                <small class="text-muted">
+                                    <del>@Model.CurrentBaseUnit.Value</del>
+                                </small>
+                            }
+                        </div>
                     </div>
                     <hr />
                     <div class="mb-3">
-                        <strong>Tags:</strong>
-                        @if (Model.Tags.Any())
+                        <strong>Thẻ:</strong>
+                        @if (displayTagsList.Any())
                         {
-                            foreach (var t in Model.Tags)
+                            // Hiển thị tags mới (pending hoặc current)
+                            foreach (var tagName in displayTagsList)
                             {
-                                <span class="badge bg-info text-dark me-1">@t.Name</span>
+                                <span class="badge bg-info text-dark me-1">@tagName</span>
+                            }
+                            
+                            // Chỉ hiển thị tags cũ nếu có pending update và tags thực sự khác nhau
+                            @if (isPendingUpdate && Model.CurrentTags != null && Model.CurrentTags.Any())
+                            {
+                                var currentTagNames = Model.CurrentTags.Select(t => t.Name).OrderBy(x => x).ToList();
+                                var displayTagNames = displayTagsList.OrderBy(x => x).ToList();
+                                
+                                // So sánh danh sách tags (không phân biệt thứ tự)
+                                var hasChanges = !currentTagNames.SequenceEqual(displayTagNames);
+                                
+                                if (hasChanges)
+                                {
+                                    <br />
+                                    <small class="text-muted d-block mt-2">
+                                        <i class="bi bi-arrow-down me-1"></i>
+                                        <strong>Trước đây:</strong>
+                                        @foreach (var t in Model.CurrentTags)
+                                        {
+                                            <del class="me-1">
+                                                <span class="badge bg-secondary">@t.Name</span>
+                                            </del>
+                                        }
+                                    </small>
+                                }
                             }
                         }
                         else
                         {
                             <span class="text-muted">Không có</span>
+                            // Nếu không có tags mới nhưng có tags cũ, hiển thị tags cũ
+                            @if (isPendingUpdate && Model.CurrentTags != null && Model.CurrentTags.Any())
+                            {
+                                <br />
+                                <small class="text-muted">
+                                    <del>
+                                        @foreach (var t in Model.CurrentTags)
+                                        {
+                                            <span class="badge bg-secondary me-1">@t.Name</span>
+                                        }
+                                    </del>
+                                </small>
+                            }
                         }
                     </div>
                     <div>
-                        <strong>Options:</strong>
-                        @if (Model.Options.Any())
+                        <strong>Tùy chọn:</strong>
+                        @if (displayOptions != null && displayOptions.Any())
                         {
                             <ul class="mt-2">
-                                @foreach (var o in Model.Options)
+                                @foreach (var o in displayOptions)
                                 {
                                     <li>
                                         <strong>@o.OptionName</strong>
                                         <span class="text-muted"> — @o.Description</span>
-                                        <span class="ms-2">@o.Price.ToString("N0") VNĐ/@o.UnitType</span>
+                                        <span class="ms-2">@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
                                     </li>
                                 }
                             </ul>
+                            @if (isPendingUpdate && Model.CurrentOptions != null && Model.CurrentOptions.Any())
+                            {
+                                var currentOptionIds = Model.CurrentOptions.Select(o => o.OptionId).OrderBy(x => x).ToList();
+                                var pendingOptionIds = displayOptions.Select(o => o.OptionId).OrderBy(x => x).ToList();
+                                if (!currentOptionIds.SequenceEqual(pendingOptionIds))
+                                {
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <del>
+                                                <ul class="mb-0">
+                                                    @foreach (var o in Model.CurrentOptions)
+                                                    {
+                                                        <li>
+                                                            <strong>@o.OptionName</strong>
+                                                            <span class="text-muted"> — @o.Description</span>
+                                                            <span class="ms-2">@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </del>
+                                        </small>
+                                    </div>
+                                }
+                            }
                         }
                         else
                         {
@@ -99,9 +437,66 @@
                         }
                     </div>
                 </div>
+                @if (isPendingUpdate || Model.Status == "Pending")
+                {
+                    <div class="card-footer bg-light">
+                        <div class="d-flex justify-content-end gap-2">
+                            @{
+                                var returnUrlForActions = ViewBag.ReturnUrl as string ?? Url.Action("Index", "AdminServiceApproval");
+                            }
+                            <form asp-action="Approve" method="post" class="d-inline">
+                                <input type="hidden" name="id" value="@Model.ServiceId" />
+                                <input type="hidden" name="returnUrl" value="@returnUrlForActions" />
+                                <button type="submit" class="btn btn-approval btn-approval-approve">
+                                    <i class="bi bi-check2 me-1"></i>@(isPendingUpdate ? "Duyệt chỉnh sửa" : "Duyệt")
+                                </button>
+                            </form>
+                            <button class="btn btn-approval btn-approval-reject" data-bs-toggle="modal" data-bs-target="#rejectModal" data-id="@Model.ServiceId" data-status="@Model.Status">
+                                <i class="bi bi-x-lg me-1"></i>Từ chối
+                            </button>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
     </div>
 </div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rejectModalLabel">Lý do từ chối</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="Reject" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="rejectId" />
+                    @{
+                        var returnUrlForReject = ViewBag.ReturnUrl as string ?? Url.Action("Index", "AdminServiceApproval");
+                    }
+                    <input type="hidden" name="returnUrl" value="@returnUrlForReject" />
+                    <textarea class="form-control" name="reason" rows="4" placeholder="Nhập lý do (tuỳ chọn)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-danger">Xác nhận từ chối</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    var rejectModal = document.getElementById('rejectModal');
+    if (rejectModal) {
+        rejectModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var id = button.getAttribute('data-id');
+            document.getElementById('rejectId').value = id;
+        });
+    }
+</script>
 
 

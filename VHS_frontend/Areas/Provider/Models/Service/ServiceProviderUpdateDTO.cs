@@ -18,7 +18,8 @@ namespace VHS_frontend.Areas.Provider.Models.Service
         [Required(ErrorMessage = "Đơn vị không được để trống.")]
         public string UnitType { get; set; } = string.Empty;
 
-        [Range(1, int.MaxValue, ErrorMessage = "Đơn vị cơ bản phải lớn hơn 0.")]
+        [Required(ErrorMessage = "Số lượng tối thiểu không được để trống.")]
+        [Range(1, int.MaxValue, ErrorMessage = "Số lượng tối thiểu phải từ 1 trở lên.")]
         public int BaseUnit { get; set; }
 
         public IFormFile? Avatar { get; set; }

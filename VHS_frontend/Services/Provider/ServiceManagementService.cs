@@ -171,6 +171,15 @@ namespace VHS_frontend.Services.Provider
             return await response.Content.ReadFromJsonAsync<ApiResponse<string>>(_json, ct);
         }
 
+        public async Task<ApiResponse<string>?> UpdateStatusAsync(string serviceId, string status, string? token = null, CancellationToken ct = default)
+        {
+            SetAuthHeader(token);
+
+            var payload = JsonContent.Create(new { status }, options: _json);
+            var response = await _httpClient.PatchAsync($"/api/ServiceProvider/{serviceId}/status", payload, ct);
+            return await response.Content.ReadFromJsonAsync<ApiResponse<string>>(_json, ct);
+        }
+
         // Xóa dịch vụ
         public async Task<ApiResponse<string>?> DeleteServiceAsync(string serviceId, string? token = null, CancellationToken ct = default)
         {

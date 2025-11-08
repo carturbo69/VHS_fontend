@@ -46,26 +46,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
             try
             {
-                var service = await _serviceManagementService.GetServiceByIdAsync(id, token);
-                if (service == null)
-                {
-                    TempData["Error"] = "Không tìm thấy dịch vụ.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                var updateDto = new ServiceProviderUpdateDTO
-                {
-                    Title = service.Title,
-                    Description = service.Description,
-                    Price = service.Price,
-                    UnitType = service.UnitType,
-                    BaseUnit = service.BaseUnit,
-                    Status = targetStatus,
-                    TagIds = service.Tags.Select(t => t.TagId).ToList(),
-                    OptionIds = service.Options.Select(o => o.OptionId).ToList()
-                };
-
-                var resp = await _serviceManagementService.UpdateServiceAsync(id, updateDto, token);
+                var resp = await _serviceManagementService.UpdateStatusAsync(id, targetStatus, token);
                 if (resp?.Success == true)
                 {
                     TempData["Success"] = targetStatus == "Active" ? "Đã bật hoạt động dịch vụ." : "Đã tạm dừng dịch vụ.";
@@ -113,9 +94,9 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 return RedirectToAction("Login", "Account", new { area = "" });
             }
 
-            // Lấy danh sách Categories khả dụng
-            var categories = await _serviceManagementService.GetAvailableCategoriesAsync(providerId, token);
-            ViewBag.Categories = categories ?? new List<CategoryDTO>();
+        // Lấy danh sách Categories khả dụng
+        var categories = await _serviceManagementService.GetAvailableCategoriesAsync(providerId, token);
+        ViewBag.Categories = categories ?? new List<CategoryDTO>();
 
             // Không nạp Options dùng chung cho trang tạo mới (bắt đầu trống, provider tự thêm)
 
@@ -216,8 +197,8 @@ namespace VHS_frontend.Areas.Provider.Controllers
             var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), token);
             ViewBag.Tags = tags ?? new List<TagDTO>();
 
-            // Only pass options already selected with this service
-            ViewBag.Options = service.Options ?? new List<OptionDTO>();
+        // Only pass options already selected with this service
+        ViewBag.Options = service.Options ?? new List<OptionDTO>();
 
             ViewData["Title"] = "Chỉnh sửa Dịch vụ";
             ViewBag.ServiceId = id;
@@ -379,6 +360,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 return Json(new { success = false, message = ex.Message });
             }
         }
+
     }
 }
 
