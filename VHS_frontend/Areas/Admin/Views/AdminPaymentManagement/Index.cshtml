@@ -39,6 +39,17 @@
            class="tab-link @(currentTab == "dashboard" ? "active" : "")">
             <i class="bi bi-speedometer2"></i>
             <span>Tổng quan</span>
+            @{
+                // Tính tổng số thông báo: pending refunds + pending withdrawals + approved refunds + processed withdrawals
+                var totalNotifications = (Model.Dashboard?.PendingRefunds ?? 0) + 
+                                        (Model.PendingWithdrawals?.Count ?? 0) + 
+                                        (Model.ApprovedRefunds?.Count ?? 0) + 
+                                        (Model.ProcessedWithdrawals?.Count ?? 0);
+            }
+            @if (totalNotifications > 0)
+            {
+                <span class="badge badge-primary">@totalNotifications</span>
+            }
         </a>
         <a href="@Url.Action("Index", new { tab = "refunds" })" 
            class="tab-link @(currentTab == "refunds" ? "active" : "")">
@@ -56,24 +67,6 @@
             @if (Model.ApprovedRefunds.Count > 0)
             {
                 <span class="badge badge-success">@Model.ApprovedRefunds.Count</span>
-            }
-        </a>
-        <a href="@Url.Action("Index", new { tab = "provider-payments" })" 
-           class="tab-link @(currentTab == "provider-payments" ? "active" : "")">
-            <i class="bi bi-cash-coin"></i>
-            <span>Phê duyệt thanh toán</span>
-            @if (Model.Dashboard?.PendingPayouts > 0)
-            {
-                <span class="badge">@Model.Dashboard.PendingPayouts</span>
-            }
-        </a>
-        <a href="@Url.Action("Index", new { tab = "approved-provider-payments" })" 
-           class="tab-link @(currentTab == "approved-provider-payments" ? "active" : "")">
-            <i class="bi bi-check-circle"></i>
-            <span>Đã phê duyệt</span>
-            @if (Model.ApprovedProviderPayments.Count > 0)
-            {
-                <span class="badge badge-success">@Model.ApprovedProviderPayments.Count</span>
             }
         </a>
         <a href="@Url.Action("Index", new { tab = "withdrawals" })" 
@@ -109,14 +102,6 @@
         else if (currentTab == "approved-refunds")
         {
             @await Html.PartialAsync("_ApprovedRefundsPartial", Model.ApprovedRefunds)
-        }
-        else if (currentTab == "provider-payments")
-        {
-            @await Html.PartialAsync("_ProviderPaymentsPartial", Model.PendingProviderPayments)
-        }
-        else if (currentTab == "approved-provider-payments")
-        {
-            @await Html.PartialAsync("_ApprovedProviderPaymentsPartial", Model.ApprovedProviderPayments)
         }
         else if (currentTab == "withdrawals")
         {
@@ -164,14 +149,15 @@
             adminNoteModal.show();
         }
 
-        // Approve Provider Payment
-        function approveProviderPayment(bookingId) {
-            currentModalContext = { type: 'approveProviderPayment', bookingId: bookingId };
-            document.getElementById('modalActionText').textContent = 'phê duyệt thanh toán';
+        // Reject Refund
+        function rejectRefund(bookingId) {
+            currentModalContext = { type: 'rejectRefund', bookingId: bookingId };
+            document.getElementById('modalActionText').textContent = 'từ chối hoàn tiền';
             document.getElementById('adminNoteInput').value = '';
             document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
             adminNoteModal.show();
         }
+
 
         // Approve/Reject Withdrawal
         function handleWithdrawal(withdrawalId, action) {
@@ -195,8 +181,8 @@
             // Execute action based on context
             if (context.type === 'approveRefund') {
                 executeApproveRefund(context.bookingId, adminNote);
-            } else if (context.type === 'approveProviderPayment') {
-                executeApproveProviderPayment(context.bookingId, adminNote);
+            } else if (context.type === 'rejectRefund') {
+                executeRejectRefund(context.bookingId, adminNote);
             } else if (context.type === 'handleWithdrawal') {
                 executeHandleWithdrawal(context.withdrawalId, context.action, adminNote);
             }
@@ -204,6 +190,30 @@
 
         function executeApproveRefund(bookingId, adminNote) {
             fetch('@Url.Action("ApproveRefund")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({ bookingId, adminNote })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Từ chối hoàn tiền thành công!');
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + (data.message || 'Có lỗi xảy ra'));
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Có lỗi xảy ra khi xử lý yêu cầu');
+            });
+        }
+
+        function executeRejectRefund(bookingId, adminNote) {
+            fetch('@Url.Action("RejectRefund")', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -226,29 +236,6 @@
             });
         }
 
-        function executeApproveProviderPayment(bookingId, adminNote) {
-            fetch('@Url.Action("ApproveProviderPayment")', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
-                },
-                body: JSON.stringify({ bookingId, adminNote })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Phê duyệt thanh toán thành công!');
-                    location.reload();
-                } else {
-                    alert('Lỗi: ' + data.message);
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Đã có lỗi xảy ra');
-            });
-        }
 
         function executeHandleWithdrawal(withdrawalId, action, adminNote) {
             fetch('@Url.Action("ApproveWithdrawal")', {
