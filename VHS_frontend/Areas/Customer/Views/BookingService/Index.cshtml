@@ -1,7 +1,5 @@
 ﻿
 @using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
-@using Microsoft.Extensions.Configuration
-@inject IConfiguration Configuration
 @model BookingViewModel
 @{
     ViewData["Title"] = "Thanh toán";
@@ -12,14 +10,9 @@
     var placeOrderFormId = "placeOrderForm";
 }
 
-<!-- Google Maps API - Thêm libraries=marker để dùng AdvancedMarkerElement -->
-@{
-    var googleMapsApiKey = Configuration["GoogleMaps:ApiKey"] ?? "";
-}
-@if (!string.IsNullOrEmpty(googleMapsApiKey))
-{
-    <script src="https://maps.googleapis.com/maps/api/js?key=@googleMapsApiKey&libraries=places,marker&language=vi&region=VN"></script>
-}
+<!-- Leaflet Maps (OpenStreetMap) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 @if (Model.Address.Latitude.HasValue && Model.Address.Longitude.HasValue)
 {
@@ -27,66 +20,32 @@
         let map;
         let marker;
         
-        async function initMap() {
-            if (typeof google === 'undefined' || !google.maps) {
-                console.error('Google Maps API chưa được load');
-                return;
-            }
-            
+        function initMap() {
             const lat = @Model.Address.Latitude.Value;
             const lng = @Model.Address.Longitude.Value;
             
-            // Khởi tạo Google Maps
-            map = new google.maps.Map(document.getElementById('addressMap'), {
-                center: { lat: lat, lng: lng },
-                zoom: 15,
-                mapTypeControl: true,
-                streetViewControl: true,
-                fullscreenControl: true
-            });
+            // Khởi tạo Leaflet Map
+            map = L.map('addressMap').setView([lat, lng], 15);
             
-            // Sử dụng AdvancedMarkerElement (thay vì Marker deprecated)
-            try {
-                const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-                
-                marker = new AdvancedMarkerElement({
-                    map: map,
-                    position: { lat: lat, lng: lng },
-                    title: '@Html.Raw(Model.Address.ToDisplayString())'
-                });
-                
-                // Thêm info window
-                const infoWindow = new google.maps.InfoWindow({
-                    content: '<div style="padding: 8px;"><strong>@Html.Raw(Model.Address.ToDisplayString())</strong></div>'
-                });
-                infoWindow.open(map, marker);
-            } catch (error) {
-                console.error('Error loading AdvancedMarkerElement, falling back to Marker:', error);
-                // Fallback to old Marker if AdvancedMarkerElement fails
-                marker = new google.maps.Marker({
-                    position: { lat: lat, lng: lng },
-                    map: map,
-                    title: '@Html.Raw(Model.Address.ToDisplayString())',
-                    draggable: false
-                });
-                
-                const infoWindow = new google.maps.InfoWindow({
-                    content: '<div style="padding: 8px;"><strong>@Html.Raw(Model.Address.ToDisplayString())</strong></div>'
-                });
-                infoWindow.open(map, marker);
-            }
+            // Thêm tile layer (OpenStreetMap)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Thêm marker
+            marker = L.marker([lat, lng], {
+                draggable: false
+            }).addTo(map);
+            
+            // Thêm popup với địa chỉ
+            marker.bindPopup('<div style="padding: 8px;"><strong>@Html.Raw(Model.Address.ToDisplayString())</strong></div>').openPopup();
         }
         
         // Khởi tạo bản đồ khi trang load
         document.addEventListener('DOMContentLoaded', function() {
             if (document.getElementById('addressMap')) {
-                // Đợi Google Maps load xong
-                if (typeof google !== 'undefined' && google.maps) {
-                    initMap();
-                } else {
-                    // Retry sau 1 giây nếu chưa load
-                    setTimeout(initMap, 1000);
-                }
+                initMap();
             }
         });
     </script>
@@ -557,15 +516,9 @@
                 </button>
             </div>
 
-            <div class="form-grid-2">
-                <div class="form-row">
-                    <label for="wardName">Phường/Xã</label>
-                    <input type="text" id="wardName" name="wardName" required />
-                </div>
-                <div class="form-row">
-                    <label for="districtName">Quận/Huyện</label>
-                    <input type="text" id="districtName" name="districtName" placeholder="Quận/Huyện (tùy chọn)" />
-                </div>
+            <div class="form-row">
+                <label for="wardName">Phường/Xã</label>
+                <input type="text" id="wardName" name="wardName" required />
             </div>
             <div class="form-row">
                 <label for="provinceName">Tỉnh/Thành</label>
@@ -604,11 +557,10 @@
             const province = document.getElementById('provinceName')?.value.trim() || '';
             const lat = document.getElementById('Latitude')?.value.trim() || '';
             const lng = document.getElementById('Longitude')?.value.trim() || '';
-            const district = document.getElementById('districtName')?.value.trim() || '';
             const recipientName = document.getElementById('recipientName')?.value.trim() || '';
             const recipientPhone = document.getElementById('recipientPhone')?.value.trim() || '';
             
-            console.log('Form values:', { street, ward, province, lat, lng, district, recipientName, recipientPhone });
+            console.log('Form values:', { street, ward, province, lat, lng, recipientName, recipientPhone });
             
             if (!street || !ward || !province) {
               e.preventDefault();
@@ -768,7 +720,7 @@
           const checked = document.querySelector('.addr-item input[type="radio"][name="addressChoice"]:checked');
           if(!checked){ closeAddressModal(); return; }
           const row = checked.closest('.addr-item');
-          const parts = [row.dataset.street, row.dataset.ward, row.dataset.district, row.dataset.province]
+          const parts = [row.dataset.street, row.dataset.ward, row.dataset.province]
                         .filter(s => s && s.trim() !== '');
           const text = parts.join(', ');
           
@@ -798,7 +750,7 @@
         }
 
         /* ========= Modal Upsert Address ========= */
-        let addressPickerMap, addressPickerMarker; // Google Maps objects
+        let addressPickerMap, addressPickerMarker; // Leaflet objects
         
         function openCreateAddressForm(){
           document.getElementById('upsertTitle').innerText = 'Thêm địa chỉ';
@@ -806,7 +758,6 @@
           document.getElementById('streetAddress').value = '';
           document.getElementById('wardName').value = '';
           document.getElementById('provinceName').value = '';
-          document.getElementById('districtName').value = '';
           document.getElementById('recipientName').value = '';
           document.getElementById('recipientPhone').value = '';
           document.getElementById('Latitude').value = '';
@@ -820,106 +771,62 @@
           document.getElementById('addressUpsertModal').classList.add('open');
         }
         
-        async function initAddressPickerMap() {
-          // Kiểm tra Google Maps đã load chưa
-          if (typeof google === 'undefined' || !google.maps) {
-            console.error('Google Maps API chưa được load. Vui lòng kiểm tra API key và billing.');
-            alert('Google Maps chưa sẵn sàng. Vui lòng kiểm tra:\n1. Maps JavaScript API đã được enable\n2. Billing account đã được link\n3. API key đúng trong appsettings.json');
+        function initAddressPickerMap() {
+          // Kiểm tra Leaflet đã load chưa
+          if (typeof L === 'undefined') {
+            console.error('Leaflet chưa được load');
+            alert('Leaflet Maps chưa sẵn sàng. Vui lòng refresh trang.');
             return;
           }
           
-          // Khởi tạo bản đồ Google Maps
+          // Mặc định: Cần Thơ
+          const defaultLat = parseFloat(document.getElementById('Latitude').value) || 10.0452;
+          const defaultLng = parseFloat(document.getElementById('Longitude').value) || 105.7469;
+          
+          // Nếu map chưa được khởi tạo, tạo mới
           if (!addressPickerMap) {
-            // Mặc định: Cần Thơ
-            const defaultLat = parseFloat(document.getElementById('Latitude').value) || 10.0452;
-            const defaultLng = parseFloat(document.getElementById('Longitude').value) || 105.7469;
+            // Khởi tạo Leaflet Map
+            addressPickerMap = L.map('addressMapPicker').setView([defaultLat, defaultLng], 13);
             
-            try {
-              // Khởi tạo Google Maps
-              addressPickerMap = new google.maps.Map(document.getElementById('addressMapPicker'), {
-                center: { lat: defaultLat, lng: defaultLng },
-                zoom: 13,
-                mapTypeControl: true,
-                streetViewControl: true,
-                fullscreenControl: true
-              });
+            // Thêm tile layer (OpenStreetMap)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+              maxZoom: 19
+            }).addTo(addressPickerMap);
+            
+            // Thêm marker có thể kéo
+            addressPickerMarker = L.marker([defaultLat, defaultLng], {
+              draggable: true
+            }).addTo(addressPickerMap);
+            
+            // Cập nhật tọa độ khi kéo marker
+            addressPickerMarker.on('dragend', function(e) {
+              const pos = addressPickerMarker.getLatLng();
+              document.getElementById('Latitude').value = pos.lat;
+              document.getElementById('Longitude').value = pos.lng;
+            });
+            
+            // Nhấn vào bản đồ để di chuyển marker
+            addressPickerMap.on('click', function(e) {
+              const lat = e.latlng.lat;
+              const lng = e.latlng.lng;
               
-              // Sử dụng AdvancedMarkerElement (thay vì Marker deprecated)
-              try {
-                const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-                
-                addressPickerMarker = new AdvancedMarkerElement({
-                  map: addressPickerMap,
-                  position: { lat: defaultLat, lng: defaultLng },
-                  title: 'Kéo để chọn vị trí',
-                  gmpDraggable: true
-                });
-                
-                // Cập nhật tọa độ khi kéo marker
-                addressPickerMarker.addListener('dragend', function(e) {
-                  const pos = addressPickerMarker.position;
-                  document.getElementById('Latitude').value = pos.lat;
-                  document.getElementById('Longitude').value = pos.lng;
-                });
-              } catch (markerError) {
-                console.error('Error loading AdvancedMarkerElement, falling back to Marker:', markerError);
-                // Fallback to old Marker if AdvancedMarkerElement fails
-                addressPickerMarker = new google.maps.Marker({
-                  position: { lat: defaultLat, lng: defaultLng },
-                  map: addressPickerMap,
-                  draggable: true,
-                  title: 'Kéo để chọn vị trí'
-                });
-                
-                // Cập nhật tọa độ khi kéo marker
-                google.maps.event.addListener(addressPickerMarker, 'dragend', function(e) {
-                  const pos = addressPickerMarker.getPosition();
-                  document.getElementById('Latitude').value = pos.lat();
-                  document.getElementById('Longitude').value = pos.lng();
-                });
-              }
+              document.getElementById('Latitude').value = lat;
+              document.getElementById('Longitude').value = lng;
               
-              // Nhấn vào bản đồ để di chuyển marker
-              addressPickerMap.addListener('click', function(e) {
-                const lat = e.latLng.lat();
-                const lng = e.latLng.lng();
-                
-                document.getElementById('Latitude').value = lat;
-                document.getElementById('Longitude').value = lng;
-                
-                // Di chuyển marker đến vị trí mới
-                if (addressPickerMarker.position) {
-                  // AdvancedMarkerElement
-                  addressPickerMarker.position = { lat: lat, lng: lng };
-                } else if (addressPickerMarker.setPosition) {
-                  // Old Marker
-                  addressPickerMarker.setPosition({ lat: lat, lng: lng });
-                }
-              });
-            } catch (error) {
-              console.error('Error initializing Google Maps:', error);
-              alert('Không thể khởi tạo bản đồ. Lỗi: ' + error.message + '\n\nVui lòng kiểm tra:\n1. Maps JavaScript API đã được enable\n2. Billing account đã được link\n\nHướng dẫn link billing:\nhttps://console.cloud.google.com/billing?project=vhs-maps');
-              return;
-            }
+              // Di chuyển marker đến vị trí mới
+              addressPickerMarker.setLatLng([lat, lng]);
+            });
           } else {
             // Cập nhật vị trí nếu map đã được khởi tạo
-            const lat = parseFloat(document.getElementById('Latitude').value) || 10.0452;
-            const lng = parseFloat(document.getElementById('Longitude').value) || 105.7469;
-            addressPickerMap.setCenter({ lat: lat, lng: lng });
-            addressPickerMap.setZoom(13);
+            addressPickerMap.setView([defaultLat, defaultLng], 13);
             if (addressPickerMarker) {
-              if (addressPickerMarker.position) {
-                // AdvancedMarkerElement
-                addressPickerMarker.position = { lat: lat, lng: lng };
-              } else if (addressPickerMarker.setPosition) {
-                // Old Marker
-                addressPickerMarker.setPosition({ lat: lat, lng: lng });
-              }
+              addressPickerMarker.setLatLng([defaultLat, defaultLng]);
             }
           }
         }
         
-        // Nút "Lấy địa chỉ từ vị trí đã chọn" - Reverse Geocoding
+        // Nút "Lấy địa chỉ từ vị trí đã chọn" - Reverse Geocoding (Nominatim API)
         document.addEventListener('click', function(e) {
           if (e.target && e.target.id === 'btnGeocode') {
             const lat = document.getElementById('Latitude').value;
@@ -935,113 +842,124 @@
             btn.disabled = true;
             btn.textContent = 'Đang tải...';
             
-            // Gọi Google Geocoding API để lấy địa chỉ từ tọa độ
-            const apiKey = '@googleMapsApiKey';
-            if (!apiKey) {
-              alert('Google Maps API key chưa được cấu hình trong appsettings.json');
-              btn.disabled = false;
-              btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
-              return;
-            }
-            
-            fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=vi&key=${apiKey}`)
+            // Gọi Nominatim API (OpenStreetMap) để lấy địa chỉ từ tọa độ
+            // Nominatim là miễn phí, không cần API key
+            // Thêm zoom=12 để có độ chi tiết tốt hơn (tỉnh/thành sẽ rõ ràng hơn)
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1&accept-language=vi&extratags=1`)
               .then(response => response.json())
               .then(data => {
-                console.log('Google Geocoding API Response:', data);
+                console.log('=== Nominatim API Response ===');
+                console.log('Full response:', data);
+                console.log('Address object:', data.address);
                 
-                // Kiểm tra lỗi từ API
-                if (data.status === 'REQUEST_DENIED' || data.status === 'OVER_QUERY_LIMIT' || data.status === 'INVALID_REQUEST') {
-                  alert(`Lỗi Google Maps API: ${data.error_message || data.status}\n\nVui lòng kiểm tra:\n1. Maps JavaScript API đã được enable\n2. Geocoding API đã được enable\n3. Billing account đã được link\n4. API key đúng trong appsettings.json`);
-                  btn.disabled = false;
-                  btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
-                  return;
-                }
-                
-                if (data && data.status === 'OK' && data.results && data.results.length > 0) {
-                  const result = data.results[0];
-                  console.log('=== Google Geocoding Response ===');
-                  console.log(data);
-                  console.log('=== First Result ===');
-                  console.log(result);
+                if (data && data.address) {
+                  const address = data.address;
                   
-                  // Parse address components từ Google Geocoding API
-                  const addressComponents = result.address_components || [];
-                  let streetNumber = '';
-                  let route = '';
-                  let ward = '';
-                  let district = '';
-                  let province = '';
+                  // Parse address từ Nominatim API
+                  // Nominatim trả về các trường như: road, house_number, suburb, city_district, city, state, etc.
+                  let streetNumber = address.house_number || '';
+                  let route = address.road || address.street || '';
                   
-                  // Parse từng component
-                  addressComponents.forEach(component => {
-                    const types = component.types || [];
-                    const longName = component.long_name || '';
+                  // Parse Phường/Xã - thử nhiều field
+                  let ward = address.suburb || 
+                            address.city_district || 
+                            address.neighbourhood || 
+                            address.quarter || 
+                            address.village || 
+                            '';
+                  
+                  // Parse Tỉnh/Thành - thử nhiều field khác nhau
+                  // Ở Việt Nam, Nominatim có thể trả về: state, city, province, region, county, town, municipality
+                  let province = address.city || 
+                                address.state || 
+                                address.province || 
+                                address.region || 
+                                address.county || 
+                                address.town || 
+                                address.municipality || 
+                                '';
+                  
+                  // Nếu vẫn không có tỉnh/thành, thử parse từ display_name
+                  if (!province && data.display_name) {
+                    console.log('Trying to parse province from display_name:', data.display_name);
+                    // Parse từ display_name
+                    // Format thường gặp: "Đường, Phường/Xã, Quận/Huyện, Thành phố/Tỉnh, Vietnam"
+                    // Hoặc: "Đường, Phường/Xã, Thành phố/Tỉnh, Vietnam"
+                    const parts = data.display_name.split(',').map(p => p.trim()).filter(p => p);
+                    console.log('Display name parts:', parts);
                     
-                    if (types.includes('street_number')) {
-                      streetNumber = longName;
-                    } else if (types.includes('route')) {
-                      route = longName;
-                    } else if (types.includes('sublocality') || types.includes('sublocality_level_1') || 
-                               types.includes('administrative_area_level_3')) {
-                      // Phường/Xã
-                      if (longName.includes('Phường') || longName.includes('Xã')) {
-                        ward = longName.replace(/^(Phường|Xã)\s*/, '');
-                      } else {
-                        ward = longName;
+                    // Tỉnh/thành thường là phần ngay trước "Vietnam" (phần thứ 2 từ cuối)
+                    // Hoặc có thể là phần thứ 3 từ cuối nếu có Quận/Huyện
+                    if (parts.length >= 3) {
+                      // Thử lấy phần thứ 2 từ cuối (trước "Vietnam")
+                      let candidate = parts[parts.length - 2];
+                      
+                      // Nếu phần đó quá ngắn (< 4 ký tự) hoặc là số, thử phần thứ 3 từ cuối
+                      if (!candidate || candidate.length < 4 || candidate.match(/^\d+$/)) {
+                        if (parts.length >= 4) {
+                          candidate = parts[parts.length - 3];
+                        }
                       }
-                    } else if (types.includes('administrative_area_level_2')) {
-                      // Quận/Huyện
-                      if (longName.includes('Quận') || longName.includes('Huyện')) {
-                        district = longName.replace(/^(Quận|Huyện)\s*/, '');
-                      } else {
-                        district = longName;
-                      }
-                    } else if (types.includes('administrative_area_level_1')) {
-                      // Tỉnh/Thành phố
-                      if (longName.includes('Tỉnh') || longName.includes('Thành phố')) {
-                        province = longName.replace(/^(Tỉnh|Thành phố)\s*/, '');
-                      } else {
-                        province = longName;
+                      
+                      // Nếu candidate hợp lệ (không phải "Vietnam", không phải số, có độ dài > 3)
+                      if (candidate && !candidate.match(/^Vietnam$/i) && !candidate.match(/^\d+$/) && candidate.length > 3) {
+                        province = candidate;
+                        console.log('Found province from display_name:', province);
                       }
                     }
-                  });
+                  }
                   
-                  // Tạo street address từ street_number và route
-                  const streetAddress = (streetNumber + ' ' + route).trim() || route || result.formatted_address.split(',')[0];
+                  // Xử lý tên tỉnh/thành phố (loại bỏ "Tỉnh", "Thành phố" ở đầu nếu có)
+                  if (province) {
+                    province = province.replace(/^(Tỉnh|Thành phố|Thành Phố|TP\.?)\s*/i, '').trim();
+                  }
+                  
+                  // Xử lý tên phường/xã (loại bỏ "Phường", "Xã" ở đầu nếu có)
+                  if (ward) {
+                    ward = ward.replace(/^(Phường|Xã|P\.?|X\.?)\s*/i, '').trim();
+                  }
+                  
+                  // Tạo street address
+                  const streetAddress = (streetNumber + ' ' + route).trim() || route || address.house || '';
+                  
+                  // Log để debug
+                  console.log('=== Parsed Address ===');
+                  console.log('Street Number:', streetNumber);
+                  console.log('Route:', route);
+                  console.log('Street Address:', streetAddress);
+                  console.log('Ward:', ward);
+                  console.log('Province (raw):', address.state || address.city || address.province || address.region || address.county);
+                  console.log('Province (parsed):', province);
+                  console.log('All address fields:', Object.keys(address));
+                  console.log('Address values:', address);
+                  
+                  // Điền vào form
                   document.getElementById('streetAddress').value = streetAddress;
-                  
                   document.getElementById('wardName').value = ward;
-                  document.getElementById('districtName').value = district;
                   document.getElementById('provinceName').value = province;
                   
-                  console.log('Final mapped:', { streetAddress, ward, district, province });
+                  console.log('Final mapped:', { streetAddress, ward, province });
                   
                   btn.disabled = false;
                   btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
                   
                   // Kiểm tra và hiển thị thông báo
-                  if (!ward && !district && !province) {
-                    alert('Không thể tự động điền đầy đủ. Vui lòng kiểm tra console (F12) để xem dữ liệu từ API.');
+                  if (!ward && !province) {
+                    alert('Không thể tự động điền đầy đủ. Vui lòng kiểm tra console (F12) để xem dữ liệu từ API.\n\nRaw response: ' + JSON.stringify(data, null, 2));
+                  } else if (!province) {
+                    alert('Đã lấy địa chỉ nhưng không tìm thấy Tỉnh/Thành. Vui lòng nhập thủ công.\n\nVui lòng kiểm tra console (F12) để xem chi tiết.');
                   } else {
-                    let successMsg = 'Đã lấy địa chỉ thành công!';
-                    if (!district) {
-                      successMsg += '\nLưu ý: Không tìm thấy Quận/Huyện, bạn có thể nhập thủ công.';
-                    }
-                    alert(successMsg);
+                    alert('Đã lấy địa chỉ thành công!');
                   }
-                } else if (data.status === 'ZERO_RESULTS') {
-                  alert('Không tìm thấy địa chỉ tại vị trí này. Vui lòng thử lại hoặc chọn vị trí khác.');
-                  btn.disabled = false;
-                  btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
                 } else {
-                  alert(`Không thể lấy địa chỉ. Lỗi: ${data.status}${data.error_message ? ' - ' + data.error_message : ''}`);
+                  alert('Không tìm thấy địa chỉ tại vị trí này. Vui lòng thử lại hoặc chọn vị trí khác.');
                   btn.disabled = false;
                   btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
                 }
               })
               .catch(error => {
                 console.error('Geocoding error:', error);
-                alert('Không thể lấy địa chỉ từ vị trí đã chọn');
+                alert('Không thể lấy địa chỉ từ vị trí đã chọn. Lỗi: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
               });
@@ -1056,7 +974,6 @@
           document.getElementById('AddressId').value = row.dataset.id || '';
           document.getElementById('streetAddress').value = row.dataset.street || '';
           document.getElementById('wardName').value = row.dataset.ward || '';
-          document.getElementById('districtName').value = row.dataset.district || '';
           document.getElementById('provinceName').value = row.dataset.province || '';
           
           // Set tên và số điện thoại
@@ -1082,15 +999,11 @@
           
           // Khởi tạo bản đồ với tọa độ đã có
           setTimeout(() => {
-            if (lat && lng) {
-              initAddressPickerMap();
-              // Set marker tại vị trí đã có
-              if (addressPickerMap && addressPickerMarker) {
-                addressPickerMap.setView([parseFloat(lat), parseFloat(lng)], 15);
-                addressPickerMarker.setLatLng([parseFloat(lat), parseFloat(lng)]);
-              }
-            } else {
-              initAddressPickerMap();
+            initAddressPickerMap();
+            // Set marker tại vị trí đã có (nếu có tọa độ)
+            if (lat && lng && addressPickerMap && addressPickerMarker) {
+              addressPickerMap.setView([parseFloat(lat), parseFloat(lng)], 15);
+              addressPickerMarker.setLatLng([parseFloat(lat), parseFloat(lng)]);
             }
           }, 300);
         }
