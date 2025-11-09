@@ -32,10 +32,19 @@ namespace VHS_frontend.Areas.Admin.Controllers
             
             try
             {
+                // Set default values if not provided
+                if (filter == null)
+                {
+                    filter = new AdminComplaintFilterDTO();
+                }
+                if (filter.Page <= 0) filter.Page = 1;
+                if (filter.PageSize <= 0) filter.PageSize = 10;
+                
                 var result = await _complaintService.GetAllAsync(filter);
                 
                 if (result == null)
                 {
+                    Console.WriteLine($"[AdminComplaintController] Service returned null, creating empty result");
                     result = new PaginatedAdminComplaintDTO
                     {
                         Complaints = new List<AdminComplaintDTO>(),
@@ -44,6 +53,10 @@ namespace VHS_frontend.Areas.Admin.Controllers
                         PageSize = filter.PageSize
                     };
                 }
+                else
+                {
+                    Console.WriteLine($"[AdminComplaintController] Service returned {result.Complaints.Count} complaints, TotalCount: {result.TotalCount}");
+                }
 
                 ViewBag.Filter = filter;
                 return View(result);
@@ -51,6 +64,8 @@ namespace VHS_frontend.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 TempData["Error"] = "Không thể tải danh sách khiếu nại: " + ex.Message;
+                Console.WriteLine($"[AdminComplaintController] Error: {ex.Message}");
+                Console.WriteLine($"[AdminComplaintController] StackTrace: {ex.StackTrace}");
                 return View(new PaginatedAdminComplaintDTO { Complaints = new List<AdminComplaintDTO>() });
             }
         }
@@ -137,6 +152,8 @@ namespace VHS_frontend.Areas.Admin.Controllers
         }
     }
 }
+
+
 
 
 

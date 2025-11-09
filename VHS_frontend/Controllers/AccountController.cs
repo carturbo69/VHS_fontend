@@ -7,10 +7,13 @@ namespace VHS_frontend.Controllers
     public class AccountController : Controller
     {
         private readonly AuthService _authService;
+        private readonly GoogleAuthService _googleAuthService;
 
-        public AccountController(AuthService authService)
+
+        public AccountController(AuthService authService, GoogleAuthService googleAuthService)
         {
             _authService = authService;
+            _googleAuthService = googleAuthService;
         }
 
         [HttpGet]
@@ -127,7 +130,7 @@ namespace VHS_frontend.Controllers
             HttpContext.Session.SetString("PendingActivationEmail", model.Email);
             TempData["ShowOTPModal"] = true;
             TempData["RegisterMessage"] = result.Message ?? "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP.";
-            
+
             return View(model); // Giữ lại view để hiển thị modal OTP
         }
 
@@ -153,6 +156,54 @@ namespace VHS_frontend.Controllers
                 return Json(new { success = true, message = result.Message });
             }
             return Json(new { success = false, message = result?.Message ?? "Gửi lại OTP thất bại." });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+        {
+            var result = await _googleAuthService.LoginWithGoogleAsync(request.IdToken);
+            if (result == null)
+                return Json(new { success = false, message = "Đăng nhập Google thất bại." });
+
+            //  Lưu session
+            HttpContext.Session.SetString("JWToken", result.Token);
+            HttpContext.Session.SetString("JWTToken", result.Token);
+            HttpContext.Session.SetString("Role", result.Role ?? string.Empty);
+            HttpContext.Session.SetString("AccountID", result.AccountID.ToString());
+
+            // Lấy thêm thông tin tài khoản từ API
+            var account = await _googleAuthService.GetAccountInfoAsync(result.AccountID, result.Token);
+            if (account == null)
+                return Json(new { success = false, message = "Không lấy được thông tin tài khoản." });
+
+            var displayName = account.AccountName;
+
+            // 🔥 Lưu thêm Username
+            HttpContext.Session.SetString("Username", account.AccountName);
+
+            // ✨ Nếu là Provider, lấy ProviderId từ API
+            if (result.Role?.Trim().Equals("Provider", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                try
+                {
+                    var providerIdResult = await _authService.GetProviderIdByAccountIdAsync(result.AccountID.ToString(), result.Token);
+                    if (!string.IsNullOrEmpty(providerIdResult))
+                    {
+                        HttpContext.Session.SetString("ProviderId", providerIdResult);
+                        Console.WriteLine($"[DEBUG] ProviderId set in session: {providerIdResult}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ERROR] Failed to get ProviderId: {ex.Message}");
+                }
+            }
+
+            // Dùng RedirectByRole() để xác định trang cần đến
+            var redirectResult = RedirectByRole(result.Role) as RedirectToActionResult;
+            var redirectUrl = redirectResult != null ? Url.Action(redirectResult.ActionName!, redirectResult.ControllerName!, redirectResult.RouteValues) : Url.Action("Index", "Home");
+
+            return Json(new { success = true, redirectUrl });
         }
 
         [HttpGet]

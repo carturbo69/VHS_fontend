@@ -1,0 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace VHS_frontend.Models.Account
+{
+    public class GoogleLoginRequest
+    {
+        public string IdToken { get; set; } = string.Empty;
+    }
+}

@@ -48,14 +48,55 @@ namespace VHS_frontend.Services.Admin
             return response?.Data;
         }
 
-        // Unconfirmed Bookings for Refund
-        public async Task<List<UnconfirmedBookingRefundDTO>?> GetUnconfirmedBookingsForRefundAsync(CancellationToken ct = default)
+        // Unconfirmed Bookings for Refund with OData support
+        public async Task<List<UnconfirmedBookingRefundDTO>?> GetUnconfirmedBookingsForRefundAsync(
+            int? page = null, 
+            int? pageSize = null, 
+            string? orderBy = null, 
+            string? filter = null,
+            CancellationToken ct = default)
         {
             AttachAuth();
-            var res = await _http.GetAsync("/api/PaymentManagement/unconfirmed-bookings-for-refund", ct);
+            
+            var queryParams = new List<string>();
+            if (page.HasValue && pageSize.HasValue)
+            {
+                queryParams.Add($"$skip={(page.Value - 1) * pageSize.Value}");
+                queryParams.Add($"$top={pageSize.Value}");
+            }
+            if (!string.IsNullOrEmpty(orderBy))
+            {
+                queryParams.Add($"$orderby={Uri.EscapeDataString(orderBy)}");
+            }
+            if (!string.IsNullOrEmpty(filter))
+            {
+                queryParams.Add($"$filter={Uri.EscapeDataString(filter)}");
+            }
+            
+            var url = "/api/PaymentManagement/unconfirmed-bookings-for-refund";
+            if (queryParams.Any())
+            {
+                url += "?" + string.Join("&", queryParams);
+            }
+            
+            var res = await _http.GetAsync(url, ct);
             await HandleErrorAsync(res, ct);
             
             var json = await res.Content.ReadAsStringAsync(ct);
+            
+            // Try to parse as OData response first
+            try
+            {
+                var jsonDoc = JsonDocument.Parse(json);
+                if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
+                {
+                    return JsonSerializer.Deserialize<List<UnconfirmedBookingRefundDTO>>(valueArray.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+            }
+            catch { }
+            
+            // Fallback to old format
             var response = JsonSerializer.Deserialize<ApiResponse<List<UnconfirmedBookingRefundDTO>>>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return response?.Data;
@@ -83,24 +124,11 @@ namespace VHS_frontend.Services.Admin
             return response?.Success ?? false;
         }
 
-        // Pending Provider Payments
-        public async Task<List<PendingProviderPaymentDTO>?> GetPendingProviderPaymentsAsync(CancellationToken ct = default)
-        {
-            AttachAuth();
-            var res = await _http.GetAsync("/api/PaymentManagement/pending-provider-payments", ct);
-            await HandleErrorAsync(res, ct);
-            
-            var json = await res.Content.ReadAsStringAsync(ct);
-            var response = JsonSerializer.Deserialize<ApiResponse<List<PendingProviderPaymentDTO>>>(json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return response?.Data;
-        }
-
-        public async Task<bool> ApproveProviderPaymentAsync(Guid bookingId, string adminNote, CancellationToken ct = default)
+        public async Task<bool> RejectRefundForUnconfirmedBookingAsync(Guid bookingId, string adminNote, CancellationToken ct = default)
         {
             AttachAuth();
             
-            var dto = new ApproveProviderPaymentRequestDTO
+            var dto = new ApproveRefundRequestDTO
             {
                 BookingId = bookingId,
                 AdminNote = adminNote
@@ -109,7 +137,7 @@ namespace VHS_frontend.Services.Admin
             var json = JsonSerializer.Serialize(dto);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             
-            var res = await _http.PostAsync("/api/PaymentManagement/approve-provider-payment", content, ct);
+            var res = await _http.PostAsync("/api/PaymentManagement/reject-refund-unconfirmed", content, ct);
             await HandleErrorAsync(res, ct);
             
             var responseJson = await res.Content.ReadAsStringAsync(ct);
@@ -118,14 +146,56 @@ namespace VHS_frontend.Services.Admin
             return response?.Success ?? false;
         }
 
-        // Withdrawals
-        public async Task<List<ProviderWithdrawalDTO>?> GetPendingWithdrawalsAsync(CancellationToken ct = default)
+
+        // Withdrawals with OData support
+        public async Task<List<ProviderWithdrawalDTO>?> GetPendingWithdrawalsAsync(
+            int? page = null, 
+            int? pageSize = null, 
+            string? orderBy = null, 
+            string? filter = null,
+            CancellationToken ct = default)
         {
             AttachAuth();
-            var res = await _http.GetAsync("/api/PaymentManagement/withdrawals/pending", ct);
+            
+            var queryParams = new List<string>();
+            if (page.HasValue && pageSize.HasValue)
+            {
+                queryParams.Add($"$skip={(page.Value - 1) * pageSize.Value}");
+                queryParams.Add($"$top={pageSize.Value}");
+            }
+            if (!string.IsNullOrEmpty(orderBy))
+            {
+                queryParams.Add($"$orderby={Uri.EscapeDataString(orderBy)}");
+            }
+            if (!string.IsNullOrEmpty(filter))
+            {
+                queryParams.Add($"$filter={Uri.EscapeDataString(filter)}");
+            }
+            
+            var url = "/api/PaymentManagement/withdrawals/pending";
+            if (queryParams.Any())
+            {
+                url += "?" + string.Join("&", queryParams);
+            }
+            
+            var res = await _http.GetAsync(url, ct);
             await HandleErrorAsync(res, ct);
             
             var json = await res.Content.ReadAsStringAsync(ct);
+            
+            // Try to parse as OData response first
+            try
+            {
+                var jsonDoc = JsonDocument.Parse(json);
+                if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
+                {
+                    return JsonSerializer.Deserialize<List<ProviderWithdrawalDTO>>(valueArray.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+            }
+            catch { }
+            
+            // Fallback to old format
             var response = JsonSerializer.Deserialize<ApiResponse<List<ProviderWithdrawalDTO>>>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return response?.Data;
@@ -157,45 +227,113 @@ namespace VHS_frontend.Services.Admin
         // Approved/Processed Items (for viewing history)
 
         /// <summary>
-        /// Get approved/completed refunds
+        /// Get approved/completed refunds with OData support
         /// </summary>
-        public async Task<List<UnconfirmedBookingRefundDTO>?> GetApprovedRefundsAsync(CancellationToken ct = default)
+        public async Task<List<UnconfirmedBookingRefundDTO>?> GetApprovedRefundsAsync(
+            int? page = null, 
+            int? pageSize = null, 
+            string? orderBy = null, 
+            string? filter = null,
+            CancellationToken ct = default)
         {
             AttachAuth();
-            var res = await _http.GetAsync("/api/PaymentManagement/refunds/approved", ct);
+            
+            var queryParams = new List<string>();
+            if (page.HasValue && pageSize.HasValue)
+            {
+                queryParams.Add($"$skip={(page.Value - 1) * pageSize.Value}");
+                queryParams.Add($"$top={pageSize.Value}");
+            }
+            if (!string.IsNullOrEmpty(orderBy))
+            {
+                queryParams.Add($"$orderby={Uri.EscapeDataString(orderBy)}");
+            }
+            if (!string.IsNullOrEmpty(filter))
+            {
+                queryParams.Add($"$filter={Uri.EscapeDataString(filter)}");
+            }
+            
+            var url = "/api/PaymentManagement/refunds/approved";
+            if (queryParams.Any())
+            {
+                url += "?" + string.Join("&", queryParams);
+            }
+            
+            var res = await _http.GetAsync(url, ct);
             await HandleErrorAsync(res, ct);
             
             var json = await res.Content.ReadAsStringAsync(ct);
+            
+            // Try to parse as OData response first
+            try
+            {
+                var jsonDoc = JsonDocument.Parse(json);
+                if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
+                {
+                    return JsonSerializer.Deserialize<List<UnconfirmedBookingRefundDTO>>(valueArray.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+            }
+            catch { }
+            
+            // Fallback to old format
             var response = JsonSerializer.Deserialize<ApiResponse<List<UnconfirmedBookingRefundDTO>>>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return response?.Data;
         }
 
-        /// <summary>
-        /// Get approved provider payments
-        /// </summary>
-        public async Task<List<PendingProviderPaymentDTO>?> GetApprovedProviderPaymentsAsync(CancellationToken ct = default)
-        {
-            AttachAuth();
-            var res = await _http.GetAsync("/api/PaymentManagement/provider-payments/approved", ct);
-            await HandleErrorAsync(res, ct);
-            
-            var json = await res.Content.ReadAsStringAsync(ct);
-            var response = JsonSerializer.Deserialize<ApiResponse<List<PendingProviderPaymentDTO>>>(json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return response?.Data;
-        }
 
         /// <summary>
-        /// Get processed withdrawals (Completed/Rejected)
+        /// Get processed withdrawals (Completed/Rejected) with OData support
         /// </summary>
-        public async Task<List<ProviderWithdrawalDTO>?> GetProcessedWithdrawalsAsync(CancellationToken ct = default)
+        public async Task<List<ProviderWithdrawalDTO>?> GetProcessedWithdrawalsAsync(
+            int? page = null, 
+            int? pageSize = null, 
+            string? orderBy = null, 
+            string? filter = null,
+            CancellationToken ct = default)
         {
             AttachAuth();
-            var res = await _http.GetAsync("/api/PaymentManagement/withdrawals/processed", ct);
+            
+            var queryParams = new List<string>();
+            if (page.HasValue && pageSize.HasValue)
+            {
+                queryParams.Add($"$skip={(page.Value - 1) * pageSize.Value}");
+                queryParams.Add($"$top={pageSize.Value}");
+            }
+            if (!string.IsNullOrEmpty(orderBy))
+            {
+                queryParams.Add($"$orderby={Uri.EscapeDataString(orderBy)}");
+            }
+            if (!string.IsNullOrEmpty(filter))
+            {
+                queryParams.Add($"$filter={Uri.EscapeDataString(filter)}");
+            }
+            
+            var url = "/api/PaymentManagement/withdrawals/processed";
+            if (queryParams.Any())
+            {
+                url += "?" + string.Join("&", queryParams);
+            }
+            
+            var res = await _http.GetAsync(url, ct);
             await HandleErrorAsync(res, ct);
             
             var json = await res.Content.ReadAsStringAsync(ct);
+            
+            // Try to parse as OData response first
+            try
+            {
+                var jsonDoc = JsonDocument.Parse(json);
+                if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
+                {
+                    return JsonSerializer.Deserialize<List<ProviderWithdrawalDTO>>(valueArray.GetRawText(),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+            }
+            catch { }
+            
+            // Fallback to old format
             var response = JsonSerializer.Deserialize<ApiResponse<List<ProviderWithdrawalDTO>>>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             return response?.Data;

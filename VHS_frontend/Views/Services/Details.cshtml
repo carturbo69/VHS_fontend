@@ -26,6 +26,25 @@
             _ => Url.Content("~/images/VeSinh.jpg")
         };
 
+    // Hàm chuyển đổi UnitType sang tiếng Việt
+    string GetUnitTypeVietnamese(string? unitType)
+    {
+        if (string.IsNullOrEmpty(unitType)) return unitType ?? "";
+        return unitType switch
+        {
+            "Hour" => "Giờ",
+            "Day" => "Ngày",
+            "Visit" => "Lần",
+            "Apartment" => "Căn",
+            "Room" => "Phòng",
+            "SquareMeter" => "Mét vuông (m²)",
+            "Person" => "Người",
+            "Package" => "Gói",
+            "Event" => "Sự kiện",
+            _ => unitType
+        };
+    }
+
     // Ảnh chính
     var imgs = SplitImgs(Model.Images);
     string fallbackMain = FallbackByUnit(Model.UnitType);
@@ -86,7 +105,7 @@
                         @string.Format("{0:#,0}đ", Model.Price)
                         @if (!string.IsNullOrWhiteSpace(Model.UnitType))
                         {
-                            <text>/ @Model.UnitType</text>
+                            <text>/ @GetUnitTypeVietnamese(Model.UnitType)</text>
                         }
                     </div>
 
@@ -127,12 +146,11 @@
                             <strong>Thời gian:</strong>
                             @if (Model.BaseUnit.HasValue)
                             {
-                                @($"{Model.BaseUnit} {Model.UnitType}")
+                                @($"{Model.BaseUnit} {GetUnitTypeVietnamese(Model.UnitType)}")
                             }
                             else
                             {
-
-                                @Model.UnitType
+                                @GetUnitTypeVietnamese(Model.UnitType)
                             }
                         </li>
                     </ul>
@@ -170,7 +188,7 @@
                                                         @o.OptionName
                                                     </div>
                                                     <div class="addon-price">
-                                                        @string.Format("{0:#,0}đ / {1}", o.Price, o.UnitType)
+                                                        @string.Format("{0:#,0}đ / {1}", o.Price, GetUnitTypeVietnamese(o.UnitType))
                                                     </div>
                                                 </div>
                                                 @if (!string.IsNullOrWhiteSpace(o.Description))
@@ -607,7 +625,7 @@
                                 : Url.Content(firstImg);
 
                                 // Hiển thị giá
-                                var priceDisplay = s.Price > 0 ? string.Format("{0:#,0}đ / {1}", s.Price, s.UnitType) : null;
+                                var priceDisplay = s.Price > 0 ? string.Format("{0:#,0}đ / {1}", s.Price, GetUnitTypeVietnamese(s.UnitType)) : null;
 
                                 <article class="top-card">
                                     @* Dùng query-string sid để không va chạm Details(int id) *@
@@ -691,7 +709,7 @@
 
                             // Giá hiển thị: Price + UnitType
                             var priceDisplay = s.Price > 0
-                            ? string.Format("{0:#,0}đ / {1}", s.Price, s.UnitType)
+                            ? string.Format("{0:#,0}đ / {1}", s.Price, GetUnitTypeVietnamese(s.UnitType))
                             : null;
 
                             <article class="related-card@(hide ? " is-hidden" : "")" data-index="@idx">
