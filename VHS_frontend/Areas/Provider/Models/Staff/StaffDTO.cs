@@ -11,5 +11,7 @@ namespace VHS_frontend.Areas.Provider.Models.Staff
         public string CitizenIDBackImage { get; set; } = string.Empty;
         public string Role { get; set; } = "Staff";
         public bool IsLocked { get; set; } = false; // Trạng thái khóa tài khoản
+        public string? Address { get; set; }
+        public string? PhoneNumber { get; set; }
     }
 }

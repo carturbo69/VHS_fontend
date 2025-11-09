@@ -74,22 +74,37 @@
 
                     <!-- Unit Type -->
                     <div class="col-md-4 mb-3">
-                        <label asp-for="UnitType" class="form-label">Đơn vị tính <span class="text-danger">*</span></label>
-                        <select asp-for="UnitType" class="form-select" required>
-                            <option value="">-- Chọn đơn vị --</option>
-                            <option value="Hour">Hour (Giờ)</option>
-                            <option value="Day">Day (Ngày)</option>
-                            <option value="Unit">Unit (Lần/Căn/Phòng)</option>
+                        <label asp-for="UnitType" class="form-label">
+                            <i class="bi bi-rulers me-1"></i>Đơn vị tính giá <span class="text-danger">*</span>
+                        </label>
+                        <select asp-for="UnitType" class="form-select" id="unitTypeSelect" required>
+                            <option value="">-- Chọn đơn vị tính giá --</option>
+                            <option value="Hour">Giờ</option>
+                            <option value="Day">Ngày</option>
+                            <option value="Visit">Lần</option>
+                            <option value="Apartment">Căn</option>
+                            <option value="Room">Phòng</option>
+                            <option value="SquareMeter">Mét vuông (m²)</option>
+                            <option value="Person">Người</option>
+                            <option value="Package">Gói</option>
+                            <option value="Event">Sự kiện</option>
                         </select>
+                        <small class="form-text text-muted">
+                            <i class="bi bi-info-circle me-1"></i>Đơn vị sẽ hiển thị cùng giá (VD: 200.000 VNĐ/Giờ hoặc 500.000 VNĐ/Gói).
+                        </small>
                         <span asp-validation-for="UnitType" class="text-danger"></span>
                     </div>
 
                     <!-- Base Unit -->
                     <div class="col-md-4 mb-3">
-                        <label asp-for="BaseUnit" class="form-label">Đơn vị cơ bản <span class="text-danger">*</span></label>
-                        <input asp-for="BaseUnit" type="number" class="form-control" min="1" placeholder="1" required />
+                        <label asp-for="BaseUnit" class="form-label">
+                            <i class="bi bi-123 me-1"></i>Số lượng tối thiểu <span class="text-danger">*</span>
+                        </label>
+                        <input asp-for="BaseUnit" type="number" class="form-control" min="1" step="1" placeholder="1" required />
+                        <small class="form-text text-muted">
+                            <i class="bi bi-info-circle me-1"></i>Nhập số lượng tối thiểu khách phải đặt theo đơn vị bên cạnh (VD: cần tối thiểu 2 Giờ hoặc 1 Gói).
+                        </small>
                         <span asp-validation-for="BaseUnit" class="text-danger"></span>
-                        <small class="form-text text-muted">Số lượng tối thiểu</small>
                     </div>
                 </div>
 
@@ -98,7 +113,7 @@
                     <label asp-for="Status" class="form-label">Trạng thái</label>
                     <select asp-for="Status" class="form-select">
                         <option value="Active">Hoạt động</option>
-                        <option value="Inactive">Không hoạt động</option>
+                        <option value="Inactive">Tạm dừng</option>
                     </select>
                     <span asp-validation-for="Status" class="text-danger"></span>
                 </div>
@@ -116,34 +131,40 @@
 
                     <!-- Hình ảnh hiện tại (gộp avatar + mô tả) -->
                     <div class="mb-3">
-                        <div class="image-inline-gallery d-flex align-items-start gap-3 flex-wrap">
-                            <div class="avatar-block">
-                                @if (!string.IsNullOrEmpty(avatar))
-                                {
-                                    var avatarUrl = ToUrl(avatar);
-                                    <img src="@avatarUrl" alt="Avatar" class="img-thumbnail shadow-sm avatar-img"
+                        <div class="image-inline-gallery" id="imageGalleryContainer">
+                            @if (!string.IsNullOrEmpty(avatar))
+                            {
+                                var avatarUrl = ToUrl(avatar);
+                                <div class="removable-image" data-path="@avatar">
+                                    <img src="@avatarUrl" alt="Avatar"
                                          onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Không thể tải ảnh</div>';" />
-                                }
-                                else
+                                    <button type="button" class="btn btn-sm btn-danger remove-image-btn" title="Xoá ảnh" aria-label="Xoá ảnh">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                            }
+                            @if (descImgs.Any())
+                            {
+                                foreach (var p in descImgs)
                                 {
-                                    <div class="no-image-placeholder-large"></div>
-                                }
-                            </div>
-                            <div class="thumbs d-flex flex-row flex-wrap gap-2">
-                                @if (descImgs.Any())
-                                {
-                                    @foreach (var p in descImgs)
-                                    {
-                                        var u = ToUrl(p);
-                                        <img src="@u" class="img-thumbnail thumb-img" alt="Desc"
+                                    var u = ToUrl(p);
+                                    <div class="removable-image" data-path="@p">
+                                        <img src="@u" alt="Desc"
                                              onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'alert alert-warning p-2\'>Lỗi ảnh</div>';" />
-                                    }
+                                        <button type="button" class="btn btn-sm btn-danger remove-image-btn" title="Xoá ảnh" aria-label="Xoá ảnh">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
                                 }
-                            </div>
+                            }
                         </div>
-                        <input name="Images" type="file" class="form-control mt-3" accept="image/*" multiple />
+                        <!-- Hidden inputs for removed images -->
+                        <div id="removedImagesContainer"></div>
+                        <div class="file-input-wrapper">
+                            <input name="Images" type="file" id="imageInputEdit" class="form-control mt-3" accept="image/*" multiple />
+                        </div>
                         <span asp-validation-for="Images" class="text-danger"></span>
-                        <small class="form-text text-muted">Chọn 1 hoặc nhiều ảnh mới. Ảnh đầu tiên sẽ là ảnh đại diện; các ảnh còn lại là ảnh mô tả.</small>
+                        <small class="form-text text-muted">Chọn 1 hoặc nhiều ảnh mới. Ảnh mới sẽ được thêm vào cuối; ảnh đại diện hiện tại không thay đổi trừ khi bạn chọn Avatar riêng.</small>
                     </div>
                 </div>
 
@@ -184,7 +205,7 @@
                             <i class="bi bi-plus-circle me-1"></i> Tạo Option mới
                         </button>
                     </div>
-                    <div class="border rounded p-3">
+                    <div id="optionsContainer" class="border rounded p-3">
                         @if (options.Any())
                         {
                             <div class="row">
@@ -192,13 +213,18 @@
                                 {
                                     var isChecked = Model.OptionIds.Contains(option.OptionId);
                                     <div class="col-md-4 mb-2">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="OptionIds" value="@option.OptionId" id="option_@option.OptionId" @(isChecked ? "checked" : "") />
-                                            <label class="form-check-label" for="option_@option.OptionId">
-                                                @option.OptionName
-                                                <br />
-                                                <small class="text-muted">@option.Description - @option.Price.ToString("N0") VNĐ/@option.UnitType</small>
-                                            </label>
+                                        <div class="d-flex align-items-center">
+                                            <div class="form-check flex-grow-1">
+                                                <input class="form-check-input" type="checkbox" name="OptionIds" value="@option.OptionId" id="option_@option.OptionId" @(isChecked ? "checked" : "") />
+                                                <label class="form-check-label" for="option_@option.OptionId">
+                                                    @option.OptionName
+                                                    <br />
+                                                    <small class="text-muted">@option.Description - @option.Price.ToString("N0") VNĐ/@option.UnitType</small>
+                                                </label>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-option-btn" data-option-id="@option.OptionId" data-option-name="@option.OptionName" title="Xóa option khỏi danh sách">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 }
@@ -247,44 +273,283 @@
             }
         }
         
-        // Create Option (Edit) handler
-        document.getElementById('createOptionFormEdit').addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const optionData = {
-                OptionName: document.getElementById('optionNameEdit').value.trim(),
-                Description: document.getElementById('optionDescriptionEdit').value.trim(),
-                Price: parseFloat(document.getElementById('optionPriceEdit').value) || 0,
-                UnitType: document.getElementById('optionUnitTypeEdit').value
-            };
+        // Xoá ảnh hiện tại và thêm input ẩn RemoveImages để submit
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.remove-image-btn');
+            if (!btn) return;
+            const wrap = btn.closest('.removable-image');
+            if (!wrap) return;
+            
+            // Only process existing images (have data-path), not preview images (have data-preview-index)
+            const path = wrap.getAttribute('data-path');
+            if (!path) return; // Skip if this is a preview image
+            
+            const container = document.getElementById('removedImagesContainer');
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'RemoveImages';
+            hidden.value = path;
+            container.appendChild(hidden);
+            wrap.remove();
+        });
 
-            if (!optionData.OptionName) { alert('Vui lòng nhập tên option!'); return; }
-            if (!optionData.UnitType) { alert('Vui lòng chọn đơn vị!'); return; }
-            if (optionData.Price < 0) { alert('Giá phải >= 0!'); return; }
+        // Image preview functionality for Edit form
+        document.addEventListener('DOMContentLoaded', function() {
+            const imageInput = document.getElementById('imageInputEdit');
+            const galleryContainer = document.getElementById('imageGalleryContainer');
+            let selectedFiles = [];
 
-            try {
-                const resp = await fetch('/Provider/ServiceManagement/CreateOption', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(optionData)
-                });
-                const result = await resp.json();
-                if (result && result.success) {
-                    const modalElement = document.getElementById('createOptionModalEdit');
-                    const modal = bootstrap.Modal.getInstance(modalElement) ?? new bootstrap.Modal(modalElement);
-                    modal.hide();
-                    this.reset();
-                    // Reload page to refresh options checkboxes quickly
-                    location.reload();
-                } else {
-                    alert(result?.message || 'Có lỗi xảy ra khi tạo option!');
+            if (imageInput && galleryContainer) {
+                function addPreviewToGallery() {
+                    selectedFiles.forEach((file, index) => {
+                        if (!file.type.startsWith('image/')) {
+                            return;
+                        }
+
+                        // Check if preview already exists
+                        const existingPreview = galleryContainer.querySelector(`[data-preview-index="${index}"]`);
+                        if (existingPreview) {
+                            return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            const imageWrapper = document.createElement('div');
+                            imageWrapper.className = 'removable-image';
+                            imageWrapper.dataset.previewIndex = index;
+                            imageWrapper.innerHTML = `
+                                <img src="${e.target.result}" alt="Preview ${index + 1}" />
+                                <button type="button" class="btn btn-sm btn-danger remove-image-btn remove-preview-btn" data-index="${index}" title="Xóa ảnh" aria-label="Xóa ảnh">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            `;
+                            galleryContainer.appendChild(imageWrapper);
+                        };
+                        reader.readAsDataURL(file);
+                    });
                 }
-            } catch (err) {
-                alert('Có lỗi xảy ra khi tạo option!');
+
+                imageInput.addEventListener('change', function(e) {
+                    const newFiles = Array.from(e.target.files);
+                    // Merge với files hiện có (nếu có)
+                    selectedFiles = [...selectedFiles, ...newFiles];
+                    addPreviewToGallery();
+                    
+                    // Update input files
+                    const dt = new DataTransfer();
+                    selectedFiles.forEach(file => dt.items.add(file));
+                    imageInput.files = dt.files;
+                });
+
+                // Remove preview image (only for new preview images, not existing ones)
+                galleryContainer.addEventListener('click', function(e) {
+                    const removeBtn = e.target.closest('.remove-preview-btn');
+                    if (!removeBtn) return;
+                    
+                    // Make sure this is a preview image, not an existing image
+                    const wrapper = removeBtn.closest('[data-preview-index]');
+                    if (!wrapper) return; // Existing images have data-path, not data-preview-index
+
+                    const index = parseInt(removeBtn.dataset.index);
+                    
+                    wrapper.remove();
+                    
+                    // Remove file from array
+                    selectedFiles.splice(index, 1);
+                    
+                    // Update input files
+                    const dt = new DataTransfer();
+                    selectedFiles.forEach(file => dt.items.add(file));
+                    imageInput.files = dt.files;
+                    
+                    // Re-render all previews with correct indices
+                    galleryContainer.querySelectorAll('[data-preview-index]').forEach(el => el.remove());
+                    addPreviewToGallery();
+                });
             }
+        });
+
+        // Create Option (Edit) handler - Đợi DOM load xong
+        document.addEventListener('DOMContentLoaded', function() {
+            const createOptionFormEdit = document.getElementById('createOptionFormEdit');
+            if (!createOptionFormEdit) {
+                console.error('createOptionFormEdit form not found!');
+                return;
+            }
+            
+            createOptionFormEdit.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const optionData = {
+                    OptionName: document.getElementById('optionNameEdit').value.trim(),
+                    Description: document.getElementById('optionDescriptionEdit').value.trim(),
+                    Price: parseFloat(document.getElementById('optionPriceEdit').value) || 0,
+                    UnitType: document.getElementById('optionUnitTypeEdit').value
+                };
+
+                if (!optionData.OptionName) { alert('Vui lòng nhập tên option!'); return; }
+                if (optionData.OptionName.length > 50) { alert('Tên option không được vượt quá 50 ký tự!'); return; }
+                if (!optionData.UnitType) { alert('Vui lòng chọn đơn vị!'); return; }
+                if (optionData.Price < 0) { alert('Giá phải >= 0!'); return; }
+
+                try {
+                    const resp = await fetch('/Provider/ServiceManagement/CreateOption', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(optionData)
+                    });
+                    const result = await resp.json();
+                    if (result && result.success) {
+                        const modalElement = document.getElementById('createOptionModalEdit');
+                        const modal = bootstrap.Modal.getInstance(modalElement) ?? new bootstrap.Modal(modalElement);
+                        modal.hide();
+                        this.reset();
+                        
+                        // Thêm option vừa tạo vào danh sách và auto-tick
+                        const opt = result.data;
+                        const container = document.getElementById('optionsContainer');
+                        
+                        // Kiểm tra xem option này đã tồn tại chưa (tránh duplicate)
+                        const existingCheckbox = container.querySelector(`input[type="checkbox"][value="${opt.optionId}"]`);
+                        if (existingCheckbox) {
+                            alert('Option này đã được thêm vào danh sách!');
+                            return;
+                        }
+                        
+                        // Nếu container chỉ có text-muted (chưa có option nào), xóa nó và tạo row mới
+                        const textMuted = container.querySelector('.text-muted');
+                        if (textMuted && !container.querySelector('.row')) {
+                            container.innerHTML = '';
+                            const row = document.createElement('div');
+                            row.className = 'row';
+                            container.appendChild(row);
+                        }
+                        
+                        // Tìm row hiện có hoặc tạo mới
+                        let row = container.querySelector('.row');
+                        if (!row) {
+                            row = document.createElement('div');
+                            row.className = 'row';
+                            container.appendChild(row);
+                        }
+                        
+                        // Đếm số col hiện có trong row để quyết định có cần row mới không
+                        const colsInRow = row.querySelectorAll('.col-md-4').length;
+                        
+                        // Nếu row hiện tại đã đầy (3 cols vì dùng col-md-4), tạo row mới
+                        if (colsInRow >= 3) {
+                            row = document.createElement('div');
+                            row.className = 'row';
+                            container.appendChild(row);
+                        }
+
+                        // Tạo col mới cho option
+                        const col = document.createElement('div');
+                        col.className = 'col-md-4 mb-2';
+                        col.innerHTML = `
+                            <div class="d-flex align-items-center">
+                                <div class="form-check flex-grow-1">
+                                    <input class="form-check-input" type="checkbox" name="OptionIds" value="${opt.optionId}" id="option_${opt.optionId}" checked />
+                                    <label class="form-check-label" for="option_${opt.optionId}">
+                                        ${opt.optionName}
+                                        <br />
+                                        <small class="text-muted">${opt.description ?? ''} ${opt.price !== undefined ? '- ' + parseInt(opt.price).toLocaleString() + ' VNĐ/' + opt.unitType : ''}</small>
+                                    </label>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-option-btn" data-option-id="${opt.optionId}" data-option-name="${opt.optionName}" title="Xóa option khỏi danh sách">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>`;
+                        row.appendChild(col);
+                        
+                        // Thêm event handler cho nút xóa
+                        const removeBtn = col.querySelector('.remove-option-btn');
+                        removeBtn.addEventListener('click', function() {
+                            removeOptionFromList(opt.optionId, opt.optionName);
+                        });
+                        
+                        alert('Tạo option thành công!');
+                    } else {
+                        alert(result?.message || 'Có lỗi xảy ra khi tạo option!');
+                    }
+                } catch (err) {
+                    console.error('Error creating option:', err);
+                    alert('Có lỗi xảy ra khi tạo option!');
+                }
+            });
+        });
+
+        // Remove option from list (chỉ xóa khỏi UI, không xóa khỏi database)
+        function removeOptionFromList(optionId, optionName) {
+            if (!confirm(`Bạn có muốn xóa option "${optionName}" khỏi danh sách không?`)) {
+                return;
+            }
+            
+            // Tìm và xóa option khỏi UI
+            const checkbox = document.querySelector(`input[type="checkbox"][value="${optionId}"]`);
+            if (checkbox) {
+                const col = checkbox.closest('.col-md-4');
+                if (col) {
+                    col.remove();
+                    // Nếu row trống, xóa row
+                    const row = col.closest('.row');
+                    if (row && row.querySelectorAll('.col-md-4').length === 0) {
+                        row.remove();
+                    }
+                    // Nếu container trống, hiển thị message
+                    const container = document.getElementById('optionsContainer');
+                    if (container && container.querySelectorAll('.row').length === 0) {
+                        container.innerHTML = '<p class="text-muted">Chưa có option nào.</p>';
+                    }
+                    alert(`Đã xóa option "${optionName}" khỏi danh sách!`);
+                }
+            }
+        }
+
+        // Thêm event handler cho tất cả các nút xóa option (options được render từ server)
+        document.addEventListener('DOMContentLoaded', function() {
+            const removeButtons = document.querySelectorAll('.remove-option-btn');
+            removeButtons.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const optionId = this.getAttribute('data-option-id');
+                    const optionName = this.getAttribute('data-option-name');
+                    removeOptionFromList(optionId, optionName);
+                });
+            });
         });
     </script>
     
     <style>
+        /* Gallery ảnh: hiển thị ngang, tự wrap, khoảng cách đều */
+        .image-inline-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .removable-image {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            flex: 0 0 auto;
+        }
+
+        .removable-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: .5rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,.08);
+        }
+
+        .removable-image .remove-image-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            line-height: 1;
+            padding: 2px 6px;
+        }
+
         .no-image-placeholder-large {
             width: 200px;
             height: 200px;
@@ -336,13 +601,24 @@
                                 <input type="number" class="form-control" id="optionPriceEdit" required min="0" step="1000" placeholder="100000">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="optionUnitTypeEdit" class="form-label">Đơn vị <span class="text-danger">*</span></label>
+                                <label for="optionUnitTypeEdit" class="form-label">
+                                    <i class="bi bi-rulers me-1"></i>Đơn vị tính giá <span class="text-danger">*</span>
+                                </label>
                                 <select class="form-select" id="optionUnitTypeEdit" required>
-                                    <option value="">-- Chọn đơn vị --</option>
-                                    <option value="Unit">Unit (Lần/Căn/Phòng)</option>
-                                    <option value="Day">Day (Ngày)</option>
-                                    <option value="Hour">Hour (Giờ)</option>
+                                    <option value="">-- Chọn đơn vị tính giá --</option>
+                                    <option value="Hour">Giờ</option>
+                                    <option value="Day">Ngày</option>
+                                    <option value="Visit">Lần</option>
+                                    <option value="Apartment">Căn</option>
+                                    <option value="Room">Phòng</option>
+                                    <option value="SquareMeter">Mét vuông (m²)</option>
+                                    <option value="Person">Người</option>
+                                    <option value="Package">Gói</option>
+                                    <option value="Event">Sự kiện</option>
                                 </select>
+                                <small class="form-text text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>Đơn vị tính giá cho option này
+                                </small>
                             </div>
                         </div>
                     </div>

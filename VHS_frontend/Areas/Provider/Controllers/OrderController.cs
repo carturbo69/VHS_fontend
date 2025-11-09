@@ -343,8 +343,11 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 {
                     BookingId = request.BookingId,
                     NewStatus = request.NewStatus,
-                    Reason = request.Reason  // ✨ MAP LÝ DO VÀO DTO
+                    Reason = request.Reason,  // ✨ MAP LÝ DO VÀO DTO
+                    SelectedStaffId = request.SelectedStaffId  // ✨ MAP SelectedStaffId VÀO DTO
                 };
+                
+                Console.WriteLine($"[FRONTEND UpdateStatus] SelectedStaffId: {dto.SelectedStaffId?.ToString() ?? "NULL"}");
                 
                 Console.WriteLine($"[FRONTEND UpdateStatus] DTO created with Reason: {dto.Reason ?? "NULL"}");
                 
@@ -374,6 +377,21 @@ namespace VHS_frontend.Areas.Provider.Controllers
             
             try
             {
+                // Kiểm tra trạng thái booking trước khi phân công
+                var booking = await _bookingService.GetBookingDetailAsync(request.BookingId);
+                if (booking == null)
+                {
+                    return Json(new { success = false, message = "Không tìm thấy đơn hàng" });
+                }
+                
+                var status = booking.Status?.Trim() ?? string.Empty;
+                if (string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase) || 
+                    string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(status, "Canceled", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Json(new { success = false, message = $"Không thể phân công nhân viên cho đơn hàng có trạng thái '{booking.Status}'" });
+                }
+                
                 var dto = new AssignStaffDTO
                 {
                     BookingId = request.BookingId,
@@ -404,6 +422,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
         public Guid BookingId { get; set; }
         public string NewStatus { get; set; } = string.Empty;
         public string? Reason { get; set; }  // ✨ LÝ DO HỦY ĐƠN
+        public Guid? SelectedStaffId { get; set; }  // ✨ StaffId đã chọn trước khi xác nhận
     }
 
     public class AssignStaffRequest

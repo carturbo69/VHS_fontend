@@ -1,0 +1,174 @@
+@model List<VHS_frontend.Areas.Admin.Models.Provider.ProviderDTO>
+@{
+    ViewData["Title"] = "Quản lý dịch vụ theo Provider";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+}
+
+@* Force Razor recompile *@
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3><i class="bi bi-people me-2"></i>Quản lý dịch vụ theo Nhà cung cấp</h3>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Danh sách Nhà cung cấp</span>
+        </div>
+        <div class="card-body">
+            @if (Model != null && Model.Any())
+            {
+                <!-- Search Box -->
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" 
+                               id="searchInput" 
+                               class="form-control" 
+                               placeholder="Tìm kiếm theo tên tài khoản, tên nhà cung cấp hoặc email..." 
+                               autocomplete="off" />
+                        <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" style="display: none;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- No results message (hidden by default) -->
+                <div id="noResultsMessage" class="alert alert-info" style="display: none;">
+                    <i class="bi bi-info-circle me-2"></i>Không tìm thấy nhà cung cấp nào phù hợp với từ khóa tìm kiếm.
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle" id="providerTable">
+                        <thead>
+                            <tr>
+                                <th>Tên tài khoản</th>
+                                <th>Tên nhà cung cấp</th>
+                                <th>Email</th>
+                                <th>Thông báo</th>
+                                <th class="text-end">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="providerTableBody">
+                        @foreach (var p in Model)
+                        {
+                            <tr data-account-name="@p.AccountName.ToLower()" 
+                                data-provider-name="@(string.IsNullOrEmpty(p.ProviderName) ? "" : p.ProviderName.ToLower())" 
+                                data-email="@p.Email.ToLower()">
+                                <td>@p.AccountName</td>
+                                <td>@(string.IsNullOrEmpty(p.ProviderName) ? "-" : p.ProviderName)</td>
+                                <td>@p.Email</td>
+                                <td>
+                                    @if (p.PendingUpdateCount > 0)
+                                    {
+                                        <span class="badge bg-warning text-dark" title="Có @p.PendingUpdateCount dịch vụ đang chờ admin duyệt">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                            @p.PendingUpdateCount dịch vụ chờ duyệt
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">-</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <a asp-action="Details" asp-route-id="@p.Id" asp-route-name="@p.AccountName" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-list-ul me-1"></i>Xem dịch vụ
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>    
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-muted">Không có provider nào.</div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearSearchBtn = document.getElementById('clearSearchBtn');
+            const providerTableBody = document.getElementById('providerTableBody');
+            const noResultsMessage = document.getElementById('noResultsMessage');
+            const providerTable = document.getElementById('providerTable');
+
+            if (!searchInput || !clearSearchBtn || !providerTableBody) {
+                return; // Exit if elements don't exist
+            }
+
+            function filterProviders() {
+                const searchTerm = searchInput.value.trim().toLowerCase();
+                const rows = providerTableBody.querySelectorAll('tr');
+                let visibleCount = 0;
+
+                if (searchTerm === '') {
+                    // Show all rows
+                    rows.forEach(row => {
+                        row.style.display = '';
+                        visibleCount++;
+                    });
+                    clearSearchBtn.style.display = 'none';
+                    noResultsMessage.style.display = 'none';
+                    if (providerTable) providerTable.style.display = '';
+                } else {
+                    // Filter rows
+                    rows.forEach(row => {
+                        const accountName = row.getAttribute('data-account-name') || '';
+                        const providerName = row.getAttribute('data-provider-name') || '';
+                        const email = row.getAttribute('data-email') || '';
+
+                        if (accountName.includes(searchTerm) || 
+                            providerName.includes(searchTerm) || 
+                            email.includes(searchTerm)) {
+                            row.style.display = '';
+                            visibleCount++;
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+
+                    clearSearchBtn.style.display = 'inline-block';
+
+                    // Show/hide no results message and table
+                    if (visibleCount === 0) {
+                        noResultsMessage.style.display = 'block';
+                        if (providerTable) providerTable.style.display = 'none';
+                    } else {
+                        noResultsMessage.style.display = 'none';
+                        if (providerTable) providerTable.style.display = '';
+                    }
+                }
+            }
+
+            // Search input event (live search)
+            searchInput.addEventListener('input', filterProviders);
+
+            // Clear search button
+            clearSearchBtn.addEventListener('click', function() {
+                searchInput.value = '';
+                filterProviders();
+                searchInput.focus();
+            });
+
+            // Allow Escape key to clear search
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    searchInput.value = '';
+                    filterProviders();
+                    searchInput.focus();
+                }
+            });
+        });
+    </script>
+}
+
+    

@@ -25,6 +25,7 @@
         // Provider
         public Guid ProviderId { get; set; }
         public string ProviderName { get; set; } = null!;
+        public string? ProviderImages { get; set; } // Logo/ảnh của provider
 
         // Service (sản phẩm)
         public Guid ServiceId { get; set; }

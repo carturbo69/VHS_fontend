@@ -11,84 +11,127 @@
         <div class="bookings-list">
             @foreach (var booking in Model)
             {
-                <div class="booking-card">
+                var statusText = booking.BookingStatus == "Canceled" ? "Đã hủy" : booking.BookingStatus == "Pending" ? "Chờ xác nhận" : booking.BookingStatus;
+                var statusClass = booking.BookingStatus == "Canceled" ? "status-canceled" : "status-pending";
+                var statusIcon = booking.BookingStatus == "Canceled" ? "bi-x-circle" : "bi-clock-history";
+                var methodText = booking.PaymentMethod == "CreditCard" ? "Thẻ tín dụng" :
+                               booking.PaymentMethod == "BankTransfer" ? "Chuyển khoản ngân hàng" :
+                               booking.PaymentMethod == "Cash" ? "Tiền mặt" :
+                               booking.PaymentMethod == "VnPay" ? "VnPay" :
+                               booking.PaymentMethod == "MoMo" ? "Ví MoMo" :
+                               booking.PaymentMethod == "ZaloPay" ? "Ví ZaloPay" :
+                               booking.PaymentMethod == "Wallet" ? "Ví điện tử" :
+                               booking.PaymentMethod == "E-Wallet" ? "Ví điện tử" :
+                               booking.PaymentMethod == "Refund" ? "Hoàn tiền" :
+                               !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Chưa xác định";
+                var paymentStatusText = booking.PaymentStatus == "Pending" ? "Chờ xử lý" :
+                                      booking.PaymentStatus == "Completed" ? "Đã thanh toán" :
+                                      booking.PaymentStatus == "Failed" ? "Thất bại" :
+                                      booking.PaymentStatus == "Refunded" ? "Đã hoàn tiền" : booking.PaymentStatus;
+                <div class="booking-card refund-booking-card">
                     <div class="booking-header">
                         <div class="booking-id">
-                            <span class="badge">Booking #@booking.BookingId.ToString().Substring(0, 8)</span>
+                            <div class="booking-id-icon"><i class="bi bi-receipt-cutoff"></i></div>
+                            <div class="booking-id-content">
+                                <span class="booking-id-label">Mã đơn hàng</span>
+                                <span class="badge booking-id-badge">#@booking.BookingId.ToString().Substring(0, 8)</span>
+                            </div>
                         </div>
                         <div class="booking-status">
-                            @{
-                                var statusText = booking.BookingStatus == "Canceled" ? "Đã hủy" : 
-                                                 booking.BookingStatus == "Pending" ? "Chờ xác nhận" : 
-                                                 booking.BookingStatus;
-                                var statusClass = booking.BookingStatus == "Canceled" ? "status-canceled" : "status-pending";
-                            }
-                            <span class="status-badge @statusClass">@statusText</span>
+                            <span class="status-badge @statusClass">
+                                <i class="bi @statusIcon"></i>
+                                <span>@statusText</span>
+                            </span>
                         </div>
                     </div>
 
                     <div class="booking-content">
                         <div class="booking-info-row">
                             <div class="info-item">
-                                <i class="bi bi-person-circle"></i>
-                                <div>
-                                    <strong>Khách hàng:</strong>
-                                    <div>@booking.CustomerName</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-person-circle"></i></div>
+                                <div class="info-content">
+                                    <strong>Khách hàng</strong>
+                                    <div class="info-value">@booking.CustomerName</div>
                                     <small>@booking.CustomerEmail</small>
                                 </div>
                             </div>
                             <div class="info-item">
-                                <i class="bi bi-gear"></i>
-                                <div>
-                                    <strong>Dịch vụ:</strong>
-                                    <div>@booking.ServiceName</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-gear"></i></div>
+                                <div class="info-content">
+                                    <strong>Dịch vụ</strong>
+                                    <div class="info-value">@booking.ServiceName</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="booking-info-row">
                             <div class="info-item">
-                                <i class="bi bi-calendar3"></i>
-                                <div>
-                                    <strong>Ngày đặt:</strong>
-                                    <div>@booking.BookingDate.ToString("dd/MM/yyyy HH:mm")</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-calendar3"></i></div>
+                                <div class="info-content">
+                                    <strong>Ngày đặt</strong>
+                                    <div class="info-value">@booking.BookingDate.ToString("dd/MM/yyyy HH:mm")</div>
                                 </div>
                             </div>
                             <div class="info-item">
-                                <i class="bi bi-cash-stack"></i>
-                                <div>
-                                    <strong>Số tiền:</strong>
-                                    <div class="amount">@booking.PaymentAmount.ToString("N0") VNĐ</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-cash-stack"></i></div>
+                                <div class="info-content">
+                                    <strong>Số tiền cần hoàn</strong>
+                                    <div class="amount highlight">@booking.PaymentAmount.ToString("N0") VNĐ</div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="payment-info">
-                            <small>
-                                <i class="bi bi-credit-card"></i>
-                                Phương thức: @booking.PaymentMethod | 
-                                Trạng thái: @booking.PaymentStatus
-                            </small>
+                        <div class="payment-info-section">
+                            <div class="payment-method-info">
+                                <div class="payment-info-icon-wrapper"><i class="bi bi-credit-card-2-front"></i></div>
+                                <div class="payment-info-content">
+                                    <strong>Phương thức thanh toán</strong>
+                                    <div class="payment-info-value">@methodText</div>
+                                </div>
+                            </div>
+                            <div class="payment-status-info">
+                                <div class="payment-info-icon-wrapper"><i class="bi bi-info-circle"></i></div>
+                                <div class="payment-info-content">
+                                    <strong>Trạng thái thanh toán</strong>
+                                    <div class="payment-info-value">@paymentStatusText</div>
+                                </div>
+                            </div>
                         </div>
 
                         @if (!string.IsNullOrWhiteSpace(booking.CancelReason))
                         {
-                            <div class="cancel-info mt-2 p-2 bg-light rounded">
-                                <strong><i class="bi bi-info-circle"></i> Lý do hủy:</strong>
-                                <div>@booking.CancelReason</div>
+                            <div class="cancel-info">
+                                <div class="cancel-info-header">
+                                    <div class="cancel-info-header-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                                    <strong>Lý do hủy đơn hàng</strong>
+                                </div>
+                                <div class="cancel-info-content">@booking.CancelReason</div>
                             </div>
                         }
 
                         @if (!string.IsNullOrWhiteSpace(booking.BankAccount))
                         {
-                            <div class="bank-info mt-2 p-2 bg-light rounded">
-                                <strong><i class="bi bi-bank"></i> Thông tin ngân hàng:</strong>
-                                <div>
-                                    <div>STK: @booking.BankAccount</div>
-                                    <div>Ngân hàng: @booking.BankName</div>
+                            <div class="bank-info">
+                                <div class="bank-info-header bank-info-toggle" onclick="toggleBankInfo(this)">
+                                    <div class="bank-info-header-icon"><i class="bi bi-bank"></i></div>
+                                    <strong>Thông tin ngân hàng nhận hoàn tiền</strong>
+                                    <i class="bi bi-chevron-down bank-info-chevron"></i>
+                                </div>
+                                <div class="bank-info-content bank-info-collapsible collapsed">
+                                    <div class="bank-detail-item">
+                                        <span class="bank-detail-label">Số tài khoản:</span>
+                                        <span class="bank-detail-value">@booking.BankAccount</span>
+                                    </div>
+                                    <div class="bank-detail-item">
+                                        <span class="bank-detail-label">Ngân hàng:</span>
+                                        <span class="bank-detail-value">@booking.BankName</span>
+                                    </div>
                                     @if (!string.IsNullOrWhiteSpace(booking.AccountHolderName))
                                     {
-                                        <div>Chủ tài khoản: @booking.AccountHolderName</div>
+                                        <div class="bank-detail-item">
+                                            <span class="bank-detail-label">Chủ tài khoản:</span>
+                                            <span class="bank-detail-value">@booking.AccountHolderName</span>
+                                        </div>
                                     }
                                 </div>
                             </div>
@@ -112,12 +155,9 @@
     else
     {
         <div class="empty-state">
-            <div class="empty-icon">
-                <i class="bi bi-check-circle"></i>
-            </div>
+            <div class="empty-icon"><i class="bi bi-inbox"></i></div>
             <h3>Không có đơn hàng nào cần hoàn tiền</h3>
             <p>Tất cả các đơn hàng đã được xử lý hoặc không có đơn hàng nào ở trạng thái chờ xác nhận.</p>
         </div>
     }
 </div>
-

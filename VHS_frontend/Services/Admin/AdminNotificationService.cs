@@ -275,6 +275,70 @@ namespace VHS_frontend.Services.Admin
                 return new List<AdminNotificationDTO>();
             }
         }
+
+        // DELETE: Xóa các thông báo đã gửi (User/Provider) cũ hơn 1 tuần
+        public async Task<int> DeleteOldSentNotificationsAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                AttachAuth();
+                var url = "/api/notification/admin/all";
+                var res = await _http.GetAsync(url, ct);
+                if (!res.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Failed to get notifications for cleanup: {res.StatusCode}");
+                    return 0;
+                }
+                
+                var json = await res.Content.ReadAsStringAsync(ct);
+                using var doc = JsonDocument.Parse(json);
+                
+                if (!doc.RootElement.TryGetProperty("data", out var dataElement))
+                {
+                    return 0;
+                }
+                
+                var allNotifications = JsonSerializer.Deserialize<List<AdminNotificationItemDTO>>(
+                    dataElement.GetRawText(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                
+                // Lọc các thông báo đã gửi (User/Provider) cũ hơn 7 ngày (từ thời điểm tạo)
+                // Tính từ thời điểm hiện tại, các thông báo có CreatedAt < 7 ngày trước sẽ bị xóa
+                var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+                var oldSentNotifications = allNotifications
+                    .Where(n => (n.ReceiverRole == "User" || n.ReceiverRole == "Provider") 
+                        && n.CreatedAt.HasValue 
+                        && n.CreatedAt.Value.ToUniversalTime() < sevenDaysAgo)
+                    .ToList();
+                
+                Console.WriteLine($"Tìm thấy {oldSentNotifications.Count} thông báo đã gửi cũ hơn 7 ngày (từ {sevenDaysAgo:yyyy-MM-dd HH:mm:ss} UTC)");
+                
+                int deletedCount = 0;
+                foreach (var notification in oldSentNotifications)
+                {
+                    try
+                    {
+                        var deleteRes = await _http.DeleteAsync($"/api/notification/{notification.NotificationId}", ct);
+                        if (deleteRes.IsSuccessStatusCode)
+                        {
+                            deletedCount++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error deleting notification {notification.NotificationId}: {ex.Message}");
+                    }
+                }
+                
+                Console.WriteLine($"Deleted {deletedCount} old sent notifications (older than 1 week)");
+                return deletedCount;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deleting old sent notifications: {ex.Message}");
+                return 0;
+            }
+        }
     }
 
     public class AccountItemDTO

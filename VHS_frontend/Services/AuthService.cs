@@ -12,7 +12,6 @@ namespace VHS_frontend.Services
     {
         private readonly HttpClient _httpClient;
         private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly string _baseUrl = "http://localhost:5154/api/auth/";
 
         public AuthService(HttpClient httpClient, IHttpContextAccessor httpContextAccessor)
         {
@@ -22,8 +21,27 @@ namespace VHS_frontend.Services
 
         public async Task<LoginRespondDTO?> LoginAsync(LoginDTO dto, CancellationToken ct = default)
         {
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}login", dto, ct);
-            if (!res.IsSuccessStatusCode) return null;
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/login", dto, ct);
+            if (!res.IsSuccessStatusCode)
+            {
+                // Nếu là Unauthorized (401), throw exception với message từ API
+                if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    try
+                    {
+                        var errorObj = await res.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+                        var message = errorObj.TryGetProperty("Message", out var msgProp) ? msgProp.GetString() : 
+                                     (errorObj.TryGetProperty("message", out var msgProp2) ? msgProp2.GetString() : "Tài khoản đã bị ngừng hoạt động.");
+                        throw new UnauthorizedAccessException(message ?? "Tài khoản đã bị ngừng hoạt động.");
+                    }
+                    catch (JsonException)
+                    {
+                        var errorText = await res.Content.ReadAsStringAsync(ct);
+                        throw new UnauthorizedAccessException(errorText ?? "Tài khoản đã bị ngừng hoạt động.");
+                    }
+                }
+                return null;
+            }
 
             return await res.Content.ReadFromJsonAsync<LoginRespondDTO>(cancellationToken: ct);
         }
@@ -40,7 +58,7 @@ namespace VHS_frontend.Services
 
         public async Task<RegisterRespondDTO?> RegisterAsync(RegisterDTO dto, CancellationToken ct = default)
         {
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}register", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/register", dto, ct);
 
             // Nếu không 2xx: log & trả object lỗi
             if (!res.IsSuccessStatusCode)
@@ -87,14 +105,14 @@ namespace VHS_frontend.Services
         public async Task<bool> VerifyOTPAsync(string email, string otp, CancellationToken ct = default)
         {
             var dto = new { Email = email, OTP = otp };
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}verify-otp", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/verify-otp", dto, ct);
             return res.IsSuccessStatusCode;
         }
 
         public async Task<RegisterRespondDTO?> ActivateAccountAsync(string email, string otp, CancellationToken ct = default)
         {
             var dto = new { Email = email, OTP = otp };
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}activate-account", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/activate-account", dto, ct);
             
             var responseText = await res.Content.ReadAsStringAsync(ct);
             
@@ -135,7 +153,7 @@ namespace VHS_frontend.Services
         public async Task<RegisterRespondDTO?> ResendOTPAsync(string email, CancellationToken ct = default)
         {
             var dto = new { Email = email };
-            var res = await _httpClient.PostAsJsonAsync($"{_baseUrl}resend-otp", dto, ct);
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/resend-otp", dto, ct);
             
             if (!res.IsSuccessStatusCode)
             {
@@ -145,6 +163,111 @@ namespace VHS_frontend.Services
 
             var result = await res.Content.ReadFromJsonAsync<RegisterRespondDTO>(cancellationToken: ct);
             return result ?? new RegisterRespondDTO { Success = true, Message = "OTP đã được gửi lại." };
+        }
+
+        public async Task<RegisterRespondDTO?> SendForgotPasswordOTPAsync(string email, CancellationToken ct = default)
+        {
+            var dto = new { Email = email };
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/forgot-password/send-otp", dto, ct);
+            
+            if (!res.IsSuccessStatusCode)
+            {
+                var errText = await res.Content.ReadAsStringAsync(ct);
+                try
+                {
+                    var errorObj = JsonSerializer.Deserialize<JsonElement>(errText);
+                    var message = errorObj.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : 
+                                 (errorObj.TryGetProperty("Message", out var msgProp2) ? msgProp2.GetString() : errText);
+                    return new RegisterRespondDTO { Success = false, Message = message ?? errText };
+                }
+                catch
+                {
+                    return new RegisterRespondDTO { Success = false, Message = errText };
+                }
+            }
+
+            var result = await res.Content.ReadFromJsonAsync<RegisterRespondDTO>(cancellationToken: ct);
+            return result ?? new RegisterRespondDTO { Success = true, Message = "Mã OTP đã được gửi đến email của bạn." };
+        }
+
+        public async Task<RegisterRespondDTO?> VerifyForgotPasswordOTPAsync(string email, string otp, CancellationToken ct = default)
+        {
+            var dto = new { Email = email, OTP = otp };
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/forgot-password/verify-otp", dto, ct);
+            
+            var responseText = await res.Content.ReadAsStringAsync(ct);
+            
+            if (!res.IsSuccessStatusCode)
+            {
+                try
+                {
+                    var errorObj = JsonSerializer.Deserialize<JsonElement>(responseText);
+                    var message = errorObj.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : responseText;
+                    return new RegisterRespondDTO { Success = false, Message = message ?? responseText };
+                }
+                catch
+                {
+                    return new RegisterRespondDTO { Success = false, Message = responseText };
+                }
+            }
+
+            try
+            {
+                var result = JsonSerializer.Deserialize<JsonElement>(responseText);
+                var success = result.TryGetProperty("success", out var successProp) && successProp.GetBoolean();
+                var message = result.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "OTP hợp lệ.";
+                var token = result.TryGetProperty("token", out var tokenProp) ? tokenProp.GetString() : null;
+                
+                return new RegisterRespondDTO 
+                { 
+                    Success = success, 
+                    Message = message ?? "OTP hợp lệ.",
+                    Data = token // Lưu token vào Data để dùng cho reset password
+                };
+            }
+            catch (Exception ex)
+            {
+                return new RegisterRespondDTO { Success = true, Message = "OTP hợp lệ." };
+            }
+        }
+
+        public async Task<RegisterRespondDTO?> ResetPasswordAsync(string email, string resetToken, string newPassword, CancellationToken ct = default)
+        {
+            var dto = new { Email = email, Token = resetToken, Password = newPassword };
+            var res = await _httpClient.PostAsJsonAsync("/api/auth/reset-password", dto, ct);
+            
+            var responseText = await res.Content.ReadAsStringAsync(ct);
+            
+            if (!res.IsSuccessStatusCode)
+            {
+                try
+                {
+                    var errorObj = JsonSerializer.Deserialize<JsonElement>(responseText);
+                    var message = errorObj.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : responseText;
+                    return new RegisterRespondDTO { Success = false, Message = message ?? responseText };
+                }
+                catch
+                {
+                    return new RegisterRespondDTO { Success = false, Message = responseText };
+                }
+            }
+
+            try
+            {
+                var result = JsonSerializer.Deserialize<JsonElement>(responseText);
+                var success = result.TryGetProperty("success", out var successProp) && successProp.GetBoolean();
+                var message = result.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "Mật khẩu đã được đặt lại thành công.";
+                
+                return new RegisterRespondDTO 
+                { 
+                    Success = success, 
+                    Message = message ?? "Mật khẩu đã được đặt lại thành công."
+                };
+            }
+            catch (Exception ex)
+            {
+                return new RegisterRespondDTO { Success = true, Message = "Mật khẩu đã được đặt lại thành công." };
+            }
         }
 
         /// <summary>
@@ -158,7 +281,7 @@ namespace VHS_frontend.Services
                 _httpClient.DefaultRequestHeaders.Authorization = 
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-                var apiUrl = $"http://localhost:5154/api/Provider/get-id-by-account/{accountId}";
+                var apiUrl = $"/api/Provider/get-id-by-account/{accountId}";
                 var response = await _httpClient.GetAsync(apiUrl, ct);
 
                 if (!response.IsSuccessStatusCode)

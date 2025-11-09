@@ -10,5 +10,9 @@
         public bool IsDeleted { get; set; }           // map từ IsDeleted của backend
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+        // Tên nhà cung cấp (ProviderName) - không map từ backend, được lấy từ ProviderProfile
+        public string ProviderName { get; set; } = string.Empty;
+        // Số lượng dịch vụ chờ duyệt (Pending hoặc PendingUpdate) - không map từ backend, được tính ở frontend
+        public int PendingUpdateCount { get; set; } = 0;
     }
 }

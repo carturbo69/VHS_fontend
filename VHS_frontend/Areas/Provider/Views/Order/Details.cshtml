@@ -56,8 +56,13 @@
                     <div class="d-flex">
                         @if (!string.IsNullOrEmpty(Model.ServiceImages))
                         {
-                            var firstImage = Model.ServiceImages.Split(',').FirstOrDefault();
-                            <img src="@firstImage" alt="@Model.ServiceName" class="service-image me-3" />
+                            string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
+                            var firstImage = Model.ServiceImages.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                            var firstUrl = ToUrl(firstImage);
+                            if (!string.IsNullOrEmpty(firstUrl))
+                            {
+                                <img src="@firstUrl" alt="@Model.ServiceName" class="service-image me-3" />
+                            }
                         }
                         <div class="flex-grow-1">
                             <h5>@Model.ServiceName</h5>
@@ -110,55 +115,86 @@
                 </div>
             </div>
 
-            <!-- Staff Assignment Card -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-people me-2"></i>
-                        Phân công nhân viên
-                    </h5>
-                </div>
-                <div class="card-body">
-                    @if (Model.StaffId.HasValue)
-                    {
-                        <div class="alert alert-success">
-                            <i class="bi bi-person-check-fill"></i>
-                            Đã phân công cho: <strong>@Model.StaffName</strong>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="alert alert-warning">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            Chưa phân công nhân viên
-                        </div>
-                    }
-
-                    @if (ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
-                    {
-                        <div class="mt-3">
-                            <label class="form-label">Chọn nhân viên:</label>
-                            <div class="input-group">
-                                <select id="staffSelect" class="form-select">
-                                    <option value="">-- Chọn nhân viên --</option>
-                                    @foreach (var staff in (List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList)
-                                    {
-                                        var isSelected = Model.StaffId.HasValue && 
-                                                        Guid.TryParse(staff.StaffId, out var staffGuid) && 
-                                                        staffGuid == Model.StaffId.Value;
-                                        <option value="@staff.StaffId" selected="@isSelected">
-                                            @staff.StaffName
-                                        </option>
-                                    }
-                                </select>
-                                <button type="button" class="btn btn-primary" onclick="assignStaff()">
-                                    <i class="bi bi-check"></i> Phân công
-                                </button>
+            @{
+                var currentStatus = (Model.Status ?? string.Empty).Trim();
+                var isCompletedOrCancelled = string.Equals(currentStatus, "Completed", StringComparison.OrdinalIgnoreCase) || 
+                                            string.Equals(currentStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                                            string.Equals(currentStatus, "Canceled", StringComparison.OrdinalIgnoreCase);
+            }
+            
+            @* Chỉ hiển thị phần phân công nhân viên nếu đơn hàng chưa hoàn thành hoặc hủy *@
+            @if (!isCompletedOrCancelled)
+            {
+                <!-- Staff Assignment Card -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-people me-2"></i>
+                            Phân công nhân viên
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        @{
+                            var isPendingStatus = string.Equals((Model.Status ?? string.Empty).Trim(), "Pending", StringComparison.OrdinalIgnoreCase);
+                            var isConfirmedOrAbove = string.Equals((Model.Status ?? string.Empty).Trim(), "Confirmed", StringComparison.OrdinalIgnoreCase) ||
+                                                    string.Equals((Model.Status ?? string.Empty).Trim(), "InProgress", StringComparison.OrdinalIgnoreCase) ||
+                                                    string.Equals((Model.Status ?? string.Empty).Trim(), "Completed", StringComparison.OrdinalIgnoreCase);
+                        }
+                        
+                        @* Chỉ hiển thị "Đã phân công" khi status là Confirmed trở lên *@
+                        @if (isConfirmedOrAbove && Model.StaffId.HasValue)
+                        {
+                            <div class="alert alert-success">
+                                <i class="bi bi-person-check-fill"></i>
+                                Đã phân công cho: <strong>@Model.StaffName</strong>
                             </div>
-                        </div>
-                    }
+                        }
+                        else if (isPendingStatus)
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Đơn hàng đang chờ xử lý</strong>
+                                <p class="mb-0 mt-2 small">
+                                    Bạn có thể chọn nhân viên trước, sau đó nhấn "Xác nhận đơn hàng" để gán chính thức. 
+                                    Nếu không chọn, hệ thống sẽ tự động gán nhân viên rảnh có ít công việc nhất.
+                                </p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                Chưa phân công nhân viên
+                            </div>
+                        }
+
+                        @if (ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
+                        {
+                            <div class="mt-3">
+                                <label class="form-label">Chọn nhân viên:</label>
+                                <div class="input-group">
+                                    <select id="staffSelect" class="form-select">
+                                        <option value="">-- Chọn nhân viên (tùy chọn) --</option>
+                                        @foreach (var staff in (List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList)
+                                        {
+                                            @* Chỉ pre-select nhân viên nếu status là Confirmed trở lên *@
+                                            var isSelected = isConfirmedOrAbove && Model.StaffId.HasValue && 
+                                                            Guid.TryParse(staff.StaffId, out var staffGuid) && 
+                                                            staffGuid == Model.StaffId.Value;
+                                            <option value="@staff.StaffId" selected="@isSelected">
+                                                @staff.StaffName
+                                            </option>
+                                        }
+                                    </select>
+                                    <button type="button" class="btn btn-primary" onclick="assignStaff()">
+                                        <i class="bi bi-check"></i> Phân công
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 </div>
-            </div>
+            }
 
             <!-- Checker Records -->
             @if (Model.CheckerRecords.Any())
@@ -224,7 +260,8 @@
                         var statusNorm = (Model.Status ?? string.Empty).Trim();
                         bool isConfirmed = string.Equals(statusNorm, "Confirmed", StringComparison.OrdinalIgnoreCase);
                         bool isCompleted = string.Equals(statusNorm, "Completed", StringComparison.OrdinalIgnoreCase);
-                        bool isCanceled  = string.Equals(statusNorm, "Canceled",  StringComparison.OrdinalIgnoreCase);
+                        bool isCanceled  = string.Equals(statusNorm, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+                                          string.Equals(statusNorm, "Cancelled", StringComparison.OrdinalIgnoreCase);
                         // Hiển thị nút nếu đơn chưa ở các trạng thái cuối cùng
                         bool canAct = !(isConfirmed || isCompleted || isCanceled);
                     }
@@ -253,36 +290,36 @@
                             <i class="bi bi-x-circle"></i> Hủy đơn hàng (khẩn cấp)
                         </button> *@
                     }
-                    else if (Model.Status == "Completed")
+                    else if (isCompleted)
                     {
                         <div class="alert alert-success">
                             <i class="bi bi-check-circle-fill"></i>
                             <strong>Đơn hàng đã hoàn thành</strong>
-                            <p class="mb-0 mt-2 small">
-                                Công việc đã được nhân viên hoàn thành.
+                            <p class="mb-0 mt-2">
+                                @if (!string.IsNullOrEmpty(Model.StaffName))
+                                {
+                                    <text>Đơn hàng đã được nhân viên <strong>@Model.StaffName</strong> hoàn thành.</text>
+                                }
+                                else
+                                {
+                                    <text>Công việc đã được nhân viên hoàn thành.</text>
+                                }
                             </p>
                         </div>
                     }
-                    else if (Model.Status == "Canceled")
+                    else if (isCanceled)
                     {
                         <div class="alert alert-danger">
                             <h5 class="alert-heading">
                                 <i class="bi bi-x-circle-fill"></i>
-                                <strong>Đơn hàng đã bị từ chối</strong>
+                                <strong>Đơn hàng này đã được hủy</strong>
                             </h5>
                             @if (!string.IsNullOrEmpty(Model.CancelReason))
                             {
                                 <hr />
                                 <p class="mb-0">
-                                    <strong>Lý do từ chối:</strong><br />
+                                    <strong>Lý do hủy:</strong><br />
                                     <span class="text-dark">@Model.CancelReason</span>
-                                </p>
-                            }
-                            else
-                            {
-                                <hr />
-                                <p class="mb-0 text-muted">
-                                    <em>(Không có lý do cụ thể)</em>
                                 </p>
                             }
                         </div>
@@ -340,6 +377,16 @@
         function updateStatus(newStatus) {
             console.log('[DEBUG] updateStatus called with:', newStatus);
             
+            // ✨ Nếu xác nhận đơn hàng, lấy staffId từ dropdown (nếu có)
+            let selectedStaffId = null;
+            if (newStatus === 'Confirmed') {
+                const staffSelect = document.getElementById('staffSelect');
+                if (staffSelect && staffSelect.value) {
+                    selectedStaffId = staffSelect.value;
+                    console.log('[DEBUG] Selected staff ID:', selectedStaffId);
+                }
+            }
+            
             const confirmMsg = newStatus === 'Confirmed' ? 'xác nhận' : 
                               newStatus === 'Completed' ? 'hoàn thành' : 'cập nhật';
             
@@ -351,7 +398,8 @@
             const payload = {
                 bookingId: bookingId,
                 newStatus: newStatus,
-                reason: null
+                reason: null,
+                selectedStaffId: selectedStaffId  // ✨ Gửi staffId đã chọn (nếu có)
             };
             
             console.log('[DEBUG] Sending payload:', payload);
@@ -503,7 +551,32 @@
         function assignStaff() {
             console.log('[DEBUG] assignStaff called');
             
+            // Kiểm tra trạng thái booking
+            const bookingStatus = '@Model.Status'.trim().toLowerCase();
+            
+            // ✨ Chỉ cho phép gán khi status là Confirmed
+            if (bookingStatus !== 'confirmed') {
+                if (bookingStatus === 'pending') {
+                    alert('⚠️ Đơn hàng đang ở trạng thái chờ xử lý. Vui lòng xác nhận đơn hàng trước khi phân công nhân viên.\n\n' +
+                          'Bạn có thể:\n' +
+                          '1. Chọn nhân viên, sau đó nhấn "Xác nhận đơn hàng" - hệ thống sẽ gán nhân viên bạn chọn\n' +
+                          '2. Nhấn "Xác nhận đơn hàng" trực tiếp - hệ thống sẽ tự động gán nhân viên rảnh có ít công việc nhất');
+                } else if (bookingStatus === 'completed' || bookingStatus === 'cancelled' || bookingStatus === 'canceled') {
+                    alert('⚠️ Không thể phân công nhân viên cho đơn hàng đã hoàn thành hoặc đã hủy.');
+                } else {
+                    alert('⚠️ Chỉ có thể phân công nhân viên cho đơn hàng đã được xác nhận.');
+                }
+                return;
+            }
+            
             const staffSelect = document.getElementById('staffSelect');
+            
+            // Kiểm tra nếu select bị disabled
+            if (staffSelect.disabled) {
+                alert('⚠️ Không thể phân công nhân viên cho đơn hàng này.');
+                return;
+            }
+            
             const staffId = staffSelect.value;
             
             console.log('[DEBUG] Selected staff ID:', staffId);

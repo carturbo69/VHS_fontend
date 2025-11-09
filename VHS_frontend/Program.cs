@@ -184,7 +184,11 @@ builder.Services.AddHttpClient<OptionManagementService>(client =>
 });
 
 // HttpClient cho AuthService
-builder.Services.AddHttpClient<AuthService>();
+builder.Services.AddHttpClient<AuthService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
 builder.Services.AddHttpClient<StaffManagementService>(client => { 
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); 
 });
@@ -205,6 +209,12 @@ builder.Services.AddHttpClient<ChatCustomerService>(client =>
 builder.Services.AddHttpClient<ChatboxService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
+// HttpClient cho GoogleAuthService
+builder.Services.AddHttpClient<GoogleAuthService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); 
 });
 
 builder.Services.AddControllersWithViews();

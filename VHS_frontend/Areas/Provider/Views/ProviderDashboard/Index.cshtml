@@ -86,7 +86,7 @@
                     <!-- Revenue Summary -->
                     <div class="row mb-4">
                         <div class="col-md-6">
-                            <div class="revenue-summary p-3 bg-light rounded">
+                            <div class="revenue-summary p-3 rounded">
                                 <div class="d-flex align-items-center">
                                     <div class="revenue-icon me-3">
                                         <i class="bi bi-cash-coin text-primary" style="font-size: 2.5rem;"></i>
@@ -102,7 +102,7 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="revenue-summary p-3 bg-light rounded">
+                            <div class="revenue-summary p-3 rounded">
                                 <div class="d-flex align-items-center">
                                     <div class="revenue-icon me-3">
                                         <i class="bi bi-graph-up-arrow text-success" style="font-size: 2.5rem;"></i>
@@ -159,7 +159,7 @@
                                         <p class="text-muted small mb-1">@order.CustomerName</p>
                                         <p class="text-muted small mb-2">@order.ServiceName</p>
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <span class="badge bg-@(GetStatusColor(order.Status))">@order.Status</span>
+                                            <span class="badge bg-@(GetStatusColor(order.Status))">@GetStatusText(order.Status)</span>
                                             <span class="fw-bold">@order.Amount.ToString("N0") VNĐ</span>
                                         </div>
                                     </div>
@@ -392,13 +392,41 @@
 @functions {
     string GetStatusColor(string status)
     {
-        return status switch
+        // Chuyển đổi status về lowercase để so sánh không phân biệt hoa thường
+        var statusLower = status?.ToLower() ?? "";
+        
+        return statusLower switch
         {
-            "Đang thực hiện" => "warning",
-            "Hoàn thành" => "success",
-            "Đã thanh toán" => "info",
-            "Chờ xử lý" => "secondary",
+            "completed" or "hoàn thành" => "success",
+            "confirmed" or "đã xác nhận" or "đang thực hiện" => "warning",
+            "pending" or "chờ xử lý" or "đang chờ xử lý" => "secondary",
+            "canceled" or "cancelled" or "đã hủy" => "danger",
+            "paid" or "đã thanh toán" => "info",
             _ => "secondary"
+        };
+    }
+
+    string GetStatusText(string status)
+    {
+        // Chuyển đổi status về lowercase để so sánh không phân biệt hoa thường
+        var statusLower = status?.ToLower() ?? "";
+        
+        return statusLower switch
+        {
+            "completed" => "Hoàn thành",
+            "confirmed" => "Đã xác nhận",
+            "pending" => "Chờ xử lý",
+            "canceled" or "cancelled" => "Đã hủy",
+            "paid" => "Đã thanh toán",
+            "in progress" or "inprogress" => "Đang thực hiện",
+            // Giữ nguyên nếu đã là tiếng Việt
+            "hoàn thành" => "Hoàn thành",
+            "đã xác nhận" => "Đã xác nhận",
+            "chờ xử lý" or "đang chờ xử lý" => "Chờ xử lý",
+            "đã hủy" => "Đã hủy",
+            "đã thanh toán" => "Đã thanh toán",
+            "đang thực hiện" => "Đang thực hiện",
+            _ => status ?? "Chưa xác định"
         };
     }
 }

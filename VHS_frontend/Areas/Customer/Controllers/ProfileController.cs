@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using VHS_frontend.Areas.Customer.Models.Profile;
 using VHS_frontend.Services.Customer;
+using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
@@ -9,10 +10,17 @@ namespace VHS_frontend.Areas.Customer.Controllers
     public class ProfileController : Controller
     {
         private readonly ProfileServiceCustomer _profileService;
+        private readonly BookingServiceCustomer _bookingServiceCustomer;
+        private readonly ReviewServiceCustomer _reviewServiceCustomer;
 
-        public ProfileController(ProfileServiceCustomer profileService)
+        public ProfileController(
+            ProfileServiceCustomer profileService,
+            BookingServiceCustomer bookingServiceCustomer,
+            ReviewServiceCustomer reviewServiceCustomer)
         {
             _profileService = profileService;
+            _bookingServiceCustomer = bookingServiceCustomer;
+            _reviewServiceCustomer = reviewServiceCustomer;
         }
 
         /// <summary>
@@ -44,6 +52,39 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     return RedirectToAction("Index", "Home", new { area = "" });
                 }
 
+                // Lấy số đơn hàng đã hoàn thành
+                int completedOrdersCount = 0;
+                try
+                {
+                    var bookingHistory = await _bookingServiceCustomer.GetHistoryByAccountAsync(accountId, jwtToken);
+                    if (bookingHistory?.Items != null)
+                    {
+                        completedOrdersCount = bookingHistory.Items.Count(b => 
+                            b.Status != null && 
+                            (b.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase) ||
+                             b.Status.Equals("Hoàn thành", StringComparison.OrdinalIgnoreCase)));
+                    }
+                }
+                catch
+                {
+                    // Nếu lỗi thì giữ giá trị mặc định 0
+                }
+
+                // Lấy số đánh giá đã viết
+                int reviewsCount = 0;
+                try
+                {
+                    var (success, reviews, _) = await _reviewServiceCustomer.GetMyReviewsAsync(accountId, jwtToken);
+                    if (success && reviews != null)
+                    {
+                        reviewsCount = reviews.Count;
+                    }
+                }
+                catch
+                {
+                    // Nếu lỗi thì giữ giá trị mặc định 0
+                }
+
                 var viewModel = new ProfileViewModel
                 {
                     UserId = profile.UserId,
@@ -57,7 +98,9 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     Address = profile.Address ?? "",
                     CreatedAt = profile.CreatedAt,
                     UpdatedAt = profile.UpdatedAt,
-                    IsProfileComplete = profile.IsProfileComplete
+                    IsProfileComplete = profile.IsProfileComplete,
+                    CompletedOrdersCount = completedOrdersCount,
+                    ReviewsCount = reviewsCount
                 };
 
                 return View(viewModel);
@@ -183,12 +226,33 @@ namespace VHS_frontend.Areas.Customer.Controllers
         /// API: Update profile from modal
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateProfile([FromForm] EditProfileViewModel model)
         {
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
                 return Json(new { success = false, message = "Bạn cần đăng nhập." });
+            }
+
+            // Validate phone number if provided
+            if (!string.IsNullOrWhiteSpace(model.PhoneNumber))
+            {
+                // Remove spaces and special characters for validation
+                var cleanedPhone = model.PhoneNumber.Trim().Replace(" ", "").Replace("-", "");
+                
+                // Vietnamese phone number patterns
+                // 10 digits starting with 0 (e.g., 0123456789)
+                // 11-12 characters starting with +84 (e.g., +84123456789)
+                var phonePattern = new System.Text.RegularExpressions.Regex(@"^(0[0-9]{9}|\+84[0-9]{9,10})$");
+                
+                if (!phonePattern.IsMatch(cleanedPhone))
+                {
+                    return Json(new { success = false, message = "Số điện thoại không hợp lệ. Vui lòng nhập 10 số bắt đầu bằng 0 (ví dụ: 0123456789) hoặc +84 (ví dụ: +84123456789)" });
+                }
+                
+                // Normalize phone number (use cleaned version)
+                model.PhoneNumber = cleanedPhone;
             }
 
             try
