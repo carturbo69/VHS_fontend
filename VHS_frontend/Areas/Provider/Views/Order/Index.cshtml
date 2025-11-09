@@ -13,7 +13,7 @@
                     <!-- Status Filter -->
                     <div class="col-md-2">
                         <label class="form-label">Trạng thái</label>
-                        <select name="status" class="form-select" onchange="this.form.submit()">
+                        <select name="status" class="form-select form-select-filter" onchange="this.form.submit()">
                             <option value="" selected="@(string.IsNullOrEmpty(ViewBag.CurrentStatus))">Tất cả</option>
                             <option value="Pending" selected="@(ViewBag.CurrentStatus == "Pending")">Chờ xử lý</option>
                             <option value="Confirmed" selected="@(ViewBag.CurrentStatus == "Confirmed")">Đã xác nhận</option>
@@ -145,7 +145,7 @@
                                         {
                                             <br />
                                             <span class="badge bg-@(booking.PaymentStatus == "Paid" ? "success" : "warning")">
-                                                @booking.PaymentStatus
+                                                @GetPaymentStatusText(booking.PaymentStatus)
                                             </span>
                                         }
                                     </td>
@@ -250,13 +250,26 @@
 @functions {
     string GetStatusText(string status)
     {
-        return status switch
+        var statusLower = status?.ToLower() ?? "";
+        return statusLower switch
         {
-            "Pending" => "Chờ xử lý",
-            "Confirmed" => "Đã xác nhận",
-            "Completed" => "Hoàn thành",
-            "Canceled" => "Đã hủy",
-            _ => status
+            "pending" => "Chờ xử lý",
+            "confirmed" => "Đã xác nhận",
+            "completed" => "Hoàn thành",
+            "canceled" or "cancelled" => "Đã hủy",
+            _ => status ?? "Chưa xác định"
+        };
+    }
+
+    string GetPaymentStatusText(string paymentStatus)
+    {
+        var statusLower = paymentStatus?.ToLower() ?? "";
+        return statusLower switch
+        {
+            "paid" => "Đã thanh toán",
+            "unpaid" => "Chưa thanh toán",
+            "pending" => "Chờ thanh toán",
+            _ => paymentStatus ?? "Chưa xác định"
         };
     }
 }

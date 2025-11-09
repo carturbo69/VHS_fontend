@@ -1,0 +1,141 @@
+@model List<VHS_frontend.Areas.Provider.Models.Service.ServiceProviderReadDTO>
+@{
+    var providerName = ViewBag.ProviderName as string ?? "Provider";
+    ViewData["Title"] = $"Dịch vụ của {providerName}";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+    
+    // Hàm chuyển đổi UnitType sang tiếng Việt
+    string GetUnitTypeVietnamese(string? unitType)
+    {
+        if (string.IsNullOrEmpty(unitType)) return unitType ?? "";
+        return unitType switch
+        {
+            "Hour" => "Giờ",
+            "Day" => "Ngày",
+            "Visit" => "Lần",
+            "Apartment" => "Căn",
+            "Room" => "Phòng",
+            "SquareMeter" => "Mét vuông (m²)",
+            "Person" => "Người",
+            "Package" => "Gói",
+            "Event" => "Sự kiện",
+            _ => unitType
+        };
+    }
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3><i class="bi bi-briefcase me-2"></i>Dịch vụ của @providerName</h3>
+        <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Danh sách dịch vụ</div>
+        <div class="card-body">
+            @if (Model != null && Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Tên dịch vụ</th>
+                                <th>Danh mục</th>
+                                <th>Giá</th>
+                                <th>Đơn vị</th>
+                                <th>Trạng thái</th>
+                                <th class="text-end">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var s in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@s.Title</strong>
+                                    <div class="text-muted small">@s.Description</div>
+                                </td>
+                                <td>@s.CategoryName</td>
+                                <td>@s.Price.ToString("N0") VNĐ</td>
+                                <td>@GetUnitTypeVietnamese(s.UnitType) (@s.BaseUnit)</td>
+                                <td>
+                                    @if (string.Equals(s.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge bg-warning text-dark">Đăng ký</span>
+                                    }
+                                    else if (string.Equals(s.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge bg-success">Đã duyệt</span>
+                                    }
+                                    else if (string.Equals(s.Status, "PendingUpdate", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge bg-info text-dark">Chờ duyệt chỉnh sửa</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">@s.Status</span>
+                                    }
+                                </td>
+                                <td class="text-end" style="white-space: nowrap;">
+                                    <div class="d-flex gap-2 justify-content-end align-items-center flex-nowrap">
+                                        @{
+                                            var detailReturnUrl = Context.Request?.Path + Context.Request?.QueryString;
+                                            var detailUrl = Url.Action("Detail", "AdminServiceApproval", new { area = "Admin", id = s.ServiceId, returnUrl = detailReturnUrl });
+                                            var currentUrl = Context.Request?.Path + Context.Request?.QueryString;
+                                        }
+                                        <a href="@detailUrl" class="btn btn-outline-secondary btn-sm">
+                                            <i class="bi bi-eye me-1"></i>Xem chi tiết
+                                        </a>
+                                        @if (string.Equals(s.Status, "Pending", StringComparison.OrdinalIgnoreCase) || string.Equals(s.Status, "PendingUpdate", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <form asp-area="Admin" asp-controller="AdminServiceApproval" asp-action="Approve" method="post" class="d-inline m-0">
+                                                <input type="hidden" name="id" value="@s.ServiceId" />
+                                                <input type="hidden" name="returnUrl" value="@currentUrl" />
+                                                <button type="submit" class="btn btn-approval btn-approval-approve">
+                                                    <i class="bi bi-check2 me-1"></i>@(string.Equals(s.Status, "PendingUpdate", StringComparison.OrdinalIgnoreCase) ? "Duyệt chỉnh sửa" : "Duyệt")
+                                                </button>
+                                            </form>
+                                            <button class="btn btn-approval btn-approval-reject" data-bs-toggle="modal" data-bs-target="#rejectModal_@s.ServiceId" data-id="@s.ServiceId" data-status="@s.Status">
+                                                <i class="bi bi-x-lg me-1"></i>Từ chối
+                                            </button>
+                                            
+                                            <!-- Reject Modal for each service -->
+                                            <div class="modal fade" id="rejectModal_@s.ServiceId" tabindex="-1" aria-labelledby="rejectModalLabel_@s.ServiceId" aria-hidden="true">
+                                                <div class="modal-dialog">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title" id="rejectModalLabel_@s.ServiceId">Lý do từ chối</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <form asp-area="Admin" asp-controller="AdminServiceApproval" asp-action="Reject" method="post">
+                                                            <div class="modal-body">
+                                                                <input type="hidden" name="id" value="@s.ServiceId" />
+                                                                <input type="hidden" name="returnUrl" value="@currentUrl" />
+                                                                <textarea class="form-control" name="reason" rows="4" placeholder="Nhập lý do (tuỳ chọn)"></textarea>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                                                <button type="submit" class="btn btn-danger">Xác nhận từ chối</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-muted">Provider này chưa có dịch vụ phù hợp tiêu chí.</div>
+            }
+        </div>
+    </div>
+</div>
+
+

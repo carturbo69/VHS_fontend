@@ -25,5 +25,12 @@ namespace VHS_frontend.Areas.Provider.Models.Staff
         public string? CurrentFaceImage { get; set; }
         public string? CurrentCitizenIDFrontImage { get; set; }
         public string? CurrentCitizenIDBackImage { get; set; }
+
+        [StringLength(500, ErrorMessage = "Địa chỉ không được vượt quá 500 ký tự")]
+        public string? Address { get; set; }
+
+        [StringLength(20, ErrorMessage = "Số điện thoại không được vượt quá 20 ký tự")]
+        [RegularExpression(@"^[0-9]{10,11}$", ErrorMessage = "Số điện thoại không hợp lệ")]
+        public string? PhoneNumber { get; set; }
     }
 }

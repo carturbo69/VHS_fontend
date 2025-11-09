@@ -123,6 +123,15 @@ namespace VHS_frontend.Services.Provider
             if (!string.IsNullOrEmpty(dto.Status))
                 formContent.Add(new StringContent(dto.Status), "Status");
 
+            if (dto.Avatar != null)
+            {
+                using var msA = new MemoryStream();
+                await dto.Avatar.CopyToAsync(msA, ct);
+                var fileContent = new ByteArrayContent(msA.ToArray());
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(dto.Avatar.ContentType ?? "application/octet-stream");
+                formContent.Add(fileContent, "Avatar", dto.Avatar.FileName);
+            }
+
             if (dto.Images != null && dto.Images.Count > 0)
             {
                 foreach (var img in dto.Images)
@@ -133,6 +142,16 @@ namespace VHS_frontend.Services.Provider
                     var fileContent = new ByteArrayContent(ms.ToArray());
                     fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(img.ContentType ?? "application/octet-stream");
                     formContent.Add(fileContent, "Images", img.FileName);
+                }
+            }
+
+            // Add RemoveImages (có thể nhiều trường cùng tên)
+            if (dto.RemoveImages != null && dto.RemoveImages.Count > 0)
+            {
+                foreach (var path in dto.RemoveImages)
+                {
+                    if (string.IsNullOrWhiteSpace(path)) continue;
+                    formContent.Add(new StringContent(path), "RemoveImages");
                 }
             }
 
@@ -149,6 +168,15 @@ namespace VHS_frontend.Services.Provider
             }
 
             var response = await _httpClient.PutAsync($"/api/ServiceProvider/{serviceId}", formContent, ct);
+            return await response.Content.ReadFromJsonAsync<ApiResponse<string>>(_json, ct);
+        }
+
+        public async Task<ApiResponse<string>?> UpdateStatusAsync(string serviceId, string status, string? token = null, CancellationToken ct = default)
+        {
+            SetAuthHeader(token);
+
+            var payload = JsonContent.Create(new { status }, options: _json);
+            var response = await _httpClient.PatchAsync($"/api/ServiceProvider/{serviceId}/status", payload, ct);
             return await response.Content.ReadFromJsonAsync<ApiResponse<string>>(_json, ct);
         }
 

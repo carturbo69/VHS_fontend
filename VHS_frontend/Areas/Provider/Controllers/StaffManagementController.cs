@@ -47,12 +47,10 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     staffList = new List<StaffDTO>();
                 }
                 
-                // Debug log dữ liệu từ Backend
-                Console.WriteLine($"📊 Staff data from Backend:");
-                Console.WriteLine($"Total staff: {staffList.Count}");
+                // Debug log để kiểm tra FaceImage
                 foreach (var staff in staffList)
                 {
-                    Console.WriteLine($"- {staff.StaffName}: IsLocked = {staff.IsLocked}");
+                    Console.WriteLine($"Staff: {staff.StaffName}, FaceImage: {staff.FaceImage ?? "NULL"}");
                 }
                 
                 // Sắp xếp danh sách: IsDeleted = false trước, IsDeleted = true sau
@@ -60,12 +58,6 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     .OrderBy(s => s.IsLocked)  // false (hoạt động) trước, true (bị khóa) sau
                     .ThenBy(s => s.StaffName)  // Sắp xếp theo tên trong cùng trạng thái
                     .ToList();
-                
-                Console.WriteLine($"📊 Sorted staff list:");
-                foreach (var staff in sortedStaffList)
-                {
-                    Console.WriteLine($"- {staff.StaffName}: IsLocked = {staff.IsLocked}");
-                }
                 
                 return View(sortedStaffList);
             }
@@ -132,6 +124,16 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 formData.Add(new StringContent(model.Password), "Password");
                 formData.Add(new StringContent(model.CitizenID), "CitizenID");
                 
+                // Add Address and PhoneNumber
+                if (!string.IsNullOrEmpty(model.Address))
+                {
+                    formData.Add(new StringContent(model.Address), "Address");
+                }
+                if (!string.IsNullOrEmpty(model.PhoneNumber))
+                {
+                    formData.Add(new StringContent(model.PhoneNumber), "PhoneNumber");
+                }
+                
                 if (model.FaceImage != null)
                 {
                     formData.Add(new StreamContent(model.FaceImage.OpenReadStream()), "FaceImage", model.FaceImage.FileName);
@@ -197,6 +199,8 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     CitizenID = staff.CitizenID,
                     CitizenIDFrontImage = null, // New file will be uploaded
                     CitizenIDBackImage = null, // New file will be uploaded
+                    Address = staff.Address,
+                    PhoneNumber = staff.PhoneNumber,
                     CurrentFaceImage = currentFaceImage,
                     CurrentCitizenIDFrontImage = !string.IsNullOrEmpty(staff.CitizenIDFrontImage) 
                         ? (staff.CitizenIDFrontImage.StartsWith("http") ? staff.CitizenIDFrontImage : $"http://localhost:5154{staff.CitizenIDFrontImage}")
@@ -253,6 +257,16 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 var formData = new MultipartFormDataContent();
                 formData.Add(new StringContent(model.StaffName), "StaffName");
                 formData.Add(new StringContent(model.CitizenID), "CitizenID");
+                
+                // Add Address and PhoneNumber
+                if (!string.IsNullOrEmpty(model.Address))
+                {
+                    formData.Add(new StringContent(model.Address), "Address");
+                }
+                if (!string.IsNullOrEmpty(model.PhoneNumber))
+                {
+                    formData.Add(new StringContent(model.PhoneNumber), "PhoneNumber");
+                }
                 
                 // Add image files directly to FormData if provided
                 if (model.FaceImage != null)
