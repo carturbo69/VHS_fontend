@@ -226,12 +226,33 @@ namespace VHS_frontend.Areas.Customer.Controllers
         /// API: Update profile from modal
         /// </summary>
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateProfile([FromForm] EditProfileViewModel model)
         {
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
                 return Json(new { success = false, message = "Bạn cần đăng nhập." });
+            }
+
+            // Validate phone number if provided
+            if (!string.IsNullOrWhiteSpace(model.PhoneNumber))
+            {
+                // Remove spaces and special characters for validation
+                var cleanedPhone = model.PhoneNumber.Trim().Replace(" ", "").Replace("-", "");
+                
+                // Vietnamese phone number patterns
+                // 10 digits starting with 0 (e.g., 0123456789)
+                // 11-12 characters starting with +84 (e.g., +84123456789)
+                var phonePattern = new System.Text.RegularExpressions.Regex(@"^(0[0-9]{9}|\+84[0-9]{9,10})$");
+                
+                if (!phonePattern.IsMatch(cleanedPhone))
+                {
+                    return Json(new { success = false, message = "Số điện thoại không hợp lệ. Vui lòng nhập 10 số bắt đầu bằng 0 (ví dụ: 0123456789) hoặc +84 (ví dụ: +84123456789)" });
+                }
+                
+                // Normalize phone number (use cleaned version)
+                model.PhoneNumber = cleanedPhone;
             }
 
             try

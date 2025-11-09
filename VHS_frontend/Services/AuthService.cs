@@ -22,7 +22,26 @@ namespace VHS_frontend.Services
         public async Task<LoginRespondDTO?> LoginAsync(LoginDTO dto, CancellationToken ct = default)
         {
             var res = await _httpClient.PostAsJsonAsync("/api/auth/login", dto, ct);
-            if (!res.IsSuccessStatusCode) return null;
+            if (!res.IsSuccessStatusCode)
+            {
+                // Nếu là Unauthorized (401), throw exception với message từ API
+                if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    try
+                    {
+                        var errorObj = await res.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+                        var message = errorObj.TryGetProperty("Message", out var msgProp) ? msgProp.GetString() : 
+                                     (errorObj.TryGetProperty("message", out var msgProp2) ? msgProp2.GetString() : "Tài khoản đã bị ngừng hoạt động.");
+                        throw new UnauthorizedAccessException(message ?? "Tài khoản đã bị ngừng hoạt động.");
+                    }
+                    catch (JsonException)
+                    {
+                        var errorText = await res.Content.ReadAsStringAsync(ct);
+                        throw new UnauthorizedAccessException(errorText ?? "Tài khoản đã bị ngừng hoạt động.");
+                    }
+                }
+                return null;
+            }
 
             return await res.Content.ReadFromJsonAsync<LoginRespondDTO>(cancellationToken: ct);
         }

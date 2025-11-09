@@ -31,7 +31,26 @@ namespace VHS_frontend.Controllers
                 return View(model);
             }
 
-            var result = await _authService.LoginAsync(model);
+            LoginRespondDTO? result = null;
+            try
+            {
+                result = await _authService.LoginAsync(model);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Xử lý trường hợp tài khoản bị khóa hoặc lỗi xác thực khác
+                ModelState.AddModelError(string.Empty, ex.Message);
+                ViewBag.ReturnUrl = returnUrl;
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                // Xử lý các lỗi khác
+                ModelState.AddModelError(string.Empty, "Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại.");
+                ViewBag.ReturnUrl = returnUrl;
+                return View(model);
+            }
+
             if (result == null)
             {
                 ModelState.AddModelError(string.Empty, "Sai tài khoản hoặc mật khẩu");

@@ -237,6 +237,7 @@
             </div>
             <div class="modal-body">
                 <form id="imageUploadForm" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
                     <div class="mb-3">
                         <label for="profileImage" class="form-label">Chọn ảnh</label>
                         <input type="file" class="form-control" id="profileImage" name="image" accept="image/*" required>
@@ -291,7 +292,18 @@
 
                     <div class="mb-3">
                         <label class="form-label">Số điện thoại</label>
-                        <input type="tel" class="form-control" name="PhoneNumber" value="@Model.PhoneNumber" />
+                        <input type="tel" 
+                               class="form-control" 
+                               name="PhoneNumber" 
+                               id="phoneNumberInput"
+                               value="@Model.PhoneNumber" 
+                               placeholder="0123456789 hoặc +84123456789" />
+                        <div class="invalid-feedback" id="phoneNumberError">
+                            Số điện thoại không hợp lệ. Vui lòng nhập 10 số bắt đầu bằng 0 (ví dụ: 0123456789) hoặc +84 (ví dụ: +84123456789)
+                        </div>
+                        <small class="form-text text-muted">
+                            Ví dụ: 0123456789 hoặc +84123456789 (10-11 số). Để trống nếu không có số điện thoại.
+                        </small>
                     </div>
 
                     <div class="mb-3">
@@ -443,19 +455,40 @@
             };
 
             window.deleteProfileImage = async function() {
+                if (!confirm('Bạn có chắc muốn xóa ảnh đại diện?')) {
+                    return;
+                }
+                
                 try {
-                    const response = await fetch('@Url.Action("DeleteImage")', {
+                    const token = document.querySelector('input[name="__RequestVerificationToken"]');
+                    if (!token) {
+                        showToast('Không tìm thấy token bảo mật', 'error');
+                        return;
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append('__RequestVerificationToken', token.value);
+                    
+                    const response = await fetch('@Url.Action("DeleteImage", "Profile", new { area = "Customer" })', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                        }
+                        body: formData
                     });
                     
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
                     const result = await response.json();
+                    console.log('Delete result:', result);
+                    
                     if (result.success) {
                         showToast('Xóa ảnh thành công!', 'success');
-                        document.getElementById('profileAvatar').src = '/images/default-avatar.png';
+                        
+                        // Update avatar to default
+                        const avatarImg = document.getElementById('profileAvatar');
+                        if (avatarImg) {
+                            avatarImg.src = '/images/default-avatar.png?t=' + new Date().getTime();
+                        }
                         
                         // Update avatar container class
                         const avatarContainer = document.querySelector('.avatar-container');
@@ -472,17 +505,30 @@
                         
                         // Update percentage
                         updateCompletionPercentage();
+                        
+                        // Reload page after a short delay
+                        setTimeout(() => {
+                            location.reload();
+                        }, 500);
                     } else {
                         showToast(result.message || 'Có lỗi xảy ra khi xóa ảnh', 'error');
+                        console.error('Delete failed:', result);
                     }
                 } catch (error) {
-                    showToast('Có lỗi xảy ra khi xóa ảnh', 'error');
+                    console.error('Delete error:', error);
+                    showToast('Có lỗi xảy ra khi xóa ảnh: ' + error.message, 'error');
                 }
             };
+
+            // Store preview image URL globally for use in upload function
+            let currentPreviewImageUrl = null;
 
             window.uploadProfileImage = async function() {
                 const fileInput = document.getElementById('profileImage');
                 const file = fileInput.files[0];
+                const uploadBtn = document.querySelector('#imageUploadModal .btn-primary');
+                const uploadSpinner = document.getElementById('uploadSpinner');
+                const uploadIcon = document.getElementById('uploadIcon');
                 
                 if (!file) {
                     showToast('Vui lòng chọn ảnh để tải lên', 'error');
@@ -500,38 +546,64 @@
                     return;
                 }
 
+                // Get preview image URL for immediate update
+                // Use the globally stored preview URL, or try to get from preview element
+                let previewImageUrl = currentPreviewImageUrl;
+                if (!previewImageUrl) {
+                    const previewImg = document.getElementById('previewImg');
+                    if (previewImg && previewImg.src && previewImg.src.startsWith('data:')) {
+                        previewImageUrl = previewImg.src;
+                    }
+                }
+
+                // Show loading state
+                if (uploadBtn) uploadBtn.disabled = true;
+                if (uploadSpinner) uploadSpinner.classList.remove('d-none');
+                if (uploadIcon) uploadIcon.style.display = 'none';
+
                 const formData = new FormData();
                 formData.append('image', file);
                 
+                // Get AntiForgeryToken
+                const token = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (token) {
+                    formData.append('__RequestVerificationToken', token.value);
+                }
+                
                 try {
-                    const response = await fetch('@Url.Action("UploadImage")', {
+                    const response = await fetch('@Url.Action("UploadImage", "Profile", new { area = "Customer" })', {
                         method: 'POST',
-                        body: formData,
-                        headers: {
-                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                        }
+                        body: formData
                     });
                     
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
                     const result = await response.json();
+                    console.log('Upload result:', result);
+                    
                     if (result.success) {
                         showToast('Tải ảnh lên thành công!', 'success');
-                        // Thêm backend URL nếu imageUrl là đường dẫn tương đối
-                        let fullImageUrl = result.imageUrl;
-                        if (fullImageUrl && !fullImageUrl.startsWith('http://') && !fullImageUrl.startsWith('https://')) {
-                            fullImageUrl = 'http://localhost:5154' + fullImageUrl;
-                        }
-                        alert('Tải ảnh lên thành công!');
-                        // Dùng helper function để lấy URL đầy đủ
-                        let fullImageUrl = typeof getImageUrl !== 'undefined' 
-                            ? getImageUrl(result.imageUrl) 
-                            : result.imageUrl;
-                        document.getElementById('profileAvatar').src = fullImageUrl;
+                        
+                        // Immediately update avatar with preview image (from FileReader) for instant feedback
+                        const avatarImg = document.getElementById('profileAvatar');
+                        if (avatarImg) {
+                            // Use preview image first for immediate visual feedback
+                            if (previewImageUrl && previewImageUrl.startsWith('data:')) {
+                                avatarImg.src = previewImageUrl;
+                                // Force image to reload
+                                avatarImg.onload = function() {
+                                    this.style.opacity = '1';
+                                };
+                            }
                         
                         // Update avatar container class
                         const avatarContainer = document.querySelector('.avatar-container');
                         if (avatarContainer) {
                             avatarContainer.classList.remove('no-image');
                             avatarContainer.classList.add('has-image');
+                            }
                         }
                         
                         // Show delete button
@@ -543,14 +615,51 @@
                         // Update percentage
                         updateCompletionPercentage();
                         
-                        bootstrap.Modal.getInstance(document.getElementById('imageUploadModal')).hide();
+                        // Close modal and reset form
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('imageUploadModal'));
+                        if (modal) modal.hide();
                         document.getElementById('imageUploadForm').reset();
                         document.getElementById('imagePreview').style.display = 'none';
+                        
+                        // Update avatar with server URL after a delay to ensure it's saved
+                        // First try to get URL from response
+                        let serverImageUrl = result.imageUrl || result.imagePath || result.data?.imageUrl;
+                        if (serverImageUrl && avatarImg) {
+                            // Construct full URL if needed
+                            if (!serverImageUrl.startsWith('http://') && !serverImageUrl.startsWith('https://')) {
+                                const backendUrl = '@(Configuration["Apis:Backend"] ?? "http://localhost:5154")';
+                                serverImageUrl = backendUrl + (serverImageUrl.startsWith('/') ? '' : '/') + serverImageUrl;
+                            }
+                            
+                            // Update with server URL after a short delay
+                            setTimeout(() => {
+                                if (avatarImg) {
+                                    avatarImg.src = serverImageUrl + '?t=' + new Date().getTime();
+                                }
+                            }, 500);
+                        } else {
+                            // If no URL in response, reload page to get updated image
+                            setTimeout(() => {
+                                location.reload();
+                            }, 1000);
+                        }
                     } else {
                         showToast(result.message || 'Có lỗi xảy ra khi tải ảnh lên', 'error');
+                        console.error('Upload failed:', result);
+                        
+                        // Reset loading state on error
+                        if (uploadBtn) uploadBtn.disabled = false;
+                        if (uploadSpinner) uploadSpinner.classList.add('d-none');
+                        if (uploadIcon) uploadIcon.style.display = 'inline';
                     }
                 } catch (error) {
-                    showToast('Có lỗi xảy ra khi tải ảnh lên', 'error');
+                    console.error('Upload error:', error);
+                    showToast('Có lỗi xảy ra khi tải ảnh lên: ' + error.message, 'error');
+                    
+                    // Reset loading state on error
+                    if (uploadBtn) uploadBtn.disabled = false;
+                    if (uploadSpinner) uploadSpinner.classList.add('d-none');
+                    if (uploadIcon) uploadIcon.style.display = 'inline';
                 }
             };
 
@@ -562,10 +671,20 @@
                     if (file) {
                         const reader = new FileReader();
                         reader.onload = function(e) {
-                            document.getElementById('previewImg').src = e.target.result;
-                            document.getElementById('imagePreview').style.display = 'block';
+                            const previewUrl = e.target.result;
+                            currentPreviewImageUrl = previewUrl; // Store globally
+                            const previewImg = document.getElementById('previewImg');
+                            const imagePreview = document.getElementById('imagePreview');
+                            if (previewImg) {
+                                previewImg.src = previewUrl;
+                            }
+                            if (imagePreview) {
+                                imagePreview.style.display = 'block';
+                            }
                         };
                         reader.readAsDataURL(file);
+                    } else {
+                        currentPreviewImageUrl = null;
                     }
                 });
             }
@@ -650,7 +769,11 @@
             
             // Function to update profile info display
             function updateProfileInfo(fieldName, value) {
-                if (!value || value.trim() === '') return;
+                if (!value || value.trim() === '') {
+                    value = '';
+                } else {
+                    value = value.trim();
+                }
                 
                 const infoRows = document.querySelectorAll('.info-row');
                 infoRows.forEach(row => {
@@ -661,11 +784,11 @@
                     if (!span) return;
                     
                     let shouldUpdate = false;
-                    if (fieldName === 'fullname' && label.textContent.includes('Họ và tên')) {
+                    if (fieldName === 'fullname' && (label.textContent.includes('Họ và tên') || label.textContent.includes('FullName'))) {
                         shouldUpdate = true;
-                    } else if (fieldName === 'phone' && label.textContent.includes('Số điện thoại')) {
+                    } else if (fieldName === 'phone' && (label.textContent.includes('Số điện thoại') || label.textContent.includes('PhoneNumber'))) {
                         shouldUpdate = true;
-                    } else if (fieldName === 'address' && label.textContent.includes('Địa chỉ')) {
+                    } else if (fieldName === 'address' && (label.textContent.includes('Địa chỉ') || label.textContent.includes('Address'))) {
                         shouldUpdate = true;
                     }
                     
@@ -675,24 +798,172 @@
                         if (badge) {
                             badge.remove();
                         }
+                        
+                        if (value && value.trim() !== '') {
                         span.innerHTML = value;
                         span.classList.remove('text-muted');
+                        } else {
+                            span.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Chưa cập nhật</span>';
+                            span.classList.add('text-muted');
+                        }
                     }
                 });
             }
+            
+            // Phone number validation function
+            window.validatePhoneNumber = function(input) {
+                if (!input) return false;
+                
+                const phoneNumber = input.value.trim();
+                const phoneError = document.getElementById('phoneNumberError');
+                
+                // Remove all non-digit characters except + for validation
+                const cleaned = phoneNumber.replace(/[^\d+]/g, '');
+                
+                // Vietnamese phone number patterns
+                // 10 digits starting with 0 (e.g., 0123456789)
+                // 11-12 characters starting with +84 (e.g., +84123456789)
+                const phonePattern = /^(0[0-9]{9}|\+84[0-9]{9,10})$/;
+                
+                if (phoneNumber === '') {
+                    // Empty is allowed (optional field)
+                    input.classList.remove('is-invalid', 'is-valid');
+                    if (phoneError) {
+                        phoneError.style.display = 'none';
+                        phoneError.classList.remove('show');
+                    }
+                    return true;
+                }
+                
+                if (!phonePattern.test(cleaned)) {
+                    input.classList.add('is-invalid');
+                    input.classList.remove('is-valid');
+                    if (phoneError) {
+                        phoneError.style.display = 'block';
+                        phoneError.classList.add('show');
+                        phoneError.textContent = 'Số điện thoại không hợp lệ. Vui lòng nhập 10 số bắt đầu bằng 0 (ví dụ: 0123456789) hoặc +84 (ví dụ: +84123456789)';
+                    }
+                    return false;
+                } else {
+                    input.classList.remove('is-invalid');
+                    input.classList.add('is-valid');
+                    if (phoneError) {
+                        phoneError.style.display = 'none';
+                        phoneError.classList.remove('show');
+                    }
+                    // Update input value to cleaned format if different
+                    if (cleaned !== phoneNumber && cleaned !== input.value) {
+                        input.value = cleaned;
+                    }
+                    return true;
+                }
+            };
+            
+            // Real-time phone number formatting and validation
+            $(document).ready(function() {
+                function setupPhoneValidation() {
+                    const phoneInput = document.getElementById('phoneNumberInput');
+                    if (!phoneInput) return;
+                    
+                    // Check if already set up to avoid duplicate listeners
+                    if (phoneInput.dataset.validationSetup === 'true') return;
+                    phoneInput.dataset.validationSetup = 'true';
+                    
+                    // Format on input
+                    phoneInput.addEventListener('input', function(e) {
+                        let value = e.target.value;
+                        const originalValue = value;
+                        
+                        // Remove all non-digit characters except +
+                        value = value.replace(/[^\d+]/g, '');
+                        
+                        // Limit length based on format
+                        if (value.startsWith('+84')) {
+                            if (value.length > 13) value = value.substring(0, 13);
+                        } else if (value.startsWith('0')) {
+                            if (value.length > 10) value = value.substring(0, 10);
+                        } else if (value.length > 0 && !value.startsWith('+')) {
+                            // If starts with number other than 0, prepend 0
+                            if (/^[1-9]/.test(value)) {
+                                value = '0' + value;
+                            }
+                            if (value.length > 10) value = value.substring(0, 10);
+                        }
+                        
+                        // Update value if changed
+                        if (value !== originalValue) {
+                            e.target.value = value;
+                        }
+                        
+                        // Validate
+                        validatePhoneNumber(e.target);
+                    });
+                    
+                    // Validate on blur
+                    phoneInput.addEventListener('blur', function(e) {
+                        validatePhoneNumber(e.target);
+                    });
+                    
+                    // Initial validation if value exists
+                    if (phoneInput.value) {
+                        validatePhoneNumber(phoneInput);
+                    }
+                }
+                
+                // Setup validation initially
+                setupPhoneValidation();
+                
+                // Re-setup validation when modal is shown (in case modal content is re-rendered)
+                const editModal = document.getElementById('editProfileModal');
+                if (editModal) {
+                    editModal.addEventListener('shown.bs.modal', function() {
+                        // Reset the flag to allow re-setup
+                        const phoneInput = document.getElementById('phoneNumberInput');
+                        if (phoneInput) {
+                            phoneInput.dataset.validationSetup = 'false';
+                        }
+                        setupPhoneValidation();
+                    });
+                }
+            });
             
             // Modal form handlers
             const editForm = document.getElementById('editProfileForm');
             if (editForm) {
                 editForm.addEventListener('submit', async function(e) {
                     e.preventDefault();
+                    
+                    // Validate phone number before submit
+                    const phoneInput = document.getElementById('phoneNumberInput');
+                    if (phoneInput && !validatePhoneNumber(phoneInput)) {
+                        showToast('Vui lòng nhập số điện thoại hợp lệ', 'error');
+                        phoneInput.focus();
+                        return;
+                    }
+                    
                     const formData = new FormData(this);
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+                    
+                    // Show loading state
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Đang lưu...';
+                    }
+                    
                     try {
-                        const response = await fetch('@Url.Action("UpdateProfile")', {
+                        const response = await fetch('@Url.Action("UpdateProfile", "Profile", new { area = "Customer" })', {
                             method: 'POST',
                             body: formData
                         });
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        
                         const result = await response.json();
+                        console.log('Update result:', result);
+                        
                         if (result.success) {
                             showToast('Cập nhật thông tin thành công!', 'success');
                             
@@ -701,28 +972,51 @@
                             const phoneNumber = formData.get('PhoneNumber');
                             const address = formData.get('Address');
                             
-                            if (fullName) {
+                            if (fullName && fullName.trim() !== '') {
                                 updateCompletionItem('fullname', true);
-                                updateProfileInfo('fullname', fullName);
+                                updateProfileInfo('fullname', fullName.trim());
+                            } else {
+                                updateCompletionItem('fullname', false);
                             }
-                            if (phoneNumber) {
+                            
+                            if (phoneNumber && phoneNumber.trim() !== '') {
                                 updateCompletionItem('phone', true);
-                                updateProfileInfo('phone', phoneNumber);
+                                updateProfileInfo('phone', phoneNumber.trim());
+                            } else {
+                                updateCompletionItem('phone', false);
                             }
-                            if (address) {
+                            
+                            if (address && address.trim() !== '') {
                                 updateCompletionItem('address', true);
-                                updateProfileInfo('address', address);
+                                updateProfileInfo('address', address.trim());
+                            } else {
+                                updateCompletionItem('address', false);
                             }
                             
                             // Update percentage
                             updateCompletionPercentage();
                             
-                            bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
+                            // Close modal
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('editProfileModal'));
+                            if (modal) modal.hide();
+                            
+                            // Reload page after a short delay to ensure all updates are visible
+                            setTimeout(() => {
+                                location.reload();
+                            }, 500);
                         } else {
-                            showToast(result.message || 'Có lỗi xảy ra', 'error');
+                            showToast(result.message || 'Có lỗi xảy ra khi cập nhật thông tin', 'error');
+                            console.error('Update failed:', result);
                         }
                     } catch (error) {
-                        showToast('Có lỗi xảy ra khi cập nhật thông tin', 'error');
+                        console.error('Update error:', error);
+                        showToast('Có lỗi xảy ra khi cập nhật thông tin: ' + error.message, 'error');
+                    } finally {
+                        // Reset button state
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnText;
+                        }
                     }
                 });
             }
