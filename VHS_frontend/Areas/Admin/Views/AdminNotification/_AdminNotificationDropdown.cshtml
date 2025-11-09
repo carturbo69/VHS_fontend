@@ -1,17 +1,55 @@
 @model List<VHS_frontend.Areas.Admin.Models.Notification.AdminNotificationDTO>
 
+@{
+    // Helper function to convert notification type to Vietnamese
+    string GetNotificationTypeInVietnamese(string type)
+    {
+        return type switch
+        {
+            "System" => "Hệ thống",
+            "Booking" => "Đặt lịch",
+            "Payment" => "Thanh toán",
+            "Promotion" => "Khuyến mãi",
+            _ => type
+        };
+    }
+    
+    // Helper function to get icon for notification type
+    string GetNotificationTypeIcon(string type)
+    {
+        return type switch
+        {
+            "System" => "bi-gear-fill",
+            "Booking" => "bi-calendar-check-fill",
+            "Payment" => "bi-credit-card-fill",
+            "Promotion" => "bi-gift-fill",
+            _ => "bi-bell-fill"
+        };
+    }
+}
+
 <li class="notif-header">
-    <div class="d-flex align-items-center">
-        <span>Thông báo</span>
+    <div class="d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-bell-fill"></i>
+            <span class="fw-bold">Thông báo</span>
+            @if (Model != null && Model.Any(n => n.IsRead != true))
+            {
+                <span class="badge badge-unread-count">@Model.Count(n => n.IsRead != true)</span>
+            }
+        </div>
     </div>
 </li>
 
 @if (Model == null || !Model.Any())
 {
     <li class="notif-empty">
-        <div class="text-center py-4">
-            <i class="bi bi-bell-slash" style="font-size: 2rem; opacity: 0.3;"></i>
-            <p class="mb-0 mt-2 text-muted">Không có thông báo nào</p>
+        <div class="text-center py-5">
+            <div class="empty-notification-icon">
+                <i class="bi bi-bell-slash"></i>
+            </div>
+            <p class="mb-0 mt-3 empty-notification-text">Không có thông báo nào</p>
+            <small class="text-muted empty-notification-subtext">Thông báo mới sẽ xuất hiện ở đây</small>
         </div>
     </li>
 }
@@ -22,16 +60,25 @@ else
         <li class="notification-item @(notification.IsRead == true ? "read" : "unread")" data-notification-id="@notification.NotificationId">
             <a href="#" class="notification-link" onclick="markRead('@notification.NotificationId'); return false;">
                 <div class="notification-content">
-                    <div class="notification-text">@notification.Content</div>
-                    <div class="notification-meta">
-                        <small class="text-muted">
-                            <i class="bi bi-clock me-1"></i>
-                            @(notification.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")
-                        </small>
-                        @if (!string.IsNullOrEmpty(notification.NotificationType))
-                        {
-                            <span class="badge type-badge">@notification.NotificationType</span>
-                        }
+                    @if (notification.IsRead != true)
+                    {
+                        <div class="notification-indicator"></div>
+                    }
+                    <div class="notification-icon-wrapper">
+                        <i class="bi @GetNotificationTypeIcon(notification.NotificationType ?? "") notification-type-icon"></i>
+                    </div>
+                    <div class="notification-body">
+                        <div class="notification-text">@notification.Content</div>
+                        <div class="notification-meta">
+                            <div class="notification-time">
+                                <i class="bi bi-clock me-1"></i>
+                                <span>@(notification.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(notification.NotificationType))
+                            {
+                                <span class="badge type-badge">@GetNotificationTypeInVietnamese(notification.NotificationType)</span>
+                            }
+                        </div>
                     </div>
                 </div>
             </a>
@@ -40,14 +87,14 @@ else
     
     <li class="notif-divider"></li>
     <li class="notif-action">
-        <a href="#" onclick="markAllRead(); return false;">
-            <i class="bi bi-check-circle me-2"></i>
+        <a href="#" onclick="markAllRead(); return false;" class="notif-action-link">
+            <i class="bi bi-check-circle-fill"></i>
             <span>Đánh dấu tất cả đã đọc</span>
         </a>
     </li>
     <li class="notif-action">
-        <a href="/Admin/AdminNotification?tab=inbox">
-            <i class="bi bi-arrow-right-circle me-2"></i>
+        <a href="/Admin/AdminNotification?tab=inbox" class="notif-action-link">
+            <i class="bi bi-arrow-right-circle-fill"></i>
             <span>Xem tất cả thông báo</span>
         </a>
     </li>

@@ -20,7 +20,7 @@
                     </div>
                     <div class="title-content">
                         <h1>Quản lý Thanh toán</h1>
-                        <p>Quản lý hoàn tiền, phê duyệt thanh toán và rút tiền</p>
+                        <p>Quản lý hoàn tiền và rút tiền</p>
                     </div>
                 </div>
             </div>
@@ -58,24 +58,6 @@
                 <span class="badge badge-success">@Model.ApprovedRefunds.Count</span>
             }
         </a>
-        <a href="@Url.Action("Index", new { tab = "provider-payments" })" 
-           class="tab-link @(currentTab == "provider-payments" ? "active" : "")">
-            <i class="bi bi-cash-coin"></i>
-            <span>Phê duyệt thanh toán</span>
-            @if (Model.Dashboard?.PendingPayouts > 0)
-            {
-                <span class="badge">@Model.Dashboard.PendingPayouts</span>
-            }
-        </a>
-        <a href="@Url.Action("Index", new { tab = "approved-provider-payments" })" 
-           class="tab-link @(currentTab == "approved-provider-payments" ? "active" : "")">
-            <i class="bi bi-check-circle"></i>
-            <span>Đã phê duyệt</span>
-            @if (Model.ApprovedProviderPayments.Count > 0)
-            {
-                <span class="badge badge-success">@Model.ApprovedProviderPayments.Count</span>
-            }
-        </a>
         <a href="@Url.Action("Index", new { tab = "withdrawals" })" 
            class="tab-link @(currentTab == "withdrawals" ? "active" : "")">
             <i class="bi bi-bank"></i>
@@ -109,14 +91,6 @@
         else if (currentTab == "approved-refunds")
         {
             @await Html.PartialAsync("_ApprovedRefundsPartial", Model.ApprovedRefunds)
-        }
-        else if (currentTab == "provider-payments")
-        {
-            @await Html.PartialAsync("_ProviderPaymentsPartial", Model.PendingProviderPayments)
-        }
-        else if (currentTab == "approved-provider-payments")
-        {
-            @await Html.PartialAsync("_ApprovedProviderPaymentsPartial", Model.ApprovedProviderPayments)
         }
         else if (currentTab == "withdrawals")
         {
@@ -155,19 +129,42 @@
         let currentModalContext = null;
         const adminNoteModal = new bootstrap.Modal(document.getElementById('adminNoteModal'));
 
+        // Toast notification function
+        function showCenterToast(message, type = 'success') {
+            const root = document.body;
+            const existingToasts = root.querySelectorAll('.center-toast');
+            existingToasts.forEach(toast => toast.remove());
+            
+            const box = document.createElement('div');
+            box.className = 'center-toast ' + type;
+            
+            const iconClass = type === 'success' ? 'bi-check-circle' :
+                             type === 'error' ? 'bi-x-circle' :
+                             type === 'warn' ? 'bi-exclamation-triangle' : 'bi-info-circle';
+            
+            box.innerHTML = 
+                '<div class="toast-box">' +
+                    '<div class="accent"></div>' +
+                    '<i class="bi ' + iconClass + '"></i>' +
+                    '<span class="msg">' + message + '</span>' +
+                '</div>';
+            
+            root.appendChild(box);
+            
+            // Trigger animation
+            setTimeout(() => box.classList.add('show'), 10);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                box.classList.remove('show');
+                setTimeout(() => box.remove(), 300);
+            }, 3000);
+        }
+
         // Approve Refund
         function approveRefund(bookingId) {
             currentModalContext = { type: 'approveRefund', bookingId: bookingId };
             document.getElementById('modalActionText').textContent = 'hoàn tiền';
-            document.getElementById('adminNoteInput').value = '';
-            document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
-            adminNoteModal.show();
-        }
-
-        // Approve Provider Payment
-        function approveProviderPayment(bookingId) {
-            currentModalContext = { type: 'approveProviderPayment', bookingId: bookingId };
-            document.getElementById('modalActionText').textContent = 'phê duyệt thanh toán';
             document.getElementById('adminNoteInput').value = '';
             document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
             adminNoteModal.show();
@@ -195,8 +192,6 @@
             // Execute action based on context
             if (context.type === 'approveRefund') {
                 executeApproveRefund(context.bookingId, adminNote);
-            } else if (context.type === 'approveProviderPayment') {
-                executeApproveProviderPayment(context.bookingId, adminNote);
             } else if (context.type === 'handleWithdrawal') {
                 executeHandleWithdrawal(context.withdrawalId, context.action, adminNote);
             }
@@ -214,39 +209,17 @@
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    alert('Hoàn tiền thành công!');
+                    showCenterToast('Hoàn tiền thành công!', 'success');
+                    setTimeout(() => {
                     location.reload();
+                    }, 1500);
                 } else {
-                    alert('Lỗi: ' + data.message);
+                    showCenterToast('Lỗi: ' + data.message, 'error');
                 }
             })
             .catch(err => {
                 console.error(err);
-                alert('Đã có lỗi xảy ra');
-            });
-        }
-
-        function executeApproveProviderPayment(bookingId, adminNote) {
-            fetch('@Url.Action("ApproveProviderPayment")', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
-                },
-                body: JSON.stringify({ bookingId, adminNote })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Phê duyệt thanh toán thành công!');
-                    location.reload();
-                } else {
-                    alert('Lỗi: ' + data.message);
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Đã có lỗi xảy ra');
+                showCenterToast('Đã có lỗi xảy ra', 'error');
             });
         }
 
@@ -262,16 +235,36 @@
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    alert(data.message);
+                    showCenterToast(data.message, 'success');
+                    setTimeout(() => {
                     location.reload();
+                    }, 1500);
                 } else {
-                    alert('Lỗi: ' + data.message);
+                    showCenterToast('Lỗi: ' + data.message, 'error');
                 }
             })
             .catch(err => {
                 console.error(err);
-                alert('Đã có lỗi xảy ra');
+                showCenterToast('Đã có lỗi xảy ra', 'error');
             });
+        }
+
+        // Toggle bank info
+        function toggleBankInfo(header) {
+            const content = header.nextElementSibling;
+            const chevron = header.querySelector('.bank-info-chevron');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                content.classList.add('collapsed');
+                chevron.classList.remove('bi-chevron-up');
+                chevron.classList.add('bi-chevron-down');
+            } else {
+                content.classList.remove('collapsed');
+                content.classList.add('expanded');
+                chevron.classList.remove('bi-chevron-down');
+                chevron.classList.add('bi-chevron-up');
+            }
         }
     </script>
 }

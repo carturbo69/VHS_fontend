@@ -32,6 +32,54 @@
     Func<decimal, string> currency = v => v.ToString("N0") + "đ";
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 
+    // Helper để lấy ảnh đầu tiên từ ServiceImages (có thể là JSON array hoặc comma-separated string)
+    string? FirstImageOrDefault(string? images)
+    {
+        if (string.IsNullOrWhiteSpace(images)) return null;
+
+        try
+        {
+            // Thử parse JSON array trước
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+            if (arr != null && arr.Count > 0) return arr[0];
+        }
+        catch { /* ignore JSON parse error */ }
+
+        // Nếu không phải JSON, thử split bằng dấu phẩy
+        if (images.Contains(','))
+        {
+            var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
+        
+        // Nếu không có dấu phẩy, trả về nguyên chuỗi
+        return images;
+    }
+
+    // Helper để lấy ảnh service (backend đã thêm domain prefix)
+    string GetServiceImage(string? serviceImages)
+    {
+        if (string.IsNullOrWhiteSpace(serviceImages))
+            return fallbackImg;
+        
+        var img = FirstImageOrDefault(serviceImages);
+        return !string.IsNullOrWhiteSpace(img) ? img : fallbackImg;
+    }
+
+    // Helper để lấy logo provider (backend đã thêm domain prefix, giống ServiceShop/Index.cshtml)
+    string GetProviderLogo(string? providerImages)
+    {
+        if (!string.IsNullOrWhiteSpace(providerImages))
+        {
+            var logo = FirstImageOrDefault(providerImages);
+            if (!string.IsNullOrWhiteSpace(logo)) return logo;
+        }
+        
+        // Fallback về shop-badge.svg nếu không có providerImages
+        return "/images/shop-badge.svg";
+    }
+
     string StatusHeadline(string code) => (code ?? "").Trim() switch
     {
         "Pending" => "Đang chờ xác nhận",
@@ -83,13 +131,24 @@
 
 <div class="container my-3">
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center flex-wrap">
+    <div class="d-flex justify-content-between align-items-center flex-wrap header-compact">
         <div>
-            <div class="fw-semibold">MÃ ĐƠN HÀNG: @(string.IsNullOrWhiteSpace(Model?.BookingCode) ? "—" : Model.BookingCode)</div>
-            <div class="text-danger fw-bold">@StatusHeadline(statusCode)</div>
+        <h2 class="page-detail-title mb-0">Chi tiết đơn hàng</h2>
+            <div class="fw-semibold mb-2">MÃ ĐƠN HÀNG: @(string.IsNullOrWhiteSpace(Model?.BookingCode) ? "—" : Model.BookingCode)</div>
+            
+            <!-- Breadcrumb Navigation -->
+            <nav aria-label="breadcrumb" class="mt-2">
+                <ol class="breadcrumb mb-0" style="background: transparent; padding: 0;">
+                    <li class="breadcrumb-item">
+                        <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" style="color: var(--accent); text-decoration: none;">Lịch sử đặt hàng</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page" style="color: var(--muted-foreground);">Chi tiết đơn hàng</li>
+                </ol>
+            </nav>
+            
             @if (IsCancelled)
             {
-                <div class="small text-muted">Đơn đã bị hủy. Vui lòng xem lý do hủy ở bên dưới nếu có.</div>
+                <div class="small text-muted mt-2">Đơn đã bị hủy. Vui lòng xem lý do hủy ở bên dưới nếu có.</div>
             }
         </div>
 
@@ -100,7 +159,19 @@
                 var hasReport = ViewBag.HasReport == true;
                 var reportId = ViewBag.ReportId as Guid?;
 
-                <button class="btn btn-danger">Mua Lại</button>
+                <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="bookingId" value="@Model.BookingId" />
+                    <input type="hidden" name="serviceId" value="@(Model?.Service?.ServiceId ?? Guid.Empty)" />
+                    @if (Model?.Options?.Any() == true)
+                    {
+                        @foreach (var opt in Model.Options)
+                        {
+                            <input type="hidden" name="optionIds" value="@opt.OptionId" />
+                        }
+                    }
+                    <button type="submit" class="btn btn-danger">Mua Lại</button>
+                </form>
                 
                 if (hasReport && reportId.HasValue)
                 {
@@ -111,7 +182,7 @@
                 else
                 {
                     <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportService" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-secondary">
-                        <i class="bi bi-exclamation-triangle"></i> Báo cáo / Hoàn tiền
+                        <i class="bi bi-exclamation-triangle"></i> Báo cáo
                     </a>
                 }
 
@@ -139,13 +210,23 @@
             }
             else if (IsWorking || IsConfirmed)
             {
-                <button class="btn btn-primary">Xem vận đơn</button>
-                <button class="btn btn-outline-secondary">Liên hệ Shipper</button>
+                <button class="btn btn-outline-secondary">Liên hệ nhân viên</button>
             }
             else if (IsCancelled)
             {
-                <button class="btn btn-outline-secondary">Lý do hủy</button>
-                <button class="btn btn-danger">Mua Lại</button>
+                <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="bookingId" value="@Model.BookingId" />
+                    <input type="hidden" name="serviceId" value="@(Model?.Service?.ServiceId ?? Guid.Empty)" />
+                    @if (Model?.Options?.Any() == true)
+                    {
+                        @foreach (var opt in Model.Options)
+                        {
+                            <input type="hidden" name="optionIds" value="@opt.OptionId" />
+                        }
+                    }
+                    <button type="submit" class="btn btn-danger">Mua Lại</button>
+                </form>
             }
         </div>
     </div>
@@ -178,6 +259,7 @@
                     @if (!string.IsNullOrWhiteSpace(stepStaffName))
                     {
                         <span class="d-inline-flex align-items-center gap-2">
+                            <span><span class="label">Nhân viên:</span> @stepStaffName</span>
                             <img src="@stepStaffImg"
                                  alt="Ảnh @stepStaffName"
                                  width="20" height="20"
@@ -185,7 +267,6 @@
                                  loading="lazy"
                                  decoding="async"
                                  onerror="this.onerror=null;this.src='@fallbackImg';" />
-                            <span><span class="label">Nhân viên:</span> @stepStaffName</span>
                         </span>
                     }
                     else
@@ -215,7 +296,7 @@
     }
 
     <!-- Address + Timeline -->
-    <div class="row g-3">
+    <div class="row g-3 section-spacing">
         <div class="col-lg-6">
             <div class="card-block p-3 h-100">
                 <div class="h6">Địa Chỉ Đặt Dịch Vụ</div>
@@ -306,13 +387,10 @@
     </div>
 
     <!-- Service block -->
-
-    <div class="card-block p-3 mt-3">
+    <div class="card-block p-3 section-spacing">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
             <div class="d-flex align-items-center gap-2">
-                <img src="/images/shop-badge.svg" width="24" height="24" alt="shop"
-                     loading="lazy" decoding="async"
-                     onerror="this.onerror=null;this.src='@fallbackImg';" />
+                <img src="@GetProviderLogo(Model?.ProviderImages)" width="24" height="24" alt="@Model?.ProviderName" class="shop-logo" style="object-fit:cover;border-radius:4px;" onerror="this.src='/images/VeSinh.jpg';" />
                 <div class="fw-semibold">
                     @(!string.IsNullOrWhiteSpace(Model?.ProviderName) ? Model.ProviderName : "—")
                 </div>
@@ -330,10 +408,10 @@
                     <i class="bi bi-chat-dots me-1"></i> Chat
                 </a>
                 <a class="btn btn-primary btn-sm"
-                   asp-area="Customer"
-                   asp-controller="Shop"
-                   asp-action="Detail"
-                   asp-route-id="@Model.ProviderId">
+                   asp-area=""
+                   asp-controller="ServiceShop"
+                   asp-action="Index"
+                   asp-route-providerId="@Model.ProviderId">
                     <i class="bi bi-shop me-1"></i> Xem shop
                 </a>
             </div>
@@ -341,12 +419,11 @@
 
         <div class="d-flex gap-3">
             @{
-                var serviceImg = !string.IsNullOrWhiteSpace(Model?.Service?.Image) ? Model.Service.Image : fallbackImg;
                 var basePrice = Model?.Service?.UnitPrice ?? 0m;
                 var optionPrice = Model?.Options?.Sum(o => o.Price) ?? 0m;
                 var total = basePrice + optionPrice;
             }
-            <img src="@serviceImg"
+            <img src="@GetServiceImage(Model?.ServiceImages)"
                  alt="Ảnh dịch vụ"
                  class="zoomable"
                  loading="lazy" decoding="async"
@@ -355,30 +432,36 @@
 
             <div class="flex-grow-1">
                 <div class="fw-semibold">@Model?.Service?.Title</div>
-                <div class="text-muted">x@(Model?.Service?.Quantity ?? 0)</div>
+                <!-- <div class="text-muted">x@(Model?.Service?.Quantity ?? 0)</div> -->
                 @if (Model?.Options?.Any() == true)
                 {
                     <div class="mt-1">
                         @foreach (var op in Model!.Options)
                         {
                             <span class="option-badge" title="@op.Description">
-                                @op.OptionName • @op.Price.ToString("N0") @op.UnitType
+                                @op.OptionName - @op.Price.ToString("N0") @op.UnitType
                             </span>
                         }
                     </div>
                 }
             </div>
 
-            <div class="text-end">
-                <div class="text-muted small">Giá dịch vụ</div>
-                <div class="fw-semibold">@basePrice.ToString("N0")đ</div>
+            <div class="service-price-box">
+                <div class="price-item">
+                    <span class="price-label">Giá dịch vụ</span>
+                    <span class="price-value">@basePrice.ToString("N0")đ</span>
+                </div>
                 @if (optionPrice > 0)
                 {
-                    <div class="text-muted small mt-1">+ Gói tùy chọn</div>
-                    <div class="fw-semibold">@optionPrice.ToString("N0")đ</div>
+                    <div class="price-item">
+                        <span class="price-label">+ Gói tùy chọn</span>
+                        <span class="price-value">@optionPrice.ToString("N0")đ</span>
+                    </div>
                 }
-                <hr class="my-1" />
-                <div class="fs-5 fw-bold">@total.ToString("N0")đ</div>
+                <div class="price-divider"></div>
+                <div class="price-total">
+                    <span class="price-total-value">@total.ToString("N0")đ</span>
+                </div>
             </div>
         </div>
 
@@ -410,27 +493,67 @@
     </div>
 
     <!-- Prices -->
-    <div class="card-block p-3 mt-3">
+    <div class="card-block p-3 section-spacing">
         <div class="price-row"><span>Tổng tiền hàng</span><span>@currency(Model?.Subtotal ?? 0m)</span></div>
         <div class="price-row"><span>Voucher</span><span>-@currency(Model?.VoucherDiscount ?? 0m)</span></div>
-        <div class="price-row"><span>Phương thức thanh toán</span><span>@(string.IsNullOrWhiteSpace(Model?.PaymentMethod) ? "—" : Model.PaymentMethod)</span></div>
         <div class="price-row">
             <span class="fw-semibold">Thành tiền</span>
             <span class="price-strong fs-4">@currency(grandTotal)</span>
         </div>
+        <div class="price-row"><span>Phương thức thanh toán</span><span>@(string.IsNullOrWhiteSpace(Model?.PaymentMethod) ? "—" : Model.PaymentMethod)</span></div>
 
-        @if (due > 0)
-        {
-            <div class="mt-2 small text-warning">
-                Đã thanh toán: <b>@currency(paid)</b>. Vui lòng thanh toán còn lại <b>@currency(due)</b> khi hoàn thành công việc.
-            </div>
+        @{
+            // Xác định trạng thái thanh toán dựa trên PaymentStatus hoặc PaidAmount
+            var paymentStatus = Model?.PaymentStatus;
+            var paymentStatusText = "Chưa thanh toán";
+            var paymentStatusClass = "text-warning";
+            var paymentStatusIcon = "bi-clock-history";
+            
+            if (!string.IsNullOrWhiteSpace(paymentStatus))
+            {
+                var statusUpper = paymentStatus.Trim().ToUpperInvariant();
+                if (statusUpper == "ĐÃ THANH TOÁN" || 
+                    statusUpper == "PAID" || 
+                    statusUpper == "SUCCESS" || 
+                    statusUpper == "COMPLETED")
+                {
+                    paymentStatusText = "Đã thanh toán";
+                    paymentStatusClass = "text-success";
+                    paymentStatusIcon = "bi-check-circle-fill";
+                }
+                else if (statusUpper == "REFUNDED")
+                {
+                    paymentStatusText = "Đã hoàn tiền";
+                    paymentStatusClass = "text-info";
+                    paymentStatusIcon = "bi-arrow-counterclockwise";
+                }
+                else if (statusUpper == "PENDING")
+                {
+                    paymentStatusText = "Chờ thanh toán";
+                    paymentStatusClass = "text-warning";
+                    paymentStatusIcon = "bi-hourglass-split";
+                }
+            }
+            else if (paid > 0 && due == 0)
+            {
+                paymentStatusText = "Đã thanh toán đủ";
+                paymentStatusClass = "text-success";
+                paymentStatusIcon = "bi-check2-circle";
+            }
+            else if (paid > 0 && due > 0)
+            {
+                paymentStatusText = $"Đã thanh toán: {currency(paid)}. Vui lòng thanh toán còn lại {currency(due)} khi hoàn thành công việc.";
+                paymentStatusClass = "text-warning";
+                paymentStatusIcon = "bi-exclamation-triangle";
+            }
         }
-        else
-        {
-            <div class="mt-2 small text-success">
-                <i class="bi bi-check2-circle"></i> Đã thanh toán đủ.
+        
+        <div class="d-flex justify-content-end mt-3">
+            <div class="payment-status-info @paymentStatusClass">
+                <i class="bi @paymentStatusIcon"></i>
+                <span>@paymentStatusText</span>
             </div>
-        }
+        </div>
     </div>
 </div>
 
@@ -480,10 +603,7 @@
                     <input type="hidden" name="ServiceId" value="@(Model?.Service?.ServiceId ?? Guid.Empty)" />
 
                     <div class="d-flex align-items-center gap-3 mb-3">
-                        @{
-                            var detailServiceImg = !string.IsNullOrWhiteSpace(Model?.Service?.Image) ? Model.Service.Image : fallbackImg;
-                        }
-                        <img src="@(detailServiceImg)" width="60" height="60"
+                        <img src="@GetServiceImage(Model?.ServiceImages)" width="60" height="60"
                              style="object-fit:cover;border-radius:4px;border:1px solid #eee"
                              class="zoomable"
                              onerror="this.onerror=null;this.src='@fallbackImg';" />
@@ -696,6 +816,41 @@
           const inp = form.querySelector('input[name=ImageFiles]');
           if (inp) console.log('[VIEW] files before submit =', inp.files?.length || 0);
         }, true);
+
+        /* ========= TOS Modal ========= */
+        async function openTosModal(providerId) {
+            const body = document.getElementById('tosModalBody');
+            const modalEl = document.getElementById('tosModal');
+            if (!body || !modalEl) return;
+
+            body.innerHTML = '<div class="muted">Đang tải điều khoản...</div>';
+            
+            try {
+                const url = '@Url.Action("GetTermsByProvider", "BookingService", new { area = "Customer" })' + '?providerId=' + providerId;
+                const res = await fetch(url, { method: 'GET', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (res.ok) {
+                    const html = await res.text();
+                    body.innerHTML = html;
+                } else {
+                    body.innerHTML = '<div style="color:#c00">Không tải được điều khoản từ máy chủ.</div>';
+                }
+            } catch (err) {
+                body.innerHTML = '<div style="color:#c00">Không tải được điều khoản. Vui lòng thử lại.</div>';
+            }
+
+            const bsModal = new bootstrap.Modal(modalEl);
+            bsModal.show();
+        }
+
+        function closeTosModal() {
+            const modalEl = document.getElementById('tosModal');
+            if (modalEl) {
+                const bsModal = bootstrap.Modal.getInstance(modalEl);
+                if (bsModal) {
+                    bsModal.hide();
+                }
+            }
+        }
     </script>
 }
 

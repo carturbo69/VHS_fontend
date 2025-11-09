@@ -5,7 +5,7 @@ namespace VHS_frontend.Areas.Provider.Models.Option
     public class OptionCreateDTO
     {
         [Required(ErrorMessage = "Tên option không được để trống.")]
-        [StringLength(100, ErrorMessage = "Tên option không được vượt quá 100 ký tự.")]
+        [StringLength(50, ErrorMessage = "Tên option không được vượt quá 50 ký tự.")]
         public string OptionName { get; set; } = string.Empty;
 
         [StringLength(500, ErrorMessage = "Mô tả không được vượt quá 500 ký tự.")]

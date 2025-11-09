@@ -21,6 +21,36 @@ namespace VHS_frontend.Areas.Admin.Controllers
         public async Task<IActionResult> Index(string? keyword = null, string? role = null, string? notificationType = null, bool? isRead = null, int page = 1, int pageSize = 50, CancellationToken ct = default)
         {
             AttachBearerIfAny();
+            
+            // Lấy token trước khi vào background task
+            var token = HttpContext.Session.GetString("JWToken");
+            
+            // Tự động xóa các thông báo đã gửi cũ hơn 7 ngày (từ thời điểm tạo)
+            // Chạy cleanup trong background để không chặn response
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    // Sử dụng service hiện có với token đã được set
+                    if (!string.IsNullOrWhiteSpace(token))
+                    {
+                        _svc.SetBearerToken(token);
+                    }
+                    var deletedCount = await _svc.DeleteOldSentNotificationsAsync(default);
+                    if (deletedCount > 0)
+                    {
+                        Console.WriteLine($"Đã xóa {deletedCount} thông báo đã gửi cũ hơn 7 ngày (từ thời điểm tạo)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error cleaning up old notifications: {ex.Message}");
+                }
+            });
+            
+            // Không await cleanup task để không chặn response
+            // Cleanup sẽ chạy song song và hoàn thành sau khi trang đã được render
+            
             var (items, total) = await _svc.GetListAsync(new AdminNotificationQuery
             {
                 Keyword = keyword,

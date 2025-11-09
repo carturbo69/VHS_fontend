@@ -184,7 +184,11 @@ builder.Services.AddHttpClient<OptionManagementService>(client =>
 });
 
 // HttpClient cho AuthService
-builder.Services.AddHttpClient<AuthService>();
+builder.Services.AddHttpClient<AuthService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
 builder.Services.AddHttpClient<StaffManagementService>(client => { 
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); 
 });

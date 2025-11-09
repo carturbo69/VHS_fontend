@@ -75,6 +75,8 @@ namespace VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
         public string Provider { get; set; } = "Khác";
         public string ServiceName { get; set; } = string.Empty;
         public string Image { get; set; } = "/images/placeholder.png";
+        public string? ServiceImages { get; set; } // JSON/comma-separated string
+        public string? ProviderImages { get; set; } // JSON/comma-separated string for provider logo
         public decimal UnitPrice { get; set; }
         public DateTime BookingTime { get; set; } = DateTime.Now;
 

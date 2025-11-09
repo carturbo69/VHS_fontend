@@ -2,6 +2,25 @@
 @{
     ViewData["Title"] = "Duyệt dịch vụ";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+    
+    // Hàm chuyển đổi UnitType sang tiếng Việt
+    string GetUnitTypeVietnamese(string? unitType)
+    {
+        if (string.IsNullOrEmpty(unitType)) return unitType ?? "";
+        return unitType switch
+        {
+            "Hour" => "Giờ",
+            "Day" => "Ngày",
+            "Visit" => "Lần",
+            "Apartment" => "Căn",
+            "Room" => "Phòng",
+            "SquareMeter" => "Mét vuông (m²)",
+            "Person" => "Người",
+            "Package" => "Gói",
+            "Event" => "Sự kiện",
+            _ => unitType
+        };
+    }
 }
 
 <div class="container-fluid">
@@ -31,6 +50,8 @@
                                 <th>Tên dịch vụ</th>
                                 <th>Giá</th>
                                 <th>Đơn vị</th>
+                                <th>Thẻ</th>
+                                <th>Trạng thái</th>
                                 <th>Ngày tạo</th>
                                 <th></th>
                             </tr>
@@ -38,8 +59,18 @@
                         <tbody>
                         @foreach (var i in Model)
                         {
-                            var first = (i.Images ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                            // Xác định ảnh để hiển thị (ưu tiên pending nếu có)
+                            var imagesToShow = !string.IsNullOrEmpty(i.PendingImages) ? i.PendingImages : i.Images;
+                            var first = (imagesToShow ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
                             var url = string.IsNullOrEmpty(first) ? null : (first.StartsWith("http") ? first : $"http://localhost:5154{first}");
+                            
+                            // Xác định title và price để hiển thị (ưu tiên pending nếu có)
+                            var displayTitle = !string.IsNullOrEmpty(i.PendingTitle) ? i.PendingTitle : i.Title;
+                            var displayPrice = i.PendingPrice ?? i.Price;
+                            var displayUnitType = !string.IsNullOrEmpty(i.PendingUnitType) ? i.PendingUnitType : i.UnitType;
+                            var displayBaseUnit = i.PendingBaseUnit ?? i.BaseUnit;
+                            
+                            var isUpdate = i.Status == "PendingUpdate";
                             <tr>
                                 <td style="width:110px">
                                     @if (!string.IsNullOrEmpty(url))
@@ -51,21 +82,105 @@
                                         <div class="text-muted small">Không ảnh</div>
                                     }
                                 </td>
-                                <td>@i.Title</td>
-                                <td>@i.Price.ToString("N0") VNĐ</td>
-                                <td>@i.UnitType (@(i.BaseUnit ?? 0))</td>
-                                <td>@(i.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                                <td>
+                                    <strong>@displayTitle</strong>
+                                    @if (isUpdate)
+                                    {
+                                        <br />
+                                        <small class="text-info">
+                                            <i class="bi bi-arrow-repeat me-1"></i>
+                                            Chỉnh sửa từ: <span class="text-muted">@i.CurrentTitle</span>
+                                        </small>
+                                    }
+                                </td>
+                                <td>
+                                    @displayPrice.ToString("N0") VNĐ
+                                    @if (isUpdate && i.CurrentPrice.HasValue && i.CurrentPrice.Value != displayPrice)
+                                    {
+                                        <br />
+                                        <small class="text-muted">
+                                            <del>@i.CurrentPrice.Value.ToString("N0") VNĐ</del>
+                                        </small>
+                                    }
+                                </td>
+                                <td>@GetUnitTypeVietnamese(displayUnitType) (@displayBaseUnit)</td>
+                                <td>
+                                    @{
+                                        // Xác định Tags để hiển thị (ưu tiên pending nếu có)
+                                        var tagsToShow = isUpdate && i.PendingTags != null && i.PendingTags.Any() 
+                                            ? i.PendingTags 
+                                            : (isUpdate && i.CurrentTags != null && i.CurrentTags.Any() 
+                                                ? i.CurrentTags 
+                                                : (i.Tags ?? new List<VHS_frontend.Services.Admin.AdminServiceApprovalService.TagInfo>()));
+                                        
+                                        // Kiểm tra xem tags có thay đổi không (chỉ khi có pending update)
+                                        var hasTagChanges = false;
+                                        if (isUpdate && i.PendingTags != null && i.PendingTags.Any() && i.CurrentTags != null && i.CurrentTags.Any())
+                                        {
+                                            var pendingTagNames = i.PendingTags.Select(t => t.Name).OrderBy(x => x).ToList();
+                                            var currentTagNames = i.CurrentTags.Select(t => t.Name).OrderBy(x => x).ToList();
+                                            hasTagChanges = !pendingTagNames.SequenceEqual(currentTagNames);
+                                        }
+                                    }
+                                    @if (tagsToShow.Any())
+                                    {
+                                        // Hiển thị tags mới (pending hoặc current)
+                                        foreach (var tag in tagsToShow)
+                                        {
+                                            <span class="badge bg-info me-1">@tag.Name</span>
+                                        }
+                                        // Chỉ hiển thị tags cũ nếu thực sự có thay đổi
+                                        @if (hasTagChanges)
+                                        {
+                                            <br />
+                                            <small class="text-muted">
+                                                <del>
+                                                    @foreach (var tag in i.CurrentTags)
+                                                    {
+                                                        <span class="badge bg-secondary me-1">@tag.Name</span>
+                                                    }
+                                                </del>
+                                            </small>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Không có</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (isUpdate)
+                                    {
+                                        <span class="badge bg-info">Chờ duyệt chỉnh sửa</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">Chờ duyệt mới</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (isUpdate && i.PendingUpdatedAt.HasValue)
+                                    {
+                                        <span class="text-info">Cập nhật: @i.PendingUpdatedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                        <br />
+                                        <small class="text-muted">Tạo: @(i.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</small>
+                                    }
+                                    else
+                                    {
+                                        @(i.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")
+                                    }
+                                </td>
                                 <td class="text-end">
-                                    <a asp-action="Detail" asp-route-id="@i.ServiceId" class="btn btn-sm btn-outline-primary me-2">
+                                    <a asp-action="Detail" asp-route-id="@i.ServiceId" class="btn btn-outline-secondary btn-sm me-2">
                                         <i class="bi bi-eye me-1"></i>Xem
                                     </a>
                                     <form asp-action="Approve" method="post" class="d-inline">
                                         <input type="hidden" name="id" value="@i.ServiceId" />
-                                        <button type="submit" class="btn btn-sm btn-success">
-                                            <i class="bi bi-check2 me-1"></i>Duyệt
+                                        <button type="submit" class="btn btn-approval btn-approval-approve">
+                                            <i class="bi bi-check2 me-1"></i>@(isUpdate ? "Duyệt chỉnh sửa" : "Duyệt")
                                         </button>
                                     </form>
-                                    <button class="btn btn-sm btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#rejectModal" data-id="@i.ServiceId">
+                                    <button class="btn btn-approval btn-approval-reject ms-2" data-bs-toggle="modal" data-bs-target="#rejectModal" data-id="@i.ServiceId" data-status="@i.Status">
                                         <i class="bi bi-x-lg me-1"></i>Từ chối
                                     </button>
                                 </td>

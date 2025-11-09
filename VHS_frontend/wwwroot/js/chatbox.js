@@ -5,10 +5,40 @@ console.log('=== chatbox.js LOADED ===');
     'use strict';
     console.log('=== chatbox.js IIFE STARTED ===');
 
-    // Configuration
+    // Configuration - Tự động lấy từ backend
+    // Nếu frontend và backend cùng domain, dùng relative paths
+    // Nếu khác domain, có thể cấu hình trong appsettings và tạo endpoint trả về config
+    const getBaseUrl = () => {
+        // Thử lấy từ meta tag nếu có (backend có thể inject)
+        const metaApiUrl = document.querySelector('meta[name="api-base-url"]')?.getAttribute('content');
+        if (metaApiUrl) return metaApiUrl;
+        
+        // Fallback: dùng relative path (nếu cùng domain) hoặc localhost cho development
+        // Trong production, nên dùng relative path: '/api/ChatboxAI'
+        const isProduction = window.location.hostname !== 'localhost';
+        if (isProduction) {
+            return '/api/ChatboxAI'; // Relative path cho production
+        }
+        return 'http://localhost:5154/api/ChatboxAI'; // Development
+    };
+    
+    const getSignalRUrl = () => {
+        // Thử lấy từ meta tag nếu có
+        const metaSignalRUrl = document.querySelector('meta[name="signalr-url"]')?.getAttribute('content');
+        if (metaSignalRUrl) return metaSignalRUrl;
+        
+        // Fallback
+        const isProduction = window.location.hostname !== 'localhost';
+        if (isProduction) {
+            // Dùng cùng origin với frontend
+            return `${window.location.origin}/hubs/chat`;
+        }
+        return 'http://localhost:5154/hubs/chat'; // Development
+    };
+
     const CONFIG = {
-        apiBaseUrl: 'http://localhost:5154/api/ChatboxAI',
-        signalRUrl: 'http://localhost:5154/hubs/chat',
+        apiBaseUrl: getBaseUrl(),
+        signalRUrl: getSignalRUrl(),
         sessionId: localStorage.getItem('chatbox_session_id') || generateSessionId(),
         language: 'vi',
         conversationId: null
@@ -44,11 +74,13 @@ console.log('=== chatbox.js LOADED ===');
     let isDragging = false;
     let dragOffset = { x: 0, y: 0 };
     let currentPosition = { bottom: 100, right: 30 };
+    let rafId = null;
     
     // Toggle button drag and drop state
     let isToggleDragging = false;
     let toggleDragOffset = { x: 0, y: 0 };
     let togglePosition = { bottom: 30, right: 30 };
+    let toggleRafId = null;
 
     // Apply dark mode based on user's system preference or body class
     function applyDarkMode() {
@@ -387,8 +419,10 @@ console.log('=== chatbox.js LOADED ===');
             container.classList.add('dragging');
             
             const rect = container.getBoundingClientRect();
-            dragOffset.x = e.clientX - rect.right;
-            dragOffset.y = e.clientY - (window.innerHeight - rect.bottom);
+            // Tính offset từ điểm click đến góc trên bên trái của container
+            // Để khi kéo, điểm click sẽ giữ nguyên vị trí trên container
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
             
             document.addEventListener('mousemove', onDrag);
             document.addEventListener('mouseup', stopDrag);
@@ -399,30 +433,51 @@ console.log('=== chatbox.js LOADED ===');
         function onDrag(e) {
             if (!isDragging) return;
             
-            const containerRect = container.getBoundingClientRect();
-            const windowWidth = window.innerWidth;
-            const windowHeight = window.innerHeight;
+            // Cancel previous animation frame if exists
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+            }
             
-            // Calculate new position
-            let newRight = windowWidth - e.clientX - dragOffset.x;
-            let newBottom = windowHeight - e.clientY - dragOffset.y;
-            
-            // Constrain to viewport
-            const minRight = 10;
-            const maxRight = windowWidth - containerRect.width - 10;
-            const minBottom = 10;
-            const maxBottom = windowHeight - containerRect.height - 10;
-            
-            newRight = Math.max(minRight, Math.min(maxRight, newRight));
-            newBottom = Math.max(minBottom, Math.min(maxBottom, newBottom));
-            
-            currentPosition.right = newRight;
-            currentPosition.bottom = newBottom;
-            
-            applyPosition(currentPosition);
+            // Use requestAnimationFrame for smooth updates
+            rafId = requestAnimationFrame(() => {
+                const windowWidth = window.innerWidth;
+                const windowHeight = window.innerHeight;
+                const containerWidth = container.offsetWidth;
+                const containerHeight = container.offsetHeight;
+                
+                // Tính vị trí mới dựa trên điểm click trừ đi offset
+                // Điểm click sẽ giữ nguyên vị trí trên container
+                let newLeft = e.clientX - dragOffset.x;
+                let newTop = e.clientY - dragOffset.y;
+                
+                // Chuyển đổi từ left/top sang right/bottom
+                let newRight = windowWidth - newLeft - containerWidth;
+                let newBottom = windowHeight - newTop - containerHeight;
+                
+                // Constrain to viewport
+                const minRight = 10;
+                const maxRight = windowWidth - containerWidth - 10;
+                const minBottom = 10;
+                const maxBottom = windowHeight - containerHeight - 10;
+                
+                newRight = Math.max(minRight, Math.min(maxRight, newRight));
+                newBottom = Math.max(minBottom, Math.min(maxBottom, newBottom));
+                
+                currentPosition.right = newRight;
+                currentPosition.bottom = newBottom;
+                
+                applyPosition(currentPosition);
+                rafId = null;
+            });
         }
         
         function stopDrag(e) {
+            // Cancel any pending animation frame
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+            
             if (isDragging) {
                 isDragging = false;
                 container.classList.remove('dragging');
@@ -541,29 +596,44 @@ console.log('=== chatbox.js LOADED ===');
                 toggle.style.pointerEvents = 'none';
             }
             
-            // Calculate new position based on initial position + mouse movement
-            const windowWidth = window.innerWidth;
-            const windowHeight = window.innerHeight;
+            // Cancel previous animation frame if exists
+            if (toggleRafId !== null) {
+                cancelAnimationFrame(toggleRafId);
+            }
             
-            let newRight = startRight - deltaX; // Move left when mouse moves right
-            let newBottom = startBottom - deltaY; // Move up when mouse moves down
-            
-            // Constrain to viewport
-            const minRight = 10;
-            const maxRight = windowWidth - toggle.offsetWidth - 10;
-            const minBottom = 10;
-            const maxBottom = windowHeight - toggle.offsetHeight - 10;
-            
-            newRight = Math.max(minRight, Math.min(maxRight, newRight));
-            newBottom = Math.max(minBottom, Math.min(maxBottom, newBottom));
-            
-            togglePosition.right = newRight;
-            togglePosition.bottom = newBottom;
-            
-            applyTogglePosition(togglePosition);
+            // Use requestAnimationFrame for smooth updates
+            toggleRafId = requestAnimationFrame(() => {
+                // Calculate new position based on initial position + mouse movement
+                const windowWidth = window.innerWidth;
+                const windowHeight = window.innerHeight;
+                
+                let newRight = startRight - deltaX; // Move left when mouse moves right
+                let newBottom = startBottom - deltaY; // Move up when mouse moves down
+                
+                // Constrain to viewport
+                const minRight = 10;
+                const maxRight = windowWidth - toggle.offsetWidth - 10;
+                const minBottom = 10;
+                const maxBottom = windowHeight - toggle.offsetHeight - 10;
+                
+                newRight = Math.max(minRight, Math.min(maxRight, newRight));
+                newBottom = Math.max(minBottom, Math.min(maxBottom, newBottom));
+                
+                togglePosition.right = newRight;
+                togglePosition.bottom = newBottom;
+                
+                applyTogglePosition(togglePosition);
+                toggleRafId = null;
+            });
         }
         
         function stopToggleDrag(e) {
+            // Cancel any pending animation frame
+            if (toggleRafId !== null) {
+                cancelAnimationFrame(toggleRafId);
+                toggleRafId = null;
+            }
+            
             // Remove listeners
             document.removeEventListener('mousemove', onToggleDrag);
             document.removeEventListener('mouseup', stopToggleDrag);

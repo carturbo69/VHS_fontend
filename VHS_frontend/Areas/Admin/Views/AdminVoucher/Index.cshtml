@@ -35,25 +35,26 @@
         </div>
     </div>
 
-    <!-- Toolbar -->
+    <!-- Toolbar Card -->
+    <div class="toolbar-card card-x">
     <div class="v-toolbar">
         <div class="row g-3">
             <!-- Bên trái: Nút thêm + Chỉ hiện hoạt động + Tìm kiếm (4 cột) -->
             <div class="col-md-4">
-                <div class="search-card card-x">
-                    <div class="row g-3">
+                    <div class="search-card">
+                        <div class="row g-2">
                         <!-- Hàng trên: Nút thêm + Chỉ hiện hoạt động -->
                         <div class="col-12">
-                            <div class="d-flex gap-2 flex-wrap">
+                                <div class="d-flex gap-2 flex-nowrap align-items-center">
                                 <button class="btn btn-primary soft" id="btnCreate">
-                                    <i class="bi bi-plus-circle"></i> Thêm voucher
+                                        <i class="bi bi-plus-circle"></i> <span>Thêm voucher</span>
                                 </button>
-                                <a class="btn btn-ghost soft"
+                                    <a class="btn btn-ghost soft d-inline-flex align-items-center"
                                    asp-area="Admin" asp-controller="AdminVoucher" asp-action="Index"
                                    asp-route-onlyActive="@( onlyActive.HasValue ? (!onlyActive.Value) : true )"
                                    asp-route-keyword="@keyword">
                                     <i class="bi @(onlyActive==true ? "bi-eye-slash" : "bi-eye")"></i>
-                                    @(onlyActive == true ? "Hiện tất cả" : "Chỉ hiện Hoạt động")
+                                        <span class="ms-1">@(onlyActive == true ? "Hiện tất cả" : "Hiện hoạt động")</span>
                                 </a>
                             </div>
                         </div>
@@ -78,7 +79,7 @@
 
             <!-- Bên phải: Filter (6 cột) -->
             <div class="col-md-8">
-                <div class="filter-card card-x">
+                    <div class="filter-card">
                     <div class="row g-3">
                         <!-- Hàng 1: % Giảm và Trạng thái thời gian ngang nhau -->
                         <div class="col-md-6">
@@ -112,6 +113,7 @@
                                 <div class="filter-actions">
                                     <button class="btn btn-primary soft" id="btnApply" type="button">Lọc</button>
                                     <button class="btn btn-ghost soft" id="btnClear" type="button" title="Xoá lọc">Xoá</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -121,8 +123,9 @@
         </div>
     </div>
 
-    <!-- Table -->
-    <div class="table-wrap card-x">
+    <!-- Table Card -->
+    <div class="table-card card-x">
+        <div class="table-wrap">
         <div class="table-scroll">
             <table class="table table-hover align-middle mb-0" id="tblVouchers">
                 <thead>
@@ -196,8 +199,12 @@
                 </tbody>
             </table>
         </div>
+        </div>
     </div>
 </section>
+
+<!-- Toast notification root -->
+<div id="notif-root"></div>
 
 <!-- Modal: Voucher -->
 <div class="modal fade" id="vModal" tabindex="-1" aria-hidden="true">
@@ -268,12 +275,266 @@
 
 @section Scripts {
     <script>
+        /* ======= CENTER TOAST (boxed + accent bar + fast) ======= */
+        (function(){
+          var toastManager = {
+            currentToast: null,
+            hideTimeout: null,
+            removeTimeout: null,
+            
+            clearAll: function(){
+              // Clear tất cả timeout
+              if(this.hideTimeout){
+                clearTimeout(this.hideTimeout);
+                this.hideTimeout = null;
+              }
+              if(this.removeTimeout){
+                clearTimeout(this.removeTimeout);
+                this.removeTimeout = null;
+              }
+              
+              // Xóa toast hiện tại
+              if(this.currentToast && this.currentToast.parentNode){
+                this.currentToast.classList.remove('show');
+                var self = this;
+                setTimeout(function(){
+                  if(self.currentToast && self.currentToast.parentNode){
+                    self.currentToast.remove();
+                  }
+                  self.currentToast = null;
+                }, 100);
+              }
+              
+              // Xóa tất cả toast còn sót trong DOM
+              var root = document.getElementById('notif-root');
+              if(root){
+                var existingToasts = root.querySelectorAll('.center-toast');
+                for(var i = 0; i < existingToasts.length; i++){
+                  var toast = existingToasts[i];
+                  if(toast.parentNode){
+                    toast.classList.remove('show');
+                    toast.remove();
+                  }
+                }
+              }
+            },
+            
+            show: function(msg, type, duration){
+              if(!type) type = 'info';
+              // Mặc định: success 2500ms, error/warn 3000ms, info 2500ms
+              if(!duration) {
+                duration = type === 'success' ? 2500 : (type === 'error' || type === 'warn' ? 3000 : 2500);
+              }
+              
+              // Xóa toast cũ trước
+              this.clearAll();
+              
+              var root = document.getElementById('notif-root');
+              if(!root) return;
+              
+              // Tạo toast mới
+              var box = document.createElement('div');
+              box.className = 'center-toast ' + type;
+              var iconClass = type==='success'?'bi-check-circle':
+                               type==='error'  ?'bi-x-circle'   :
+                               type==='warn'   ?'bi-exclamation-triangle' : 'bi-info-circle';
+              box.innerHTML = 
+                '<div class="toast-box">' +
+                  '<div class="accent"></div>' +
+                  '<i class="bi ' + iconClass + '"></i>' +
+                  '<span class="msg">' + msg + '</span>' +
+                '</div>';
+              
+              root.appendChild(box);
+              this.currentToast = box;
+              
+              var self = this;
+              
+              // Hiển thị với animation - đợi một chút để DOM sẵn sàng
+              requestAnimationFrame(function() {
+                setTimeout(function(){ 
+                  if(self.currentToast && self.currentToast.parentNode){
+                    self.currentToast.classList.add('show'); 
+                  }
+                }, 100);
+              });
+
+              // Tự động ẩn sau duration - đảm bảo đủ thời gian hiển thị
+              this.hideTimeout = setTimeout(function() {
+                if(self.currentToast && self.currentToast.parentNode){
+                  self.currentToast.classList.remove('show');
+                  // Đợi animation fade-out hoàn tất trước khi remove
+                  self.removeTimeout = setTimeout(function(){ 
+                    if(self.currentToast && self.currentToast.parentNode){
+                      self.currentToast.remove();
+                    }
+                    self.currentToast = null;
+                    self.hideTimeout = null;
+                    self.removeTimeout = null;
+                  }, 400); // Tăng từ 350ms lên 400ms để đảm bảo animation hoàn tất
+                }
+              }, duration);
+            }
+          };
+          
+          window.showNotice = function(msg, type, duration){
+            toastManager.show(msg, type, duration);
+          };
+        })();
+
         const routes = {
           vGet   : '@Url.Action("Get", "AdminVoucher", new { area = "Admin" })',
           vCreate: '@Url.Action("Create", "AdminVoucher", new { area = "Admin" })',
           vUpdate: '@Url.Action("Update", "AdminVoucher", new { area = "Admin" })',
           vDelete: '@Url.Action("Delete", "AdminVoucher", new { area = "Admin" })'
         };
+
+        // ===== Helper functions =====
+        function formatDateYMDToDDMMYYYY(ymd) {
+          if (!ymd) return '—';
+          // Xử lý cả ISO format (có T và time) và date-only format
+          let dateStr = ymd;
+          // Nếu có 'T' (ISO format), chỉ lấy phần date trước 'T'
+          if (dateStr.indexOf('T') !== -1) {
+            dateStr = dateStr.split('T')[0];
+          }
+          // Nếu có space, chỉ lấy phần date trước space
+          if (dateStr.indexOf(' ') !== -1) {
+            dateStr = dateStr.split(' ')[0];
+          }
+          const parts = dateStr.split('-');
+          if (parts.length !== 3) return ymd;
+          // Đảm bảo day và month có 2 chữ số
+          const day = parts[2].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[0];
+          return day + '/' + month + '/' + year;
+        }
+
+        function getTimeState(startDate, endDate) {
+          if (!startDate || !endDate) return 'started';
+          try {
+            const now = new Date();
+            // Xử lý date string có thể chứa time (ISO format)
+            let startStr = startDate;
+            let endStr = endDate;
+            if (startStr.indexOf('T') !== -1) startStr = startStr.split('T')[0];
+            if (endStr.indexOf('T') !== -1) endStr = endStr.split('T')[0];
+            if (startStr.indexOf(' ') !== -1) startStr = startStr.split(' ')[0];
+            if (endStr.indexOf(' ') !== -1) endStr = endStr.split(' ')[0];
+            
+            const start = new Date(startStr + 'T00:00:00');
+            const end = new Date(endStr + 'T23:59:59');
+            if (now < start) return 'upcoming';
+            if (now > end) return 'expired';
+            return 'started';
+          } catch (e) {
+            return 'started';
+          }
+        }
+
+        function getTimeStateBadge(tState) {
+          if (tState === 'upcoming') return '<span class="badge upcoming">Chưa bắt đầu</span>';
+          if (tState === 'expired') return '<span class="badge expired">Hết hạn</span>';
+          return '<span class="badge started">Đang diễn ra</span>';
+        }
+
+        function formatNumber(num) {
+          if (!num && num !== 0) return '—';
+          return num.toLocaleString('vi-VN');
+        }
+
+        function addNewVoucherRow(v) {
+          const tbody = document.querySelector('#tblVouchers tbody');
+          if (!tbody) return;
+
+          // Lấy date string và loại bỏ phần time nếu có
+          let sStr = v.startDate || '';
+          let eStr = v.endDate || '';
+          if (sStr.indexOf('T') !== -1) sStr = sStr.split('T')[0];
+          if (eStr.indexOf('T') !== -1) eStr = eStr.split('T')[0];
+          if (sStr.indexOf(' ') !== -1) sStr = sStr.split(' ')[0];
+          if (eStr.indexOf(' ') !== -1) eStr = eStr.split(' ')[0];
+          
+          const sShow = formatDateYMDToDDMMYYYY(sStr);
+          const eShow = formatDateYMDToDDMMYYYY(eStr);
+          const tState = getTimeState(sStr, eStr);
+          const percent = v.discountPercent ? parseFloat(v.discountPercent).toFixed(2) : '—';
+          const maxAmount = v.discountMaxAmount ? formatNumber(v.discountMaxAmount) + 'đ' : '—';
+          const used = v.usedCount || 0;
+          const limit = v.usageLimit ? formatNumber(v.usageLimit) : '∞';
+          const stateHtml = v.isActive ? '<span class="state ok">Hoạt động</span>' : '<span class="state off">Tạm dừng</span>';
+
+          const tr = document.createElement('tr');
+          tr.setAttribute('data-id', v.voucherId);
+          tr.setAttribute('data-start', sStr);
+          tr.setAttribute('data-end', eStr);
+          tr.setAttribute('data-tstate', tState);
+
+          tr.innerHTML = 
+            '<td class="fw-semibold mono">' + (v.code || '') + '</td>' +
+            '<td class="description-text" title="' + (v.description || '') + '">' + (v.description || '') + '</td>' +
+            '<td>' + percent + '</td>' +
+            '<td>' + maxAmount + '</td>' +
+            '<td class="time-cell">' +
+              '<div class="date-line">' + sShow + ' → ' + eShow + '</div>' +
+              '<div class="substate">' + getTimeStateBadge(tState) + '</div>' +
+            '</td>' +
+            '<td>' + used + ' / ' + limit + '</td>' +
+            '<td>' + stateHtml + '</td>' +
+            '<td class="text-end">' +
+              '<div class="btn-group">' +
+                '<button class="btn btn-sm btn-edit soft btn-edit-v">' +
+                  '<i class="bi bi-pencil-square"></i> Sửa' +
+                '</button>' +
+                '<button class="btn btn-sm btn-outline-danger soft btn-del-v">' +
+                  '<i class="bi bi-trash"></i> Xoá' +
+                '</button>' +
+              '</div>' +
+            '</td>';
+
+          tbody.insertBefore(tr, tbody.firstChild);
+        }
+
+        function updateVoucherRow(v) {
+          const tr = document.querySelector('tr[data-id="' + v.voucherId + '"]');
+          if (!tr) return;
+
+          // Lấy date string và loại bỏ phần time nếu có
+          let sStr = v.startDate || '';
+          let eStr = v.endDate || '';
+          if (sStr.indexOf('T') !== -1) sStr = sStr.split('T')[0];
+          if (eStr.indexOf('T') !== -1) eStr = eStr.split('T')[0];
+          if (sStr.indexOf(' ') !== -1) sStr = sStr.split(' ')[0];
+          if (eStr.indexOf(' ') !== -1) eStr = eStr.split(' ')[0];
+          
+          const sShow = formatDateYMDToDDMMYYYY(sStr);
+          const eShow = formatDateYMDToDDMMYYYY(eStr);
+          const tState = getTimeState(sStr, eStr);
+          const percent = v.discountPercent ? parseFloat(v.discountPercent).toFixed(2) : '—';
+          const maxAmount = v.discountMaxAmount ? formatNumber(v.discountMaxAmount) + 'đ' : '—';
+          const used = v.usedCount || 0;
+          const limit = v.usageLimit ? formatNumber(v.usageLimit) : '∞';
+          const stateHtml = v.isActive ? '<span class="state ok">Hoạt động</span>' : '<span class="state off">Tạm dừng</span>';
+
+          tr.setAttribute('data-start', sStr);
+          tr.setAttribute('data-end', eStr);
+          tr.setAttribute('data-tstate', tState);
+
+          const tds = tr.querySelectorAll('td');
+          if (tds.length >= 7) {
+            tds[0].textContent = v.code || '';
+            tds[0].setAttribute('title', v.code || '');
+            tds[1].textContent = v.description || '';
+            tds[1].setAttribute('title', v.description || '');
+            tds[2].textContent = percent;
+            tds[3].textContent = maxAmount;
+            tds[4].innerHTML = '<div class="date-line">' + sShow + ' → ' + eShow + '</div>' +
+              '<div class="substate">' + getTimeStateBadge(tState) + '</div>';
+            tds[5].textContent = used + ' / ' + limit;
+            tds[6].innerHTML = stateHtml;
+          }
+        }
 
         // ===== Modal + fields =====
         const vModal = new bootstrap.Modal(document.getElementById('vModal'));
@@ -337,7 +598,10 @@
           if (btn.classList.contains('btn-edit-v')) {
             try{
               const res = await fetch(routes.vGet + `?id=${encodeURIComponent(id)}`);
-              if(!res.ok){ showError('Không đọc được voucher.'); return; }
+              if(!res.ok){ 
+                showNotice('Không đọc được voucher.', 'error', 3000);
+                return; 
+              }
               const v = await res.json();
 
               document.getElementById('vModalTitle').textContent = 'Sửa voucher';
@@ -355,21 +619,25 @@
               clearError();
               vModal.show();
             }catch(_){
-              showError('Không thể tải voucher để sửa.');
+              showNotice('Không thể tải voucher để sửa.', 'error', 3000);
             }
             return;
           }
 
           // Delete
           if (btn.classList.contains('btn-del-v')) {
-            if (!confirm('Xoá voucher này?')) return;
             try{
               const res = await fetch(routes.vDelete + `?id=${encodeURIComponent(id)}`, { method:'DELETE' });
-              if (res.status === 204) { location.reload(); return; }
+              if (res.status === 204) {
+                // Ẩn row ngay lập tức
+                tr.style.display = 'none';
+                showNotice('Xóa voucher thành công!', 'success', 2800);
+                return;
+              }
               const msg = await readJsonMessage(res);
-              showError(msg);
+              showNotice(msg || 'Không thể xóa voucher', 'error', 3000);
             }catch(_){
-              showError('Không xoá được voucher.');
+              showNotice('Không xoá được voucher.', 'error', 3000);
             }
             return;
           }
@@ -403,13 +671,13 @@
         function applyAllFilters(){
           const min = pfMin.value === '' ? null : Number(pfMin.value);
           const max = pfMax.value === '' ? null : Number(pfMax.value);
-          if (min != null && (isNaN(min) || min<0 || min>100)) { alert('Phần trăm tối thiểu phải trong khoảng 0–100.'); return; }
-          if (max != null && (isNaN(max) || max<0 || max>100)) { alert('Phần trăm tối đa phải trong khoảng 0–100.'); return; }
-          if (min != null && max != null && min > max) { alert('Giá trị Từ phải ≤ Đến.'); return; }
+          if (min != null && (isNaN(min) || min<0 || min>100)) { showNotice('Phần trăm tối thiểu phải trong khoảng 0–100.', 'warn', 3000); return; }
+          if (max != null && (isNaN(max) || max<0 || max>100)) { showNotice('Phần trăm tối đa phải trong khoảng 0–100.', 'warn', 3000); return; }
+          if (min != null && max != null && min > max) { showNotice('Giá trị Từ phải ≤ Đến.', 'warn', 3000); return; }
 
           const dmin = parseYMD(dMin.value);
           const dmax = parseYMD(dMax.value);
-          if (dmin && dmax && dmin.getTime() > dmax.getTime()) { alert('Ngày bắt đầu phải trước ngày kết thúc.'); return; }
+          if (dmin && dmax && dmin.getTime() > dmax.getTime()) { showNotice('Ngày bắt đầu phải trước ngày kết thúc.', 'warn', 3000); return; }
 
           const want = timeState.value; // 'all' | 'upcoming' | 'started' | 'expired'
 
@@ -491,7 +759,24 @@
                 body: JSON.stringify(payload)
               });
               if (res.status === 201 || res.status === 200) {
-                vModal.hide(); location.reload(); return;
+                const dto = await res.json();
+                vModal.hide();
+                addNewVoucherRow(dto);
+                showNotice('Thêm voucher thành công!', 'success', 2800);
+                // Reset form
+                vId.value = '';
+                vCode.value = '';
+                vDesc.value = '';
+                vPercent.value = '';
+                vMax.value = '';
+                vStart.value = '';
+                vEnd.value = '';
+                vLimit.value = '';
+                vUsed.value = '0';
+                vActive.value = 'true';
+                vCode.classList.remove('is-invalid');
+                clearError();
+                return;
               }
             } else {
               res = await fetch(routes.vUpdate + `?id=${encodeURIComponent(vId.value)}`, {
@@ -500,18 +785,44 @@
                 body: JSON.stringify(payload)
               });
               if (res.status === 200) {
-                vModal.hide(); location.reload(); return;
+                const dto = await res.json();
+                vModal.hide();
+                updateVoucherRow(dto);
+                showNotice('Cập nhật voucher thành công!', 'success', 2800);
+                // Reset form
+                vId.value = '';
+                vCode.value = '';
+                vDesc.value = '';
+                vPercent.value = '';
+                vMax.value = '';
+                vStart.value = '';
+                vEnd.value = '';
+                vLimit.value = '';
+                vUsed.value = '0';
+                vActive.value = 'true';
+                vCode.classList.remove('is-invalid');
+                clearError();
+                return;
               }
             }
 
             // Lỗi → phân loại 409 / 400 / khác
             const msg = await readJsonMessage(res);
-            if (res.status === 409)      showError(msg || 'Mã voucher đã tồn tại, vui lòng nhập mã khác.');
-            else if (res.status === 400) showError(msg || 'Dữ liệu không hợp lệ.');
-            else                         showError(msg);
+            if (res.status === 409) {
+              showError(msg || 'Mã voucher đã tồn tại, vui lòng nhập mã khác.');
+              showNotice(msg || 'Mã voucher đã tồn tại, vui lòng nhập mã khác.', 'error', 3000);
+            } else if (res.status === 400) {
+              showError(msg || 'Dữ liệu không hợp lệ.');
+              showNotice(msg || 'Dữ liệu không hợp lệ.', 'error', 3000);
+            } else {
+              showError(msg);
+              showNotice(msg, 'error', 3000);
+            }
 
           } catch (err) {
-            showError('Không thể gửi yêu cầu. Vui lòng thử lại.');
+            const errorMsg = 'Không thể gửi yêu cầu. Vui lòng thử lại.';
+            showError(errorMsg);
+            showNotice(errorMsg, 'error', 3000);
           }
         });
     </script>
