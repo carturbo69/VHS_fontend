@@ -4,7 +4,9 @@
     Layout = "~/Areas/Provider/Views/_ProviderLayout.cshtml";
 }
 
-<link rel="stylesheet" href="~/css/provider-notification.css" asp-append-version="true" />
+@section Styles {
+    <link rel="stylesheet" href="~/css/provider-notification.css" asp-append-version="true" />
+}
 
 <div class="notification-page">
     <!-- Header Stats -->
@@ -16,7 +18,7 @@
                 </div>
             </div>
             <div class="stat-content">
-                <h3 class="stat-number">@ViewBag.Total</h3>
+                <h3 class="stat-number">@(ViewBag.Total ?? 0)</h3>
                 <p class="stat-label">Tổng thông báo</p>
             </div>
         </div>
@@ -27,7 +29,7 @@
                 </div>
             </div>
             <div class="stat-content">
-                <h3 class="stat-number">@ViewBag.Unread</h3>
+                <h3 class="stat-number">@(ViewBag.Unread ?? 0)</h3>
                 <p class="stat-label">Chưa đọc</p>
             </div>
         </div>
@@ -38,7 +40,7 @@
                 </div>
             </div>
             <div class="stat-content">
-                <h3 class="stat-number">@ViewBag.Read</h3>
+                <h3 class="stat-number">@(ViewBag.Read ?? 0)</h3>
                 <p class="stat-label">Đã đọc</p>
             </div>
         </div>
@@ -59,7 +61,7 @@
                 </div>
                 @if (ViewBag.Unread > 0 && Model != null && Model.Any())
                 {
-                    <button class="btn-mark-all-read" onclick="markAllNotificationsRead()" title="Đánh dấu tất cả đã đọc">
+                    <button class="btn-mark-all-read" onclick="markAllNotificationsRead(); return false;" title="Đánh dấu tất cả đã đọc">
                         <i class="bi bi-check-all"></i>
                         <span>Đánh dấu tất cả</span>
                     </button>
@@ -82,7 +84,7 @@
                 <div class="notifications-list">
                     @foreach (var notification in Model)
                     {
-                        <div class="notification-card @(notification.IsRead == true ? "read" : "unread") notification-type-@(notification.NotificationType?.ToLower() ?? "system")">
+                        <div class="notification-card @(notification.IsRead == true ? "read" : "unread") notification-type-@(notification.NotificationType?.ToLower() ?? "system")" data-notification-id="@notification.NotificationId">
                             @if (notification.IsRead != true)
                             {
                                 <span class="notification-indicator"></span>
@@ -132,13 +134,13 @@
                                 @if (notification.IsRead != true)
                                 {
                                     <button class="btn-action btn-mark-read"
-                                            onclick="markNotificationRead('@notification.NotificationId')"
+                                            onclick="markNotificationRead('@notification.NotificationId'); return false;"
                                             title="Đánh dấu đã đọc">
                                         <i class="bi bi-check2"></i>
                                     </button>
                                 }
                                 <button class="btn-action btn-delete"
-                                        onclick="deleteNotification('@notification.NotificationId')"
+                                        onclick="deleteNotification('@notification.NotificationId'); return false;"
                                         title="Xóa">
                                     <i class="bi bi-trash3"></i>
                                 </button>
@@ -153,7 +155,107 @@
 
 @section Scripts {
     <script>
+        // Lưu scroll position
+        let scrollPosition = 0;
+
+        // Function để tính toán stats từ DOM
+        function calculateStatsFromDOM() {
+            const allCards = document.querySelectorAll('.notification-card');
+            const unreadCards = document.querySelectorAll('.notification-card.unread');
+            const readCards = document.querySelectorAll('.notification-card.read');
+            
+            return {
+                total: allCards.length,
+                unread: unreadCards.length,
+                read: readCards.length
+            };
+        }
+
+        // Function để cập nhật stats
+        function updateStats(total, unread, read) {
+            const totalElement = document.querySelector('.stat-total .stat-number');
+            const unreadElement = document.querySelector('.stat-unread .stat-number');
+            const readElement = document.querySelector('.stat-read .stat-number');
+
+            if (totalElement && total !== undefined) totalElement.textContent = total;
+            if (unreadElement && unread !== undefined) unreadElement.textContent = unread;
+            if (readElement && read !== undefined) readElement.textContent = read;
+
+            // Ẩn/hiện button "Đánh dấu tất cả"
+            const markAllBtn = document.querySelector('.btn-mark-all-read');
+            if (markAllBtn) {
+                const currentUnread = unread !== undefined ? unread : calculateStatsFromDOM().unread;
+                if (currentUnread > 0) {
+                    markAllBtn.style.display = 'flex';
+                } else {
+                    markAllBtn.style.display = 'none';
+                }
+            }
+        }
+
+        // Function để xóa notification card
+        function removeNotificationCard(id) {
+            const card = document.querySelector(`.notification-card[data-notification-id="${id}"]`);
+            if (card) {
+                // Animation fade out
+                card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'translateX(-20px)';
+                setTimeout(() => {
+                    card.remove();
+                }, 300);
+            }
+        }
+
+        // Function để đánh dấu notification là đã đọc
+        function markNotificationAsRead(id) {
+            const card = document.querySelector(`.notification-card[data-notification-id="${id}"]`);
+            if (card) {
+                // Remove unread classes và thêm read class
+                card.classList.remove('unread');
+                card.classList.add('read');
+
+                // Remove indicator dot với animation
+                const indicator = card.querySelector('.notification-indicator');
+                if (indicator) {
+                    indicator.style.transition = 'opacity 0.3s ease';
+                    indicator.style.opacity = '0';
+                    setTimeout(() => indicator.remove(), 300);
+                }
+
+                // Remove "Mới" badge với animation
+                const newBadge = card.querySelector('.badge-new');
+                if (newBadge) {
+                    newBadge.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    newBadge.style.opacity = '0';
+                    newBadge.style.transform = 'scale(0.8)';
+                    setTimeout(() => newBadge.remove(), 300);
+                }
+
+                // Remove mark-read button với animation
+                const markReadBtn = card.querySelector('.btn-mark-read');
+                if (markReadBtn) {
+                    markReadBtn.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    markReadBtn.style.opacity = '0';
+                    markReadBtn.style.transform = 'scale(0.8)';
+                    setTimeout(() => markReadBtn.remove(), 300);
+                }
+            }
+        }
+
+        // Function để giữ scroll position
+        function saveScrollPosition() {
+            scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+        }
+
+        function restoreScrollPosition() {
+            window.scrollTo(0, scrollPosition);
+        }
+
+        // Đánh dấu đã đọc
         async function markNotificationRead(id) {
+            saveScrollPosition();
+            
             try {
                 const res = await fetch(`/Provider/ProviderNotification/MarkAsRead/${id}`, {
                     method: 'POST',
@@ -162,20 +264,40 @@
                     }
                 });
                 const result = await res.json();
+                
                 if (result.success) {
-                    location.reload();
+                    // Cập nhật UI
+                    markNotificationAsRead(id);
+                    
+                    // Cập nhật stats từ response hoặc tính từ DOM
+                    if (result.total !== undefined && result.unread !== undefined && result.read !== undefined) {
+                        updateStats(result.total, result.unread, result.read);
+                    } else {
+                        // Tính toán từ DOM nếu backend không trả về stats
+                        const stats = calculateStatsFromDOM();
+                        updateStats(stats.total, stats.unread, stats.read);
+                    }
+                    
+                    // Khôi phục scroll position
+                    requestAnimationFrame(() => {
+                        restoreScrollPosition();
+                    });
                 } else {
                     alert(result.message || 'Không thể đánh dấu đã đọc');
+                    restoreScrollPosition();
                 }
             } catch (e) {
                 console.error('Error marking as read:', e);
                 alert('Có lỗi xảy ra');
+                restoreScrollPosition();
             }
         }
 
+        // Xóa notification
         async function deleteNotification(id) {
-            if (!confirm('Bạn có chắc muốn xóa thông báo này?')) return;
-
+            saveScrollPosition();
+            const card = document.querySelector(`.notification-card[data-notification-id="${id}"]`);
+            
             try {
                 const res = await fetch(`/Provider/ProviderNotification/Delete/${id}`, {
                     method: 'POST',
@@ -184,18 +306,64 @@
                     }
                 });
                 const result = await res.json();
+                
                 if (result.success) {
-                    location.reload();
+                    // Xóa card với animation
+                    removeNotificationCard(id);
+                    
+                    // Cập nhật stats từ response hoặc tính từ DOM
+                    if (result.total !== undefined && result.unread !== undefined && result.read !== undefined) {
+                        updateStats(result.total, result.unread, result.read);
+                    } else {
+                        // Tính toán từ DOM sau khi xóa (delay để đợi animation)
+                        setTimeout(() => {
+                            const stats = calculateStatsFromDOM();
+                            updateStats(stats.total, stats.unread, stats.read);
+                        }, 350);
+                    }
+                    
+                    // Kiểm tra nếu không còn notification nào
+                    setTimeout(() => {
+                        const remainingCards = document.querySelectorAll('.notification-card');
+                        if (remainingCards.length === 0) {
+                            const listContainer = document.querySelector('.notifications-list');
+                            if (listContainer) {
+                                listContainer.innerHTML = `
+                                    <div class="empty-state">
+                                        <div class="empty-icon">
+                                            <i class="bi bi-inbox"></i>
+                                        </div>
+                                        <h5>Không có thông báo nào</h5>
+                                        <p>Bạn chưa có thông báo nào trong hộp thư đến</p>
+                                    </div>
+                                `;
+                                // Cập nhật stats về 0
+                                updateStats(0, 0, 0);
+                            }
+                        }
+                    }, 350);
+                    
+                    // Khôi phục scroll position
+                    requestAnimationFrame(() => {
+                        restoreScrollPosition();
+                    });
                 } else {
                     alert(result.message || 'Không thể xóa thông báo');
+                    restoreScrollPosition();
                 }
             } catch (e) {
                 console.error('Error deleting notification:', e);
                 alert('Có lỗi xảy ra');
+                restoreScrollPosition();
             }
         }
 
+        // Đánh dấu tất cả đã đọc
         async function markAllNotificationsRead() {
+            if (!confirm('Bạn có chắc muốn đánh dấu tất cả thông báo đã đọc?')) return;
+
+            saveScrollPosition();
+            
             try {
                 const res = await fetch('/Provider/ProviderNotification/MarkAllAsRead', {
                     method: 'POST',
@@ -204,16 +372,48 @@
                     }
                 });
                 const result = await res.json();
+                
                 if (result.success) {
-                    location.reload();
+                    // Đánh dấu tất cả cards là đã đọc
+                    const unreadCards = document.querySelectorAll('.notification-card.unread');
+                    unreadCards.forEach(card => {
+                        const id = card.getAttribute('data-notification-id');
+                        if (id) {
+                            markNotificationAsRead(id);
+                        }
+                    });
+                    
+                    // Cập nhật stats từ response hoặc tính từ DOM
+                    if (result.total !== undefined && result.unread !== undefined && result.read !== undefined) {
+                        updateStats(result.total, result.unread, result.read);
+                    } else {
+                        // Tính toán từ DOM sau khi đánh dấu
+                        setTimeout(() => {
+                            const stats = calculateStatsFromDOM();
+                            updateStats(stats.total, stats.unread, stats.read);
+                        }, 100);
+                    }
+                    
+                    // Khôi phục scroll position
+                    requestAnimationFrame(() => {
+                        restoreScrollPosition();
+                    });
                 } else {
                     alert(result.message || 'Không thể đánh dấu tất cả đã đọc');
+                    restoreScrollPosition();
                 }
             } catch (e) {
                 console.error('Error marking all as read:', e);
                 alert('Có lỗi xảy ra');
+                restoreScrollPosition();
             }
         }
+
+        // Expose functions để dropdown có thể gọi
+        window.markNotificationRead = markNotificationRead;
+        window.deleteNotification = deleteNotification;
+        window.markAllNotificationsRead = markAllNotificationsRead;
+
     </script>
 }
 

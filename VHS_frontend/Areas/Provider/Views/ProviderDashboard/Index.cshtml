@@ -7,56 +7,64 @@
 <div class="dashboard-container">
     <!-- Welcome Section -->
     <div class="welcome-section mb-4">
-        <h2 class="mb-2">Chào mừng, @Context.Session.GetString("Username")!</h2>
+        @{
+            var username = Context.Session.GetString("Username");
+            var displayName = !string.IsNullOrEmpty(username) && username.Contains("@") 
+                ? username.Split('@')[0] 
+                : username ?? "";
+        }
+        <h2 class="mb-2">Chào mừng nhà cung cấp, @displayName!</h2>
         <p class="text-muted">Tổng quan hoạt động kinh doanh của bạn</p>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="row g-4 mb-4">
-        <div class="col-lg-3 col-md-6">
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="bi bi-tools"></i>
-                </div>
-                <div class="stat-content">
-                    <h3>@Model.TotalServices</h3>
-                    <p>Dịch vụ</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-3 col-md-6">
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="bi bi-receipt"></i>
-                </div>
-                <div class="stat-content">
-                    <h3>@Model.ActiveOrders</h3>
-                    <p>Đơn hàng đang thực hiện</p>
+    <!-- Stats Cards Section -->
+    <div class="stats-section mb-4">
+        <div class="row g-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-tools"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>@Model.TotalServices</h3>
+                        <p>Dịch vụ</p>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-lg-3 col-md-6">
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="bi bi-check-circle"></i>
-                </div>
-                <div class="stat-content">
-                    <h3>@Model.CompletedOrders</h3>
-                    <p>Đơn hàng đã hoàn thành</p>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-receipt"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>@Model.ActiveOrders</h3>
+                        <p>Đơn hàng đang thực hiện</p>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-lg-3 col-md-6">
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="bi bi-calendar-check"></i>
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>@Model.CompletedOrders</h3>
+                        <p>Đơn hàng đã hoàn thành</p>
+                    </div>
                 </div>
-                <div class="stat-content">
-                    <h3>@Model.PendingBookings</h3>
-                    <p>Lịch hẹn chờ xử lý</p>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="bi bi-calendar-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3>@Model.PendingBookings</h3>
+                        <p>Lịch hẹn chờ xử lý</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -89,13 +97,13 @@
                             <div class="revenue-summary p-3 bg-light rounded">
                                 <div class="d-flex align-items-center">
                                     <div class="revenue-icon me-3">
-                                        <i class="bi bi-cash-coin text-primary" style="font-size: 2.5rem;"></i>
+                                        <i class="bi bi-cash-coin" style="font-size: 2.5rem; color: #d97706;"></i>
                                     </div>
                                     <div>
                                         <p class="text-muted mb-1 small">
                                             <i class="bi bi-calendar3"></i> Tháng @DateTime.Now.Month/@DateTime.Now.Year
                                         </p>
-                                        <h2 class="text-primary mb-0 fw-bold">@Model.MonthlyRevenue.ToString("N0") VNĐ</h2>
+                                        <h2 class="mb-0 fw-bold" style="color: #d97706;">@Model.MonthlyRevenue.ToString("N0") VNĐ</h2>
                                         <small class="text-muted">Doanh thu tháng này</small>
                                     </div>
                                 </div>
@@ -105,13 +113,13 @@
                             <div class="revenue-summary p-3 bg-light rounded">
                                 <div class="d-flex align-items-center">
                                     <div class="revenue-icon me-3">
-                                        <i class="bi bi-graph-up-arrow text-success" style="font-size: 2.5rem;"></i>
+                                        <i class="bi bi-graph-up-arrow" style="font-size: 2.5rem; color: #d97706;"></i>
                                     </div>
                                     <div>
                                         <p class="text-muted mb-1 small">
                                             <i class="bi bi-calendar-range"></i> Năm @DateTime.Now.Year
                                         </p>
-                                        <h2 class="text-success mb-0 fw-bold">@totalYearRevenue.ToString("N0") VNĐ</h2>
+                                        <h2 class="mb-0 fw-bold" style="color: #d97706;">@totalYearRevenue.ToString("N0") VNĐ</h2>
                                         <small class="text-muted">Tổng doanh thu năm</small>
                                     </div>
                                 </div>
@@ -236,6 +244,28 @@
         document.addEventListener('DOMContentLoaded', function() {
             const ctx = document.getElementById('revenueChart');
             
+            // Function to detect dark mode
+            function isDarkMode() {
+                return document.documentElement.classList.contains('dark') || 
+                       document.body.classList.contains('dark');
+            }
+            
+            // Get colors based on theme
+            function getChartColors() {
+                const dark = isDarkMode();
+                return {
+                    backgroundColor: dark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(217, 119, 6, 0.08)',
+                    borderColor: dark ? 'rgba(245, 158, 11, 1)' : 'rgba(217, 119, 6, 1)',
+                    pointBackgroundColor: dark ? 'rgba(245, 158, 11, 1)' : 'rgba(217, 119, 6, 1)',
+                    pointBorderColor: dark ? '#121212' : '#fff',
+                    pointHoverBackgroundColor: dark ? '#121212' : '#fff',
+                    pointHoverBorderColor: dark ? 'rgba(245, 158, 11, 1)' : 'rgba(217, 119, 6, 1)',
+                    textColor: dark ? '#f1f5f9' : '#374151',
+                    gridColor: dark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                    tooltipBg: dark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(0, 0, 0, 0.8)'
+                };
+            }
+            
             // Chỉ khởi tạo chart nếu canvas element tồn tại (nghĩa là có dữ liệu)
             if (ctx) {
                 console.log('Initializing revenue chart with data...');
@@ -258,24 +288,26 @@
                 
                 console.log('Revenue data:', revenueData);
                 
+                const colors = getChartColors();
+                
                 const monthlyData = {
                     labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 
                              'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
                     datasets: [{
                         label: 'Doanh thu (VNĐ)',
                         data: revenueData,
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderColor: 'rgba(59, 130, 246, 1)',
+                        backgroundColor: colors.backgroundColor,
+                        borderColor: colors.borderColor,
                         borderWidth: 3,
                         fill: true,
                         tension: 0.4,
                         pointRadius: 5,
                         pointHoverRadius: 7,
-                        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
-                        pointBorderColor: '#fff',
+                        pointBackgroundColor: colors.pointBackgroundColor,
+                        pointBorderColor: colors.pointBorderColor,
                         pointBorderWidth: 2,
-                        pointHoverBackgroundColor: '#fff',
-                        pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
+                        pointHoverBackgroundColor: colors.pointHoverBackgroundColor,
+                        pointHoverBorderColor: colors.pointHoverBorderColor,
                         pointHoverBorderWidth: 3
                     }]
                 };
@@ -301,11 +333,16 @@
                                     },
                                     padding: 15,
                                     usePointStyle: true,
-                                    pointStyle: 'circle'
+                                    pointStyle: 'circle',
+                                    color: colors.textColor
                                 }
                             },
                             tooltip: {
-                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                backgroundColor: colors.tooltipBg,
+                                titleColor: isDarkMode() ? '#f1f5f9' : '#fff',
+                                bodyColor: isDarkMode() ? '#f1f5f9' : '#fff',
+                                borderColor: isDarkMode() ? 'rgba(245, 158, 11, 0.3)' : 'rgba(217, 119, 6, 0.3)',
+                                borderWidth: 1,
                                 titleFont: {
                                     size: 15,
                                     weight: 'bold'
@@ -340,13 +377,13 @@
                                         size: 12,
                                         weight: '500'
                                     },
-                                    color: '#6b7280'
+                                    color: colors.textColor
                                 }
                             },
                             y: {
                                 beginAtZero: true,
                                 grid: {
-                                    color: 'rgba(0, 0, 0, 0.05)',
+                                    color: colors.gridColor,
                                     lineWidth: 1
                                 },
                                 ticks: {
@@ -354,7 +391,7 @@
                                         size: 12,
                                         weight: '500'
                                     },
-                                    color: '#374151',
+                                    color: colors.textColor,
                                     padding: 8,
                                     callback: function(value) {
                                         if (value >= 1000000) {
@@ -372,7 +409,7 @@
                                         size: 13,
                                         weight: 'bold'
                                     },
-                                    color: '#1f2937',
+                                    color: colors.textColor,
                                     padding: 8
                                 }
                             }
@@ -382,6 +419,46 @@
 
                 const chart = new Chart(ctx, config);
                 console.log('Chart initialized successfully');
+                
+                // Update chart colors when theme changes
+                function updateChartTheme() {
+                    const newColors = getChartColors();
+                    chart.data.datasets[0].backgroundColor = newColors.backgroundColor;
+                    chart.data.datasets[0].borderColor = newColors.borderColor;
+                    chart.data.datasets[0].pointBackgroundColor = newColors.pointBackgroundColor;
+                    chart.data.datasets[0].pointBorderColor = newColors.pointBorderColor;
+                    chart.data.datasets[0].pointHoverBackgroundColor = newColors.pointHoverBackgroundColor;
+                    chart.data.datasets[0].pointHoverBorderColor = newColors.pointHoverBorderColor;
+                    chart.options.plugins.legend.labels.color = newColors.textColor;
+                    chart.options.plugins.tooltip.backgroundColor = newColors.tooltipBg;
+                    chart.options.plugins.tooltip.titleColor = isDarkMode() ? '#f1f5f9' : '#fff';
+                    chart.options.plugins.tooltip.bodyColor = isDarkMode() ? '#f1f5f9' : '#fff';
+                    chart.options.plugins.tooltip.borderColor = isDarkMode() ? 'rgba(245, 158, 11, 0.3)' : 'rgba(217, 119, 6, 0.3)';
+                    chart.options.scales.x.ticks.color = newColors.textColor;
+                    chart.options.scales.y.ticks.color = newColors.textColor;
+                    chart.options.scales.y.grid.color = newColors.gridColor;
+                    chart.options.scales.y.title.color = newColors.textColor;
+                    chart.update();
+                }
+                
+                // Listen for theme changes
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.attributeName === 'class') {
+                            updateChartTheme();
+                        }
+                    });
+                });
+                
+                observer.observe(document.documentElement, {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
+                
+                observer.observe(document.body, {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
             } else {
                 console.log('No revenue chart canvas found - no data to display');
             }

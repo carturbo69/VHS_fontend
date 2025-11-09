@@ -8,10 +8,10 @@
 
 <div class="revenue-report-container">
     <!-- Header Section với Filter -->
-    <div class="report-header mb-4">
+    <div class="report-header-section mb-4">
         <div class="row align-items-center">
-            <div class="col-md-6">
-                <h2 class="mb-0"><i class="bi bi-graph-up me-2"></i>Báo cáo doanh thu</h2>
+            <div class="col-md-6 mb-3 mb-md-0">
+                <h2 class="mb-2"><i class="bi bi-graph-up me-2"></i>Báo cáo doanh thu</h2>
                 <p class="text-muted mb-0">Từ @Model.FromDate.ToString("dd/MM/yyyy") đến @Model.ToDate.ToString("dd/MM/yyyy")</p>
             </div>
             <div class="col-md-6">
@@ -90,7 +90,7 @@
                         <div>
                             <h6 class="text-white-50 mb-1">Đơn hàng hoàn thành</h6>
                             <h3 class="mb-0">@Model.TotalCompletedBookings</h3>
-                            <small>Đơn hàng</small>
+                            <small class="stat-placeholder">Đơn hàng</small>
                         </div>
                         <div class="stat-icon">
                             <i class="bi bi-check-circle"></i>
@@ -107,7 +107,7 @@
                         <div>
                             <h6 class="text-white-50 mb-1">Giá trị TB/đơn</h6>
                             <h3 class="mb-0">@Model.AverageOrderValue.ToString("N0") đ</h3>
-                            <small>Trung bình</small>
+                            <small class="stat-placeholder">Trung bình</small>
                         </div>
                         <div class="stat-icon">
                             <i class="bi bi-graph-up-arrow"></i>
@@ -124,7 +124,7 @@
                         <div>
                             <h6 class="text-white-50 mb-1">Doanh thu tháng trước</h6>
                             <h3 class="mb-0">@((Model.PreviousRevenue ?? 0).ToString("N0")) đ</h3>
-                            <small>Để so sánh</small>
+                            <small class="stat-placeholder">Để so sánh</small>
                         </div>
                         <div class="stat-icon">
                             <i class="bi bi-clock-history"></i>
@@ -195,8 +195,8 @@
             @if (Model.Details.Any())
             {
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                    <table class="table table-hover mb-0 revenue-table">
+                        <thead>
                             <tr>
                                 <th>Mã đơn</th>
                                 <th>Khách hàng</th>
@@ -229,7 +229,7 @@
                                 </tr>
                             }
                         </tbody>
-                        <tfoot class="table-light">
+                        <tfoot>
                             <tr>
                                 <th colspan="6" class="text-end">Tổng cộng:</th>
                                 <th class="text-end text-primary">@Model.TotalRevenue.ToString("N0") đ</th>
@@ -250,54 +250,7 @@
 </div>
 
 @section Styles {
-    <style>
-        .revenue-report-container {
-            padding: 20px;
-        }
-
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-
-        .stat-icon {
-            font-size: 2.5rem;
-            opacity: 0.3;
-        }
-
-        .top-service-item {
-            padding-bottom: 15px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .top-service-item:last-child {
-            border-bottom: none;
-            margin-bottom: 0 !important;
-        }
-
-        .card {
-            border: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            border-radius: 10px;
-        }
-
-        .card-header {
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
-            border-radius: 10px 10px 0 0 !important;
-        }
-
-        .table > :not(caption) > * > * {
-            padding: 1rem 0.75rem;
-        }
-    </style>
+    <link rel="stylesheet" href="~/css/provider-revenue-report.css" asp-append-version="true" />
 }
 
 @section Scripts {
@@ -323,15 +276,48 @@
                 console.log('Revenues:', revenues);
                 console.log('Orders:', orders);
 
-                new Chart(ctx, {
+                // Function to detect dark mode
+                function isDarkMode() {
+                    return document.documentElement.classList.contains('dark') || 
+                           document.body.classList.contains('dark');
+                }
+
+                // Get colors based on theme
+                function getChartColors() {
+                    if (isDarkMode()) {
+                        return {
+                            revenueBg: 'rgba(245, 158, 11, 0.3)',
+                            revenueBorder: 'rgba(245, 158, 11, 1)',
+                            orderBorder: 'rgba(251, 191, 36, 1)',
+                            orderBg: 'rgba(251, 191, 36, 0.1)',
+                            orderPoint: 'rgba(251, 191, 36, 1)',
+                            gridColor: 'rgba(255, 255, 255, 0.1)',
+                            textColor: '#e5e7eb'
+                        };
+                    } else {
+                        return {
+                            revenueBg: 'rgba(217, 119, 6, 0.3)',
+                            revenueBorder: 'rgba(217, 119, 6, 1)',
+                            orderBorder: 'rgba(245, 158, 11, 1)',
+                            orderBg: 'rgba(245, 158, 11, 0.1)',
+                            orderPoint: 'rgba(245, 158, 11, 1)',
+                            gridColor: 'rgba(0, 0, 0, 0.05)',
+                            textColor: '#374151'
+                        };
+                    }
+                }
+
+                const colors = getChartColors();
+
+                const chart = new Chart(ctx, {
                     type: 'bar',
                     data: {
                         labels: labels,
                         datasets: [{
                             label: 'Doanh thu (VND)',
                             data: revenues,
-                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                            borderColor: 'rgba(59, 130, 246, 1)',
+                            backgroundColor: colors.revenueBg,
+                            borderColor: colors.revenueBorder,
                             borderWidth: 2,
                             borderRadius: 8,
                             yAxisID: 'y'
@@ -339,12 +325,12 @@
                             label: 'Số đơn hàng',
                             data: orders,
                             type: 'line',
-                            borderColor: 'rgba(239, 68, 68, 1)',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            borderColor: colors.orderBorder,
+                            backgroundColor: colors.orderBg,
                             borderWidth: 3,
                             pointRadius: 6,
                             pointHoverRadius: 8,
-                            pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                            pointBackgroundColor: colors.orderPoint,
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
                             yAxisID: 'y1',
@@ -369,11 +355,16 @@
                                     },
                                     padding: 20,
                                     usePointStyle: true,
-                                    pointStyle: 'circle'
+                                    pointStyle: 'circle',
+                                    color: colors.textColor
                                 }
                             },
                             tooltip: {
-                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                backgroundColor: isDarkMode() ? 'rgba(0, 0, 0, 0.9)' : 'rgba(0, 0, 0, 0.8)',
+                                titleColor: isDarkMode() ? '#f8fafc' : '#ffffff',
+                                bodyColor: isDarkMode() ? '#e5e7eb' : '#f3f4f6',
+                                borderColor: isDarkMode() ? 'rgba(245, 158, 11, 0.3)' : 'rgba(217, 119, 6, 0.3)',
+                                borderWidth: 1,
                                 titleFont: {
                                     size: 16,
                                     weight: 'bold'
@@ -410,7 +401,7 @@
                                         size: 13,
                                         weight: '500'
                                     },
-                                    color: '#6b7280'
+                                    color: colors.textColor
                                 }
                             },
                             y: {
@@ -419,7 +410,7 @@
                                 position: 'left',
                                 beginAtZero: true,
                                 grid: {
-                                    color: 'rgba(0, 0, 0, 0.05)',
+                                    color: colors.gridColor,
                                     lineWidth: 1
                                 },
                                 ticks: {
@@ -427,7 +418,7 @@
                                         size: 13,
                                         weight: '500'
                                     },
-                                    color: '#374151',
+                                    color: colors.textColor,
                                     padding: 10,
                                     callback: function(value) {
                                         if (value >= 1000000) {
@@ -445,7 +436,7 @@
                                         size: 14,
                                         weight: 'bold'
                                     },
-                                    color: '#1f2937',
+                                    color: colors.textColor,
                                     padding: 10
                                 }
                             },
@@ -462,7 +453,7 @@
                                         size: 13,
                                         weight: '500'
                                     },
-                                    color: '#374151',
+                                    color: colors.textColor,
                                     padding: 10,
                                     stepSize: 1
                                 },
@@ -473,12 +464,54 @@
                                         size: 14,
                                         weight: 'bold'
                                     },
-                                    color: '#1f2937',
+                                    color: colors.textColor,
                                     padding: 10
                                 }
                             }
                         }
                     }
+                });
+
+                // Update chart theme when dark mode changes
+                function updateChartTheme() {
+                    const newColors = getChartColors();
+                    const isDark = isDarkMode();
+                    chart.data.datasets[0].backgroundColor = newColors.revenueBg;
+                    chart.data.datasets[0].borderColor = newColors.revenueBorder;
+                    chart.data.datasets[1].borderColor = newColors.orderBorder;
+                    chart.data.datasets[1].backgroundColor = newColors.orderBg;
+                    chart.data.datasets[1].pointBackgroundColor = newColors.orderPoint;
+                    chart.options.scales.x.ticks.color = newColors.textColor;
+                    chart.options.scales.y.ticks.color = newColors.textColor;
+                    chart.options.scales.y.title.color = newColors.textColor;
+                    chart.options.scales.y.grid.color = newColors.gridColor;
+                    chart.options.scales.y1.ticks.color = newColors.textColor;
+                    chart.options.scales.y1.title.color = newColors.textColor;
+                    chart.options.plugins.legend.labels.color = newColors.textColor;
+                    chart.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(0, 0, 0, 0.9)' : 'rgba(0, 0, 0, 0.8)';
+                    chart.options.plugins.tooltip.titleColor = isDark ? '#f8fafc' : '#ffffff';
+                    chart.options.plugins.tooltip.bodyColor = isDark ? '#e5e7eb' : '#f3f4f6';
+                    chart.options.plugins.tooltip.borderColor = isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(217, 119, 6, 0.3)';
+                    chart.update();
+                }
+
+                // Observe theme changes
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                            updateChartTheme();
+                        }
+                    });
+                });
+
+                observer.observe(document.documentElement, {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
+
+                observer.observe(document.body, {
+                    attributes: true,
+                    attributeFilter: ['class']
                 });
             }
         });

@@ -30,7 +30,7 @@
     <aside id="sidebar">
         <div class="sidebar-header">
             <i class="bi bi-grid-1x2-fill brand-icon"></i>
-            <span class="brand-text">Service Provider</span>
+            <span class="brand-text">Nhà cung cấp dịch vụ</span>
         </div>
 
         <nav class="sidebar-nav">
@@ -329,6 +329,27 @@
             }
           }
 
+          // Function để cập nhật trang notification nếu đang mở
+          function updateNotificationPage(notificationId, action) {
+            // Kiểm tra xem có đang ở trang notification không
+            const notificationPage = document.querySelector('.notification-page');
+            if (!notificationPage) return;
+
+            // Sử dụng setTimeout để đảm bảo function đã được load
+            setTimeout(() => {
+              if (action === 'read' && typeof window.markNotificationRead === 'function' && notificationId) {
+                // Gọi function từ trang notification
+                window.markNotificationRead(notificationId);
+              } else if (action === 'delete' && typeof window.deleteNotification === 'function' && notificationId) {
+                // Gọi function từ trang notification
+                window.deleteNotification(notificationId);
+              } else if (action === 'readAll' && typeof window.markAllNotificationsRead === 'function') {
+                // Gọi function từ trang notification
+                window.markAllNotificationsRead();
+              }
+            }, 100);
+          }
+
           async function markProviderRead(id) {
             try {
               const res = await fetch(`/Provider/ProviderNotification/MarkAsRead/${id}`, {
@@ -339,8 +360,27 @@
               });
               const result = await res.json();
               if (result.success) {
+                // Cập nhật UI dropdown ngay lập tức (không reload)
+                const notificationItem = document.querySelector(`.notification-item[data-notification-id="${id}"]`);
+                if (notificationItem) {
+                  notificationItem.classList.remove('unread');
+                  notificationItem.classList.add('read');
+                  const dot = notificationItem.querySelector('.notification-dot');
+                  if (dot) {
+                    dot.style.transition = 'opacity 0.3s ease';
+                    dot.style.opacity = '0';
+                    setTimeout(() => dot.remove(), 300);
+                  }
+                }
+
+                // Cập nhật unread count
                 await loadUnreadCount();
-                await loadNotifications();
+
+                // Chỉ reload dropdown nếu không có item nào (để refresh nếu cần)
+                // Không reload để tránh làm mất trạng thái UI
+                
+                // Cập nhật trang notification nếu đang mở
+                updateNotificationPage(id, 'read');
               }
             } catch (e) {
               console.error('Error marking as read:', e);
@@ -357,8 +397,26 @@
               });
               const result = await res.json();
               if (result.success) {
+                // Cập nhật UI dropdown - đánh dấu tất cả là read ngay lập tức
+                const unreadItems = document.querySelectorAll('.notification-item.unread');
+                unreadItems.forEach((item, index) => {
+                  setTimeout(() => {
+                    item.classList.remove('unread');
+                    item.classList.add('read');
+                    const dot = item.querySelector('.notification-dot');
+                    if (dot) {
+                      dot.style.transition = 'opacity 0.3s ease';
+                      dot.style.opacity = '0';
+                      setTimeout(() => dot.remove(), 300);
+                    }
+                  }, index * 50); // Stagger animation
+                });
+
+                // Cập nhật unread count
                 await loadUnreadCount();
-                await loadNotifications();
+
+                // Cập nhật trang notification nếu đang mở
+                updateNotificationPage(null, 'readAll');
               }
             } catch (e) {
               console.error('Error marking all as read:', e);
@@ -378,8 +436,23 @@
               });
               const result = await res.json();
               if (result.success) {
+                // Xóa item khỏi dropdown với animation
+                const notificationItem = document.querySelector(`.notification-item[data-notification-id="${id}"]`);
+                if (notificationItem) {
+                  notificationItem.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                  notificationItem.style.opacity = '0';
+                  notificationItem.style.transform = 'translateX(-20px)';
+                  setTimeout(() => {
+                    notificationItem.remove();
+                  }, 300);
+                }
+
+                // Cập nhật dropdown
                 await loadUnreadCount();
                 await loadNotifications();
+
+                // Cập nhật trang notification nếu đang mở
+                updateNotificationPage(id, 'delete');
               }
             } catch (e) {
               console.error('Error deleting notification:', e);
