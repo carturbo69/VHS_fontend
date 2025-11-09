@@ -33,7 +33,7 @@
                 <h3><i class="bi bi-image"></i> Ảnh đại diện</h3>
                 <div class="image-section">
                     <div class="current-image">
-                        <img src="@Model.GetCurrentImageUrl()" alt="Ảnh hiện tại" class="profile-image-preview">
+                        <img src="@ImageHelper.GetImageUrl(Model.GetCurrentImageUrl(), Configuration)" alt="Ảnh hiện tại" class="profile-image-preview">
                         <div class="image-overlay">
                             <button type="button" class="btn btn-sm btn-primary" onclick="openImageUpload()">
                                 <i class="bi bi-camera"></i>
@@ -140,6 +140,7 @@
 </div>
 
 @section Scripts {
+    <script src="~/js/image-helper.js"></script>
     <script>
         // Image upload functionality
         function openImageUpload() {
@@ -208,7 +209,11 @@
 
                 if (result.success) {
                     showToast('Tải ảnh lên thành công!', 'success');
-                    document.querySelector('.profile-image-preview').src = result.imageUrl;
+                    // Dùng helper function để lấy URL đầy đủ
+                    let fullImageUrl = typeof getImageUrl !== 'undefined' 
+                        ? getImageUrl(result.imageUrl) 
+                        : result.imageUrl;
+                    document.querySelector('.profile-image-preview').src = fullImageUrl;
                     bootstrap.Modal.getInstance(document.getElementById('imageUploadModal')).hide();
                     
                     // Reset form

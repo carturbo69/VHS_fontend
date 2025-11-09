@@ -226,21 +226,116 @@ namespace VHS_frontend.Services.Customer
 
 
         /// <summary>
-        /// ✅ NEW (Demo): Lấy thông tin yêu cầu huỷ/hoàn tiền cho màn hình CanceledDetail.
-        /// Vì backend chưa có API chính thức cho phần này, hàm này trả về dữ liệu DEMO.
-        /// Nếu sau này có API (ví dụ GET api/Bookings/cancel-requests/{bookingId}), chỉ cần thay thân hàm.
+        /// ✅ Lấy thông tin yêu cầu huỷ/hoàn tiền cho màn hình CanceledDetail từ endpoint mới.
+        /// Sử dụng endpoint: api/Bookings/by-account/{accountId}/bookings/{bookingId}/refund-info
         /// </summary>
-        public Task<CancelBookingRequestDTO> GetCancelInfoDemoAsync(Guid bookingId)
+        public async Task<CancelBookingRequestDTO?> GetCancelInfoDemoAsync(
+            Guid bookingId,
+            Guid accountId,
+            string? jwtToken = null,
+            CancellationToken cancellationToken = default)
         {
-            var demo = new CancelBookingRequestDTO
+            System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] START - BookingId: {bookingId}, AccountId: {accountId}, HasJWT: {!string.IsNullOrWhiteSpace(jwtToken)}");
+            
+            if (string.IsNullOrWhiteSpace(jwtToken))
             {
-                BookingId = bookingId,
-                Reason = "Tôi muốn cập nhật địa chỉ/sđt nhận hàng",
-                BankName = "Vietcombank",
-                AccountHolderName = "NGUYEN VAN A",
-                BankAccountNumber = "0123456789"
-            };
-            return Task.FromResult(demo);
+                System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] JWT token is null or empty, returning null");
+                return null;
+            }
+
+            SetAuthHeader(jwtToken);
+
+            // Sử dụng endpoint mới: api/Bookings/by-account/{accountId}/bookings/{bookingId}/refund-info
+            var url = $"api/Bookings/by-account/{accountId}/bookings/{bookingId}/refund-info";
+            
+            System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] Calling URL: {url}");
+            System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] BookingId: {bookingId}, AccountId: {accountId}");
+            
+            try
+            {
+                using var resp = await _httpClient.GetAsync(url, cancellationToken);
+                
+                System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] Response Status: {resp.StatusCode}");
+                
+                // Nếu có lỗi, log và trả về null
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var errorContent = await resp.Content.ReadAsStringAsync(cancellationToken);
+                    System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] Error: {resp.StatusCode} - {errorContent}");
+                    
+                    // Nếu là 404, vẫn trả về object rỗng để frontend có thể hiển thị
+                    if (resp.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        return new CancelBookingRequestDTO
+                        {
+                            BookingId = bookingId,
+                            Reason = string.Empty,
+                            BankName = string.Empty,
+                            AccountHolderName = string.Empty,
+                            BankAccountNumber = string.Empty
+                        };
+                    }
+                    
+                    return null;
+                }
+
+                // Deserialize response
+                var refundInfo = await resp.Content.ReadFromJsonAsync<BookingRefundInfoDTO>(
+                    new System.Text.Json.JsonSerializerOptions 
+                    { 
+                        PropertyNameCaseInsensitive = true 
+                    }, 
+                    cancellationToken: cancellationToken);
+                
+                if (refundInfo == null)
+                    return null;
+
+                // Kiểm tra xem có dữ liệu thực sự không
+                // Nếu không có dữ liệu, vẫn trả về object để frontend có thể hiển thị "Chưa có thông tin"
+                if (string.IsNullOrWhiteSpace(refundInfo.CancelReason) && 
+                    string.IsNullOrWhiteSpace(refundInfo.BankAccountNumber))
+                {
+                    // Trả về object rỗng thay vì null để frontend có thể hiển thị
+                    return new CancelBookingRequestDTO
+                    {
+                        BookingId = bookingId,
+                        Reason = string.Empty,
+                        BankName = string.Empty,
+                        AccountHolderName = string.Empty,
+                        BankAccountNumber = string.Empty
+                    };
+                }
+
+                return new CancelBookingRequestDTO
+                {
+                    BookingId = bookingId,
+                    Reason = refundInfo.CancelReason ?? string.Empty,
+                    BankName = refundInfo.BankName ?? string.Empty,
+                    AccountHolderName = refundInfo.AccountHolderName ?? string.Empty,
+                    BankAccountNumber = refundInfo.BankAccountNumber ?? string.Empty
+                };
+            }
+            catch (Exception ex)
+            {
+                // Log lỗi để debug
+                System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] EXCEPTION: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[GetCancelInfoDemoAsync] Inner exception: {ex.InnerException.Message}");
+                }
+                return null;
+            }
+        }
+
+        // DTO để deserialize từ endpoint mới
+        private class BookingRefundInfoDTO
+        {
+            public Guid BookingId { get; set; }
+            public string CancelReason { get; set; } = string.Empty;
+            public string BankName { get; set; } = string.Empty;
+            public string AccountHolderName { get; set; } = string.Empty;
+            public string BankAccountNumber { get; set; } = string.Empty;
         }
 
         /// <summary>

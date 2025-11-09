@@ -5,7 +5,7 @@
 @using System.Text.Encodings.Web
 
 @{
-    ViewData["Title"] = "Đánh giá của tôi";
+    ViewData["Title"] = "Đánh giá dịch vụ của tôi";
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
     var fallbackAvatar = Url.Content("~/images/VeSinh.jpg");
 
@@ -17,33 +17,17 @@
     var jsonOptions = new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 }
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <link rel="stylesheet" href="~/css/review-customer.css" asp-append-version="true" />
 
 <div class="rv-container">
     <div class="rv-header">
-        <h1 class="rv-title">Đánh giá của tôi</h1>
+        <h1 class="rv-title">Đánh giá dịch vụ của tôi</h1>
         @if (Model?.Any() == true)
         {
             <p class="rv-subtitle">@Model.Count() đánh giá</p>
         }
     </div>
 
-    @if (TempData["ToastSuccess"] is string toastOk && !string.IsNullOrWhiteSpace(toastOk))
-    {
-        <div class="alert alert-success mt-2" role="alert">@toastOk</div>
-    }
-
-
-    @if (TempData["Toast"] is string toastMsg && !string.IsNullOrWhiteSpace(toastMsg))
-    {
-        <div class="alert alert-info mt-2" role="alert">@toastMsg</div>
-    }
-    @if (TempData["ToastError"] is string toastErr && !string.IsNullOrWhiteSpace(toastErr))
-    {
-        <div class="alert alert-danger mt-2" role="alert">@toastErr</div>
-    }
 
     @if (Model?.Any() == true)
     {
@@ -68,6 +52,18 @@
             var editCount = r?.EditCount ?? 0;
 
             <div class="rv-item">
+                <!-- Service Info Header -->
+                <div class="rv-service-header">
+                    <img class="rv-service-thumb" src="@serviceThumb" onerror="this.src='@fallbackImg'" alt="Ảnh dịch vụ" />
+                    <div class="rv-service-info">
+                        <h3 class="rv-service-title">@r?.ServiceTitle</h3>
+                        <div class="rv-service-meta">
+                            <span class="rv-service-date">@r?.CreatedAt?.ToString("dd/MM/yyyy HH:mm")</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Review Card -->
                 <article class="rv-card" aria-label="Đánh giá của @fullName">
                     <header class="rv-user">
                         <img class="rv-avatar" src="@avatar" onerror="this.src='@fallbackAvatar'" alt="Ảnh đại diện của @fullName" />
@@ -80,19 +76,19 @@
                                 <span class="rv-rating-text">@($"{rating:0}.0") sao</span>
                             </div>
                             <div class="rv-meta">
-                                @r?.CreatedAt?.ToString("dd/MM/yyyy HH:mm")
                                 @if (likeCount > 0)
                                 {
-                                    <span class="rv-dot">•</span>
-                                    <span class="rv-likes"><i class="bi bi-hand-thumbs-up"></i> @likeCount</span>
-         }
+                                    <span class="rv-likes"><svg class="rv-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314z"/></svg> @likeCount lượt thích</span>
+                                }
                             </div>
                         </div>
                     </header>
 
                     @if (!string.IsNullOrWhiteSpace(r?.Comment))
                     {
-                        <p class="rv-comment">@r!.Comment</p>
+                        <div class="rv-comment-wrapper">
+                            <p class="rv-comment">@r!.Comment</p>
+                        </div>
                     }
 
                     @if (toShow.Any())
@@ -120,18 +116,15 @@
                     @if (hasReply)
                     {
                         <section class="rv-reply" aria-label="Phản hồi từ Người bán">
-                            <span class="rv-reply-label">💬 Phản hồi từ Người bán</span>
+                            <div class="rv-reply-header">
+                                <svg class="rv-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15c4.418 0 8-3.134 8-7s-3.582-7-8-7-8 3.134-8 7c0 1.76.743 3.37 1.97 4.6-.097 1.016-.417 2.13-.771 2.966-.079.186.074.394.273.362 2.256-.37 3.597-.938 4.18-1.234A9.06 9.06 0 0 0 8 15z"/></svg>
+                                <span class="rv-reply-label">Phản hồi từ Người bán</span>
+                            </div>
                             <div class="rv-reply-body">@r!.Reply</div>
                         </section>
                     }
-                </article>
 
-                <footer class="rv-product-section">
-                    <img class="rv-thumb" src="@serviceThumb" onerror="this.src='@fallbackImg'" alt="Ảnh dịch vụ" />
-                    <div class="rv-prod-info">
-                        <p class="rv-prod-title">@r?.ServiceTitle</p>
-                    </div>
-
+                    <!-- Actions -->
                     <div class="rv-actions">
                         @{
                             var _hasReply = !string.IsNullOrWhiteSpace(r?.Reply);
@@ -150,13 +143,12 @@
 
                         <button type="button"
                                 class="rv-btn edit-btn"
-                                data-bs-toggle="modal"
-                                data-bs-target="#editReviewModal"
+                                data-rv-modal="editReviewModal"
                                 data-review-id="@r!.ReviewId"
                                 data-review='@Html.Raw(JsonSerializer.Serialize(reviewPayload, jsonOptions))'
                                 @(canEdit ? null : "disabled aria-disabled=\"true\"")
                                 title="@(canEdit ? "Sửa đánh giá" : "Đã có phản hồi hoặc đã sửa 1 lần")">
-                            ✏️ Sửa
+                            <svg class="rv-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"/></svg> Sửa
                         </button>
                         <form asp-area="Customer"
                               asp-controller="ReviewCustomer"
@@ -170,11 +162,11 @@
                                     @(canDelete ? null : "disabled aria-disabled=\"true\"")
                                     title="@(canDelete ? "Xoá đánh giá" : "Đánh giá đã có phản hồi, không thể xoá")"
                                     onclick="return confirm('Xóa đánh giá này?');">
-                                🗑️ Xóa
+                                <svg class="rv-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"/></svg> Xóa
                             </button>
                         </form>
                     </div>
-                </footer>
+                </article>
             </div>
         }
     }
@@ -188,29 +180,31 @@
 </div>
 
 <!-- Shared Modal Sửa Đánh Giá -->
-<div class="modal fade" id="editReviewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Sửa đánh giá</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+<div class="rv-modal-overlay" id="editReviewModal" aria-hidden="true">
+    <div class="rv-modal-dialog rv-modal-lg">
+        <div class="rv-modal-content">
+            <div class="rv-modal-header">
+                <h5 class="rv-modal-title">Sửa đánh giá</h5>
+                <button type="button" class="rv-btn-close" onclick="rvCloseEditModal()" aria-label="Đóng">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/></svg>
+                </button>
             </div>
 
             <form asp-area="Customer" asp-controller="ReviewCustomer" asp-action="Edit" method="post" enctype="multipart/form-data" novalidate>
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="ReviewId" value="" />
 
-                <div class="modal-body">
+                <div class="rv-modal-body">
                     <div class="rv-edit-head">
                         <img class="service-thumb" src="@fallbackImg" onerror="this.src='@fallbackImg'" alt="Ảnh dịch vụ" />
                         <div>
-                            <div class="fw-semibold service-title"></div>
-                            <div class="text-muted small service-created"></div>
+                            <div class="rv-service-title-text service-title"></div>
+                            <div class="rv-service-created-text service-created"></div>
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Điểm đánh giá (1–5)</label>
+                    <div class="rv-form-group">
+                        <label class="rv-form-label">Điểm đánh giá (1–5)</label>
                         <input id="rv-edit-rating" type="hidden" name="Rating" value="1" required />
                         <div class="rv-stars-input" role="radiogroup" aria-label="Chọn số sao (1 đến 5)">
                             <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="1" aria-label="1 sao">★</button>
@@ -219,26 +213,26 @@
                             <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="4" aria-label="4 sao">★</button>
                             <button type="button" class="rv-star" role="radio" aria-checked="false" data-val="5" aria-label="5 sao">★</button>
                         </div>
-                        <div class="form-text">Nhấn vào sao hoặc dùng phím mũi tên để chọn.</div>
+                        <div class="rv-form-text">Nhấn vào sao hoặc dùng phím mũi tên để chọn.</div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label" for="rv-edit-comment">Nội dung</label>
-                        <textarea id="rv-edit-comment" class="form-control" name="Comment" maxlength="2000" rows="4" placeholder="Chia sẻ trải nghiệm của bạn"></textarea>
+                    <div class="rv-form-group">
+                        <label class="rv-form-label" for="rv-edit-comment">Nội dung</label>
+                        <textarea id="rv-edit-comment" class="rv-form-control" name="Comment" maxlength="2000" rows="4" placeholder="Chia sẻ trải nghiệm của bạn"></textarea>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Ảnh đính kèm (tối đa 5)</label>
+                    <div class="rv-form-group">
+                        <label class="rv-form-label">Ảnh đính kèm (tối đa 5)</label>
                         <div id="imageSlots" class="rv-slot-grid"></div>
-                        <div class="form-text">Nhấn dấu <strong>×</strong> để xoá ảnh; nhấn <strong>+ Thêm ảnh</strong> để chọn ảnh mới.</div>
+                        <div class="rv-form-text">Nhấn dấu <strong>×</strong> để xoá ảnh; nhấn <strong>+ Thêm ảnh</strong> để chọn ảnh mới.</div>
                     </div>
 
-                    <div asp-validation-summary="All" class="text-danger"></div>
+                    <div asp-validation-summary="All" class="rv-text-danger"></div>
                 </div>
 
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                <div class="rv-modal-footer">
+                    <button type="button" class="rv-btn rv-btn-secondary" onclick="rvCloseEditModal()">Hủy</button>
+                    <button type="submit" class="rv-btn rv-btn-primary">Lưu thay đổi</button>
                 </div>
             </form>
         </div>
@@ -247,13 +241,28 @@
 
 <!-- Viewer ảnh -->
 <div id="rvModal" class="rv-modal" role="dialog" aria-modal="true" aria-label="Xem ảnh đánh giá" hidden>
-    <button class="rv-close" type="button" aria-label="Đóng" onclick="rvClose()">✕</button>
-    <button class="rv-prev" type="button" onclick="rvPrev()" aria-label="Ảnh trước">‹</button>
-    <img id="rvModalImg" src="/placeholder.svg" alt="Ảnh đánh giá phóng to" />
-    <button class="rv-next" type="button" onclick="rvNext()" aria-label="Ảnh tiếp theo">›</button>
+    <div class="rv-modal-content-wrapper">
+        <div class="rv-image-container">
+            <button class="rv-close" type="button" aria-label="Đóng" onclick="rvClose()">
+                <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
+                </svg>
+            </button>
+            <img id="rvModalImg" src="/placeholder.svg" alt="Ảnh đánh giá phóng to" />
+        </div>
+        <button class="rv-prev" type="button" onclick="rvPrev()" aria-label="Ảnh trước">
+            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+            </svg>
+        </button>
+        <button class="rv-next" type="button" onclick="rvNext()" aria-label="Ảnh tiếp theo">
+            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+            </svg>
+        </button>
+    </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 @section Scripts {
     <script>
@@ -458,23 +467,25 @@
         document.addEventListener('DOMContentLoaded', function () {
           const modalEl = document.getElementById('editReviewModal');
 
-          if (modalEl && window.bootstrap) {
-            modalEl.addEventListener('show.bs.modal', function (e) {
-              const triggerBtn = e.relatedTarget;
+          // Modal event handlers - không dùng Bootstrap
+          document.querySelectorAll('[data-rv-modal="editReviewModal"]').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+              if (this.disabled || this.getAttribute('aria-disabled') === 'true') return;
+              
               let data = null;
-              if (triggerBtn?.dataset?.review) {
-                try { data = JSON.parse(triggerBtn.dataset.review); } catch { data = null; }
+              if (this.dataset?.review) {
+                try { data = JSON.parse(this.dataset.review); } catch { data = null; }
               }
               if (window.__serverOpenDto) { data = Object.assign({}, data || {}, window.__serverOpenDto); }
 
               if (hasVendorReply(data)) {
-                e.preventDefault();
                 return;
               }
 
               populateEditModalWithData(data);
+              rvOpenEditModal();
             });
-          }
+          });
 
           // giá trị do server bơm vào khi cần auto open modal sau lỗi
           const openId = '@(openId ?? "")';
@@ -490,7 +501,7 @@
 
             if (!hasVendorReply(data)) {
               populateEditModalWithData(data);
-              if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+              rvOpenEditModal();
             }
           }
         });
@@ -513,6 +524,37 @@
           rvModal().hidden = false;
           document.body.classList.add('rv-no-scroll');
           document.addEventListener('keydown', onKey);
+          
+          // Ẩn/hiện nút điều hướng dựa trên số lượng ảnh
+          const prevBtn = document.querySelector('.rv-prev');
+          const nextBtn = document.querySelector('.rv-next');
+          if (rvList.length <= 1) {
+            if (prevBtn) prevBtn.classList.add('hidden');
+            if (nextBtn) nextBtn.classList.add('hidden');
+          } else {
+            if (prevBtn) prevBtn.classList.remove('hidden');
+            if (nextBtn) nextBtn.classList.remove('hidden');
+          }
+        }
+        
+        // Đóng modal khi click vào overlay (ngoài ảnh)
+        const modalEl = document.getElementById('rvModal');
+        if (modalEl) {
+          modalEl.addEventListener('click', function(e) {
+            // Đóng nếu click vào modal overlay hoặc wrapper (nhưng không phải vào ảnh hoặc buttons)
+            const clickedEl = e.target;
+            const isImage = clickedEl.id === 'rvModalImg' || clickedEl.tagName === 'IMG';
+            const isButton = clickedEl.classList.contains('rv-close') || 
+                           clickedEl.classList.contains('rv-prev') || 
+                           clickedEl.classList.contains('rv-next') ||
+                           clickedEl.closest('.rv-close') ||
+                           clickedEl.closest('.rv-prev') ||
+                           clickedEl.closest('.rv-next');
+            
+            if (!isImage && !isButton) {
+              rvClose();
+            }
+          });
         }
         function rvClose() {
           rvModal().hidden = true;
@@ -527,9 +569,48 @@
           else if (e.key === 'ArrowLeft') rvPrev();
           else if (e.key === 'ArrowRight') rvNext();
         }
+        // Edit Modal Functions
+        function rvOpenEditModal() {
+          const modal = document.getElementById('editReviewModal');
+          if (modal) {
+            modal.setAttribute('aria-hidden', 'false');
+            modal.classList.add('rv-modal-active');
+            document.body.classList.add('rv-no-scroll');
+          }
+        }
+
+        function rvCloseEditModal() {
+          const modal = document.getElementById('editReviewModal');
+          if (modal) {
+            modal.setAttribute('aria-hidden', 'true');
+            modal.classList.remove('rv-modal-active');
+            document.body.classList.remove('rv-no-scroll');
+          }
+        }
+
+        // Close modal khi click vào overlay
+        document.addEventListener('click', function(e) {
+          const modal = document.getElementById('editReviewModal');
+          if (modal && e.target === modal) {
+            rvCloseEditModal();
+          }
+        });
+
+        // Close modal với ESC key
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape') {
+            const modal = document.getElementById('editReviewModal');
+            if (modal && modal.classList.contains('rv-modal-active')) {
+              rvCloseEditModal();
+            }
+          }
+        });
+
         window.rvOpenFromThumb = rvOpenFromThumb;
         window.rvClose = rvClose;
         window.rvPrev  = rvPrev;
         window.rvNext  = rvNext;
+        window.rvOpenEditModal = rvOpenEditModal;
+        window.rvCloseEditModal = rvCloseEditModal;
     </script>
 }

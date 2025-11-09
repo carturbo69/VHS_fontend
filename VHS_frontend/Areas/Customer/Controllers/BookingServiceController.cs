@@ -42,10 +42,28 @@ namespace VHS_frontend.Areas.Customer.Controllers
             _reportService = reportService;
         }
 
-        // Helper: lấy AccountId từ claim/session
-        private Guid GetAccountId()
+        // Helper: lấy AccountId từ claim/session với retry logic
+        private Guid GetAccountId(bool retry = false)
         {
-            var idStr = User.FindFirstValue("AccountID") ?? HttpContext.Session.GetString("AccountID");
+            // Thử lấy từ Claims trước (nhanh hơn)
+            var idStr = User.FindFirstValue("AccountID");
+            
+            // Nếu không có trong Claims, thử lấy từ Session
+            if (string.IsNullOrWhiteSpace(idStr))
+            {
+                idStr = HttpContext.Session.GetString("AccountID");
+            }
+            
+            // Nếu vẫn không có và chưa retry, thử reload session
+            if (string.IsNullOrWhiteSpace(idStr) && !retry)
+            {
+                // Load lại session để đảm bảo có dữ liệu mới nhất
+                HttpContext.Session.LoadAsync().Wait(TimeSpan.FromMilliseconds(50));
+                
+                // Retry sau khi load
+                return GetAccountId(retry: true);
+            }
+            
             return Guid.TryParse(idStr, out var id) ? id : Guid.Empty;
         }
 
@@ -121,7 +139,25 @@ namespace VHS_frontend.Areas.Customer.Controllers
             static decimal LineTotalOf(ReadCartItemDTOs it)
                 => (it?.ServicePrice ?? 0m) + (it?.Options?.Sum(o => o?.Price ?? 0m) ?? 0m);
 
+            // Kiểm tra JWToken trước - nếu có token thì có thể session đang load
+            var hasJwt = !string.IsNullOrWhiteSpace(jwt);
+
             var accountId = GetAccountId();
+            
+            // Nếu không có accountId nhưng có JWT, có thể session chưa load kịp
+            // Thử đợi một chút và retry
+            if (accountId == Guid.Empty && hasJwt)
+            {
+                // Commit session để đảm bảo session được lưu
+                await HttpContext.Session.CommitAsync();
+                
+                // Đợi một chút để session được load
+                await Task.Delay(50);
+                
+                // Retry
+                accountId = GetAccountId(retry: true);
+            }
+            
             if (accountId == Guid.Empty)
             {
                 TempData["ToastError"] = "Bạn cần đăng nhập.";
@@ -173,8 +209,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 ServiceId    = svc.ServiceId,
                 ServiceName  = svc.Title,
                 ServicePrice = svc.Price,
+                ServiceImage = svc.Images, // Thêm service images
                 ProviderId   = svc.Provider?.ProviderId ?? Guid.Empty,
                 ProviderName = svc.Provider?.ProviderName,
+                ProviderImages = svc.Provider?.Images, // Thêm provider images
                 Options      = optList.Select(o => new CartItemOptionReadDto
                 {
                     OptionId   = o.OptionId,
@@ -535,6 +573,25 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     System.Text.Json.JsonSerializer.Serialize(result.Breakdown)
                 );
 
+                // ✨ Lưu tên dịch vụ vào session để hiển thị ở trang Success
+                var serviceNamesDict = new Dictionary<string, string>();
+                if (model.Items != null && result.BookingIds != null)
+                {
+                    for (int i = 0; i < result.BookingIds.Count && i < model.Items.Count; i++)
+                    {
+                        var bookingId = result.BookingIds[i];
+                        var item = model.Items[i];
+                        var serviceName = !string.IsNullOrWhiteSpace(item.ServiceName) 
+                            ? item.ServiceName 
+                            : $"Dịch vụ số {i + 1}";
+                        serviceNamesDict[bookingId.ToString()] = serviceName;
+                    }
+                }
+                HttpContext.Session.SetString(
+                    "BookingServiceNamesJson",
+                    System.Text.Json.JsonSerializer.Serialize(serviceNamesDict)
+                );
+
                 // ✨ Hiển thị số tiền ngay: truyền amount theo InvariantCulture
                 var amountStr = result.Total.ToString(CultureInfo.InvariantCulture);
 
@@ -552,7 +609,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                     default:
                         // COD
-                        return RedirectToAction("Success");
+                        return RedirectToAction("Success", "Payment", new { area = "Customer", bookingIds = result.BookingIds, total = result.Total });
                 }
             }
             catch (HttpRequestException ex)
@@ -607,10 +664,40 @@ namespace VHS_frontend.Areas.Customer.Controllers
         // Areas/Customer/Controllers/BookingServiceController.cs
 
 
-        [HttpGet]
+        /// <summary>
+        /// Đặt lại dịch vụ từ booking (đặt trực tiếp, không qua cart)
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult ReorderBooking(Guid bookingId, Guid serviceId, List<Guid>? optionIds)
+        {
+            if (serviceId == Guid.Empty)
+            {
+                TempData["ToastError"] = "Dịch vụ không hợp lệ.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+
+            // Lưu thông tin vào session để đặt trực tiếp (giống StartDirect)
+            var payload = new DirectCheckoutPayload(
+                serviceId,
+                (optionIds ?? new()).Where(x => x != Guid.Empty).Distinct().ToList()
+            );
+
+            HttpContext.Session.SetString(
+                SS_CHECKOUT_DIRECT,
+                System.Text.Json.JsonSerializer.Serialize(payload)
+            );
+
+            // Dọn dấu vết flow qua giỏ (để chắc chắn không lẫn)
+            HttpContext.Session.Remove(SS_SELECTED_IDS);
+
+            // Redirect đến trang booking
+            return RedirectToAction(nameof(Index));
+        }
+
         public async Task<IActionResult> ListHistoryBooking(CancellationToken ct)
         {
-            var statusOrder = new[] { "Pending", "Confirmed", "InProgress", "Completed", "Cancelled", "All" };
+            var statusOrder = new[] { "All", "Pending", "Confirmed", "InProgress", "Completed", "Cancelled" };
 
             var statusViMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -641,13 +728,12 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (HttpRequestException ex)
             {
-                TempData["ToastError"] = "Không tải được dữ liệu lịch sử đơn. " + ex.Message;
                 vm = new ListHistoryBookingServiceDTOs { Items = new() };
             }
 
             ViewBag.StatusOrder = statusOrder;
             ViewBag.StatusViMap = statusViMap;
-            return View(vm);
+            return View("ListHistoryBooking", vm);
         }
 
 
@@ -670,13 +756,11 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 if (string.IsNullOrWhiteSpace(jwtToken))
                 {
-                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
-                    return RedirectToAction("Login", "Account", new { area = "" });
+                    return RedirectToAction(nameof(ListHistoryBooking));
                 }
                 var accountId = GetAccountId();
                 if (accountId == Guid.Empty)
                 {
-                    TempData["ToastError"] = "Không tìm thấy thông tin tài khoản.";
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
                 var createRefundReq = new {
@@ -768,8 +852,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
-                TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return RedirectToAction(nameof(ListHistoryBooking));
             }
 
             try
@@ -782,6 +865,46 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
 
+                // Tính toán giá tiền (giống ListHistoryBooking)
+                var optionTotal = bookingDetail.Options?.Sum(op => op.Price) ?? 0m;
+                var servicePrice = bookingDetail.Service?.UnitPrice ?? 0m;
+                var subTotal = servicePrice + optionTotal;
+                
+                // Lấy voucher discount trực tiếp từ DTO (giống ListHistoryBooking: o.VoucherDiscount)
+                var voucherDiscount = Math.Max(0m, bookingDetail.VoucherDiscount); // bảo vệ số âm
+                var grandTotal = Math.Max(0m, subTotal - voucherDiscount);
+
+                // Xác định trạng thái thanh toán dựa trên PaymentStatus
+                var paidAmount = bookingDetail.PaidAmount;
+                var paymentStatusText = "Chưa thanh toán";
+                
+                // Kiểm tra PaymentStatus (ưu tiên) hoặc PaidAmount
+                var paymentStatus = bookingDetail.PaymentStatus;
+                if (!string.IsNullOrWhiteSpace(paymentStatus))
+                {
+                    var statusUpper = paymentStatus.Trim().ToUpperInvariant();
+                    if (statusUpper == "ĐÃ THANH TOÁN" || 
+                        statusUpper == "PAID" || 
+                        statusUpper == "SUCCESS" || 
+                        statusUpper == "COMPLETED")
+                    {
+                        paymentStatusText = "Đã thanh toán";
+                    }
+                    else if (statusUpper == "REFUNDED")
+                    {
+                        paymentStatusText = "Đã hoàn tiền";
+                    }
+                    else if (statusUpper == "PENDING")
+                    {
+                        paymentStatusText = "Chờ thanh toán";
+                    }
+                }
+                else if (paidAmount > 0)
+                {
+                    // Fallback: nếu không có PaymentStatus nhưng có PaidAmount > 0
+                    paymentStatusText = "Đã thanh toán";
+                }
+
                 // Tạo ViewModel với dữ liệu thực
                 var vm = new ReportServiceViewModel
                 {
@@ -789,9 +912,19 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     ProviderId = bookingDetail.ProviderId,
                     ServiceTitle = bookingDetail.Service?.Title ?? "Dịch vụ",
                     ProviderName = bookingDetail.ProviderName ?? "Provider",
+                    ProviderImages = bookingDetail.ProviderImages,
                     ServiceImage = bookingDetail.Service?.Image ?? "/images/VeSinh.jpg",
-                    Price = bookingDetail.Total,
-                    OriginalPrice = bookingDetail.Service?.UnitPrice ?? 0,
+                    ServiceImages = bookingDetail.ServiceImages,
+                    ServicePrice = servicePrice,
+                    OptionTotal = optionTotal,
+                    SubTotal = subTotal,
+                    VoucherDiscount = voucherDiscount,
+                    GrandTotal = grandTotal,
+                    PaidAmount = paidAmount,
+                    PaymentStatus = paymentStatusText,
+                    Options = bookingDetail.Options ?? new List<OptionDTO>(),
+                    Price = grandTotal, // Legacy
+                    OriginalPrice = servicePrice, // Legacy
                     ReportTypes = _reportService.GetReportTypes()
                 };
 
@@ -799,7 +932,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (Exception ex)
             {
-                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
         }
@@ -827,8 +959,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 if (string.IsNullOrWhiteSpace(jwtToken))
                 {
-                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn.";
-                    return RedirectToAction("Login", "Account", new { area = "" });
+                    return RedirectToAction(nameof(ListHistoryBooking));
                 }
 
                 var createDto = new CreateReportDTO
@@ -856,8 +987,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                TempData["ToastError"] = $"Bạn cần đăng nhập lại: {ex.Message}";
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return RedirectToAction(nameof(ListHistoryBooking));
             }
             catch (HttpRequestException ex)
             {
@@ -866,15 +996,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 {
                     TempData["DuplicateReportError"] = "Booking đã được báo cáo trước đó. Mỗi đơn hàng chỉ được báo cáo 1 lần.";
                 }
-                else
-                {
-                    TempData["ToastError"] = $"Không thể gửi báo cáo: {ex.Message}";
-                }
                 return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
             }
             catch (Exception ex)
             {
-                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
                 return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
             }
         }
@@ -940,11 +1065,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                 var html = $@"
 <div>
-  <div style=""font-weight:600;margin-bottom:6px"">{providerName}</div>
-  <div>{tos.Description}</div>
-  <div style=""margin-top:8px"">
-    <a href=""{tos.Url}"" target=""_blank"" rel=""noopener"">Xem đầy đủ điều khoản</a>
-  </div>
+  <div>{providerName}</div>
+  <div class=""tos-content"">{tos.Description}</div>
 </div>";
 
                 return Content(html, "text/html; charset=utf-8");
@@ -1020,18 +1142,12 @@ namespace VHS_frontend.Areas.Customer.Controllers
             if (accountId == Guid.Empty)
                 return Unauthorized();
 
-            // Lấy thông tin booking đã hủy từ service
+            // Lấy thông tin booking đã hủy từ service (bao gồm refund info)
             var vm = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, id);
             if (vm == null)
                 return NotFound();
 
-            // Lấy thông tin lý do hủy/hoàn tiền thật từ DB hoặc service
-            var cancelInfo = await _bookingServiceCustomer.GetCancelInfoDemoAsync(id);
-            if (cancelInfo == null)
-                cancelInfo = new CancelBookingRequestDTO(); // tránh null reference
-
-            ViewBag.Cancel = cancelInfo;
-            return View(vm); // truyền vm xuống View
+            return View(vm);
         }
 
 
@@ -1040,8 +1156,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
-                TempData["ToastError"] = "Bạn cần đăng nhập.";
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return RedirectToAction(nameof(ListHistoryBooking));
             }
 
             try
@@ -1049,8 +1164,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 if (string.IsNullOrWhiteSpace(jwtToken))
                 {
-                    TempData["ToastError"] = "Phiên đăng nhập đã hết hạn.";
-                    return RedirectToAction("Login", "Account", new { area = "" });
+                    return RedirectToAction(nameof(ListHistoryBooking));
                 }
 
                 var report = await _reportService.GetReportByIdAsync(reportId, jwtToken, ct);
@@ -1064,12 +1178,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (UnauthorizedAccessException)
             {
-                TempData["ToastError"] = "Bạn cần đăng nhập lại.";
-                return RedirectToAction("Login", "Account", new { area = "" });
+                return RedirectToAction(nameof(ListHistoryBooking));
             }
             catch (Exception ex)
             {
-                TempData["ToastError"] = $"Có lỗi xảy ra: {ex.Message}";
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
         }
@@ -1155,6 +1267,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         Provider = string.IsNullOrWhiteSpace(it.ProviderName) ? "Khác" : it.ProviderName,
                         ServiceName = string.IsNullOrWhiteSpace(it.ServiceName) ? "(Không có tên)" : it.ServiceName,
                         Image = string.IsNullOrWhiteSpace(it.ServiceImage) ? "/images/placeholder.png" : it.ServiceImage,
+                        ServiceImages = it.ServiceImage, // Sử dụng ServiceImage làm ServiceImages
+                        ProviderImages = it.ProviderImages, // Lấy từ cart item DTO
                         UnitPrice = it.ServicePrice ?? 0m,
                         BookingTime = DateTime.Now, // default, người dùng chỉnh ở UI
                         Options = (it.Options ?? new()).Select(o => new BookItemOption

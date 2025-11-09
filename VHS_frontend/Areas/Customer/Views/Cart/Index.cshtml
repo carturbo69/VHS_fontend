@@ -26,7 +26,43 @@
         string NameOf(ReadCartItemDTOs it)
             => string.IsNullOrWhiteSpace(it?.ServiceName) ? "(Không có tên)" : it.ServiceName;
 
-        string ImageOf(ReadCartItemDTOs it) => it?.ServiceImage ?? "";
+        // Helper để lấy ảnh đầu tiên từ images (có thể là JSON array hoặc comma-separated string)
+        string? FirstImageOrDefault(string? images)
+        {
+            if (string.IsNullOrWhiteSpace(images)) return null;
+            try
+            {
+                var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+                if (arr != null && arr.Count > 0) return arr[0];
+            }
+            catch { }
+            if (images.Contains(','))
+            {
+                var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(first)) return first;
+            }
+            return images;
+        }
+
+        // Helper để lấy logo provider
+        string GetProviderLogo(string? providerImages, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(providerImages))
+                return fallback;
+            var logo = FirstImageOrDefault(providerImages);
+            return !string.IsNullOrWhiteSpace(logo) ? logo : fallback;
+        }
+
+        // Helper để lấy ảnh service
+        string GetServiceImage(string? serviceImages, string? fallbackImage, string fallback)
+        {
+            if (string.IsNullOrWhiteSpace(serviceImages))
+                return !string.IsNullOrWhiteSpace(fallbackImage) ? fallbackImage : fallback;
+            var img = FirstImageOrDefault(serviceImages);
+            return !string.IsNullOrWhiteSpace(img) ? img : (!string.IsNullOrWhiteSpace(fallbackImage) ? fallbackImage : fallback);
+        }
+
+        string ImageOf(ReadCartItemDTOs it, string fallback) => GetServiceImage(it?.ServiceImage, null, fallback);
 
         decimal PriceOf(ReadCartItemDTOs it) => it?.ServicePrice ?? 0m;
 
@@ -122,9 +158,20 @@
                         {
                             var g = groups[gi]; var gId = $"g_{gi}";
                             <section class="provider-block" data-group="@gId">
+                                @{
+                                    var firstShopItem = g.FirstOrDefault();
+                                    var providerImages = firstShopItem?.ProviderImages;
+                                }
                                 <div class="provider-head">
                                     <label class="chk">
                                         <input class="chk-prov" type="checkbox" data-group="@gId" />
+                                        <img src="@GetProviderLogo(providerImages, fallbackImg)" 
+                                             width="24" 
+                                             height="24" 
+                                             alt="@g.Key" 
+                                             class="shop-logo" 
+                                             style="object-fit:cover;border-radius:4px;margin-right:8px;" 
+                                             onerror="this.src='@fallbackImg';" />
                                         <span class="prov-name">@g.Key</span>
                                     </label>
                                 </div>
@@ -134,12 +181,12 @@
                                     var key = KeyOf(it);
                                     var name = NameOf(it);
 
-                                    var rawImage = ImageOf(it);
+                                    var rawImage = ImageOf(it, fallbackImg);
                                     var image = string.IsNullOrWhiteSpace(rawImage)
                                     ? fallbackImg
                                     : (rawImage.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                                     ? rawImage
-                                    : Url.Content(rawImage));
+                                    : Url.Content(rawImage.StartsWith("/") ? rawImage : "/" + rawImage));
 
                                     var unitPrice = PriceOf(it);
                                     var options = it?.Options ?? new List<CartItemOptionReadDto>();
@@ -189,20 +236,21 @@
                                                     <h3>Tuỳ chọn dịch vụ</h3>
                                                     <button type="button" class="opt-panel-close" data-close="#@($"opt_{key}")" aria-label="Đóng">✕</button>
                                                 </div>
-                                                <div class="opt-section">
+                                                <div class="opt-section" id="selected-options-@key">
                                                     <div class="opt-title">Đã chọn</div>
 
                                                     @if (options.Any())
                                                     {
                                                         foreach (var a in options)
                                                         {
-                                                            <div class="opt-row">
+                                                            <div class="opt-row selected-option-row">
+                                                                <input type="checkbox" 
+                                                                       class="selected-option-checkbox" 
+                                                                       name="selectedOptionIds" 
+                                                                       value="@a.OptionId" 
+                                                                       data-cart-item-id="@it.CartItemId" />
                                                                 <div class="opt-name">
-                                                                    <div>@a.OptionName</div>
-                                                                    @if (!string.IsNullOrWhiteSpace(a.UnitType))
-                                                                    {
-                                                                        <div class="muted text-sm">@a.UnitType</div>
-                                                                    }
+                                                                    <div>@a.OptionName@(string.IsNullOrWhiteSpace(a.UnitType) ? "" : $" ({a.UnitType})")</div>
                                                                     @if (!string.IsNullOrWhiteSpace(a.Description))
                                                                     {
                                                                         <div class="muted text-sm">@a.Description</div>
@@ -211,25 +259,21 @@
 
                                                                 <div class="opt-controls">
                                                                     <span class="opt-price">+ @a.Price.ToString("n0")₫</span>
-
-                                                                    <!-- BỎ TUỲ CHỌN: thêm area + controller -->
-                                                                    <form asp-area="Customer"
-                                                                          asp-controller="Cart"
-                                                                          asp-action="RemoveAddon"
-                                                                          method="post"
-                                                                          onsubmit="lockBtn(this)">
-                                                                        @Html.AntiForgeryToken()
-                                                                        <input type="hidden" name="cartItemId" value="@it.CartItemId" />
-                                                                        <input type="hidden" name="optionId" value="@a.OptionId" />
-                                                                        <button class="opt-remove" type="submit">Bỏ</button>
-                                                                    </form>
                                                                 </div>
                                                             </div>
                                                         }
+                                                        
+                                                        <div class="opt-actions">
+                                                            <button type="button" class="btn-danger sm" onclick="removeSelectedOptions('@key', '@it.CartItemId')">Bỏ chọn</button>
+                                                            <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
+                                                        </div>
                                                     }
                                                     else
                                                     {
                                                         <div class="opt-empty muted">Chưa chọn tuỳ chọn</div>
+                                                        <div class="opt-actions">
+                                                            <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
+                                                        </div>
                                                     }
                                                 </div>
 
@@ -267,7 +311,7 @@
                                                         }
 
                                                         <div class="opt-actions">
-                                                            <button type="submit" class="btn-primary sm">Thêm</button>
+                                                            <button type="submit" class="btn-primary sm">Thêm chọn</button>
                                                             <button type="button" class="btn-ghost sm" data-close="#@($"opt_{key}")">Đóng</button>
                                                         </div>
                                                     </form>
@@ -804,6 +848,65 @@
             function lockBtn(form){
               const btn = form.querySelector('button[type="submit"]');
               if(btn){ btn.disabled = true; btn.classList.add('is-loading'); }
+            }
+
+            // Xóa nhiều option đã chọn một lượt
+            async function removeSelectedOptions(panelKey, cartItemId) {
+                const panel = document.getElementById(`selected-options-${panelKey}`);
+                if (!panel) return;
+
+                const checkboxes = panel.querySelectorAll('.selected-option-checkbox:checked');
+                if (checkboxes.length === 0) {
+                    alert('Vui lòng chọn ít nhất một tuỳ chọn để xóa.');
+                    return;
+                }
+
+                const button = event.target;
+                const originalText = button.textContent;
+                button.disabled = true;
+                button.classList.add('is-loading');
+                button.textContent = 'Đang xóa...';
+
+                try {
+                    const optionIds = Array.from(checkboxes).map(cb => cb.value);
+                    
+                    // Lấy token từ form đầu tiên hoặc meta tag
+                    let token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                    if (!token) {
+                        const metaToken = document.querySelector('meta[name="__RequestVerificationToken"]');
+                        if (metaToken) {
+                            token = metaToken.getAttribute('content');
+                        }
+                    }
+
+                    if (!token) {
+                        throw new Error('Không tìm thấy token xác thực');
+                    }
+
+                    // Xóa từng option
+                    const promises = optionIds.map(optionId => {
+                        const formData = new FormData();
+                        formData.append('__RequestVerificationToken', token);
+                        formData.append('cartItemId', cartItemId);
+                        formData.append('optionId', optionId);
+
+                        return fetch('@Url.Action("RemoveAddon", "Cart", new { area = "Customer" })', {
+                            method: 'POST',
+                            body: formData
+                        });
+                    });
+
+                    await Promise.all(promises);
+                    
+                    // Reload trang để cập nhật
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Lỗi khi xóa tuỳ chọn:', error);
+                    alert('Có lỗi xảy ra khi xóa tuỳ chọn. Vui lòng thử lại.');
+                    button.disabled = false;
+                    button.classList.remove('is-loading');
+                    button.textContent = originalText;
+                }
             }
 
             /* ========= Tuỳ chọn dùng PORTAL + MASK ========= */

@@ -8,17 +8,60 @@
     var statusViMap = ViewBag.StatusViMap as IDictionary<string, string>
                       ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                       {
+                        ["All"] = "Tất cả",
                           ["Pending"] = "Chờ xác nhận",
                           ["Confirmed"] = "Xác Nhận",
                           ["InProgress"] = "Bắt Đầu Làm Việc",
                           ["Completed"] = "Hoàn thành",
-                          ["Cancelled"] = "Đã hủy",
-                          ["All"] = "Tất cả"
+                          ["Cancelled"] = "Đã hủy"
                       };
 
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 
+    // Helper để lấy ảnh đầu tiên từ ServiceImages (có thể là JSON array hoặc comma-separated string)
+    string? FirstImageOrDefault(string? images)
+    {
+        if (string.IsNullOrWhiteSpace(images)) return null;
 
+        try
+        {
+            // Thử parse JSON array trước
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+            if (arr != null && arr.Count > 0) return arr[0];
+        }
+        catch { /* ignore JSON parse error */ }
+
+        // Nếu không phải JSON, thử split bằng dấu phẩy
+        if (images.Contains(','))
+        {
+            var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
+        
+        // Nếu không có dấu phẩy, trả về nguyên chuỗi
+        return images;
+    }
+
+    // Helper để lấy ảnh service (backend đã thêm domain prefix)
+    string GetServiceImage(string? serviceImages)
+    {
+        if (string.IsNullOrWhiteSpace(serviceImages))
+            return fallbackImg;
+        
+        var img = FirstImageOrDefault(serviceImages);
+        return !string.IsNullOrWhiteSpace(img) ? img : fallbackImg;
+    }
+
+    // Helper để lấy logo provider (backend đã thêm domain prefix, giống ServiceShop/Index.cshtml)
+    string GetProviderLogo(string? providerImages)
+    {
+        if (string.IsNullOrWhiteSpace(providerImages))
+            return "/images/VeSinh.jpg"; // Fallback logo
+        
+        var logo = FirstImageOrDefault(providerImages);
+        return !string.IsNullOrWhiteSpace(logo) ? logo : "/images/VeSinh.jpg";
+    }
 
 }
 
@@ -30,23 +73,11 @@
     <!-- Page Header -->
     <div class="page-header">
         <h1 class="page-title">
+            <span class="page-title-icon">📦</span>
             Lịch sử đơn dịch vụ
         </h1>
         <p class="page-subtitle">Quản lý và theo dõi tất cả các đơn dịch vụ của bạn</p>
     </div>
-    <!-- Toast kết quả (tuỳ chọn) -->
-    @if (TempData["ToastSuccess"] != null || TempData["ToastError"] != null)
-    {
-        <div class="custom-alert @(TempData["ToastSuccess"] != null ? "alert-success" : "alert-danger")" role="alert">
-            <i class="bi @(TempData["ToastSuccess"] != null ? "bi-check-circle-fill" : "bi-exclamation-circle-fill")"></i>
-            <div class="alert-content">
-                @(TempData["ToastSuccess"] ?? TempData["ToastError"])
-            </div>
-            <button type="button" class="alert-close" onclick="this.parentElement.remove()">
-                <i class="bi bi-x"></i>
-            </button>
-        </div>
-    }
 
     <!-- Tabs trạng thái (data-status = code EN, text = VI) -->
     <ul class="nav nav-tabs border-0 nav-status">
@@ -81,7 +112,19 @@
             // Chuẩn hóa code trạng thái về EN để lọc/tô màu nhất quán; chấp nhận cả VI và EN từ backend
             var stRaw = (o.Status ?? "").Trim();
             string stCode = stRaw; // fallback
-            if (stRaw.Equals("Pending", StringComparison.OrdinalIgnoreCase)
+            
+            // Kiểm tra Cancelled/Canceled TRƯỚC để đảm bảo bắt được tất cả các biến thể
+            if (stRaw.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Canceled", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Equals("Đã huỷ", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Contains("hủy", StringComparison.OrdinalIgnoreCase)
+                || stRaw.Contains("huy", StringComparison.OrdinalIgnoreCase))
+            {
+                stCode = "Cancelled";
+                statusText = statusViMap["Cancelled"];
+            }
+            else if (stRaw.Equals("Pending", StringComparison.OrdinalIgnoreCase)
                 || stRaw.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase)
                 || stRaw.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase)
                 || stRaw.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase))
@@ -109,27 +152,19 @@
                 stCode = "Completed";
                 statusText = statusViMap["Completed"];
             }
-            else if (stRaw.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Canceled", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Đã huỷ", StringComparison.OrdinalIgnoreCase))
-            {
-                stCode = "Cancelled";
-                statusText = statusViMap["Cancelled"];
-            }
             var isReviewed = o.HasReview; // đã có review hay chưa
 
             <div class="shop-row order-card" data-status="@stCode" data-title="@o.ServiceTitle @o.ProviderName">
                 <!-- Header -->
                 <div class="shop-head">
-                    <img src="/images/shop-badge.svg" width="24" height="24" alt="shop" />
+                    <img src="@GetProviderLogo(o.ProviderImages)" width="24" height="24" alt="@o.ProviderName" class="shop-logo" style="object-fit:cover;border-radius:4px;" onerror="this.src='/images/VeSinh.jpg';" />
                     <div class="shop-name">@o.ProviderName</div>
                     <button type="button"
                             class="btn btn-sm btn-outline-danger ms-2"
                             onclick="window.location.href='@Url.Action("WithProvider", "ChatCustomer", new { area = "Customer", providerId = o.ProviderId })'">
                         <i class="bi bi-chat-dots me-1"></i> Chat
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary">Xem Shop</button>
+                    <a asp-area="" asp-controller="ServiceShop" asp-action="Index" asp-route-providerId="@o.ProviderId" class="btn btn-sm btn-outline-secondary">Xem Shop</a>
 
                     <div class="ms-auto d-flex align-items-center gap-3">
                         <div class="status-pill">
@@ -166,7 +201,7 @@
                 <!-- Body -->
                 <div class="item-body">
                     <img class="order-cover"
-                         src="@(o.ServiceImages ?? fallbackImg)"
+                         src="@GetServiceImage(o.ServiceImages)"
                          onerror="this.onerror=null;this.src='@fallbackImg';" />
                     <div class="flex-grow-1">
                         <div class="order-title">@o.ServiceTitle</div>
@@ -239,13 +274,25 @@
 
                     @if (isDone) // Completed
                     {
-                        <button class="btn btn-danger">Đặt lại</button>
+                        <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="bookingId" value="@o.BookingId" />
+                            <input type="hidden" name="serviceId" value="@o.ServiceId" />
+                            @if (o.Options?.Any() == true)
+                            {
+                                @foreach (var opt in o.Options)
+                                {
+                                    <input type="hidden" name="optionIds" value="@opt.OptionId" />
+                                }
+                            }
+                            <button type="submit" class="btn btn-danger">Đặt lại</button>
+                        </form>
                         <a asp-area="Customer"
                            asp-controller="BookingService"
                            asp-action="ReportService"
                            asp-route-bookingId="@o.BookingId"
                            class="btn btn-outline-danger btn-report">
-                            Báo cáo / Hoàn tiền
+                            Báo cáo
                         </a>
                         @if (!isReviewed)
                         {
@@ -272,8 +319,19 @@
                     }
                     else if (st.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
                     {
-                        <button class="btn btn-outline-secondary">Lý do hủy</button>
-                        <button class="btn btn-danger">Đặt lại</button>
+                        <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="bookingId" value="@o.BookingId" />
+                            <input type="hidden" name="serviceId" value="@o.ServiceId" />
+                            @if (o.Options?.Any() == true)
+                            {
+                                @foreach (var opt in o.Options)
+                                {
+                                    <input type="hidden" name="optionIds" value="@opt.OptionId" />
+                                }
+                            }
+                            <button type="submit" class="btn btn-danger">Đặt lại</button>
+                        </form>
                     }
                 </div>
 
@@ -283,57 +341,99 @@
     {
             <!-- Modal Đánh Giá -->
             <div class="modal fade" id="reviewModal-@o.BookingId" tabindex="-1" aria-labelledby="reviewModalLabel-@o.BookingId" aria-hidden="true">
-                <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-dialog modal-dialog-scrollable modal-lg review-modal">
                     <div class="modal-content">
                         <form asp-area="Customer"
                               asp-controller="ReviewCustomer"
                               asp-action="Create"
                               method="post"
                               enctype="multipart/form-data"
+                              novalidate
                               onsubmit="
             const inp = this.querySelector('input[name=ImageFiles]');
             console.log('[VIEW] files before submit =', inp?.files?.length || 0);
           ">
                             @Html.AntiForgeryToken()
 
-                            <div class="modal-header">
-                                <h5 class="modal-title">Đánh Giá Dịch Vụ</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <div class="modal-header border-bottom">
+                                <h5 class="modal-title d-flex align-items-center gap-2">
+                                    <i class="bi bi-star-fill text-warning"></i>
+                                    Đánh Giá Dịch Vụ
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                             </div>
 
-                            <div class="modal-body">
+                            <div class="modal-body p-4">
                                 <input type="hidden" name="BookingId" value="@o.BookingId" />
                                 <input type="hidden" name="ServiceId" value="@o.ServiceId" />
                                 <input type="hidden" name="Rating" id="rating-@o.BookingId" value="0" min="1" />
 
-                                <div class="d-flex align-items-center gap-3 mb-3">
-                                    <img src="@(o.ServiceImages ?? fallbackImg)" width="60" height="60" style="object-fit:cover;border-radius:4px;border:1px solid #eee" />
-                                    <div>
-                                        <div class="fw-bold">@o.ServiceTitle</div>
-                                        <small class="text-muted">@o.ProviderName</small>
+                                <!-- Thông tin dịch vụ -->
+                                <div class="service-info-card mb-4">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="service-image-wrapper">
+                                            <img src="@GetServiceImage(o.ServiceImages)" alt="@o.ServiceTitle" class="service-image" />
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h6 class="fw-bold mb-2">@o.ServiceTitle</h6>
+                                            <div class="text-muted d-flex align-items-center gap-2">
+                                                <i class="bi bi-shop text-primary"></i>
+                                                <span class="small">@o.ProviderName</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Chất lượng dịch vụ:</label>
-                                    <div class="rating" data-target="rating-@o.BookingId">
+                                <!-- Đánh giá sao -->
+                                <div class="rating-section mb-4">
+                                    <label class="form-label fw-bold d-flex align-items-center gap-2 mb-3">
+                                        <i class="bi bi-star-fill text-warning"></i>
+                                        <span>Chất lượng dịch vụ</span>
+                                        <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="rating-container">
+                                        <div class="rating d-flex gap-3 justify-content-center" data-target="rating-@o.BookingId">
                                         @for (int i = 1; i <= 5; i++)
                                         {
-                                            <i class="bi bi-star fs-3 text-warning" data-value="@i"></i>
-                                        }
+                                                <i class="bi bi-star rating-star" data-value="@i"></i>
+                                            }
+                                        </div>
+                                        <div class="rating-text text-center mt-2 text-muted small" id="ratingError-@o.BookingId" style="display: none;">
+                                            <i class="bi bi-exclamation-circle text-danger"></i> <span class="text-danger">Vui lòng chọn số sao đánh giá</span>
+                                        </div>
+                                        <div class="rating-text text-center mt-2 text-muted small" id="ratingHint-@o.BookingId">
+                                            <i class="bi bi-info-circle"></i> Vui lòng chọn số sao đánh giá
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Nội dung đánh giá:</label>
-                                    <textarea name="Comment" class="form-control" rows="3" placeholder="Chia sẻ trải nghiệm của bạn..."></textarea>
+                                <!-- Nội dung đánh giá -->
+                                <div class="comment-section mb-4">
+                                    <label class="form-label fw-bold d-flex align-items-center gap-2 mb-2">
+                                        <i class="bi bi-chat-left-text-fill text-primary"></i>
+                                        <span>Nội dung đánh giá</span>
+                                    </label>
+                                    <textarea name="Comment" class="form-control form-control-lg" rows="5" placeholder="Chia sẻ trải nghiệm của bạn về dịch vụ này..."></textarea>
+                                    <div class="invalid-feedback d-none" id="commentError-@o.BookingId">
+                                        <i class="bi bi-exclamation-circle me-1"></i>
+                                        <span></span>
+                                    </div>
+                                    <div class="form-text mt-2 d-flex align-items-start gap-2">
+                                        <i class="bi bi-lightbulb-fill text-warning mt-1"></i>
+                                        <span>Đánh giá chi tiết sẽ giúp người khác hiểu rõ hơn về dịch vụ</span>
+                                    </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Hình ảnh (tối đa 5):</label>
-                                    <div class="d-flex gap-2 mb-2">
-                                        <button type="button" class="btn-upload-like" onclick="openPicker('file-@o.BookingId')">
-                                            <i class="bi bi-camera"></i> Thêm hình ảnh
+                                <!-- Hình ảnh -->
+                                <div class="image-section">
+                                    <label class="form-label fw-bold d-flex align-items-center gap-2 mb-3">
+                                        <i class="bi bi-images text-primary"></i>
+                                        <span>Hình ảnh</span>
+                                        <span class="badge bg-secondary">Tối đa 5</span>
+                                    </label>
+                                    <div class="d-flex gap-2 mb-3">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="openPicker('file-@o.BookingId')">
+                                            <i class="bi bi-camera-fill me-1"></i> Thêm hình ảnh
                                         </button>
                                     </div>
                                     <input id="file-@o.BookingId"
@@ -345,12 +445,20 @@
                                            onchange="uploaderAddFiles('uploader-@o.BookingId', this.files, 5)" />
 
                                     <div id="uploader-@o.BookingId" class="uploader" data-input="file-@o.BookingId" data-max="5"></div>
+                                    <div class="form-text mt-2 d-flex align-items-start gap-2">
+                                        <i class="bi bi-image-fill text-info mt-1"></i>
+                                        <span>Bạn có thể thêm tối đa 5 hình ảnh để minh họa cho đánh giá</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                                <button type="submit" class="btn btn-danger">Gửi đánh giá</button>
+                            <div class="modal-footer border-top justify-content-center gap-3">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-circle me-1"></i> Hủy
+                                </button>
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="bi bi-send me-1"></i> Gửi đánh giá
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -360,43 +468,114 @@
             }
             <!-- Modal Hủy Đơn -->
             <div class="modal fade" id="cancelModal-@o.BookingId" tabindex="-1" aria-labelledby="cancelModalLabel-@o.BookingId" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-dialog modal-dialog-scrollable modal-lg cancel-order-modal">
                     <div class="modal-content">
-                        <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post">
+                        <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post" novalidate>
                             @Html.AntiForgeryToken()
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="cancelModalLabel-@o.BookingId">Hủy đơn hàng</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <div class="modal-header border-bottom">
+                                <h5 class="modal-title d-flex align-items-center gap-2" id="cancelModalLabel-@o.BookingId">
+                                    <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                                    Hủy đơn hàng
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                             </div>
 
-                            <div class="modal-body">
+                            <div class="modal-body p-4">
                                 <input type="hidden" name="BookingId" value="@o.BookingId" />
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Lý do hủy <span class="text-danger">*</span></label>
-                                    <textarea class="form-control" name="Reason" rows="3" required placeholder="Vui lòng mô tả ngắn gọn lý do hủy..."></textarea>
-                                    <div class="form-text">Ví dụ: Đặt nhầm dịch vụ, thay đổi thời gian, tìm được nhà cung cấp khác...</div>
+                                
+                                <!-- Thông báo -->
+                                <div class="alert alert-warning d-flex align-items-start gap-3 mb-4 cancel-warning-alert" role="alert">
+                                    <i class="bi bi-exclamation-triangle-fill fs-4 mt-1"></i>
+                                    <div>
+                                        <strong class="d-block mb-1">Lưu ý quan trọng</strong>
+                                        <span>Việc hủy đơn có thể ảnh hưởng đến quá trình hoàn tiền. Vui lòng điền đầy đủ thông tin ngân hàng để nhận hoàn tiền (nếu áp dụng).</span>
+                                    </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Tên ngân hàng <span class="text-danger">*</span></label>
-                                    <input class="form-control" name="BankName" required placeholder="VD: Vietcombank" />
+                                <!-- Lý do hủy -->
+                                <div class="cancel-reason-section mb-4">
+                                    <label class="form-label fw-bold d-flex align-items-center gap-2 mb-3">
+                                        <i class="bi bi-chat-left-text-fill text-danger"></i>
+                                        <span>Lý do hủy</span>
+                                        <span class="text-danger">*</span>
+                                    </label>
+                                    <textarea class="form-control form-control-lg" name="Reason" rows="5" placeholder="Vui lòng mô tả ngắn gọn lý do hủy đơn hàng của bạn..."></textarea>
+                                    <div class="invalid-feedback d-none" id="reasonError-@o.BookingId">
+                                        <i class="bi bi-exclamation-circle me-1"></i>
+                                        <span></span>
+                                    </div>
+                                    <div class="form-text mt-2 d-flex align-items-start gap-2">
+                                        <i class="bi bi-lightbulb-fill text-warning mt-1"></i>
+                                        <span>Ví dụ: Đặt nhầm dịch vụ, thay đổi thời gian, tìm được nhà cung cấp khác...</span>
+                                    </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Tên chủ tài khoản <span class="text-danger">*</span></label>
-                                    <input class="form-control" name="AccountHolderName" required placeholder="VD: NGUYEN VAN A" />
+                                <!-- Thông tin ngân hàng -->
+                                <div class="bank-info-section border-top pt-4">
+                                    <div class="d-flex align-items-center gap-2 mb-4">
+                                        <div class="bank-icon-wrapper">
+                                            <i class="bi bi-bank2 text-primary"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="fw-bold mb-0">Thông tin ngân hàng để hoàn tiền</h6>
+                                            <small class="text-muted">Điền đầy đủ để nhận hoàn tiền (nếu áp dụng)</small>
+                                        </div>
                                 </div>
 
-                                <div class="mb-1">
-                                    <label class="form-label fw-bold">Số tài khoản <span class="text-danger">*</span></label>
-                                    <input class="form-control" name="BankAccountNumber" required inputmode="numeric" pattern="[0-9]{6,20}" placeholder="Chỉ nhập số, 6–20 ký tự" />
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                                                <i class="bi bi-building text-primary"></i>
+                                                <span>Tên ngân hàng</span>
+                                                <span class="text-danger">*</span>
+                                            </label>
+                                            <input class="form-control" name="BankName" placeholder="VD: Vietcombank, Techcombank, BIDV..." />
+                                            <div class="invalid-feedback d-none" id="bankNameError-@o.BookingId">
+                                                <i class="bi bi-exclamation-circle me-1"></i>
+                                                <span></span>
+                                            </div>
                                 </div>
-                                <small class="text-muted">Thông tin ngân hàng được dùng để hoàn tiền (nếu áp dụng).</small>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                                                <i class="bi bi-person-badge text-primary"></i>
+                                                <span>Tên chủ tài khoản</span>
+                                                <span class="text-danger">*</span>
+                                            </label>
+                                            <input class="form-control text-uppercase" name="AccountHolderName" placeholder="VD: NGUYEN VAN A" />
+                                            <div class="invalid-feedback d-none" id="accountHolderError-@o.BookingId">
+                                                <i class="bi bi-exclamation-circle me-1"></i>
+                                                <span></span>
+                                            </div>
+                                </div>
+
+                                        <div class="col-12">
+                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                                                <i class="bi bi-credit-card text-primary"></i>
+                                                <span>Số tài khoản</span>
+                                                <span class="text-danger">*</span>
+                                            </label>
+                                            <input class="form-control" name="BankAccountNumber" inputmode="numeric" placeholder="Chỉ nhập số, từ 6–20 ký tự" />
+                                            <div class="invalid-feedback d-none" id="accountNumberError-@o.BookingId">
+                                                <i class="bi bi-exclamation-circle me-1"></i>
+                                                <span></span>
+                                            </div>
+                                            <div class="form-text mt-2 d-flex align-items-start gap-2">
+                                                <i class="bi bi-shield-check-fill text-success mt-1"></i>
+                                                <span>Thông tin ngân hàng được bảo mật và chỉ dùng để hoàn tiền (nếu áp dụng).</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                                <button type="submit" class="btn btn-danger">Xác nhận hủy</button>
+                            <div class="modal-footer border-top justify-content-center gap-3">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-circle me-1"></i> Đóng
+                                </button>
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="bi bi-check-circle me-1"></i> Xác nhận hủy
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -418,9 +597,14 @@
 
             function applyFilter(statusCode) {
                 const q = (input.value || '').toLowerCase();
+                const targetStatus = (statusCode || '').trim().toLowerCase();
+                
                 cards().forEach(c => {
                     const status = (c.dataset.status || '').trim().toLowerCase();
-                    const okStatus = (statusCode === 'All') || (status === statusCode.trim().toLowerCase());
+                    // Debug log để kiểm tra
+                    // console.log('Card status:', status, 'Target:', targetStatus, 'Match:', status === targetStatus || targetStatus === 'all');
+                    
+                    const okStatus = (targetStatus === 'all') || (status === targetStatus);
                     const okQuery  = (c.dataset.title || '').toLowerCase().includes(q);
                     c.style.display = (okStatus && okQuery) ? '' : 'none';
                 });
@@ -443,6 +627,10 @@
             document.querySelectorAll('.rating').forEach(group => {
                 const stars = group.querySelectorAll('i');
                 const target = document.getElementById(group.dataset.target);
+                const bookingId = target.id.replace('rating-', '');
+                const ratingError = document.getElementById(`ratingError-${bookingId}`);
+                const ratingHint = document.getElementById(`ratingHint-${bookingId}`);
+                
                 stars.forEach(star => {
                     star.addEventListener('click', () => {
                         const val = star.dataset.value;
@@ -452,8 +640,91 @@
                             stars[i].classList.remove('bi-star');
                             stars[i].classList.add('bi-star-fill');
                         }
+                        // Ẩn error khi chọn rating
+                        if (ratingError) ratingError.style.display = 'none';
+                        if (ratingHint) ratingHint.style.display = 'block';
                     });
                 });
+            });
+            
+            // Validation cho form đánh giá
+            document.querySelectorAll('form[action*="ReviewCustomer/Create"]').forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    // Ngăn submit mặc định
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const bookingId = form.querySelector('input[name="BookingId"]')?.value;
+                    let hasError = false;
+                    
+                    // Validate rating
+                    const ratingInput = form.querySelector('input[name="Rating"]');
+                    const ratingValue = parseInt(ratingInput?.value || '0', 10);
+                    const ratingError = document.getElementById(`ratingError-${bookingId}`);
+                    const ratingHint = document.getElementById(`ratingHint-${bookingId}`);
+                    
+                    if (!ratingValue || ratingValue < 1 || ratingValue > 5) {
+                        hasError = true;
+                        if (ratingError) ratingError.style.display = 'block';
+                        if (ratingHint) ratingHint.style.display = 'none';
+                    } else {
+                        if (ratingError) ratingError.style.display = 'none';
+                        if (ratingHint) ratingHint.style.display = 'block';
+                    }
+                    
+                    // Validate comment
+                    const comment = form.querySelector('textarea[name="Comment"]')?.value?.trim();
+                    const commentError = document.getElementById(`commentError-${bookingId}`);
+                    const commentTextarea = form.querySelector('textarea[name="Comment"]');
+                    
+                    if (!comment || comment.length < 10) {
+                        hasError = true;
+                        if (commentTextarea) {
+                            commentTextarea.classList.add('is-invalid');
+                        }
+                        if (commentError) {
+                            commentError.querySelector('span').textContent = comment ? 'Nội dung đánh giá phải có ít nhất 10 ký tự.' : 'Vui lòng nhập nội dung đánh giá.';
+                            commentError.classList.remove('d-none');
+                        }
+                    } else {
+                        if (commentTextarea) {
+                            commentTextarea.classList.remove('is-invalid');
+                        }
+                        if (commentError) {
+                            commentError.classList.add('d-none');
+                        }
+                    }
+                    
+                    // Nếu có lỗi, scroll đến phần đầu tiên có lỗi
+                    if (hasError) {
+                        const firstError = form.querySelector('.is-invalid') || ratingError;
+                        if (firstError) {
+                            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            if (firstError.tagName === 'TEXTAREA') {
+                                firstError.focus();
+                            }
+                        }
+                        return false;
+                    }
+                    
+                    // Nếu không có lỗi, submit form
+                    form.submit();
+                });
+                
+                // Clear error khi user nhập comment
+                const commentTextarea = form.querySelector('textarea[name="Comment"]');
+                if (commentTextarea) {
+                    commentTextarea.addEventListener('input', function() {
+                        if (this.classList.contains('is-invalid')) {
+                            this.classList.remove('is-invalid');
+                            const bookingId = form.querySelector('input[name="BookingId"]')?.value;
+                            const commentError = document.getElementById(`commentError-${bookingId}`);
+                            if (commentError) {
+                                commentError.classList.add('d-none');
+                            }
+                        }
+                    });
+                }
             });
         });
 
@@ -575,5 +846,145 @@
           const inp = form.querySelector('input[name=ImageFiles]');
           if (inp) console.log('[VIEW] files before submit =', inp.files?.length || 0);
         }, true);
+
+        // Validation cho form hủy đơn - hiển thị lỗi dưới từng field
+        document.querySelectorAll('form[action*="CancelBooking"]').forEach(form => {
+            // Clear errors khi modal được mở
+            const modalId = form.closest('.modal')?.id;
+            if (modalId) {
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.addEventListener('show.bs.modal', function() {
+                        // Clear tất cả errors khi mở modal
+                        form.querySelectorAll('.is-invalid').forEach(field => {
+                            field.classList.remove('is-invalid');
+                        });
+                        form.querySelectorAll('.invalid-feedback').forEach(errorDiv => {
+                            errorDiv.classList.add('d-none');
+                        });
+                    });
+                }
+            }
+            
+            // Lưu timeout IDs để có thể clear (scope ngoài submit handler)
+            const errorTimeouts = {};
+            
+            form.addEventListener('submit', function(e) {
+                // Ngăn submit mặc định ngay từ đầu
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const bookingId = form.querySelector('input[name="BookingId"]')?.value;
+                let hasError = false;
+                
+                // Helper function để hiển thị/ẩn lỗi
+                function showError(fieldName, errorId, message) {
+                    const field = form.querySelector(`[name="${fieldName}"]`);
+                    const errorDiv = document.getElementById(`${errorId}-${bookingId}`);
+                    
+                    if (field && errorDiv) {
+                        // Clear timeout cũ nếu có
+                        if (errorTimeouts[errorId]) {
+                            clearTimeout(errorTimeouts[errorId]);
+                            delete errorTimeouts[errorId];
+                        }
+                        
+                        if (message) {
+                            field.classList.add('is-invalid');
+                            errorDiv.querySelector('span').textContent = message;
+                            errorDiv.classList.remove('d-none');
+                            hasError = true;
+                            
+                            // Tự động ẩn sau 5 giây
+                            errorTimeouts[errorId] = setTimeout(() => {
+                                field.classList.remove('is-invalid');
+                                errorDiv.classList.add('d-none');
+                                delete errorTimeouts[errorId];
+                            }, 5000);
+                        } else {
+                            field.classList.remove('is-invalid');
+                            errorDiv.classList.add('d-none');
+                            // Clear timeout nếu đang có
+                            if (errorTimeouts[errorId]) {
+                                clearTimeout(errorTimeouts[errorId]);
+                                delete errorTimeouts[errorId];
+                            }
+                        }
+                    }
+                }
+                
+                // Validate từng field
+                const reason = form.querySelector('textarea[name="Reason"]')?.value?.trim();
+                const bankName = form.querySelector('input[name="BankName"]')?.value?.trim();
+                const accountHolder = form.querySelector('input[name="AccountHolderName"]')?.value?.trim();
+                const accountNumber = form.querySelector('input[name="BankAccountNumber"]')?.value?.trim();
+                
+                // Clear all errors first
+                showError('Reason', 'reasonError', '');
+                showError('BankName', 'bankNameError', '');
+                showError('AccountHolderName', 'accountHolderError', '');
+                showError('BankAccountNumber', 'accountNumberError', '');
+                
+                // Validate và hiển thị lỗi
+                if (!reason) {
+                    showError('Reason', 'reasonError', 'Vui lòng nhập lý do hủy đơn hàng.');
+                }
+                
+                if (!bankName) {
+                    showError('BankName', 'bankNameError', 'Vui lòng nhập tên ngân hàng.');
+                }
+                
+                if (!accountHolder) {
+                    showError('AccountHolderName', 'accountHolderError', 'Vui lòng nhập tên chủ tài khoản.');
+                }
+                
+                if (!accountNumber) {
+                    showError('BankAccountNumber', 'accountNumberError', 'Vui lòng nhập số tài khoản.');
+                } else if (!/^\d{6,20}$/.test(accountNumber)) {
+                    showError('BankAccountNumber', 'accountNumberError', 'Số tài khoản phải là số và có từ 6 đến 20 ký tự.');
+                }
+                
+                // Nếu có lỗi, ngăn submit và scroll đến field đầu tiên có lỗi
+                if (hasError) {
+                    const firstError = form.querySelector('.is-invalid');
+                    if (firstError) {
+                        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        firstError.focus();
+                    }
+                    return false;
+                }
+                
+                // Nếu không có lỗi, submit form thủ công
+                form.submit();
+            });
+            
+            // Clear error khi user nhập
+            form.querySelectorAll('input, textarea').forEach(field => {
+                field.addEventListener('input', function() {
+                    if (this.classList.contains('is-invalid')) {
+                        this.classList.remove('is-invalid');
+                        const fieldName = this.getAttribute('name');
+                        let errorId = '';
+                        if (fieldName === 'Reason') errorId = 'reasonError';
+                        else if (fieldName === 'BankName') errorId = 'bankNameError';
+                        else if (fieldName === 'AccountHolderName') errorId = 'accountHolderError';
+                        else if (fieldName === 'BankAccountNumber') errorId = 'accountNumberError';
+                        
+                        if (errorId) {
+                            const bookingId = form.querySelector('input[name="BookingId"]')?.value;
+                            const errorDiv = document.getElementById(`${errorId}-${bookingId}`);
+                            if (errorDiv) {
+                                errorDiv.classList.add('d-none');
+                            }
+                            // Clear timeout nếu có
+                            if (errorTimeouts[errorId]) {
+                                clearTimeout(errorTimeouts[errorId]);
+                                delete errorTimeouts[errorId];
+                            }
+                        }
+                    }
+                });
+            });
+        });
     </script>
 }

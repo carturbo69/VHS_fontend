@@ -31,7 +31,26 @@ namespace VHS_frontend.Controllers
                 return View(model);
             }
 
-            var result = await _authService.LoginAsync(model);
+            LoginRespondDTO? result = null;
+            try
+            {
+                result = await _authService.LoginAsync(model);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Xử lý trường hợp tài khoản bị khóa hoặc lỗi xác thực khác
+                ModelState.AddModelError(string.Empty, ex.Message);
+                ViewBag.ReturnUrl = returnUrl;
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                // Xử lý các lỗi khác
+                ModelState.AddModelError(string.Empty, "Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại.");
+                ViewBag.ReturnUrl = returnUrl;
+                return View(model);
+            }
+
             if (result == null)
             {
                 ModelState.AddModelError(string.Empty, "Sai tài khoản hoặc mật khẩu");
@@ -179,18 +198,53 @@ namespace VHS_frontend.Controllers
         // POST: /Account/ForgotPassword
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult ForgotPassword(ForgotPasswordDTO model)
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordDTO model)
         {
             if (!ModelState.IsValid)
             {
                 return View(model);
             }
 
-            // TODO: Gửi email reset password
-            // Giả sử bạn có service EmailSender -> gọi emailSender.SendResetLink(model.Email);
+            // Gửi OTP cho forgot password
+            var result = await _authService.SendForgotPasswordOTPAsync(model.Email);
+            if (result == null || !result.Success)
+            {
+                ModelState.AddModelError(string.Empty, result?.Message ?? "Gửi OTP thất bại");
+                return View(model);
+            }
 
-            TempData["Success"] = "Liên kết đặt lại mật khẩu đã được gửi đến email của bạn.";
-            return RedirectToAction("Login", "Account");
+            // Lưu email vào session để dùng cho OTP verification
+            HttpContext.Session.SetString("PendingResetEmail", model.Email);
+            TempData["ShowOTPModal"] = true;
+            TempData["ForgotPasswordMessage"] = result.Message ?? "Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email.";
+            
+            return View(model); // Giữ lại view để hiển thị modal OTP
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> VerifyForgotPasswordOTP([FromBody] VerifyOTPDTO dto)
+        {
+            var result = await _authService.VerifyForgotPasswordOTPAsync(dto.Email, dto.OTP);
+            if (result?.Success == true && result.Data != null)
+            {
+                HttpContext.Session.Remove("PendingResetEmail");
+                TempData.Remove("ShowOTPModal");
+                // Lưu token vào session để dùng cho reset password
+                HttpContext.Session.SetString("ResetPasswordToken", result.Data.ToString() ?? "");
+                return Json(new { success = true, message = result.Message, token = result.Data });
+            }
+            return Json(new { success = false, message = result?.Message ?? "Xác thực OTP thất bại." });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ResendForgotPasswordOTP([FromBody] ResendOTPDTO dto)
+        {
+            var result = await _authService.SendForgotPasswordOTPAsync(dto.Email);
+            if (result?.Success == true)
+            {
+                return Json(new { success = true, message = result.Message });
+            }
+            return Json(new { success = false, message = result?.Message ?? "Gửi lại OTP thất bại." });
         }
 
         // GET: /Account/ResetPassword
@@ -208,15 +262,33 @@ namespace VHS_frontend.Controllers
         // POST: /Account/ResetPassword
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult ResetPassword(ResetPasswordDTO model)
+        public async Task<IActionResult> ResetPassword(ResetPasswordDTO model)
         {
             if (!ModelState.IsValid)
+            {
+                // Hiển thị lỗi validation
                 return View(model);
+            }
 
-            // TODO: xử lý logic reset password bằng token + email
-            // Ví dụ: gọi service.ResetPassword(model.Email, model.Token, model.Password);
+            // Kiểm tra token và email
+            if (string.IsNullOrEmpty(model.Token) || string.IsNullOrEmpty(model.Email))
+            {
+                TempData["Error"] = "Token hoặc email không hợp lệ. Vui lòng thử lại từ đầu.";
+                return View(model);
+            }
 
-            TempData["Success"] = "Mật khẩu của bạn đã được đặt lại thành công!";
+            // Gọi service để reset password
+            var result = await _authService.ResetPasswordAsync(model.Email, model.Token, model.Password);
+            if (result == null || !result.Success)
+            {
+                TempData["Error"] = result?.Message ?? "Đặt lại mật khẩu thất bại. Vui lòng thử lại.";
+                return View(model);
+            }
+
+            // Xóa token khỏi session
+            HttpContext.Session.Remove("ResetPasswordToken");
+            
+            TempData["Success"] = result.Message ?? "Mật khẩu của bạn đã được đặt lại thành công! Bạn có thể đăng nhập ngay bây giờ.";
             return RedirectToAction("Login", "Account");
         }
     }

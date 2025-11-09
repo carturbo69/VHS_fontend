@@ -19,6 +19,15 @@
 
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 
+    // Helper function để xử lý ImageUrl trong tin nhắn (giống ServiceShop/Index.cshtml)
+    // Backend đã tự động thêm domain prefix, nên chỉ cần dùng trực tiếp
+    string GetMessageImageUrl(MessageDto message)
+    {
+        // Giống như ServiceShop: dùng trực tiếp ImageUrl, backend đã xử lý domain rồi
+        if (string.IsNullOrWhiteSpace(message.ImageUrl)) return fallbackImg;
+        return message.ImageUrl.Trim();
+    }
+
     // ===== Map hỗ trợ hiển thị trích dẫn tin gốc (reply) =====
     Func<MessageDto, string> SnippetOf = (MessageDto m) =>
     {
@@ -76,65 +85,93 @@
             _ => ""
         };
         return new Microsoft.AspNetCore.Html.HtmlString(
-            $"<span class=\"msg-status d-inline-flex align-items-center gap-1\" data-status=\"{status}\">{icon}<span class=\"d-none d-md-inline\">{text}</span></span>"
+            $"<span class=\"msg-status\" data-status=\"{status}\">{icon}<span class=\"status-text\">{text}</span></span>"
         );
     }
 }
 
-<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
 <link rel="stylesheet" href="~/css/chat-provider.css" asp-append-version="true" />
 
-<div class="container-fluid chat-wrapper">
-    <div class="row h-100 g-0">
+<div class="chat-wrapper">
+    <div class="chat-grid">
         <!-- Sidebar -->
-        <aside class="col-12 col-md-4 col-lg-3 border-end chat-col d-flex flex-column">
-            <div class="p-3">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input class="form-control" placeholder="Tìm theo tên hoặc nội dung…" />
-                </div>
-                <div class="d-flex align-items-center mt-2 small text-muted">
-                    <span class="fw-semibold">Tất cả cuộc trò chuyện</span>
-                    <span class="ms-auto">(@Model.Conversations.Count)</span>
+        <aside class="chat-sidebar">
+            <div class="sidebar-header">
+                <div class="search-box">
+                    <span class="search-icon"><i class="bi bi-search"></i></span>
+                    <input type="text" class="search-input" placeholder="Tìm theo tên hoặc nội dung…" />
                 </div>
             </div>
 
-            <div class="pt-2 px-3">
+            <div class="conversations-header">
+                <div class="conversations-title">
+                    <i class="bi bi-chat-dots"></i>
+                    <span>Tất cả cuộc trò chuyện</span>
+                </div>
+                <span class="conversations-count">@Model.Conversations.Count</span>
+            </div>
+
+            <div class="chat-with-admin-section">
                 <form method="post" action='@Url.Action("StartWithAdmin", "ChatProvider", new { area = "Provider" })'>
                     @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-success w-100 d-inline-flex align-items-center gap-2">
-                        <i class="bi bi-headset"></i> Chat với Admin
+                    <button type="submit" class="chat-admin-btn">
+                        <i class="bi bi-headset"></i>
+                        <span>Chat với Admin</span>
                     </button>
                 </form>
             </div>
 
-            <div class="chat-scroll px-2">
+            <div class="chat-scroll">
                 @foreach (var c in Model.Conversations
                                 .OrderByDescending(x => x.IsPinned)
                                 .ThenByDescending(x => x.LastMessageAt))
                 {
                     var isActive = c.ConversationId == Model.SelectedConversationId;
 
-                    <a class="d-flex align-items-start gap-2 p-2 rounded conv-item @(isActive ? "bg-light" : "")"
-                       href="@Url.Action("Index", "ChatProvider", new { area = "Provider", id = c.ConversationId })">
+                    // Dùng avatar trực tiếp từ database (conversation list item)
+                    // Ưu tiên: c.AvatarUrl từ database > otherInSelected.AvatarUrl (nếu active) > fallback
+                    string? avatarUrlToUse = null;
+                    
+                    // Ưu tiên 1: Avatar từ conversation list item (từ database - backend đã xử lý)
+                    if (!string.IsNullOrWhiteSpace(c.AvatarUrl))
+                    {
+                        avatarUrlToUse = c.AvatarUrl;
+                    }
+                    // Ưu tiên 2: Nếu conversation đang active và không có c.AvatarUrl, dùng avatar từ participant
+                    else if (isActive && hasSelection && otherInSelected != null && !string.IsNullOrWhiteSpace(otherInSelected.AvatarUrl))
+                    {
+                        avatarUrlToUse = otherInSelected.AvatarUrl;
+                    }
+                    // Fallback: Dùng ảnh mặc định
+                    else
+                    {
+                        avatarUrlToUse = null; // Sẽ dùng fallbackImg
+                    }
+
+                    <a class="conv-item @(isActive ? "active" : "")"
+                       href="@Url.Action("Index", "ChatProvider", new { area = "Provider", id = c.ConversationId })"
+                       data-conversation-id="@c.ConversationId"
+                       data-avatar-url="@(avatarUrlToUse ?? "")"
+                       data-conversation-url="@Url.Action("Index", "ChatProvider", new { area = "Provider", id = c.ConversationId })">
                         <img class="avatar"
-                             src="@((string.IsNullOrWhiteSpace(c.AvatarUrl) ? fallbackImg : c.AvatarUrl))"
+                             src="@(avatarUrlToUse ?? fallbackImg)"
                              alt=""
-                             loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                             loading="lazy" 
+                             decoding="async" 
+                             referrerpolicy="no-referrer"
                              onerror="this.onerror=null;this.src='@fallbackImg';" />
 
-                        <div class="flex-grow-1">
-                            <div class="d-flex">
-                                <div class="fw-semibold text-ellipsis-1">@c.Title</div>
-                                <div class="ms-auto small text-muted">@ToVnHHmm(c.LastMessageAt)</div>
-
+                        <div class="conv-content">
+                            <div class="conv-header">
+                                <div class="conv-title">@c.Title</div>
+                                <div class="conv-time">@ToVnHHmm(c.LastMessageAt)</div>
                             </div>
-                            <div class="small text-muted text-ellipsis-1">@c.LastMessageSnippet</div>
+                            <div class="conv-snippet">@c.LastMessageSnippet</div>
                         </div>
 
                         @if (c.UnreadCount > 0)
                         {
-                            <span class="badge rounded-pill bg-danger ms-2">@c.UnreadCount</span>
+                            <span class="unread-badge">@c.UnreadCount</span>
                         }
                     </a>
                 }
@@ -145,49 +182,46 @@
         @if (!hasSelection)
         {
             <!-- Chưa chọn hội thoại: panel phải trắng, không header, không nội dung, không ô soạn -->
-            <main class="col-12 col-md-8 col-lg-9 chat-col d-flex flex-column" style="background:#fff;"></main>
+            <main class="chat-main empty"></main>
         }
         else
         {
             <!-- Đã chọn hội thoại: hiển thị đầy đủ -->
-            <main class="col-12 col-md-8 col-lg-9 chat-col d-flex flex-column"
-                  data-selected-conv="@Model.SelectedConversationId">
+            <main class="chat-main" data-selected-conv="@Model.SelectedConversationId">
                 <!-- Header -->
-                <div class="border-bottom p-3 d-flex align-items-center position-relative">
-                    <img class="avatar me-2"
-                         src="@((string.IsNullOrWhiteSpace(otherInSelected?.AvatarUrl) ? fallbackImg : otherInSelected?.AvatarUrl))"
+                <div class="chat-header">
+                    <img class="avatar"
+                         src="@(otherInSelected?.AvatarUrl ?? fallbackImg)"
                          alt=""
-                         loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                         loading="lazy" 
+                         decoding="async" 
+                         referrerpolicy="no-referrer"
                          onerror="this.onerror=null;this.src='@fallbackImg';" />
 
-                    <div class="me-3">
-                        <div class="fw-semibold">
+                    <div class="chat-header-info">
+                        <div class="chat-header-name">
                             @(otherInSelected?.AccountName ?? selected!.Title ?? "Đối tác")
                         </div>
                     </div>
 
                     <!-- Nút 3 chấm ở góc phải -->
-                    <div class="ms-auto dropdown">
+                    <div class="chat-header-menu">
                         <button type="button"
-                                class="btn btn-link p-0 text-muted"
-                                data-bs-toggle="dropdown"
-                                data-bs-display="static"
+                                class="menu-toggle-btn"
+                                id="headerMenuBtn"
                                 aria-expanded="false"
                                 title="Tùy chọn">
-                            <i class="bi bi-three-dots fs-4"></i>
+                            <i class="bi bi-three-dots"></i>
                         </button>
 
-                        <div class="dropdown-menu dropdown-menu-end shadow-sm p-0" style="min-width:220px;">
+                        <div class="dropdown-menu hidden" id="headerMenu">
                             <form method="post"
-                                  action='@Url.Action("DeleteConversation", "ChatProvider", new { area = "Provider", id = Model.SelectedConversationId, hide = true })'
-                                  onsubmit="return confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?');">
+                                  action='@Url.Action("DeleteConversation", "ChatProvider", new { area = "Provider", id = Model.SelectedConversationId, hide = true })'>
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="dropdown-item text-danger">Xóa cuộc trò chuyện</button>
+                                <button type="submit" class="dropdown-item delete-item">Xóa cuộc trò chuyện</button>
                             </form>
                         </div>
                     </div>
-
-                  
                 </div>
 
                 <!-- Danh sách tin nhắn -->
@@ -197,12 +231,12 @@
                         foreach (var m in selected.Messages.OrderBy(x => x.CreatedAt))
                         {
                             var isMe = m.SenderAccountId == me;
-                            var createdIso = m.CreatedAt.ToUniversalTime().ToString("o"); // luôn ISO-UTC
+                            var createdIso = m.CreatedAt.ToUniversalTime().ToString("o");
 
                             var senderName = isMe ? "Bạn" : (otherInSelected?.AccountName ?? "Đối tác");
                             var snippetThis = SnippetOf(m);
 
-                            <div class="d-flex @(isMe ? "justify-content-end" : "justify-content-start")">
+                            <div class="msg-wrapper @(isMe ? "msg-me" : "msg-other")">
                                 <div class="bubble @(isMe ? "me" : "other")"
                                      data-message-id="@m.MessageId"
                                      data-created-at="@createdIso"
@@ -215,9 +249,9 @@
                                     @if (m.ReplyToMessageId != null && msgMap.TryGetValue(m.ReplyToMessageId.Value, out var parent))
                                     {
                                         var parentName = parent.SenderAccountId == me ? "Bạn" : (otherInSelected?.AccountName ?? "Người kia");
-                                        <div class="reply-ref small text-muted border-start ps-2 mb-2">
-                                            <div class="fw-semibold">@parentName</div>
-                                            <div class="text-truncate" style="max-width: 420px;">@SnippetOf(parent)</div>
+                                        <div class="reply-ref">
+                                            <div class="reply-ref-name">@parentName</div>
+                                            <div class="reply-ref-text">@SnippetOf(parent)</div>
                                         </div>
                                     }
 
@@ -227,23 +261,24 @@
                                     }
                                     @if (!string.IsNullOrWhiteSpace(decodedBody))
                                     {
-                                        <div>@decodedBody</div>
+                                        <div class="msg-body">@decodedBody</div>
                                     }
 
                                     @if (!string.IsNullOrWhiteSpace(m.ImageUrl))
                                     {
                                         <img src="@m.ImageUrl"
-                                             class="mt-2 rounded"
-                                             style="max-width:220px;"
-                                             loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                                             class="msg-image"
+                                             loading="lazy" 
+                                             decoding="async" 
+                                             referrerpolicy="no-referrer"
                                              onerror="this.onerror=null;this.src='@fallbackImg';" />
                                     }
 
-                                    <div class="msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2">
-                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời">
-                                            <i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span>
+                                    <div class="msg-meta">
+                                        <button type="button" class="reply-btn" title="Trả lời">
+                                            <i class="bi bi-reply"></i> <span class="reply-text">Reply</span>
                                         </button>
-                                        <span class="text-muted">@ToVnHHmm(m.CreatedAt)</span>
+                                        <span class="msg-time">@ToVnHHmm(m.CreatedAt)</span>
 
                                         @if (isMe)
                                         {
@@ -258,60 +293,61 @@
                 </div>
 
                 <!-- Ô soạn tin -->
-                <div class="msg-input p-3">
+                <div class="msg-input">
                     <form method="post"
                           action='@Url.Action("Send", "ChatProvider", new { area = "Provider" })'
-                          class="w-100"
+                          class="msg-form"
                           enctype="multipart/form-data">
 
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="conversationId" value="@Model.SelectedConversationId" />
                         <!-- ===== Hidden + pill hiển thị đang trả lời ===== -->
                         <input type="hidden" name="replyToMessageId" id="replyToMessageId" value="" />
-                        <div id="replyPreview" class="replying-pill d-none p-2 mb-2 small d-flex align-items-start gap-2">
-                            <i class="bi bi-reply mt-1"></i>
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold" id="replyingToName"></div>
-                                <div class="text-muted text-truncate" id="replyingSnippet" style="max-width: 520px;"></div>
+                        <div id="replyPreview" class="replying-pill hidden">
+                            <i class="bi bi-reply"></i>
+                            <div class="replying-content">
+                                <div class="replying-name" id="replyingToName"></div>
+                                <div class="replying-snippet" id="replyingSnippet"></div>
                             </div>
-                            <button type="button" id="cancelReplyBtn" class="btn btn-sm btn-outline-secondary">Hủy</button>
+                            <button type="button" id="cancelReplyBtn" class="cancel-reply-btn">Hủy</button>
                         </div>
 
-                        <div id="attachPreview" class="d-none mt-2">
-                            <div class="d-inline-flex align-items-center gap-2 border rounded p-2 bg-light">
+                        <div id="attachPreview" class="attach-preview hidden">
+                            <div class="attach-preview-box">
+                                <div class="attach-thumb-wrapper">
                                 <img id="attachThumb"
                                      src=""
                                      alt="Xem trước"
-                                     style="width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;"
+                                         class="attach-thumb"
                                      onerror="this.onerror=null;this.src='@fallbackImg';" />
-                                <div class="small text-muted" id="attachName"></div>
-                                <button type="button" id="removeAttachBtn" class="btn btn-sm btn-outline-secondary">
-                                    Bỏ ảnh
+                                    <button type="button" id="removeAttachBtn" class="remove-attach-btn" title="Xóa ảnh">
+                                        <i class="bi bi-x-lg"></i>
                                 </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="d-flex gap-2 align-items-start">
+                        <div class="msg-input-row">
                             <input type="text"
                                    name="body"
-                                   class="form-control"
+                                   class="msg-input-field"
                                    placeholder="Nhập tin nhắn…"
                                    autocomplete="off" />
 
                             <input type="file"
                                    id="fileInput"
                                    name="image"
-                                   class="d-none"
+                                   class="file-input-hidden"
                                    accept="image/*" />
 
                             <button type="button"
                                     id="pickFileBtn"
-                                    class="btn"
+                                    class="attach-btn"
                                     title="Đính kèm ảnh">
                                 <i class="bi bi-paperclip"></i>
                             </button>
 
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="send-btn">
                                 Gửi
                             </button>
                         </div>
@@ -324,27 +360,531 @@
 
 
 @section Scripts {
+    @* Hệ thống quản lý avatar trong conversation list (sử dụng sessionStorage) *@
+    <script>
+        (function() {
+            try {
+                var fallbackImg = '@fallbackImg';
+                var STORAGE_KEY = 'chat_avatars_provider';
+                
+                // Khởi tạo storage nếu chưa có
+                function initStorage() {
+                    if (!sessionStorage.getItem(STORAGE_KEY)) {
+                        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+                    }
+                }
+                
+                // Lấy avatar từ storage
+                function getAvatarFromStorage(convId) {
+                    try {
+                        var storage = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
+                        return storage[convId] || null;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                
+                // Lưu avatar vào storage
+                function saveAvatarToStorage(convId, avatarUrl) {
+                    try {
+                        initStorage();
+                        var storage = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
+                        if (avatarUrl && avatarUrl.trim()) {
+                            storage[convId] = avatarUrl;
+                            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
+                            return true;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to save avatar to storage:', e);
+                    }
+                    return false;
+                }
+                
+                // Cập nhật avatar trong conversation item
+                function updateAvatarInListItem(convItem, avatarUrl) {
+                    if (!convItem || !avatarUrl) return;
+                    
+                    var avatarImg = convItem.querySelector('.avatar');
+                    if (!avatarImg) return;
+                    
+                    var currentSrc = avatarImg.getAttribute('src') || '';
+                    var isFallback = !currentSrc || currentSrc === fallbackImg || currentSrc.indexOf('VeSinh.jpg') > -1;
+                    
+                    // Cập nhật nếu đang hiển thị fallback hoặc URL khác
+                    if (isFallback || (currentSrc && currentSrc !== avatarUrl && !currentSrc.includes(avatarUrl.split('?')[0]))) {
+                        var separator = avatarUrl.indexOf('?') > -1 ? '&' : '?';
+                        avatarImg.src = avatarUrl + separator + 't=' + new Date().getTime();
+                        // Cập nhật data-avatar-url attribute
+                        convItem.setAttribute('data-avatar-url', avatarUrl);
+                    }
+                }
+                
+                // Áp dụng avatar từ storage cho tất cả conversations
+                function applyStoredAvatars() {
+                    var convItems = document.querySelectorAll('.conv-item[data-conversation-id]');
+                    convItems.forEach(function(convItem) {
+                        var convId = convItem.getAttribute('data-conversation-id');
+                        if (convId) {
+                            var storedAvatar = getAvatarFromStorage(convId);
+                            if (storedAvatar) {
+                                updateAvatarInListItem(convItem, storedAvatar);
+                            }
+                        }
+                    });
+                }
+                
+                // Khởi tạo
+                initStorage();
+                
+                // Áp dụng avatar từ storage ngay khi trang load
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', applyStoredAvatars);
+                } else {
+                    applyStoredAvatars();
+                }
+                
+                // Lưu hàm vào window để sử dụng từ các script khác
+                window.chatAvatarManager = {
+                    save: saveAvatarToStorage,
+                    get: getAvatarFromStorage,
+                    update: updateAvatarInListItem,
+                    applyAll: applyStoredAvatars
+                };
+            } catch (e) {
+                console.warn('Failed to initialize avatar manager:', e);
+            }
+        })();
+    </script>
+    
+    @* Lưu avatar từ selected conversation vào storage *@
+    @if (hasSelection && otherInSelected != null && Model.SelectedConversationId.HasValue && !string.IsNullOrWhiteSpace(otherInSelected.AvatarUrl))
+    {
+        <script>
+            (function() {
+                try {
+                    var selectedConvId = '@Model.SelectedConversationId.Value';
+                    var correctAvatarUrl = '@(Html.Raw(otherInSelected.AvatarUrl?.Replace("'", "\\'").Replace("\"", "&quot;") ?? ""))';
+                    
+                    if (selectedConvId && correctAvatarUrl && window.chatAvatarManager) {
+                        // Lưu vào storage
+                        window.chatAvatarManager.save(selectedConvId, correctAvatarUrl);
+                        
+                        // Cập nhật ngay trong list
+                        var selectedConvItem = document.querySelector('.conv-item[data-conversation-id="' + selectedConvId + '"]');
+                        if (selectedConvItem) {
+                            window.chatAvatarManager.update(selectedConvItem, correctAvatarUrl);
+                        }
+                        
+                        // Áp dụng lại cho tất cả conversations (để đảm bảo)
+                        setTimeout(function() {
+                            window.chatAvatarManager.applyAll();
+                        }, 100);
+                    }
+                } catch (e) {
+                    console.warn('Failed to save avatar from selected conversation:', e);
+                }
+            })();
+        </script>
+    }
+    
+    @* Ngăn reload khi click vào conversation và load qua AJAX *@
+    <script>
+        (function() {
+            var isLoading = false;
+            
+            // Lắng nghe khi có conversation được click
+            document.addEventListener('click', function(e) {
+                var convItem = e.target.closest('.conv-item[data-conversation-id]');
+                if (!convItem) return;
+                
+                // Ngăn navigation mặc định
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Nếu đang loading, bỏ qua
+                if (isLoading) {
+                    console.log('[Chat] Already loading, ignoring click');
+                    return;
+                }
+                
+                var convId = convItem.getAttribute('data-conversation-id');
+                var convUrl = convItem.getAttribute('data-conversation-url') || convItem.getAttribute('href');
+                var avatarUrl = convItem.getAttribute('data-avatar-url');
+                
+                if (!convId || !convUrl) {
+                    console.warn('[Chat] Missing conversation ID or URL');
+                    return;
+                }
+                
+                // Lưu avatar vào storage nếu có
+                if (window.chatAvatarManager && avatarUrl && avatarUrl.trim()) {
+                    window.chatAvatarManager.save(convId, avatarUrl);
+                }
+                
+                // Cập nhật active state trong sidebar
+                document.querySelectorAll('.conv-item').forEach(function(item) {
+                    item.classList.remove('active');
+                });
+                convItem.classList.add('active');
+                
+                // Ẩn unread badge
+                var unreadBadge = convItem.querySelector('.unread-badge');
+                if (unreadBadge) {
+                    unreadBadge.style.display = 'none';
+                    unreadBadge.remove();
+                }
+                
+                // Load conversation qua AJAX
+                isLoading = true;
+                var chatMain = document.querySelector('.chat-main');
+                
+                // Hiển thị loading state
+                if (chatMain) {
+                    chatMain.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;"><div style="text-align: center;"><div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"><span class="visually-hidden">Loading...</span></div><div style="margin-top: 1rem;">Đang tải cuộc trò chuyện...</div></div></div>';
+                }
+                
+                // Fetch conversation mới
+                fetch(convUrl, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'text/html'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.status);
+                    }
+                    return response.text();
+                })
+                .then(function(html) {
+                    // Parse HTML response
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Extract chat-main từ response
+                    var newChatMain = doc.querySelector('.chat-main');
+                    if (newChatMain && chatMain) {
+                        // Update chat-main content (không include scripts để tránh duplicate execution)
+                        chatMain.outerHTML = newChatMain.outerHTML;
+                        
+                        // Update URL với History API (không reload)
+                        if (window.history && window.history.pushState) {
+                            window.history.pushState({ conversationId: convId }, '', convUrl);
+                        }
+                        
+                        // Re-init SignalR sau khi scripts đã execute
+                        if (window.__initProviderChatRealtime) {
+                            setTimeout(function() {
+                                window.__initProviderChatRealtime();
+                            }, 200);
+                        }
+                        
+                        // Re-init các event handlers
+                        setTimeout(function() {
+                            // File attach preview
+                            var pickBtn = document.getElementById('pickFileBtn');
+                            var fileInput = document.getElementById('fileInput');
+                            var previewWrap = document.getElementById('attachPreview');
+                            var imgEl = document.getElementById('attachThumb');
+                            var removeBtn = document.getElementById('removeAttachBtn');
+                            var objectUrl = null;
+                            
+                            if (pickBtn && fileInput) {
+                                pickBtn.addEventListener('click', function() { fileInput.click(); });
+                                
+                                fileInput.addEventListener('change', function() {
+                                    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+                                    
+                                    if (fileInput.files && fileInput.files.length > 0) {
+                                        var f = fileInput.files[0];
+                                        if (!f.type || !f.type.startsWith('image/')) {
+                                            alert('Vui lòng chọn file ảnh.');
+                                            fileInput.value = '';
+                                            if (previewWrap) previewWrap.classList.add('hidden');
+                                            return;
+                                        }
+                                        objectUrl = URL.createObjectURL(f);
+                                        if (imgEl) imgEl.src = objectUrl;
+                                        if (previewWrap) previewWrap.classList.remove('hidden');
+                                    } else {
+                                        if (previewWrap) previewWrap.classList.add('hidden');
+                                    }
+                                });
+                                
+                                if (removeBtn) {
+                                    removeBtn.addEventListener('click', function() {
+                                        if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+                                        if (fileInput) fileInput.value = '';
+                                        if (imgEl) imgEl.src = '';
+                                        if (previewWrap) previewWrap.classList.add('hidden');
+                                    });
+                                }
+                            }
+                            
+                            // Reply UI
+                            var pageMain = document.querySelector('main.chat-main[data-selected-conv]');
+                            if (pageMain) {
+                                var form = pageMain.querySelector('form[action*="ChatProvider/Send"]');
+                                var bodyInput = form?.querySelector('input[name="body"]');
+                                var replyHidden = form?.querySelector('#replyToMessageId');
+                                var replyPreview = document.getElementById('replyPreview');
+                                var replyingToName = document.getElementById('replyingToName');
+                                var replyingSnippet = document.getElementById('replyingSnippet');
+                                var cancelReplyBtn = document.getElementById('cancelReplyBtn');
+                                
+                                function showReplyPreview(id, name, snippet) {
+                                    if (!replyHidden || !replyPreview) return;
+                                    replyHidden.value = id || '';
+                                    if (replyingToName) replyingToName.textContent = name || '—';
+                                    if (replyingSnippet) replyingSnippet.textContent = snippet || '';
+                                    replyPreview.classList.remove('hidden');
+                                    if (bodyInput) bodyInput.focus();
+                                }
+                                
+                                function clearReplyPreview() {
+                                    if (replyHidden) replyHidden.value = '';
+                                    if (replyingToName) replyingToName.textContent = '';
+                                    if (replyingSnippet) replyingSnippet.textContent = '';
+                                    if (replyPreview) replyPreview.classList.add('hidden');
+                                }
+                                
+                                if (cancelReplyBtn) {
+                                    cancelReplyBtn.addEventListener('click', function(e) {
+                                        e.preventDefault();
+                                        clearReplyPreview();
+                                    });
+                                }
+                                
+                                pageMain.addEventListener('click', function(e) {
+                                    var btn = e.target.closest('.reply-btn');
+                                    if (!btn) return;
+                                    var bubble = btn.closest('.bubble');
+                                    if (!bubble) return;
+                                    
+                                    var id = bubble.getAttribute('data-message-id') || '';
+                                    var name = bubble.getAttribute('data-sender-name') || '—';
+                                    var sn = bubble.getAttribute('data-snippet') || '';
+                                    
+                                    showReplyPreview(id, name, sn);
+                                }, {passive: true});
+                            }
+                            
+                            // Menu header toggle
+                            var headerMenuBtn = document.getElementById('headerMenuBtn');
+                            var headerMenu = document.getElementById('headerMenu');
+                            if (headerMenuBtn && headerMenu) {
+                                function closeMenu() {
+                                    headerMenu.classList.add('hidden');
+                                    headerMenuBtn.setAttribute('aria-expanded', 'false');
+                                }
+                                function openMenu() {
+                                    headerMenu.classList.remove('hidden');
+                                    headerMenuBtn.setAttribute('aria-expanded', 'true');
+                                }
+                                
+                                headerMenuBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (headerMenu.classList.contains('hidden')) {
+                                        openMenu();
+                                    } else {
+                                        closeMenu();
+                                    }
+                                });
+                                
+                                headerMenu.addEventListener('click', function(e) {
+                                    e.stopPropagation();
+                                    if (e.target.closest('button[type="submit"]')) {
+                                        setTimeout(closeMenu, 100);
+                                    }
+                                });
+                                
+                                document.addEventListener('click', function(e) {
+                                    if (headerMenu.contains(e.target) || e.target === headerMenuBtn || headerMenuBtn.contains(e.target) || e.target.closest('.dropdown-menu')) {
+                                        return;
+                                    }
+                                    closeMenu();
+                                }, { passive: true });
+                                
+                                document.addEventListener('keydown', function(e) {
+                                    if (e.key === 'Escape') closeMenu();
+                                });
+                            }
+                            
+                            // Auto-scroll to bottom
+                            setTimeout(function() {
+                                var msgList = document.getElementById('msgList');
+                                if (msgList) {
+                                    msgList.scrollTop = msgList.scrollHeight;
+                                }
+                            }, 100);
+                        }, 150);
+                    } else {
+                        console.error('[Chat] Could not find chat-main in response');
+                        // Fallback: reload page
+                        window.location.href = convUrl;
+                    }
+                })
+                .catch(function(error) {
+                    console.error('[Chat] Error loading conversation:', error);
+                    // Fallback: reload page
+                    window.location.href = convUrl;
+                })
+                .finally(function() {
+                    isLoading = false;
+                });
+            }, true); // Use capture phase to intercept early
+        })();
+    </script>
+    
     @* Auto-scroll khi đã chọn hội thoại *@
     @if (hasSelection)
     {
         <script>
             (function () {
+              // Sử dụng setTimeout để đảm bảo DOM đã render xong
+              setTimeout(function() {
+                var el = document.getElementById('msgList');
+                if (el) {
+                  el.scrollTop = el.scrollHeight;
+                }
+              }, 100);
+              
+              // Scroll lại sau khi images load xong
+              var imgEls = document.querySelectorAll('#msgList img');
+              var loadedCount = 0;
+              imgEls.forEach(function(img) {
+                if (img.complete) {
+                  loadedCount++;
+                } else {
+                  img.addEventListener('load', function() {
+                    loadedCount++;
+                    if (loadedCount === imgEls.length) {
+                      var el = document.getElementById('msgList');
+                      if (el) el.scrollTop = el.scrollHeight;
+                    }
+                  });
+                }
+              });
+              
+              if (loadedCount === imgEls.length && imgEls.length > 0) {
+                setTimeout(function() {
               var el = document.getElementById('msgList');
               if (el) el.scrollTop = el.scrollHeight;
+                }, 200);
+              }
             })();
         </script>
     }
 
     <script>
-        // ===== File attach preview (giữ nguyên) =====
+        // ===== Ẩn badge unread khi click vào conversation và scroll xuống tin nhắn mới nhất =====
+        (function() {
+          document.addEventListener('click', function(e) {
+            var convItem = e.target.closest('.conv-item');
+            if (!convItem) return;
+            
+            var unreadBadge = convItem.querySelector('.unread-badge');
+            if (unreadBadge) {
+              // Ẩn badge ngay lập tức
+              unreadBadge.style.display = 'none';
+              unreadBadge.remove();
+            }
+            
+            // Khi click vào conversation, sau khi page load sẽ scroll xuống tin nhắn mới nhất
+            // Logic này sẽ được thực hiện trong phần auto-scroll ở trên
+          });
+        })();
+        
+        // ===== Menu header toggle (khởi tạo ngay, không cần SignalR) =====
+        (function () {
+          var btn = document.getElementById('headerMenuBtn');
+          var menu = document.getElementById('headerMenu');
+          if (!btn || !menu) return;
+
+          function closeMenu() {
+            menu.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+          }
+          function openMenu() {
+            menu.classList.remove('hidden');
+            btn.setAttribute('aria-expanded', 'true');
+          }
+
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Menu button clicked, current state:', menu.classList.contains('hidden'));
+            if (menu.classList.contains('hidden')) {
+              openMenu();
+              console.log('Menu opened');
+            } else {
+              closeMenu();
+              console.log('Menu closed');
+            }
+          });
+          
+          // Không đóng menu khi click vào menu item hoặc form
+          menu.addEventListener('click', function(e){
+            e.stopPropagation();
+            // Nếu click vào button submit, cho phép form submit nhưng vẫn đóng menu sau
+            if (e.target.closest('button[type="submit"]')) {
+              setTimeout(function() {
+                closeMenu();
+              }, 100);
+              return;
+            }
+          });
+
+          document.addEventListener('click', function (e) {
+            // Không đóng menu nếu click vào menu, button, hoặc form
+            if (menu.contains(e.target) || e.target === btn || btn.contains(e.target) || e.target.closest('.dropdown-menu')) {
+              return;
+            }
+            closeMenu();
+          }, { passive: true });
+
+          document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeMenu();
+          });
+        })();
+    </script>
+
+    <script>
+        // ===== File attach preview + chặn gửi rỗng =====
         (function () {
           var pickBtn = document.getElementById('pickFileBtn');
           var fileInput = document.getElementById('fileInput');
           var previewWrap = document.getElementById('attachPreview');
           var imgEl = document.getElementById('attachThumb');
-          var nameEl = document.getElementById('attachName');
           var removeBtn = document.getElementById('removeAttachBtn');
           var objectUrl = null;
+
+          // Form/Inputs
+          var form = document.querySelector('form[action*="ChatProvider/Send"]');
+          var bodyInput = form?.querySelector('input[name="body"]');
+          var sendBtn = form?.querySelector('button[type="submit"]');
+
+          function hasPayload() {
+            var hasText = !!(bodyInput && bodyInput.value.trim().length > 0);
+            var hasImage = !!(fileInput && fileInput.files && fileInput.files.length > 0);
+            return hasText || hasImage;
+          }
+          function refreshSendState() { if (sendBtn) sendBtn.disabled = !hasPayload(); }
+
+          form?.addEventListener('submit', function (e) {
+            if (!hasPayload()) {
+              e.preventDefault();
+              alert('Vui lòng nhập nội dung hoặc đính kèm ảnh trước khi gửi.');
+              bodyInput?.focus();
+              return false;
+            }
+            if (sendBtn) sendBtn.disabled = true; // chặn spam
+          });
+
+          bodyInput?.addEventListener('input', refreshSendState);
 
           if (!pickBtn || !fileInput) return;
 
@@ -359,31 +899,31 @@
               if (!f.type || !f.type.startsWith('image/')) {
                 alert('Vui lòng chọn file ảnh.');
                 fileInput.value = '';
-                previewWrap.classList.add('d-none');
+                previewWrap.classList.add('hidden');
                 return;
               }
 
               objectUrl = URL.createObjectURL(f);
               imgEl.src = objectUrl;
-              nameEl.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
-              previewWrap.classList.remove('d-none');
+              previewWrap.classList.remove('hidden');
             } else {
-              previewWrap.classList.add('d-none');
+              previewWrap.classList.add('hidden');
             }
+            refreshSendState();
           });
 
           removeBtn?.addEventListener('click', function () {
             if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
             fileInput.value = '';
             imgEl.src = '';
-            nameEl.textContent = '';
-            previewWrap.classList.add('d-none');
+            previewWrap.classList.add('hidden');
+            refreshSendState();
           });
         })();
 
         // ===== Reply UI: KHỞI TẠO ĐỘC LẬP KHỎI SIGNALR =====
         (function initReplyUi(){
-          var pageMain = document.querySelector('main.chat-col[data-selected-conv]');
+          var pageMain = document.querySelector('main.chat-main[data-selected-conv]');
           if (!pageMain) return;
 
           var form = pageMain.querySelector('form[action*="ChatProvider/Send"]');
@@ -400,14 +940,14 @@
             replyHidden.value = id || '';
             if (replyingToName) replyingToName.textContent = name || '—';
             if (replyingSnippet) replyingSnippet.textContent = snippet || '';
-            replyPreview.classList.remove('d-none');
+            replyPreview.classList.remove('hidden');
             bodyInput?.focus();
           }
           function clearReplyPreview(){
             if (replyHidden) replyHidden.value = '';
             if (replyingToName) replyingToName.textContent = '';
             if (replyingSnippet) replyingSnippet.textContent = '';
-            replyPreview?.classList.add('d-none');
+            replyPreview?.classList.add('hidden');
           }
 
           cancelReplyBtn?.addEventListener('click', function(e){
@@ -419,7 +959,7 @@
           pageMain.addEventListener('click', function(e){
             var btn = e.target.closest('.reply-btn');
             if (!btn) return;
-            var bubble = btn.closest('.bubble'); // ✅ sửa: không dùng e.target.closest
+            var bubble = btn.closest('.bubble');
             if (!bubble) return;
 
             var id = bubble.getAttribute('data-message-id') || '';
@@ -437,7 +977,7 @@
         // Tất cả logic realtime gom vào hàm này; gọi sau khi SignalR sẵn sàng
         window.__initProviderChatRealtime = function () {
           // Chỉ init khi có cuộc trò chuyện được chọn
-          var pageMain = document.querySelector('main.chat-col[data-selected-conv]');
+          var pageMain = document.querySelector('main.chat-main[data-selected-conv]');
           if (!pageMain) { console.debug('[provider-chat] no selection, skip signalR'); return; }
 
           const me = '@(Model.CurrentAccount?.AccountId.ToString())';
@@ -459,7 +999,7 @@
               case 'Delivered': icon = '<i class="bi bi-check2-all"></i>';    text = 'Đã nhận';  break;
               case 'Seen':      icon = '<i class="bi bi-check2-all"></i>';    text = 'Đã xem';   break;
             }
-            return '<span class="msg-status d-inline-flex align-items-center gap-1" data-status="'+status+'">'+icon+'<span class="d-none d-md-inline">'+text+'</span></span>';
+            return '<span class="msg-status" data-status="'+status+'">'+icon+'<span class="status-text">'+text+'</span></span>';
           }
 
           function setBubbleStatus(bubble, status){
@@ -500,15 +1040,14 @@
             var sn   = parent?.getAttribute('data-snippet')      || (msg.replyToSnippet || '(Không có nội dung)');
 
             var wrap = document.createElement('div');
-            wrap.className = 'reply-ref small text-muted border-start ps-2 mb-2';
+            wrap.className = 'reply-ref';
 
             var nameEl = document.createElement('div');
-            nameEl.className = 'fw-semibold';
+            nameEl.className = 'reply-ref-name';
             nameEl.textContent = name;
 
             var snEl = document.createElement('div');
-            snEl.className = 'text-truncate';
-            snEl.style.maxWidth = '420px';
+            snEl.className = 'reply-ref-text';
             snEl.textContent = sn;
 
             wrap.appendChild(nameEl);
@@ -531,6 +1070,15 @@
           });
 
           connection.on('message:created', msg => {
+            // Lưu avatar từ sender vào storage nếu có
+            if (msg.conversationId && msg.sender && msg.sender.avatarUrl && window.chatAvatarManager) {
+              window.chatAvatarManager.save(msg.conversationId, msg.sender.avatarUrl);
+              // Cập nhật avatar trong list ngay lập tức
+              var convItem = document.querySelector('.conv-item[data-conversation-id="' + msg.conversationId + '"]');
+              if (convItem) {
+                window.chatAvatarManager.update(convItem, msg.sender.avatarUrl);
+              }
+            }
             if (!msg) return;
             if (String(msg.conversationId).toLowerCase() !== String(selectedConversationId).toLowerCase()) return;
 
@@ -540,7 +1088,7 @@
             const isMine = String(msg.senderAccountId).toLowerCase() === String(me).toLowerCase();
 
             const wrap = document.createElement('div');
-            wrap.className = 'd-flex ' + (isMine ? 'justify-content-end' : 'justify-content-start');
+            wrap.className = 'msg-wrapper ' + (isMine ? 'msg-me' : 'msg-other');
 
             const bubble = document.createElement('div');
             bubble.className = 'bubble ' + (isMine ? 'me' : 'other');
@@ -558,21 +1106,27 @@
 
             if (msg.body){
               const bodyEl = document.createElement('div');
+              bodyEl.className = 'msg-body';
               bodyEl.textContent = msg.body;
               bubble.appendChild(bodyEl);
             }
             if (msg.imageUrl){
               const img = document.createElement('img');
+              // Giống ServiceShop: dùng trực tiếp imageUrl, backend đã xử lý domain rồi
               img.src = msg.imageUrl;
-              img.className = 'mt-2 rounded';
-              img.style.maxWidth = '220px';
+              img.className = 'msg-image';
               img.loading = 'lazy';
               img.decoding = 'async';
+              img.referrerPolicy = 'no-referrer';
+              img.onerror = function() {
+                this.onerror = null;
+                this.src = '@fallbackImg';
+              };
               bubble.appendChild(img);
             }
 
             const meta = document.createElement('div');
-            meta.className = 'msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2';
+            meta.className = 'msg-meta';
                    // Dùng formatter theo VN, 24h
         const fmtVN = new Intl.DateTimeFormat('vi-VN', {
           hour: '2-digit',
@@ -585,15 +1139,18 @@
         const hhmm = isNaN(d) ? '' : fmtVN.format(d);
 
         meta.innerHTML =
-          '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span></button>'
-          + '<span class="text-muted">' + hhmm + '</span>'
+              '<button type="button" class="reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="reply-text">Reply</span></button>'
+              + '<span class="msg-time">' + hhmm + '</span>'
           + (isMine ? statusHtml(msg.status || 'Sent') : '');
 
             bubble.appendChild(meta);
 
             wrap.appendChild(bubble);
             list.appendChild(wrap);
+            // Scroll xuống tin nhắn mới nhất với smooth scroll
+            setTimeout(function() {
             list.scrollTop = list.scrollHeight;
+            }, 50);
           });
 
           // ====== Reconnect lifecycle ======
@@ -633,37 +1190,6 @@
               setTimeout(startAndRegister, 2000);
             }
           })();
-
-          // (tuỳ chọn) header menu toggle — giữ nguyên nếu bạn có menu custom
-          (function () {
-            var btn = document.getElementById('headerMenuBtn');
-            var menu = document.getElementById('headerMenu');
-            if (!btn || !menu) return;
-
-            function closeMenu() {
-              menu.classList.add('d-none');
-              btn.setAttribute('aria-expanded', 'false');
-            }
-            function openMenu() {
-              menu.classList.remove('d-none');
-              btn.setAttribute('aria-expanded', 'true');
-            }
-
-            btn.addEventListener('click', function (e) {
-              e.stopPropagation();
-              if (menu.classList.contains('d-none')) openMenu(); else closeMenu();
-            });
-
-            document.addEventListener('click', function (e) {
-              if (!menu.contains(e.target) && e.target !== btn) {
-                closeMenu();
-              }
-            }, { passive: true });
-
-            document.addEventListener('keydown', function (e) {
-              if (e.key === 'Escape') closeMenu();
-            });
-          })();
         };
 
         // Nếu SignalR đã có sẵn từ bundle => init ngay; nếu chưa, tải CDN rồi init onload
@@ -681,5 +1207,4 @@
         })();
     </script>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 }

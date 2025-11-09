@@ -16,6 +16,78 @@
         System.Diagnostics.Debug.WriteLine($"Services count: {Model.Services?.Count ?? 0}");
         System.Diagnostics.Debug.WriteLine($"BestsellingServices count: {Model.BestsellingServices?.Count ?? 0}");
     }
+
+    // Helper functions để xử lý ảnh giống Services/Index.cshtml và Details.cshtml
+    string? FirstImageOrDefault(string? images)
+    {
+        if (string.IsNullOrWhiteSpace(images)) return null;
+
+        try
+        {
+            // Thử parse JSON array trước
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+            if (arr != null && arr.Count > 0) return arr[0];
+        }
+        catch { /* ignore JSON parse error */ }
+
+        // Nếu không phải JSON, thử split bằng dấu phẩy
+        if (images.Contains(','))
+        {
+            var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
+        
+        // Nếu không có dấu phẩy, trả về nguyên chuỗi
+        return images;
+    }
+
+    var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+
+    string FallbackByUnit(string? unit)
+    {
+        if (string.IsNullOrWhiteSpace(unit)) return Url.Content("~/images/VeSinh.jpg");
+        
+        var unitLower = unit.Trim().ToLower();
+        
+        // Kiểm tra các pattern khác nhau của UnitType
+        if (unitLower.Contains("nội trợ") || unitLower == "nội trợ")
+            return Url.Content("~/images/NoiTro.jpg");
+        
+        if (unitLower.Contains("sự kiện") || unitLower.Contains("sukien") || unitLower == "sự kiện nhỏ tại nhà")
+            return Url.Content("~/images/SuKienNho.jpg");
+        
+        // Mặc định
+        return Url.Content("~/images/VeSinh.jpg");
+    }
+
+    // Helper để lấy ảnh cho service (giống Services/Index.cshtml)
+    // Backend đã tự động thêm domain prefix, nên chỉ cần dùng trực tiếp
+    string GetServiceImage(VHS_frontend.Models.ServiceItem service)
+    {
+        // Ưu tiên ImageUrl trước (giống service.Images trong Services/Index.cshtml)
+        if (!string.IsNullOrWhiteSpace(service.ImageUrl))
+        {
+            var img = FirstImageOrDefault(service.ImageUrl);
+            if (!string.IsNullOrWhiteSpace(img))
+            {
+                return img; // Backend đã thêm domain prefix rồi, dùng trực tiếp
+            }
+        }
+
+        // Sau đó thử Image
+        if (!string.IsNullOrWhiteSpace(service.Image))
+        {
+            var img = FirstImageOrDefault(service.Image);
+            if (!string.IsNullOrWhiteSpace(img))
+            {
+                return img; // Backend đã thêm domain prefix rồi, dùng trực tiếp
+            }
+        }
+
+        // Cuối cùng fallback theo Unit
+        return FallbackByUnit(service.Unit);
+    }
 }
 
 <link rel="stylesheet" href="~/css/service-shop.css" asp-append-version="true" />
@@ -111,7 +183,7 @@
                             }
                         </div>
                         <div class="product-image">
-                            <img src="@service.Image" alt="@service.Name" onerror="this.src='/images/VeSinh.jpg'">
+                            <img src="@GetServiceImage(service)" alt="@service.Name" data-fallback="@fallbackImg">
                         </div>
                         <div class="product-info">
                             <h4 class="product-name">@service.Name</h4>
@@ -243,7 +315,7 @@
                                     }
                                 </div>
                                 <div class="product-image">
-                                    <img src="@service.Image" alt="@service.Name" onerror="this.src='/images/VeSinh.jpg'">
+                                    <img src="@GetServiceImage(service)" alt="@service.Name" data-fallback="@fallbackImg">
                                 </div>
                                 <div class="product-info">
                                     <h4 class="product-name">@service.Name</h4>
@@ -275,6 +347,32 @@
 
 @section Scripts {
     <script>
+        // Tự động thay ảnh lỗi bằng fallback, tránh lặp vô hạn khi fallback hỏng.
+        (function () {
+          function applyFallback(img) {
+            if (!img || img.dataset.fallbackApplied === '1') return;
+            const fb = img.getAttribute('data-fallback');
+            if (!fb) return;
+            img.dataset.fallbackApplied = '1';
+            img.src = fb;
+          }
+
+          // Gắn listener cho tất cả ảnh có data-fallback
+          function wireImages(root = document) {
+            root.querySelectorAll('img[data-fallback]').forEach(function (img) {
+              // Nếu ảnh đã load lỗi trước khi gắn listener, xử lý ngay
+              if (img.complete && img.naturalWidth === 0) applyFallback(img);
+
+              // Bắt lỗi khi load thất bại
+              img.addEventListener('error', function () {
+                applyFallback(img);
+              }, { once: true });
+            });
+          }
+
+          wireImages(document);
+        })();
+
         const providerId = '@Model.ProviderId';
         let currentCategoryId = '@(Model.SelectedCategoryId?.ToString() ?? "")';
         let currentTagId = '@(Model.SelectedTagId?.ToString() ?? "")';
