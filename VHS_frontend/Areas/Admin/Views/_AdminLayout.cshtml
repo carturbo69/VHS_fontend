@@ -130,14 +130,9 @@
 
                 <!-- Chat -->
                 <a asp-area="Admin" asp-controller="ChatAdmin" asp-action="Index"
-                   class="icon-btn chat-btn" aria-label="Chat">
-                    <svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 4h16v12H5.17L4 17.17V4z" fill="none" stroke="currentColor" stroke-width="2" />
-                        <circle cx="8" cy="10" r="1.5" />
-                        <circle cx="12" cy="10" r="1.5" />
-                        <circle cx="16" cy="10" r="1.5" />
-                    </svg>
-                    <span class="chat-badge" data-chat-count>0</span>
+                   class="icon-btn chat-btn" aria-label="Chat" title="Chat">
+                    <i class="bi bi-chat-dots fs-5"></i>
+                    <span class="chat-badge badge-dot" data-chat-count style="display:none;">0</span>
                 </a>
 
                 <!-- Notifications -->
@@ -159,7 +154,14 @@
                 <!-- User -->
                 <div class="user">
                     <i class="bi bi-person-circle fs-5"></i>
-                    <span class="ms-1">@Context.Session.GetString("Username")</span>
+                    <span class="ms-1">@{
+                        var username = Context.Session.GetString("Username");
+                        if (!string.IsNullOrEmpty(username) && username.Contains("@"))
+                        {
+                            username = username.Split('@')[0];
+                        }
+                        @username
+                    }</span>
                 </div>
 
                 <!-- Logout -->
@@ -236,21 +238,16 @@
 
             const data = await resp.json();
             const badge = document.querySelector('[data-chat-count]');
-
-                   if (badge) {
-          const total = Number(data?.total ?? 0);
-          // luôn hiển thị
-          badge.style.display = 'inline-flex';
-          // đổi màu theo trạng thái (ví dụ)
-          badge.classList.toggle('is-empty', total === 0);
-          badge.textContent = total;
-        }
-
-
             if (badge) {
               const total = Number(data?.total ?? 0);
               badge.textContent = total;
-              badge.style.display = total > 0 ? 'inline-flex' : 'none';
+              if (total > 0) {
+                badge.style.display = 'inline-flex';
+                badge.classList.remove('is-empty');
+              } else {
+                badge.style.display = 'none';
+                badge.classList.add('is-empty');
+              }
             }
 
           } catch (e) {
@@ -349,7 +346,11 @@
                 console.log('✅ Badge computed display:', window.getComputedStyle(notifBadge).display);
                 console.log('✅ Badge computed visibility:', window.getComputedStyle(notifBadge).visibility);
               } else {
-                notifBadge.style.display = 'none';
+                // Ẩn badge hoàn toàn khi không còn thông báo chưa đọc
+                notifBadge.style.setProperty('display', 'none', 'important');
+                notifBadge.style.setProperty('visibility', 'hidden', 'important');
+                notifBadge.style.setProperty('opacity', '0', 'important');
+                notifBadge.textContent = '0';
                 console.log('ℹ️ No unread notifications, badge hidden');
               }
             } catch (e) { 
@@ -380,6 +381,38 @@
               });
               const result = await res.json();
               if (result.success) {
+                // Cập nhật UI ngay lập tức
+                const notificationItem = notifMenu.querySelector(`[data-notification-id="${id}"]`);
+                if (notificationItem) {
+                  notificationItem.classList.remove('unread');
+                  notificationItem.classList.add('read');
+                  
+                  // Xóa indicator dot
+                  const indicator = notificationItem.querySelector('.notification-indicator');
+                  if (indicator) {
+                    indicator.remove();
+                  }
+                  
+                  // Cập nhật badge trong header nếu cần
+                  const headerBadge = notifMenu.querySelector('.badge-unread-count');
+                  if (headerBadge) {
+                    const currentCount = parseInt(headerBadge.textContent) || 0;
+                    const newCount = Math.max(0, currentCount - 1);
+                    if (newCount === 0) {
+                      headerBadge.remove();
+                      // Ẩn badge trên chuông nếu không còn thông báo chưa đọc
+                      if (notifBadge) {
+                        notifBadge.style.setProperty('display', 'none', 'important');
+                        notifBadge.style.setProperty('visibility', 'hidden', 'important');
+                        notifBadge.style.setProperty('opacity', '0', 'important');
+                      }
+                    } else {
+                      headerBadge.textContent = newCount;
+                    }
+                  }
+                }
+                
+                // Cập nhật từ server để đồng bộ
                 await loadUnreadCount();
                 await loadNotifications();
               }
@@ -399,6 +432,35 @@
               });
               const result = await res.json();
               if (result.success) {
+                // Cập nhật UI ngay lập tức không cần reload
+                // 1. Ẩn badge trên chuông hoàn toàn
+                if (notifBadge) {
+                  notifBadge.style.setProperty('display', 'none', 'important');
+                  notifBadge.style.setProperty('visibility', 'hidden', 'important');
+                  notifBadge.style.setProperty('opacity', '0', 'important');
+                  notifBadge.textContent = '0';
+                }
+                
+                // 2. Cập nhật tất cả notification items thành "read"
+                const notificationItems = notifMenu.querySelectorAll('.notification-item.unread');
+                notificationItems.forEach(item => {
+                  item.classList.remove('unread');
+                  item.classList.add('read');
+                  
+                  // Xóa indicator dot nếu có
+                  const indicator = item.querySelector('.notification-indicator');
+                  if (indicator) {
+                    indicator.remove();
+                  }
+                });
+                
+                // 3. Ẩn badge trong header của dropdown
+                const headerBadge = notifMenu.querySelector('.badge-unread-count');
+                if (headerBadge) {
+                  headerBadge.remove();
+                }
+                
+                // 4. Cập nhật lại từ server để đồng bộ
                 await loadUnreadCount();
                 await loadNotifications();
               }

@@ -19,6 +19,15 @@
 
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 
+    // Helper function để xử lý ImageUrl trong tin nhắn (giống ServiceShop/Index.cshtml)
+    // Backend đã tự động thêm domain prefix, nên chỉ cần dùng trực tiếp
+    string GetMessageImageUrl(MessageDto message)
+    {
+        // Giống như ServiceShop: dùng trực tiếp ImageUrl, backend đã xử lý domain rồi
+        if (string.IsNullOrWhiteSpace(message.ImageUrl)) return fallbackImg;
+        return message.ImageUrl.Trim();
+    }
+
     // ===== Map hỗ trợ hiển thị trích dẫn tin gốc (reply) =====
     Func<MessageDto, string> SnippetOf = (MessageDto m) =>
     {
@@ -94,6 +103,21 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/chat-customer.css" asp-append-version="true" />
+    <style>
+        /* Ẩn footer chính của trang khi ở trang chat customer */
+        /* Chỉ ẩn footer ở cấp body, không ảnh hưởng modal/dropdown footer */
+        body > footer,
+        body > .footer,
+        body footer:not(.modal-footer):not(.dropdown-footer):not(.replying-pill):not(.kb-card-footer):not(.address-modal-footer):not(.upsert-form-footer):not(.rv-modal-footer):not([class*="modal"]):not([class*="dropdown"]):not([class*="card"]):not([class*="form"]) {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            opacity: 0 !important;
+            overflow: hidden !important;
+        }
+    </style>
 }
 
 <!-- Wrapper để isolate chat khỏi header -->
@@ -135,15 +159,40 @@
                                 .ThenByDescending(x => x.LastMessageAt))
                 {
                     var isActive = c.ConversationId == Model.SelectedConversationId;
+                    
+                    // Dùng avatar trực tiếp từ database (conversation list item)
+                    // Ưu tiên: c.AvatarUrl từ database > otherInSelected.AvatarUrl (nếu active) > fallback
+                    string? avatarUrlToUse = null;
+                    
+                    // Ưu tiên 1: Avatar từ conversation list item (từ database - backend đã xử lý)
+                    if (!string.IsNullOrWhiteSpace(c.AvatarUrl))
+                    {
+                        avatarUrlToUse = c.AvatarUrl;
+                    }
+                    // Ưu tiên 2: Nếu conversation đang active và không có c.AvatarUrl, dùng avatar từ participant
+                    else if (isActive && hasSelection && otherInSelected != null && !string.IsNullOrWhiteSpace(otherInSelected.AvatarUrl))
+                    {
+                        avatarUrlToUse = otherInSelected.AvatarUrl;
+                    }
+                    // Fallback: Dùng ảnh mặc định
+                    else
+                    {
+                        avatarUrlToUse = null; // Sẽ dùng fallbackImg
+                    }
 
                     <a class="d-flex align-items-start gap-2 p-2 rounded conv-item @(isActive ? "bg-light" : "")"
                        href="@Url.Action("Index", "ChatCustomer", new { area = "Customer", id = c.ConversationId })"
                        data-search-title="@(c.Title?.ToLower() ?? "")"
-                       data-search-snippet="@(c.LastMessageSnippet?.ToLower() ?? "")">
+                       data-search-snippet="@(c.LastMessageSnippet?.ToLower() ?? "")"
+                       data-conversation-id="@c.ConversationId"
+                       data-avatar-url="@(avatarUrlToUse ?? "")"
+                       data-conversation-url="@Url.Action("Index", "ChatCustomer", new { area = "Customer", id = c.ConversationId })">
                         <img class="avatar"
-                             src="@((string.IsNullOrWhiteSpace(c.AvatarUrl) ? fallbackImg : c.AvatarUrl))"
+                             src="@(avatarUrlToUse ?? fallbackImg)"
                              alt=""
-                             loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                             loading="lazy" 
+                             decoding="async" 
+                             referrerpolicy="no-referrer"
                              onerror="this.onerror=null;this.src='@fallbackImg';" />
 
                         <div class="flex-grow-1">
@@ -182,9 +231,11 @@
                 <!-- Header -->
                 <div class="border-bottom p-3 d-flex align-items-center position-relative">
                     <img class="avatar me-2"
-                         src="@((string.IsNullOrWhiteSpace(otherInSelected?.AvatarUrl) ? fallbackImg : otherInSelected?.AvatarUrl))"
+                         src="@(otherInSelected?.AvatarUrl ?? fallbackImg)"
                          alt=""
-                         loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                         loading="lazy" 
+                         decoding="async" 
+                         referrerpolicy="no-referrer"
                          onerror="this.onerror=null;this.src='@fallbackImg';" />
 
                     <div class="me-3">
@@ -273,7 +324,9 @@
                                         <img src="@m.ImageUrl"
                                              class="mt-2 rounded"
                                              style="max-width:220px;"
-                                             loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                                             loading="lazy" 
+                                             decoding="async" 
+                                             referrerpolicy="no-referrer"
                                              onerror="this.onerror=null;this.src='@fallbackImg';" />
                                     }
 
@@ -354,6 +407,7 @@
                         <div class="d-flex gap-2 align-items-center">
                             <input type="text"
                                    name="body"
+                                   id="messageBodyInput"
                                    class="form-control"
                                    placeholder="Nhập tin nhắn…"
                                    autocomplete="off" />
@@ -366,12 +420,16 @@
 
                             <button type="button"
                                     id="pickFileBtn"
-                                    class="btn"
+                                    class="btn btn-outline-secondary"
                                     title="Đính kèm ảnh">
                                 <i class="bi bi-paperclip"></i>
                             </button>
 
-                            <button type="submit" class="btn btn-primary" title="Gửi tin nhắn">
+                            <button type="submit" 
+                                    id="sendMessageBtn"
+                                    class="btn btn-primary" 
+                                    title="Gửi tin nhắn"
+                                    disabled>
                                 <i class="bi bi-send-fill"></i>
                             </button>
                         </div>
@@ -387,6 +445,321 @@
 
 
 @section Scripts {
+    @* Hệ thống quản lý avatar trong conversation list (sử dụng sessionStorage) *@
+    <script>
+        (function() {
+            try {
+                var fallbackImg = '@fallbackImg';
+                var STORAGE_KEY = 'chat_avatars_customer';
+                
+                // Khởi tạo storage nếu chưa có
+                function initStorage() {
+                    if (!sessionStorage.getItem(STORAGE_KEY)) {
+                        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+                    }
+                }
+                
+                // Lấy avatar từ storage
+                function getAvatarFromStorage(convId) {
+                    try {
+                        var storage = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
+                        return storage[convId] || null;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                
+                // Lưu avatar vào storage
+                function saveAvatarToStorage(convId, avatarUrl) {
+                    try {
+                        initStorage();
+                        var storage = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
+                        if (avatarUrl && avatarUrl.trim()) {
+                            storage[convId] = avatarUrl;
+                            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
+                            return true;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to save avatar to storage:', e);
+                    }
+                    return false;
+                }
+                
+                // Cập nhật avatar trong conversation item
+                function updateAvatarInListItem(convItem, avatarUrl) {
+                    if (!convItem || !avatarUrl) return;
+                    
+                    var avatarImg = convItem.querySelector('.avatar');
+                    if (!avatarImg) return;
+                    
+                    var currentSrc = avatarImg.getAttribute('src') || '';
+                    var isFallback = !currentSrc || currentSrc === fallbackImg || currentSrc.indexOf('VeSinh.jpg') > -1;
+                    
+                    // Cập nhật nếu đang hiển thị fallback hoặc URL khác
+                    if (isFallback || (currentSrc && currentSrc !== avatarUrl && !currentSrc.includes(avatarUrl.split('?')[0]))) {
+                        var separator = avatarUrl.indexOf('?') > -1 ? '&' : '?';
+                        avatarImg.src = avatarUrl + separator + 't=' + new Date().getTime();
+                        // Cập nhật data-avatar-url attribute
+                        convItem.setAttribute('data-avatar-url', avatarUrl);
+                    }
+                }
+                
+                // Áp dụng avatar từ storage cho tất cả conversations
+                function applyStoredAvatars() {
+                    var convItems = document.querySelectorAll('.conv-item[data-conversation-id]');
+                    convItems.forEach(function(convItem) {
+                        var convId = convItem.getAttribute('data-conversation-id');
+                        if (convId) {
+                            var storedAvatar = getAvatarFromStorage(convId);
+                            if (storedAvatar) {
+                                updateAvatarInListItem(convItem, storedAvatar);
+                            }
+                        }
+                    });
+                }
+                
+                // Khởi tạo
+                initStorage();
+                
+                // Áp dụng avatar từ storage ngay khi trang load
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', applyStoredAvatars);
+                } else {
+                    applyStoredAvatars();
+                }
+                
+                // Lưu hàm vào window để sử dụng từ các script khác
+                window.chatAvatarManager = {
+                    save: saveAvatarToStorage,
+                    get: getAvatarFromStorage,
+                    update: updateAvatarInListItem,
+                    applyAll: applyStoredAvatars
+                };
+            } catch (e) {
+                console.warn('Failed to initialize avatar manager:', e);
+            }
+        })();
+    </script>
+    
+    @* Lưu avatar từ selected conversation vào storage *@
+    @if (hasSelection && otherInSelected != null && Model.SelectedConversationId.HasValue && !string.IsNullOrWhiteSpace(otherInSelected.AvatarUrl))
+    {
+        <script>
+            (function() {
+                try {
+                    var selectedConvId = '@Model.SelectedConversationId.Value';
+                    var correctAvatarUrl = '@(Html.Raw(otherInSelected.AvatarUrl?.Replace("'", "\\'").Replace("\"", "&quot;") ?? ""))';
+                    
+                    if (selectedConvId && correctAvatarUrl && window.chatAvatarManager) {
+                        // Lưu vào storage
+                        window.chatAvatarManager.save(selectedConvId, correctAvatarUrl);
+                        
+                        // Cập nhật ngay trong list
+                        var selectedConvItem = document.querySelector('.conv-item[data-conversation-id="' + selectedConvId + '"]');
+                        if (selectedConvItem) {
+                            window.chatAvatarManager.update(selectedConvItem, correctAvatarUrl);
+                        }
+                        
+                        // Áp dụng lại cho tất cả conversations (để đảm bảo)
+                        setTimeout(function() {
+                            window.chatAvatarManager.applyAll();
+                        }, 100);
+                    }
+                } catch (e) {
+                    console.warn('Failed to save avatar from selected conversation:', e);
+                }
+            })();
+        </script>
+    }
+    
+    @* Ngăn reload khi click vào conversation và load qua AJAX *@
+    <script>
+        (function() {
+            var isLoading = false;
+            
+            // Lắng nghe khi có conversation được click
+            document.addEventListener('click', function(e) {
+                var convItem = e.target.closest('.conv-item[data-conversation-id]');
+                if (!convItem) return;
+                
+                // Ngăn navigation mặc định
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Nếu đang loading, bỏ qua
+                if (isLoading) {
+                    console.log('[Chat] Already loading, ignoring click');
+                    return;
+                }
+                
+                var convId = convItem.getAttribute('data-conversation-id');
+                var convUrl = convItem.getAttribute('data-conversation-url') || convItem.getAttribute('href');
+                var avatarUrl = convItem.getAttribute('data-avatar-url');
+                
+                if (!convId || !convUrl) {
+                    console.warn('[Chat] Missing conversation ID or URL');
+                    return;
+                }
+                
+                // Lưu avatar vào storage nếu có
+                if (window.chatAvatarManager && avatarUrl && avatarUrl.trim()) {
+                    window.chatAvatarManager.save(convId, avatarUrl);
+                }
+                
+                // Cập nhật active state trong sidebar
+                document.querySelectorAll('.conv-item').forEach(function(item) {
+                    item.classList.remove('bg-light', 'active');
+                });
+                convItem.classList.add('bg-light');
+                
+                // Ẩn unread badge nếu có
+                var unreadBadge = convItem.querySelector('.badge, .unread-badge');
+                if (unreadBadge) {
+                    unreadBadge.style.display = 'none';
+                    unreadBadge.remove();
+                }
+                
+                // Load conversation qua AJAX
+                isLoading = true;
+                var chatMain = document.querySelector('.chat-main, main');
+                var chatContainer = document.querySelector('.chat-container, .chat-wrapper');
+                
+                // Hiển thị loading state
+                if (chatMain) {
+                    var originalContent = chatMain.innerHTML;
+                    chatMain.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; padding: 2rem;"><div style="text-align: center;"><div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"><span class="visually-hidden">Loading...</span></div><div style="margin-top: 1rem;">Đang tải cuộc trò chuyện...</div></div></div>';
+                }
+                
+                // Fetch conversation mới
+                fetch(convUrl, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'text/html'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.status);
+                    }
+                    return response.text();
+                })
+                .then(function(html) {
+                    // Parse HTML response
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Extract chat container từ response (có thể là .chat-main hoặc main hoặc .chat-container)
+                    var newChatMain = doc.querySelector('.chat-main, main.chat-main, .chat-container') || doc.querySelector('main');
+                    if (newChatMain && chatMain) {
+                        // Update chat container content
+                        chatMain.outerHTML = newChatMain.outerHTML;
+                        
+                        // Update URL với History API (không reload)
+                        if (window.history && window.history.pushState) {
+                            window.history.pushState({ conversationId: convId }, '', convUrl);
+                        }
+                        
+                        // Re-init các scripts và event handlers sẽ được thực thi từ script tags trong response
+                        // SignalR và các handlers khác sẽ tự động được khởi tạo lại
+                        
+                        // Scroll to top để hiển thị conversation mới
+                        window.scrollTo(0, 0);
+                    } else {
+                        console.error('[Chat] Could not find chat container in response');
+                        // Fallback: reload page
+                        window.location.href = convUrl;
+                    }
+                })
+                .catch(function(error) {
+                    console.error('[Chat] Error loading conversation:', error);
+                    // Fallback: reload page
+                    window.location.href = convUrl;
+                })
+                .finally(function() {
+                    isLoading = false;
+                });
+            }, true); // Use capture phase to intercept early
+        })();
+    </script>
+    
+    @* Ẩn footer chính của trang khi ở trang chat *@
+    <script>
+        (function() {
+            // Ẩn footer chính (chỉ footer ở cấp body, không ảnh hưởng modal/dropdown)
+            function hideMainFooter() {
+                // Chỉ tìm footer là con trực tiếp của body hoặc có class chính là footer
+                var mainFooters = document.querySelectorAll('body > footer, body > .footer');
+                
+                // Nếu không tìm thấy, tìm các footer không nằm trong modal/dropdown
+                if (mainFooters.length === 0) {
+                    var allFooters = document.querySelectorAll('footer, .footer');
+                    allFooters.forEach(function(footer) {
+                        // Bỏ qua nếu footer nằm trong modal, dropdown, hoặc các container đặc biệt
+                        var parent = footer.parentElement;
+                        var isInModal = false;
+                        var isInDropdown = false;
+                        var isInSpecialContainer = false;
+                        
+                        while (parent && parent !== document.body) {
+                            if (parent.classList.contains('modal') || 
+                                parent.classList.contains('dropdown') ||
+                                parent.classList.contains('dropdown-menu') ||
+                                parent.classList.contains('card') ||
+                                parent.classList.contains('form') ||
+                                parent.classList.contains('kb-card') ||
+                                parent.classList.contains('address-modal') ||
+                                parent.classList.contains('upsert-form') ||
+                                parent.classList.contains('rv-modal')) {
+                                isInModal = true;
+                                isInDropdown = true;
+                                isInSpecialContainer = true;
+                                break;
+                            }
+                            parent = parent.parentElement;
+                        }
+                        
+                        // Chỉ ẩn footer chính, không ẩn footer trong modal/dropdown
+                        if (!isInModal && !isInDropdown && !isInSpecialContainer) {
+                            footer.style.display = 'none';
+                            footer.style.visibility = 'hidden';
+                            footer.style.height = '0';
+                            footer.style.margin = '0';
+                            footer.style.padding = '0';
+                            footer.style.opacity = '0';
+                            footer.style.overflow = 'hidden';
+                        }
+                    });
+                } else {
+                    // Ẩn footer chính
+                    mainFooters.forEach(function(footer) {
+                        footer.style.display = 'none';
+                        footer.style.visibility = 'hidden';
+                        footer.style.height = '0';
+                        footer.style.margin = '0';
+                        footer.style.padding = '0';
+                        footer.style.opacity = '0';
+                        footer.style.overflow = 'hidden';
+                    });
+                }
+            }
+            
+            // Chạy ngay lập tức
+            hideMainFooter();
+            
+            // Chạy khi DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', hideMainFooter);
+            } else {
+                hideMainFooter();
+            }
+            
+            // Chạy sau khi window load
+            window.addEventListener('load', hideMainFooter);
+        })();
+    </script>
+
     @* Chỉ auto-scroll khi đã chọn hội thoại *@
     @if (hasSelection)
     {
@@ -633,8 +1006,27 @@
           var imgEl = document.getElementById('attachThumb');
           var removeBtn = document.getElementById('removeAttachBtn');
           var objectUrl = null;
+          
+          // Form và inputs
+          var form = document.querySelector('form[action*="ChatCustomer/Send"]');
+          var bodyInput = document.getElementById('messageBodyInput') || form?.querySelector('input[name="body"]');
+          var sendBtn = document.getElementById('sendMessageBtn') || form?.querySelector('button[type="submit"]');
 
           if (!pickBtn || !fileInput) return;
+
+          // Kiểm tra có nội dung để gửi (text hoặc ảnh)
+          function hasPayload() {
+            var hasText = !!(bodyInput && bodyInput.value && bodyInput.value.trim().length > 0);
+            var hasImage = !!(fileInput && fileInput.files && fileInput.files.length > 0);
+            return hasText || hasImage;
+          }
+          
+          // Cập nhật trạng thái nút gửi
+          function refreshSendState() {
+            if (sendBtn) {
+              sendBtn.disabled = !hasPayload();
+            }
+          }
 
           pickBtn.addEventListener('click', function () { fileInput.click(); });
 
@@ -648,6 +1040,16 @@
                 alert('Vui lòng chọn file ảnh.');
                 fileInput.value = '';
                 previewWrap.classList.add('d-none');
+                refreshSendState();
+                return;
+              }
+              
+              // Kiểm tra kích thước file (tối đa 5MB)
+              if (f.size > 5 * 1024 * 1024) {
+                alert('Kích thước file không được vượt quá 5MB.');
+                fileInput.value = '';
+                previewWrap.classList.add('d-none');
+                refreshSendState();
                 return;
               }
 
@@ -657,6 +1059,8 @@
             } else {
               previewWrap.classList.add('d-none');
             }
+            
+            refreshSendState();
           });
 
           removeBtn?.addEventListener('click', function () {
@@ -664,7 +1068,97 @@
             fileInput.value = '';
             imgEl.src = '';
             previewWrap.classList.add('d-none');
+            refreshSendState();
           });
+          
+          // Validate form trước khi submit
+          if (form) {
+            form.addEventListener('submit', function(e) {
+              console.log('[Chat] Form submit triggered');
+              console.log('[Chat] Has payload:', hasPayload());
+              console.log('[Chat] File input files:', fileInput?.files?.length);
+              console.log('[Chat] Body input value:', bodyInput?.value);
+              
+              if (!hasPayload()) {
+                e.preventDefault();
+                e.stopPropagation();
+                alert('Vui lòng nhập nội dung hoặc đính kèm ảnh trước khi gửi.');
+                if (bodyInput) bodyInput.focus();
+                return false;
+              }
+              
+              // Đảm bảo file được chọn nếu có
+              if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                var file = fileInput.files[0];
+                console.log('[Chat] File selected:', file.name, file.size, file.type);
+                
+                // Kiểm tra lại file type
+                if (!file.type || !file.type.startsWith('image/')) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  alert('Vui lòng chọn file ảnh hợp lệ.');
+                  return false;
+                }
+                
+                // Kiểm tra lại kích thước
+                if (file.size > 5 * 1024 * 1024) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  alert('Kích thước file không được vượt quá 5MB.');
+                  return false;
+                }
+              }
+              
+              // Disable button để tránh spam
+              if (sendBtn) {
+                sendBtn.disabled = true;
+                sendBtn.style.pointerEvents = 'none';
+                sendBtn.style.opacity = '0.6';
+              }
+              
+              // Hiển thị loading state
+              var originalBtnText = sendBtn?.innerHTML;
+              if (sendBtn) {
+                sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...';
+              }
+              
+              // Clear preview và file input sau khi submit thành công
+              // (Sẽ được clear khi trang reload)
+              
+              // Re-enable sau 10 giây nếu có lỗi (timeout) - tăng thời gian để chờ response
+              var timeoutId = setTimeout(function() {
+                console.warn('[Chat] Submit timeout - re-enabling button');
+                if (sendBtn) {
+                  sendBtn.disabled = false;
+                  sendBtn.style.pointerEvents = 'auto';
+                  sendBtn.style.opacity = '1';
+                  if (originalBtnText) sendBtn.innerHTML = originalBtnText;
+                }
+              }, 10000);
+              
+              // Clear timeout khi form submit thành công (trang sẽ reload)
+              window.addEventListener('beforeunload', function() {
+                clearTimeout(timeoutId);
+              });
+              
+              console.log('[Chat] Form submitting...');
+              // Form sẽ submit bình thường
+            });
+          }
+          
+          // Cập nhật trạng thái khi nhập text
+          if (bodyInput) {
+            bodyInput.addEventListener('input', refreshSendState);
+            bodyInput.addEventListener('keyup', function(e) {
+              if (e.key === 'Enter' && !e.shiftKey && hasPayload()) {
+                // Cho phép submit khi nhấn Enter (nếu có nội dung)
+                // Form sẽ tự submit
+              }
+            });
+          }
+          
+          // Khởi tạo trạng thái ban đầu
+          refreshSendState();
         })();
     </script>
 
@@ -1122,6 +1616,15 @@
           });
 
           connection.on('message:created', msg => {
+            // Lưu avatar từ sender vào storage nếu có
+            if (msg.conversationId && msg.sender && msg.sender.avatarUrl && window.chatAvatarManager) {
+              window.chatAvatarManager.save(msg.conversationId, msg.sender.avatarUrl);
+              // Cập nhật avatar trong list ngay lập tức
+              var convItem = document.querySelector('.conv-item[data-conversation-id="' + msg.conversationId + '"]');
+              if (convItem) {
+                window.chatAvatarManager.update(convItem, msg.sender.avatarUrl);
+              }
+            }
             if (!msg) return;
             if (String(msg.conversationId).toLowerCase() !== String(selectedConversationId).toLowerCase()) return;
 
@@ -1154,11 +1657,17 @@
             }
             if (msg.imageUrl){
               const img = document.createElement('img');
+              // Giống ServiceShop: dùng trực tiếp imageUrl, backend đã xử lý domain rồi
               img.src = msg.imageUrl;
               img.className = 'mt-2 rounded';
               img.style.maxWidth = '220px';
               img.loading = 'lazy';
               img.decoding = 'async';
+              img.referrerPolicy = 'no-referrer';
+              img.onerror = function() {
+                this.onerror = null;
+                this.src = '@fallbackImg';
+              };
               bubble.appendChild(img);
             }
 

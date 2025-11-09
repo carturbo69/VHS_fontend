@@ -26,18 +26,21 @@
         // Nhà cung cấp / nhân sự thực hiện
         public Guid ProviderId { get; set; }
         public string ProviderName { get; set; } = string.Empty;
+        public string? ProviderImages { get; set; } // Logo/ảnh của provider
         public Guid? StaffId { get; set; }
         public string? StaffName { get; set; }
         public string? StaffImage { get; set; }
 
         // ===== Service =====
         public ServiceInBookingDTO Service { get; set; } = new();
+        public string? ServiceImages { get; set; } // giữ dạng string (JSON/comma) như DB
         public List<OptionDTO> Options { get; set; } = new();
 
         // ===== Giá tiền =====
         public decimal ShippingFee { get; set; }
         public decimal VoucherDiscount { get; set; }
         public string PaymentMethod { get; set; } = " ";
+        public string? PaymentStatus { get; set; } // Trạng thái thanh toán từ Payment.Status
 
         [JsonIgnore] public decimal Subtotal => Service.LineTotal;
         [JsonIgnore] public decimal Total => Subtotal + ShippingFee - VoucherDiscount;
@@ -45,6 +48,12 @@
         public decimal PaidAmount { get; set; }
 
         public bool HasReview { get; set; } = false;   // NEW
+
+        // ===== Refund Info =====
+        public string? CancelReason { get; set; }
+        public string? BankName { get; set; }
+        public string? AccountHolderName { get; set; }
+        public string? BankAccountNumber { get; set; }
 
         // ===== Tiến trình / Tracking =====
         public List<TrackingEventDTO> Timeline { get; set; } = new();

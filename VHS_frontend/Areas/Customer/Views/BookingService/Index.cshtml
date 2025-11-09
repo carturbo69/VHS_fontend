@@ -67,6 +67,42 @@
         => (opts != null && opts.Any())
             ? string.Join(", ", opts.Select(o => o.Name))
             : "Chưa chọn";
+
+    // Helper để lấy ảnh đầu tiên từ images (có thể là JSON array hoặc comma-separated string)
+    string? FirstImageOrDefault(string? images)
+    {
+        if (string.IsNullOrWhiteSpace(images)) return null;
+        try
+        {
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+            if (arr != null && arr.Count > 0) return arr[0];
+        }
+        catch { }
+        if (images.Contains(','))
+        {
+            var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
+        return images;
+    }
+
+    // Helper để lấy logo provider
+    string GetProviderLogo(string? providerImages)
+    {
+        if (string.IsNullOrWhiteSpace(providerImages))
+            return "/images/VeSinh.jpg";
+        var logo = FirstImageOrDefault(providerImages);
+        return !string.IsNullOrWhiteSpace(logo) ? logo : "/images/VeSinh.jpg";
+    }
+
+    // Helper để lấy ảnh service
+    string GetServiceImage(string? serviceImages, string? fallbackImage)
+    {
+        if (string.IsNullOrWhiteSpace(serviceImages))
+            return !string.IsNullOrWhiteSpace(fallbackImage) ? fallbackImage : "/images/VeSinh.jpg";
+        var img = FirstImageOrDefault(serviceImages);
+        return !string.IsNullOrWhiteSpace(img) ? img : (!string.IsNullOrWhiteSpace(fallbackImage) ? fallbackImage : "/images/VeSinh.jpg");
+    }
 }
 
 <link rel="stylesheet" href="~/css/booking-service.css" asp-append-version="true" />
@@ -143,8 +179,19 @@
             }
             @foreach (var shop in Model.Items.GroupBy(it => it.Provider))
             {
+                var firstShopItem = shop.FirstOrDefault();
+                var providerImages = firstShopItem?.ProviderImages;
                 <div class="shop-block">
-                    <div class="shop-head">@shop.Key</div>
+                    <div class="shop-head">
+                        <img src="@GetProviderLogo(providerImages)" 
+                             width="24" 
+                             height="24" 
+                             alt="@shop.Key" 
+                             class="shop-logo" 
+                             style="object-fit:cover;border-radius:4px;margin-right:8px;" 
+                             onerror="this.src='/images/VeSinh.jpg';" />
+                        @shop.Key
+                    </div>
 
                     @foreach (var it in shop)
                     {
@@ -153,7 +200,10 @@
 
                         <div class="item-row">
                             <!-- Cột 1: Ảnh -->
-                            <img class="thumb" src="@it.Image" alt="@it.ServiceName" />
+                            <img class="thumb" 
+                                 src="@GetServiceImage(it.ServiceImages, it.Image)" 
+                                 alt="@it.ServiceName" 
+                                 onerror="this.onerror=null;this.src='/images/VeSinh.jpg';" />
 
                             <!-- Cột 2: Tên dịch vụ + Đơn giá -->
                             <div>
@@ -244,8 +294,7 @@
 
                     @* ====== Ô tích + link mở điều khoản theo Provider ====== *@
                     @{
-                        var firstItem = shop.FirstOrDefault();
-                        var providerId = firstItem?.ProviderId ?? Guid.Empty;
+                        var providerId = firstShopItem?.ProviderId ?? Guid.Empty;
                     }
                     <div class="tos-accept">
                         <input type="checkbox"
@@ -706,7 +755,7 @@
                 if (nameMatch) matchCount++;
                 if (addressMatch) matchCount++;
                 if (phoneMatch) matchCount++;
-                
+          
                 // Nếu trùng cả 3 thì không cho tạo
                 // Nếu chỉ có 2 trường được điền và trùng cả 2 thì cũng không cho tạo
                 const totalFields = (normalizedName ? 1 : 0) + 1 + (normalizedPhone ? 1 : 0); // name + address + phone
@@ -729,8 +778,8 @@
                     }, 3000);
                   }
                   // Re-enable button
-                  const btnSave = document.getElementById('btnSaveAddress');
-                  if (btnSave) {
+          const btnSave = document.getElementById('btnSaveAddress');
+          if (btnSave) {
                     btnSave.disabled = false;
                     btnSave.textContent = 'Lưu';
                   }
@@ -783,8 +832,8 @@
                 if (phoneError) {
                   phoneError.style.display = 'none';
                   phoneError.textContent = '';
-                }
-                
+          }
+          
                 // Đóng modal
                 closeUpsertModal();
                 
@@ -843,7 +892,7 @@
                       mapContainer.id = 'addressMap';
                       mapContainer.style.cssText = 'width: 100%; height: 250px; margin-top: 1rem; border-radius: 8px; overflow: hidden;';
                       addrBody.appendChild(mapContainer);
-                    }
+}
                   }
                   if (mapContainer && typeof L !== 'undefined' && L.map) {
                     setTimeout(() => {
@@ -945,9 +994,9 @@
             if (toast.parentElement) {
               toast.style.transition = 'none'; // Bỏ transition để resize ngay lập tức
               toast.remove();
-            }
+    }
           }, 2500);
-        }
+}
         </script>
     </div>
 </div>
@@ -1027,7 +1076,7 @@
             alert.style.display = 'none';
             alert.innerHTML = '';
           }
-        }
+          }
         function closeAddressModal(){ 
           document.getElementById('addressModal').classList.remove('open');
           // Ẩn thông báo khi đóng modal
@@ -1037,6 +1086,37 @@
             alert.innerHTML = '';
           }
         }
+        
+        /* ========= Click vào card địa chỉ để chọn ========= */
+        // Sử dụng event delegation để tự động hoạt động với các element được thêm động
+        document.addEventListener('DOMContentLoaded', function() {
+          const addressListContainer = document.getElementById('addressListContainer');
+          if (addressListContainer) {
+            addressListContainer.addEventListener('click', function(e) {
+              // Tìm addr-item gần nhất (có thể click vào bất kỳ phần nào của card)
+              const addrItem = e.target.closest('.addr-item');
+              if (!addrItem) return;
+              
+              // Nếu click vào button (edit/delete), không làm gì
+              if (e.target.closest('button') || e.target.tagName === 'BUTTON') {
+              return;
+            }
+              
+              // Nếu click vào radio button, không cần làm gì thêm (đã được xử lý tự động)
+              if (e.target.type === 'radio') {
+              return;
+            }
+              
+              // Tìm radio button trong addr-item và chọn nó
+              const radio = addrItem.querySelector('input[type="radio"][name="addressChoice"]');
+              if (radio) {
+                radio.checked = true;
+                // Trigger change event để các listener khác biết
+                radio.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            });
+          }
+        });
         
         /* ========= Xóa địa chỉ bằng AJAX ========= */
         async function deleteAddress(addressId, button) {
@@ -1612,7 +1692,7 @@
                 btn.style.pointerEvents = '';
                 btn.innerHTML = originalText;
               });
-          });
+        });
         }
         function openEditAddressForm(btn){
           const row = btn.closest('.addr-item');

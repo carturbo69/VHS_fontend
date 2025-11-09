@@ -32,7 +32,8 @@
         </div>
     </div>
 
-    <!-- Toolbar -->
+    <!-- Toolbar Card -->
+    <div class="toolbar-card card-x">
     <div class="cat-toolbar">
         <div class="actions">
             <button class="btn btn-primary soft" id="btnCreate">
@@ -50,11 +51,13 @@
         <div class="search">
             <i class="bi bi-search"></i>
             <input id="txtSearch" class="form-control" placeholder="Tìm danh mục theo tên…" />
+            </div>
         </div>
     </div>
 
-    <!-- Table -->
-    <div class="table-wrap card-x">
+    <!-- Table Card -->
+    <div class="table-card card-x">
+        <div class="table-wrap">
         <table class="table table-hover align-middle mb-0" id="tblCats">
             <thead>
                 <tr>
@@ -141,6 +144,9 @@
     </div>
 </section>
 
+<!-- Toast notification root -->
+<div id="notif-root"></div>
+
 <!-- Modal: Category -->
 <div class="modal fade" id="catModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -194,6 +200,107 @@
 
 @section Scripts {
     <script>
+        /* ======= CENTER TOAST (boxed + accent bar + fast) ======= */
+        (function(){
+          var toastManager = {
+            currentToast: null,
+            hideTimeout: null,
+            removeTimeout: null,
+            
+            clearAll: function(){
+              // Clear tất cả timeout
+              if(this.hideTimeout){
+                clearTimeout(this.hideTimeout);
+                this.hideTimeout = null;
+              }
+              if(this.removeTimeout){
+                clearTimeout(this.removeTimeout);
+                this.removeTimeout = null;
+              }
+              
+              // Xóa toast hiện tại
+              if(this.currentToast && this.currentToast.parentNode){
+                this.currentToast.classList.remove('show');
+                var self = this;
+                setTimeout(function(){
+                  if(self.currentToast && self.currentToast.parentNode){
+                    self.currentToast.remove();
+                  }
+                  self.currentToast = null;
+                }, 100);
+              }
+              
+              // Xóa tất cả toast còn sót trong DOM
+              var root = document.getElementById('notif-root');
+              if(root){
+                var existingToasts = root.querySelectorAll('.center-toast');
+                for(var i = 0; i < existingToasts.length; i++){
+                  var toast = existingToasts[i];
+                  if(toast.parentNode){
+                    toast.classList.remove('show');
+                    toast.remove();
+                  }
+                }
+              }
+            },
+            
+            show: function(msg, type, duration){
+              if(!type) type = 'info';
+              if(!duration) duration = 2500;
+              
+              // Xóa toast cũ trước
+              this.clearAll();
+              
+              var root = document.getElementById('notif-root');
+              if(!root) return;
+              
+              // Tạo toast mới
+              var box = document.createElement('div');
+              box.className = 'center-toast ' + type;
+              var iconClass = type==='success'?'bi-check-circle':
+                               type==='error'  ?'bi-x-circle'   :
+                               type==='warn'   ?'bi-exclamation-triangle' : 'bi-info-circle';
+              box.innerHTML = 
+                '<div class="toast-box">' +
+                  '<div class="accent"></div>' +
+                  '<i class="bi ' + iconClass + '"></i>' +
+                  '<span class="msg">' + msg + '</span>' +
+                '</div>';
+              
+              root.appendChild(box);
+              this.currentToast = box;
+              
+              var self = this;
+              
+              // Hiển thị với animation
+              setTimeout(function(){ 
+                if(self.currentToast && self.currentToast.parentNode){
+                  self.currentToast.classList.add('show'); 
+                }
+              }, 50);
+
+              // Tự động ẩn sau duration
+              this.hideTimeout = setTimeout(function() {
+                if(self.currentToast && self.currentToast.parentNode){
+                  self.currentToast.classList.remove('show');
+                  self.removeTimeout = setTimeout(function(){ 
+                    if(self.currentToast && self.currentToast.parentNode){
+                      self.currentToast.remove();
+                    }
+                    self.currentToast = null;
+                    self.hideTimeout = null;
+                    self.removeTimeout = null;
+                  }, 350);
+                }
+              }, duration);
+            }
+          };
+          
+          window.showNotice = function(msg, type, duration){
+            toastManager.show(msg, type, duration);
+          };
+        })();
+
         const routes = {
           catCreate : '@Url.Action("Create", "Category", new { area = "Admin" })',
           catGet    : '@Url.Action("Get", "Category", new { area = "Admin" })',
@@ -259,7 +366,7 @@
           // edit
           if (btn.classList.contains('btn-edit')) {
             const res = await fetch(routes.catGet + `?id=${id}`);
-            if (!res.ok) { alert('Không đọc được dữ liệu'); return; }
+            if (!res.ok) { showNotice('Không đọc được dữ liệu', 'error', 3000); return; }
             const dto = await res.json();
             document.getElementById('catModalTitle').textContent = 'Sửa danh mục';
             catIdEl.value = dto.categoryId;
@@ -270,8 +377,6 @@
 
            // delete
            if (btn.classList.contains('btn-delete-cat')) {
-             if (!confirm('Xóa danh mục này?')) return;
-             
              const res = await fetch(routes.catDelete + `?id=${id}`, { method:'DELETE' });
              if (res.status === 204) {
                // Hide immediately when successful
@@ -308,18 +413,16 @@
                updateMetrics();
                
                // Show success message
-               alert('✅ Xóa danh mục thành công!');
+               showNotice('Xóa danh mục thành công!', 'success', 2500);
              } else {
                const errorText = await res.text();
-               alert(`Lỗi: ${errorText || 'Không thể xóa danh mục'}`);
+               showNotice(errorText || 'Không thể xóa danh mục', 'error', 3000);
              }
              return;
            }
 
            // restore
            if (btn.classList.contains('btn-restore-cat')) {
-             if (!confirm('Khôi phục danh mục này?')) return;
-             
              const res = await fetch(routes.catRestore + `?id=${id}`, { method:'POST' });
              if (res.status === 204) {
                // Hide immediately when successful
@@ -356,10 +459,10 @@
                updateMetrics();
                
                // Show success message
-               alert('✅ Khôi phục danh mục thành công!');
+               showNotice('Khôi phục danh mục thành công!', 'success', 2500);
              } else {
                const errorText = await res.text();
-               alert(`Lỗi: ${errorText || 'Không thể khôi phục danh mục'}`);
+               showNotice(errorText || 'Không thể khôi phục danh mục', 'error', 3000);
              }
              return;
            }
@@ -390,11 +493,20 @@
            if (res.status === 200 || res.status === 201) {
              catModal.hide();
              if (!id) {
-               // Create new category - reload page to show new item
-               location.reload();
+               // Create new category - add row to table without reload
+               const dto = await res.json();
+               addNewCategoryRow(dto);
+               updateMetrics();
+               showNotice('Thêm danh mục thành công!', 'success', 2500);
+               
+               // Reset form
+               catIdEl.value = '';
+               catNameEl.value = '';
+               catErr.textContent = '';
+               catNameEl.classList.remove('is-invalid');
              } else {
                // Update existing category - update UI immediately
-               const row = document.querySelector(`tr[data-id="${id}"]`);
+               const row = document.querySelector('tr[data-id="' + id + '"]');
                if (row) {
                  row.querySelector('.cat-name').textContent = name;
                  row.querySelector('.cat-name').classList.remove('cut');
@@ -402,6 +514,7 @@
                  // Update metrics
                  updateMetrics();
                }
+               showNotice('Cập nhật danh mục thành công!', 'success', 2500);
              }
            } else {
             const errorText = await res.text();
@@ -505,27 +618,25 @@
             }
 
             if (btn.classList.contains('btn-delete-tag')) {
-              if (!confirm('Xóa tag này?')) return;
-              
               const res = await fetch(routes.tagDelete + `?id=${tagId}`, { method:'DELETE' });
               if (res.status === 204) {
                 await reloadTags(catId, pane);
+                showNotice('Xóa tag thành công!', 'success', 2500);
               } else {
                 const errorText = await res.text();
-                alert(`Lỗi: ${errorText || 'Không thể xóa tag'}`);
+                showNotice(errorText || 'Không thể xóa tag', 'error', 3000);
               }
               return;
             }
 
             if (btn.classList.contains('btn-restore-tag')) {
-              if (!confirm('Khôi phục tag này?')) return;
-              
               const res = await fetch(routes.tagRestore + `?id=${tagId}`, { method:'POST' });
               if (res.status === 204) {
                 await reloadTags(catId, pane);
+                showNotice('Khôi phục tag thành công!', 'success', 2500);
               } else {
                 const errorText = await res.text();
-                alert(`Lỗi: ${errorText || 'Không thể khôi phục tag'}`);
+                showNotice(errorText || 'Không thể khôi phục tag', 'error', 3000);
               }
               return;
             }
@@ -564,6 +675,11 @@
             // Reload tags for this category
             const pane = document.querySelector(`[data-category-id="${categoryId}"]`);
             if (pane) await reloadTags(categoryId, pane);
+            if (!id) {
+              showNotice('Thêm tag thành công!', 'success', 2500);
+            } else {
+              showNotice('Cập nhật tag thành công!', 'success', 2500);
+            }
           } else {
             const errorText = await res.text();
             if (res.status === 409) {
@@ -584,6 +700,68 @@
           const list = await res.json();
           updateTagCountBadges(catId, list?.length ?? 0);
           renderTagList(pane.querySelector('.tag-list'), list, catId, pane);
+        }
+
+         // Function to add new category row to table
+         function addNewCategoryRow(dto) {
+           const tbody = document.querySelector('#tblCats tbody');
+           if (!tbody) return;
+           
+           // Create category row
+           const catRow = document.createElement('tr');
+           catRow.className = 'cat-row';
+           catRow.setAttribute('data-id', dto.categoryId);
+           
+           catRow.innerHTML = 
+             '<td>' +
+               '<div class="branch">' +
+                 '<button class="btn toggle-tags soft" data-target="#tags-' + dto.categoryId + '" aria-expanded="false" title="Mở danh sách tag">' +
+                   '<i class="bi bi-caret-right-fill"></i>' +
+                 '</button>' +
+                 '<span class="chip chip-count" data-count-for="' + dto.categoryId + '">0</span>' +
+               '</div>' +
+             '</td>' +
+             '<td class="cat-name fw-semibold">' + dto.name + '</td>' +
+             '<td><span class="state ok">Hoạt động</span></td>' +
+             '<td class="text-end">' +
+               '<div class="btn-group">' +
+                 '<button class="btn btn-sm btn-outline-primary soft btn-edit">' +
+                   '<i class="bi bi-pencil-square"></i> Sửa' +
+                 '</button>' +
+                 '<button class="btn btn-sm btn-outline-danger soft btn-delete-cat">' +
+                   '<i class="bi bi-trash"></i> Xoá' +
+                 '</button>' +
+               '</div>' +
+             '</td>';
+           
+           // Create tag row
+           const tagRow = document.createElement('tr');
+           tagRow.className = 'tag-row';
+           tagRow.innerHTML = 
+             '<td colspan="4" class="p-0">' +
+               '<div id="tags-' + dto.categoryId + '" class="tags-box collapse card-x" data-category-id="' + dto.categoryId + '">' +
+                 '<div class="tags-top">' +
+                   '<div class="ttl">' +
+                     '<i class="bi bi-tags-fill"></i>' +
+                     '<strong>Tags</strong>' +
+                     '<span class="hint">(nhánh con)</span>' +
+                   '</div>' +
+                   '<div class="top-right">' +
+                     '<span class="chip chip-mini chip-count-bottom" data-count-for="' + dto.categoryId + '">0</span>' +
+                     '<button class="btn btn-ghost sm soft btn-add-tag" data-category-id="' + dto.categoryId + '">' +
+                       '<i class="bi bi-plus-lg"></i> Thêm tag' +
+                     '</button>' +
+                   '</div>' +
+                 '</div>' +
+                 '<ul class="list-group tag-list" data-category-id="' + dto.categoryId + '">' +
+                   '<li class="list-group-item note">Nhấn mũi tên để tải danh sách tag…</li>' +
+                 '</ul>' +
+               '</div>' +
+             '</td>';
+           
+           // Add both rows to tbody
+           tbody.appendChild(catRow);
+           tbody.appendChild(tagRow);
         }
 
          // Function to update metrics (số lượng) ngay lập tức

@@ -15,6 +15,7 @@
         // Provider của dịch vụ
         public Guid ProviderId { get; set; }
         public string? ProviderName { get; set; }
+        public string? ProviderImages { get; set; } // Logo/ảnh của provider
 
         // Tuỳ chọn của cart item (nếu dùng)
         public List<CartItemOptionReadDto> Options { get; set; } = new();

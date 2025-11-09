@@ -4,43 +4,97 @@
     ViewData["Title"] = "Chi tiết đơn đã hủy";
     Layout = "~/Views/Shared/_Layout.cshtml";
 
-    var cancel = ViewBag.Cancel as CancelBookingRequestDTO;
-
     string FmtMoney(decimal v) => string.Format("{0:#,0}", v);
     string FmtDate(DateTime? d) => d.HasValue ? d.Value.ToString("HH:mm dd-MM-yyyy") : "—";
 
-    // var createdAt = FmtDate(Model?.CreatedAt);
-    // var canceledAt = FmtDate(Model?.CompletedAt);
+    var fallbackImg = Url.Content("~/images/VeSinh.jpg");
 
-    var serviceImg = string.IsNullOrWhiteSpace(Model?.Service?.Image)
-        ? Url.Content("~/images/VeSinh.jpg")
-        : Model.Service.Image;
+    // Helper để lấy ảnh đầu tiên từ ServiceImages (có thể là JSON array hoặc comma-separated string)
+    string? FirstImageOrDefault(string? images)
+    {
+        if (string.IsNullOrWhiteSpace(images)) return null;
+
+        try
+        {
+            // Thử parse JSON array trước
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+            if (arr != null && arr.Count > 0) return arr[0];
+        }
+        catch { /* ignore JSON parse error */ }
+
+        // Nếu không phải JSON, thử split bằng dấu phẩy
+        if (images.Contains(','))
+        {
+            var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
+        
+        // Nếu không có dấu phẩy, trả về nguyên chuỗi
+        return images;
+    }
+
+    // Helper để lấy ảnh service (backend đã thêm domain prefix)
+    string GetServiceImage(string? serviceImages)
+    {
+        if (string.IsNullOrWhiteSpace(serviceImages))
+            return fallbackImg;
+        
+        var img = FirstImageOrDefault(serviceImages);
+        return !string.IsNullOrWhiteSpace(img) ? img : fallbackImg;
+    }
+
+    // Helper để lấy logo provider (backend đã thêm domain prefix)
+    string GetProviderLogo(string? providerImages)
+    {
+        if (!string.IsNullOrWhiteSpace(providerImages))
+        {
+            var logo = FirstImageOrDefault(providerImages);
+            if (!string.IsNullOrWhiteSpace(logo)) return logo;
+        }
+        
+        // Fallback về shop-badge.svg nếu không có providerImages
+        return "/images/shop-badge.svg";
+    }
+
+    // Tính toán giá
+    var servicePrice = Model?.Service?.UnitPrice ?? 0m;
+    var optionTotal = Model?.Options?.Sum(o => o.Price) ?? 0m;
+    var subtotal = Model?.Subtotal ?? 0m;
+    var shippingFee = Model?.ShippingFee ?? 0m;
+    var voucherDiscount = Model?.VoucherDiscount ?? 0m;
+    var total = Model?.Total ?? 0m;
+    var paidAmount = Model?.PaidAmount ?? 0m;
 }
 
 <link rel="stylesheet" href="~/css/cancel-booking-detail.css" asp-append-version="true" />
 
-<div class="kb container py-4">
+<div class="kb kb-container">
     <!-- Header -->
-    <div class="kb-header d-flex flex-wrap align-items-center justify-content-between mb-4">
-        <div class="d-flex align-items-center gap-2">
-            <h2 class="kb-title mb-0">Chi tiết hủy đơn</h2>
-            <span class="kb-badge kb-badge-danger"><i class="bi bi-x-circle me-1"></i>Đã hủy</span>
-        </div>
-        <div class="d-flex gap-2">
-            <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" class="btn btn-ghost">
-                <i class="bi bi-clock-history me-1"></i>Lịch sử đơn
-            </a>
-            <a href="javascript:history.back()" class="btn btn-brand">
-                <i class="bi bi-arrow-left-short me-1"></i>Quay lại
-            </a>
-        </div>
+    <div class="kb-header-compact">
+        <h2 class="kb-title">Chi tiết hủy đơn</h2>
+        <nav aria-label="breadcrumb" class="kb-breadcrumb-nav">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" class="breadcrumb-link">Lịch sử đặt hàng </a>
+                </li>
+                <li> / </li>
+                <li class="breadcrumb-item active" aria-current="page"> Chi tiết hủy đơn</li>
+            </ol>
+        </nav>
     </div>
 
     <!-- Timeline -->
     @if (Model?.Timeline?.Any() ?? false)
     {
         <div class="kb-card kb-timeline">
-            <div class="kb-card-header"><i class="bi bi-activity me-2"></i>Tiến trình</div>
+            <div class="kb-card-header">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" class="kb-icon">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                    <path d="M7.5 4.5a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5zm0 5a.5.5 0 0 1 .5.5h.5a.5.5 0 0 1 0 1H8a.5.5 0 0 1-.5-.5v-.5a.5.5 0 0 1 .5-.5z"/>
+                </svg>
+                <span>Tiến trình</span>
+            </div>
             <div class="kb-card-body">
                 <ol class="kb-steps">
                     @foreach (var ev in Model.Timeline.OrderBy(t => t.Time))
@@ -48,12 +102,18 @@
                         <li class="kb-step">
                             <div class="kb-step-dot"></div>
                             <div class="kb-step-content">
-                                <div class="fw-semibold">@ev.Title</div>
+                                <div class="kb-step-title">@ev.Title</div>
                                 @if (!string.IsNullOrWhiteSpace(ev.Description))
                                 {
-                                    <div class="text-muted small">@ev.Description</div>
+                                    <div class="kb-step-desc">@ev.Description</div>
                                 }
-                                <div class="text-muted small mt-1"><i class="bi bi-clock me-1"></i>@ev.Time:HH:mm dd-MM-yyyy</div>
+                                <div class="kb-step-time">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="kb-icon-small">
+                                        <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+                                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+                                    </svg>
+                                    <span>@ev.Time:HH:mm dd-MM-yyyy</span>
+                                </div>
                             </div>
                         </li>
                     }
@@ -63,123 +123,202 @@
     }
 
     <!-- Service / Product -->
-    <div class="kb-card mb-4">
-        <div class="kb-card-header">
-            <i class="bi bi-bag me-2"></i>Sản phẩm / Dịch vụ
-        </div>
+    <div class="kb-card">
         <div class="kb-card-body">
-            <div class="row g-3 align-items-start">
-                <div class="col-auto">
-                    <img src="@serviceImg" alt="Ảnh dịch vụ" class="kb-thumb" loading="lazy" decoding="async"
-                         onerror="this.onerror=null;this.src='@Url.Content("~/images/VeSinh.jpg")'" />
+            @if (!string.IsNullOrWhiteSpace(Model?.ProviderName))
+            {
+                <div class="kb-provider-info">
+                    <img src="@GetProviderLogo(Model?.ProviderImages)" alt="@Model.ProviderName" class="kb-provider-logo" 
+                         loading="lazy" decoding="async"
+                         onerror="this.onerror=null;this.src='@fallbackImg';" />
+                    <div class="kb-provider-details">
+                        <div class="kb-provider-name">@Model.ProviderName</div>
+                        <div class="kb-provider-label">Nhà cung cấp dịch vụ</div>
+                    </div>
                 </div>
-                <div class="col">
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                        <div class="fw-bold fs-6">@Model?.Service?.Title</div>
-                        @if (!string.IsNullOrWhiteSpace(Model?.ProviderName))
-                        {
-                            <span class="kb-chip"><i class="bi bi-shop me-1"></i>@Model.ProviderName</span>
-                        }
-                    </div>
-                    <div class="text-muted small mt-1">
-                        Đơn giá: <strong>@FmtMoney(Model?.Service?.UnitPrice ?? 0)</strong> @Model?.Service?.UnitType ·
-                        SL: <strong>@(Model?.Service?.Quantity ?? 0)</strong>
-                    </div>
-
-                    @if (Model?.Options?.Any() ?? false)
-                    {
-                        <div class="mt-3">
-                            <div class="kb-label mb-2">Tuỳ chọn đã chọn</div>
-                            <div class="d-flex flex-wrap gap-2">
-                                @foreach (var op in Model.Options)
-                                {
-                                    <span class="kb-option">
-                                        <i class="bi bi-check2 me-1"></i>@op.OptionName
-                                        <span class="text-muted">— @FmtMoney(op.Price) @op.UnitType</span>
-                                    </span>
-                                }
-                            </div>
+                <div class="kb-provider-divider"></div>
+            }
+            
+            <div class="kb-service-layout">
+                <div class="kb-service-left">
+                    <div class="kb-service-row">
+                        <div class="kb-service-image-wrapper">
+                            <img src="@GetServiceImage(Model?.ServiceImages)" alt="Ảnh dịch vụ" class="kb-thumb" loading="lazy" decoding="async"
+                                 onerror="this.onerror=null;this.src='@fallbackImg';" />
                         </div>
-                    }
+                        <div class="kb-service-content">
+                            <div class="kb-service-title">@Model?.Service?.Title</div>
+                            
+                            @if (Model?.Options?.Any() ?? false)
+                            {
+                                <div class="kb-options-section">
+                                    <div class="kb-options-list">
+                                        @foreach (var op in Model.Options)
+                                        {
+                                    <span class="kb-option">
+                                        <span>@op.OptionName</span>
+                                        <span class="kb-option-price">• @FmtMoney(op.Price)</span>
+                                    </span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="kb-service-right">
+                    <div class="kb-price-box">
+                        <div class="kb-price-item">
+                            <span class="kb-price-label">Giá dịch vụ:</span>
+                            <span class="kb-price-value">@FmtMoney(servicePrice)</span>
+                        </div>
+                        @if (optionTotal > 0)
+                        {
+                            <div class="kb-price-item">
+                                <span class="kb-price-label">Tuỳ chọn:</span>
+                                <span class="kb-price-value">@FmtMoney(optionTotal)</span>
+                            </div>
+                        }
+                        @if (voucherDiscount > 0)
+                        {
+                            <div class="kb-price-item kb-price-item-discount">
+                                <span class="kb-price-label">Giảm giá:</span>
+                                <span class="kb-price-value kb-price-value-discount">-@FmtMoney(voucherDiscount)</span>
+                            </div>
+                        }
+                        <div class="kb-price-divider"></div>
+                        <div class="kb-price-total-box">
+                            <span class="kb-price-label">Tổng cộng:</span>
+                            <span class="kb-price-total-value">@FmtMoney(total)</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="kb-card-footer">
-            <div class="row g-3 align-items-center">
-                <div class="col-md-6">
-                    <div class="kb-label">Phương thức thanh toán</div>
-                    <div class="fw-semibold">@(!string.IsNullOrWhiteSpace(Model?.PaymentMethod) ? Model.PaymentMethod : "—")</div>
+            <div class="kb-payment-summary">
+                <div class="kb-payment-total">
+                    <span class="kb-payment-total-label">Thành tiền:</span>
+                    <span class="kb-payment-total-value">@FmtMoney(total)</span>
                 </div>
-                <div class="col-md-6">
-                    <div class="kb-price table-responsive">
-                        <table class="table table-borderless table-sm align-middle mb-1">
-                            <tbody>
-                                <tr>
-                                    <td class="text-muted">Tạm tính</td>
-                                    <td class="text-end fw-semibold">@FmtMoney(Model?.Subtotal ?? 0)</td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted">Phí vận chuyển</td>
-                                    <td class="text-end fw-semibold">@FmtMoney(Model?.ShippingFee ?? 0)</td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted">Voucher</td>
-                                    <td class="text-end fw-semibold">-@FmtMoney(Model?.VoucherDiscount ?? 0)</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div class="d-flex justify-content-between border-top pt-2">
-                            <div class="fw-bold">Tổng tiền</div>
-                            <div class="fw-bold fs-5 text-brand">@FmtMoney(Model?.Total ?? 0) @Model?.Service?.UnitType</div>
+                <div class="kb-payment-status-wrapper">
+                    <span class="kb-payment-status-label">Xử lí:</span>
+                    @{
+                        var paymentStatus = Model?.PaymentStatus ?? "";
+                        var isPaid = paidAmount > 0 || paymentStatus.Equals("Paid", StringComparison.OrdinalIgnoreCase) || 
+                                     paymentStatus.Equals("Đã thanh toán", StringComparison.OrdinalIgnoreCase);
+                    }
+                    @if (isPaid)
+                    {
+                        <div class="kb-payment-status kb-payment-status-paid">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="kb-icon-small">
+                                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                            </svg>
+                            <span>Đã thanh toán</span>
                         </div>
-                        <div class="text-end text-muted small mt-1">Đã thanh toán: @FmtMoney(Model?.PaidAmount ?? 0) @Model?.Service?.UnitType</div>
-                    </div>
+                    }
+                    else
+                    {
+                        <div class="kb-payment-status kb-payment-status-pending">
+                            <span>Chưa thanh toán</span>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Receiver & Address -->
-    <div class="kb-card mb-4">
-        <div class="kb-card-header"><i class="bi bi-geo-alt me-2"></i>Người nhận & địa chỉ</div>
+    <div class="kb-card">
+        <div class="kb-card-header">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" class="kb-icon">
+                <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>
+            </svg>
+            <span>Người nhận & địa chỉ</span>
+        </div>
         <div class="kb-card-body">
-            <div class="d-flex flex-column gap-1">
-                <div class="fw-semibold">@Model?.RecipientFullName <span class="text-muted">— @Model?.RecipientPhone</span></div>
-                <div class="text-muted">@Model?.AddressLine</div>
+            <div class="kb-address-list">
+                <div class="kb-address-name">
+                    @Model?.RecipientFullName <span class="kb-address-phone">— @Model?.RecipientPhone</span>
+                </div>
+                <div class="kb-address-line">@Model?.AddressLine</div>
                 @if (!string.IsNullOrWhiteSpace(Model?.ShippingTrackingCode))
                 {
-                    <div class="small text-muted"><i class="bi bi-truck me-1"></i>Mã vận đơn: @Model.ShippingTrackingCode</div>
+                    <div class="kb-tracking-code">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="kb-icon-small">
+                            <path d="M0 3.5A1.5 1.5 0 0 1 1.5 2h9A1.5 1.5 0 0 1 12 3.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 0 8.5v-5zM1.5 3a.5.5 0 0 0-.5.5v.793l.853.853A.5.5 0 0 0 3 4.707V3.5a.5.5 0 0 0-.5-.5h-1zm11 .5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.207l.853.853A.5.5 0 0 0 11 4.707V3.5zm-2.5 3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3zm0 2a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1h-1z"/>
+                        </svg>
+                        <span>Mã vận đơn: @Model.ShippingTrackingCode</span>
+                    </div>
                 }
             </div>
         </div>
     </div>
 
     <!-- Cancel / Refund info -->
-    <div class="kb-card mb-4">
-        <div class="kb-card-header"><i class="bi bi-receipt-cutoff me-2"></i>Thông tin hủy & hoàn tiền</div>
+    <div class="kb-card">
+        <div class="kb-card-header">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" class="kb-icon">
+                <path d="M3 4.5a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5zm8-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+            <span>Thông tin hủy & hoàn tiền</span>
+        </div>
         <div class="kb-card-body">
-            <div class="row g-3 mb-2">
-                <div class="col-12">
-                    <div class="kb-label">Lý do hủy</div>
-                    <div class="fw-semibold">@((cancel?.Reason ?? "—"))</div>
-                </div>
-                <div class="col-md-4 col-12">
-                    <div class="kb-label">Ngân hàng</div>
-                    <div class="fw-semibold">@((cancel?.BankName ?? "—"))</div>
-                </div>
-                <div class="col-md-4 col-12">
-                    <div class="kb-label">Chủ tài khoản</div>
-                    <div class="fw-semibold text-uppercase">@((cancel?.AccountHolderName ?? "—"))</div>
-                </div>
-                <div class="col-md-4 col-12">
-                    <div class="kb-label">Số tài khoản</div>
-                    <div class="fw-semibold">@((cancel?.BankAccountNumber ?? "—"))</div>
+            <!-- Lý do hủy -->
+            <div class="kb-cancel-reason-section">
+                <div class="kb-cancel-reason-label">LÝ DO HỦY</div>
+                <div class="kb-cancel-reason-value">
+                    @if (!string.IsNullOrWhiteSpace(Model?.CancelReason))
+                    {
+                        @Model.CancelReason
+                    }
+                    else
+                    {
+                        <span style="color: var(--muted-foreground); font-style: italic;">Chưa có thông tin</span>
+                    }
                 </div>
             </div>
-            <div class="alert alert-warning d-flex align-items-start gap-2 mb-0 small">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-                <div>
+            
+            <!-- Thông tin ngân hàng hoàn tiền -->
+            @if (!string.IsNullOrWhiteSpace(Model?.BankAccountNumber))
+            {
+                <div class="kb-bank-info">
+                    <div class="kb-bank-info-header">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" class="kb-icon">
+                            <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1H2zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z"/>
+                            <path d="M2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1zm6 0a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-1z"/>
+                        </svg>
+                        <strong>Thông tin ngân hàng:</strong>
+                    </div>
+                    <div class="kb-bank-info-details">
+                        <div class="kb-bank-info-row">
+                            <span class="kb-bank-info-label">STK:</span>
+                            <span class="kb-bank-info-value">@Model.BankAccountNumber</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(Model?.BankName))
+                        {
+                            <div class="kb-bank-info-row">
+                                <span class="kb-bank-info-label">Ngân hàng:</span>
+                                <span class="kb-bank-info-value">@Model.BankName</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model?.AccountHolderName))
+                        {
+                            <div class="kb-bank-info-row">
+                                <span class="kb-bank-info-label">Chủ tài khoản:</span>
+                                <span class="kb-bank-info-value kb-value-uppercase">@Model.AccountHolderName</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            <div class="kb-alert kb-alert-warning">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" class="kb-alert-icon">
+                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                </svg>
+                <div class="kb-alert-content">
                     Nếu đã thanh toán, khoản hoàn sẽ được xử lý theo quy trình của hệ thống/nhà cung cấp.
                     Vui lòng theo dõi thông báo để biết thời gian hoàn chính xác.
                 </div>
