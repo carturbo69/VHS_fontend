@@ -523,6 +523,227 @@
     </div>
 </div>
 
+<!-- Script inline để đảm bảo hàm có sẵn ngay khi HTML được parse -->
+<script>
+    // Định nghĩa hàm modal địa chỉ trong global scope NGAY SAU KHI modal được định nghĩa
+    // Điều này đảm bảo hàm có sẵn khi button onclick được gọi
+    if (typeof window.openAddressModal === 'undefined') {
+        window.openAddressModal = function() {
+            const modal = document.getElementById('addressModal');
+            if (!modal) {
+                console.error('Address modal not found');
+                return;
+            }
+            modal.classList.add('open');
+            // Ẩn thông báo khi mở modal
+            const alert = document.getElementById('addressModalAlert');
+            if (alert) {
+                alert.style.display = 'none';
+                alert.innerHTML = '';
+            }
+        };
+    }
+    
+    if (typeof window.closeAddressModal === 'undefined') {
+        window.closeAddressModal = function() {
+            const modal = document.getElementById('addressModal');
+            if (!modal) {
+                console.error('Address modal not found');
+                return;
+            }
+            modal.classList.remove('open');
+            // Ẩn thông báo khi đóng modal
+            const alert = document.getElementById('addressModalAlert');
+            if (alert) {
+                alert.style.display = 'none';
+                alert.innerHTML = '';
+            }
+        };
+    }
+    
+    // Hàm xác nhận địa chỉ đã chọn
+    if (typeof window.applySelectedAddress === 'undefined') {
+        window.applySelectedAddress = function() {
+            const checked = document.querySelector('.addr-item input[type="radio"][name="addressChoice"]:checked');
+            if (!checked) {
+                window.closeAddressModal();
+                return;
+            }
+            const row = checked.closest('.addr-item');
+            const parts = [row.dataset.street, row.dataset.ward, row.dataset.province]
+                          .filter(s => s && s.trim() !== '');
+            const text = parts.join(', ');
+            
+            // Cập nhật địa chỉ
+            const hidden = document.getElementById('AddressText');
+            const view = document.getElementById('currentAddressText');
+            if (hidden) hidden.value = text;
+            
+            // Kiểm tra xem đang ở empty state hay không
+            const isEmptyState = view && view.classList.contains('address-empty-state');
+            
+            if (view) {
+                if (isEmptyState) {
+                    // Thay thế empty state bằng nội dung địa chỉ đơn giản
+                    const addrBody = view.parentElement;
+                    view.remove();
+                    
+                    // Tạo lại structure đúng
+                    const recipientInfo = document.getElementById('currentRecipientInfo');
+                    if (recipientInfo) {
+                        recipientInfo.style.display = 'block';
+                    }
+                    
+                    // Tạo div address text mới
+                    const newAddressText = document.createElement('div');
+                    newAddressText.id = 'currentAddressText';
+                    newAddressText.textContent = text;
+                    if (addrBody) {
+                        addrBody.appendChild(newAddressText);
+                    }
+                } else {
+                    // Chỉ cập nhật text nếu đã có structure
+                    view.textContent = text;
+                }
+            }
+            
+            // Cập nhật tên và số điện thoại người đặt
+            const recipientInfo = document.getElementById('currentRecipientInfo');
+            if (recipientInfo) {
+                const recipientName = row.dataset.recipientname || '';
+                const recipientPhone = row.dataset.recipientphone || '';
+                
+                // Lấy giá trị mặc định từ Model (sẽ được xử lý trong phần Scripts)
+                const defaultName = '@(Model.RecipientFullName ?? "")';
+                const defaultPhone = '@(Model.RecipientPhone ?? "")';
+                
+                const name = recipientName || defaultName;
+                const phone = recipientPhone || defaultPhone;
+                recipientInfo.innerHTML = `<strong>${name}</strong> (${phone})`;
+                recipientInfo.style.display = 'block';
+            }
+            
+            // Cập nhật nút "Thay đổi"
+            const btn = document.querySelector('.address-card .addr-title .btn');
+            if (btn) btn.textContent = 'Thay đổi';
+            
+            window.closeAddressModal();
+        };
+    }
+    
+    // Hàm mở form thêm địa chỉ
+    if (typeof window.openCreateAddressForm === 'undefined') {
+        window.openCreateAddressForm = function() {
+            const upsertModal = document.getElementById('addressUpsertModal');
+            if (!upsertModal) {
+                console.error('Address upsert modal not found');
+                return;
+            }
+            
+            const title = document.getElementById('upsertTitle');
+            if (title) title.innerText = 'Thêm địa chỉ';
+            
+            const addressId = document.getElementById('AddressId');
+            if (addressId) addressId.value = '';
+            
+            const streetAddress = document.getElementById('streetAddress');
+            if (streetAddress) streetAddress.value = '';
+            
+            const wardName = document.getElementById('wardName');
+            if (wardName) wardName.value = '';
+            
+            const provinceName = document.getElementById('provinceName');
+            if (provinceName) provinceName.value = '';
+            
+            const recipientName = document.getElementById('recipientName');
+            if (recipientName) recipientName.value = '';
+            
+            const recipientPhone = document.getElementById('recipientPhone');
+            if (recipientPhone) recipientPhone.value = '';
+            
+            const latitude = document.getElementById('Latitude');
+            if (latitude) latitude.value = '';
+            
+            const longitude = document.getElementById('Longitude');
+            if (longitude) longitude.value = '';
+            
+            // Reset thông báo lỗi
+            const formError = document.getElementById('upsertFormError');
+            if (formError) {
+                formError.style.display = 'none';
+                formError.style.visibility = 'hidden';
+                formError.style.opacity = '0';
+                formError.textContent = '';
+            }
+            
+            // Reset lỗi số điện thoại
+            const phoneInput = document.getElementById('recipientPhone');
+            const phoneError = document.getElementById('recipientPhoneError');
+            if (phoneInput) {
+                phoneInput.classList.remove('input-error');
+            }
+            if (phoneError) {
+                phoneError.style.display = 'none';
+                phoneError.textContent = '';
+            }
+            
+            // Mở modal
+            upsertModal.classList.add('open');
+            
+            // Khởi tạo bản đồ sau khi modal mở (nếu hàm initAddressPickerMap đã có)
+            setTimeout(() => {
+                if (typeof initAddressPickerMap === 'function') {
+                    initAddressPickerMap();
+                }
+            }, 300);
+        };
+    }
+    
+    // Hàm đóng modal upsert địa chỉ
+    if (typeof window.closeUpsertModal === 'undefined') {
+        window.closeUpsertModal = function() {
+            const modal = document.getElementById('addressUpsertModal');
+            if (modal) modal.classList.remove('open');
+            
+            // Reset lỗi số điện thoại
+            const phoneInput = document.getElementById('recipientPhone');
+            const phoneError = document.getElementById('recipientPhoneError');
+            if (phoneInput) {
+                phoneInput.classList.remove('input-error');
+            }
+            if (phoneError) {
+                phoneError.style.display = 'none';
+                phoneError.textContent = '';
+            }
+            
+            // Reset lỗi form
+            const formError = document.getElementById('upsertFormError');
+            if (formError) {
+                formError.style.display = 'none';
+                formError.style.visibility = 'hidden';
+                formError.style.opacity = '0';
+                formError.textContent = '';
+            }
+        };
+    }
+    
+    // Hàm mở form chỉnh sửa địa chỉ (placeholder - sẽ được override trong phần Scripts)
+    if (typeof window.openEditAddressForm === 'undefined') {
+        window.openEditAddressForm = function(button) {
+            // Hàm này sẽ được định nghĩa đầy đủ trong phần Scripts
+            console.log('openEditAddressForm called - full implementation in Scripts section');
+        };
+    }
+    
+    // Hàm xóa địa chỉ (placeholder - sẽ được override trong phần Scripts)
+    if (typeof window.deleteAddress === 'undefined') {
+        window.deleteAddress = function(addressId, button) {
+            // Hàm này sẽ được định nghĩa đầy đủ trong phần Scripts
+            console.log('deleteAddress called - full implementation in Scripts section', addressId);
+        };
+    }
+</script>
+
 @foreach (var addr in Model.Addresses ?? new List<UserAddressDto>())
 {
     <form id="del-@addr.AddressId" asp-area="Customer" asp-controller="Address" asp-action="Delete" asp-route-id="@addr.AddressId" method="post">
@@ -558,7 +779,7 @@
                     <button type="button" id="btnGeocode" class="btn-geocode" title="Lấy địa chỉ từ tọa độ đã chọn">
                         <span class="btn-icon">🔍</span>
                         <span>Lấy địa chỉ từ vị trí đã chọn</span>
-                </button>
+                    </button>
                 </div>
                 <input type="text" id="streetAddress" name="streetAddress" required placeholder="Nhập địa chỉ hoặc chọn trên bản đồ" class="form-input" />
             </div>
@@ -663,6 +884,7 @@
             e.preventDefault();
             e.stopPropagation();
             
+            const addressId = document.getElementById('AddressId')?.value.trim() || '';
             const street = document.getElementById('streetAddress')?.value.trim() || '';
             const ward = document.getElementById('wardName')?.value.trim() || '';
             const province = document.getElementById('provinceName')?.value.trim() || '';
@@ -671,7 +893,7 @@
             const recipientName = document.getElementById('recipientName')?.value.trim() || '';
             const recipientPhone = document.getElementById('recipientPhone')?.value.trim() || '';
             
-            console.log('Form values:', { street, ward, province, lat, lng, recipientName, recipientPhone });
+            console.log('Form values:', { addressId, street, ward, province, lat, lng, recipientName, recipientPhone });
             
             if (!street || !ward || !province) {
               const errorEl = document.getElementById('upsertFormError');
@@ -714,7 +936,7 @@
               const existingAddresses = document.querySelectorAll('.addr-item');
               const normalizedPhone = recipientPhone ? recipientPhone.replace(/[\s\-\(\)]/g, '') : '';
               const normalizedName = recipientName ? recipientName.trim().toLowerCase() : '';
-              const normalizedAddress = [street, ward, district, province]
+              const normalizedAddress = [street, ward, province]
                 .filter(s => s && s.trim() !== '')
                 .map(s => s.trim().toLowerCase())
                 .join(', ');
@@ -728,10 +950,9 @@
                 const existingPhone = (addrItem.getAttribute('data-recipientphone') || '').replace(/[\s\-\(\)]/g, '');
                 const existingStreet = (addrItem.getAttribute('data-street') || '').trim().toLowerCase();
                 const existingWard = (addrItem.getAttribute('data-ward') || '').trim().toLowerCase();
-                const existingDistrict = (addrItem.getAttribute('data-district') || '').trim().toLowerCase();
                 const existingProvince = (addrItem.getAttribute('data-province') || '').trim().toLowerCase();
                 
-                const existingAddress = [existingStreet, existingWard, existingDistrict, existingProvince]
+                const existingAddress = [existingStreet, existingWard, existingProvince]
                   .filter(s => s && s !== '')
                   .join(', ');
                 
@@ -831,7 +1052,7 @@
                 closeUpsertModal();
                 
                 // Cập nhật address card ngay lập tức
-                const addressParts = [street, ward, district, province].filter(s => s && s.trim() !== '');
+                const addressParts = [street, ward, province].filter(s => s && s.trim() !== '');
                 const addressText = addressParts.join(', ');
                 
                 // Cập nhật hidden input
@@ -1024,11 +1245,43 @@
 
 @section Scripts {
     <script>
-                  function cancelCheckout() {
+        // ========= Định nghĩa các hàm global TRƯỚC TIÊN để đảm bảo có sẵn khi button được click =========
+        // Modal chọn địa chỉ - PHẢI định nghĩa trong global scope
+        window.openAddressModal = function() {
+            const modal = document.getElementById('addressModal');
+            if (!modal) {
+                console.error('Address modal not found');
+                return;
+            }
+            modal.classList.add('open');
+            // Ẩn thông báo khi mở modal
+            const alert = document.getElementById('addressModalAlert');
+            if (alert) {
+                alert.style.display = 'none';
+                alert.innerHTML = '';
+            }
+        };
+        
+        window.closeAddressModal = function() {
+            const modal = document.getElementById('addressModal');
+            if (!modal) {
+                console.error('Address modal not found');
+                return;
+            }
+            modal.classList.remove('open');
+            // Ẩn thông báo khi đóng modal
+            const alert = document.getElementById('addressModalAlert');
+            if (alert) {
+                alert.style.display = 'none';
+                alert.innerHTML = '';
+            }
+        };
+
+        function cancelCheckout() {
             window.location.href = '/Customer/Cart/Index';
         }
 
-                /* ========= Chọn phương thức thanh toán: chỉ đổi UI, KHÔNG auto submit ========= */
+        /* ========= Chọn phương thức thanh toán: chỉ đổi UI, KHÔNG auto submit ========= */
         (function bindPaymentPickUIOnly(){
           // Toggle .active khi đổi radio
           document.querySelectorAll('input.pm-radio[name="SelectedPaymentCode"]').forEach(r => {
@@ -1059,26 +1312,6 @@
         /* ========= Validate trước khi submit: phải có Payment + TOS + Địa chỉ ========= */
         // Đã được thay thế bằng validation mới ở dòng 2107 với thông báo inline
         // Phần này đã được loại bỏ để tránh duplicate validation và alert popup
-
-        /* ========= Modal chọn địa chỉ ========= */
-        function openAddressModal(){ 
-          document.getElementById('addressModal').classList.add('open');
-          // Ẩn thông báo khi mở modal
-          const alert = document.getElementById('addressModalAlert');
-          if (alert) {
-            alert.style.display = 'none';
-            alert.innerHTML = '';
-          }
-          }
-        function closeAddressModal(){ 
-          document.getElementById('addressModal').classList.remove('open');
-          // Ẩn thông báo khi đóng modal
-          const alert = document.getElementById('addressModalAlert');
-          if (alert) {
-            alert.style.display = 'none';
-            alert.innerHTML = '';
-          }
-        }
         
         /* ========= Click vào card địa chỉ để chọn ========= */
         // Sử dụng event delegation để tự động hoạt động với các element được thêm động
@@ -1112,7 +1345,8 @@
         });
         
         /* ========= Xóa địa chỉ bằng AJAX ========= */
-        async function deleteAddress(addressId, button) {
+        // Override hàm từ script inline với implementation đầy đủ
+        window.deleteAddress = async function(addressId, button) {
           // Disable button
           button.disabled = true;
           const originalText = button.innerHTML;
@@ -1299,7 +1533,8 @@
         }
 
         /* ✅ Áp địa chỉ đang chọn trong modal vào hidden + UI */
-        function applySelectedAddress(){
+        // Override hàm từ script inline với implementation đầy đủ (bao gồm map)
+        window.applySelectedAddress = function(){
           const checked = document.querySelector('.addr-item input[type="radio"][name="addressChoice"]:checked');
           if(!checked){ closeAddressModal(); return; }
           const row = checked.closest('.addr-item');
@@ -1408,7 +1643,8 @@
         /* ========= Modal Upsert Address ========= */
         let addressPickerMap, addressPickerMarker; // Leaflet objects
         
-        function openCreateAddressForm(){
+        // Override hàm từ script inline với implementation đầy đủ (bao gồm map initialization)
+        window.openCreateAddressForm = function(){
           document.getElementById('upsertTitle').innerText = 'Thêm địa chỉ';
           document.getElementById('AddressId').value = '';
           document.getElementById('streetAddress').value = '';
@@ -1439,104 +1675,221 @@
             phoneError.textContent = '';
           }
           
-          // Khởi tạo bản đồ cho modal
-          setTimeout(() => {
-            initAddressPickerMap();
-          }, 300);
+          // MỞ MODAL TRƯỚC để element có kích thước
+          const modal = document.getElementById('addressUpsertModal');
+          if (modal) {
+            modal.classList.add('open');
+          }
           
-          document.getElementById('addressUpsertModal').classList.add('open');
+          // Khởi tạo bản đồ SAU KHI modal đã được hiển thị
+          // Sử dụng setTimeout để đảm bảo modal đã render và có kích thước
+          setTimeout(() => {
+            console.log('Initializing map after modal open...');
+            const mapContainer = document.getElementById('addressMapPicker');
+            if (mapContainer) {
+              console.log('Map container found, dimensions:', {
+                width: mapContainer.offsetWidth,
+                height: mapContainer.offsetHeight
+              });
+              // Đảm bảo container có kích thước trước khi khởi tạo map
+              if (mapContainer.offsetHeight === 0) {
+                mapContainer.style.height = '400px';
+                console.log('Set map container height to 400px');
+              }
+            }
+            
+            if (typeof initAddressPickerMap === 'function') {
+              initAddressPickerMap();
+              // Đảm bảo map được render đúng kích thước sau khi modal hiển thị
+              setTimeout(() => {
+                if (addressPickerMap) {
+                  console.log('Invalidating map size after initialization...');
+                  addressPickerMap.invalidateSize();
+                  // Thử lại sau 300ms nữa để đảm bảo
+                  setTimeout(() => {
+                    if (addressPickerMap) {
+                      addressPickerMap.invalidateSize();
+                    }
+                  }, 300);
+                }
+              }, 300);
+            } else {
+              console.error('initAddressPickerMap function not found');
+            }
+          }, 400);
         }
         
         function initAddressPickerMap() {
+          console.log('=== initAddressPickerMap called ===');
+          
           // Kiểm tra Leaflet đã load chưa
           if (typeof L === 'undefined') {
-            console.error('Leaflet chưa được load');
+            console.error('Leaflet chưa được load. Kiểm tra xem script Leaflet đã được include chưa.');
             alert('Leaflet Maps chưa sẵn sàng. Vui lòng refresh trang.');
             return;
           }
           
+          console.log('Leaflet loaded:', typeof L);
+          
+          // Kiểm tra element có tồn tại không
+          const mapContainer = document.getElementById('addressMapPicker');
+          if (!mapContainer) {
+            console.error('Map container addressMapPicker not found');
+            return;
+          }
+          
+          console.log('Map container found:', mapContainer);
+          console.log('Map container dimensions:', {
+            width: mapContainer.offsetWidth,
+            height: mapContainer.offsetHeight,
+            clientWidth: mapContainer.clientWidth,
+            clientHeight: mapContainer.clientHeight
+          });
+          
+          // Đảm bảo container có kích thước
+          if (mapContainer.offsetWidth === 0 || mapContainer.offsetHeight === 0) {
+            console.warn('Map container has no size. Setting default size.');
+            mapContainer.style.width = '100%';
+            mapContainer.style.height = '400px';
+          }
+          
           // Mặc định: Cần Thơ
-          const defaultLat = parseFloat(document.getElementById('Latitude').value) || 10.0452;
-          const defaultLng = parseFloat(document.getElementById('Longitude').value) || 105.7469;
+          const latInput = document.getElementById('Latitude');
+          const lngInput = document.getElementById('Longitude');
+          const defaultLat = (latInput && latInput.value) ? parseFloat(latInput.value) : 10.0452;
+          const defaultLng = (lngInput && lngInput.value) ? parseFloat(lngInput.value) : 105.7469;
+          
+          console.log('Default coordinates:', defaultLat, defaultLng);
           
           // Nếu map chưa được khởi tạo, tạo mới
           if (!addressPickerMap) {
-            // Khởi tạo Leaflet Map
-            addressPickerMap = L.map('addressMapPicker').setView([defaultLat, defaultLng], 13);
-            
-            // Thêm tile layer (OpenStreetMap)
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-              maxZoom: 19
-            }).addTo(addressPickerMap);
-            
-            // Thêm marker có thể kéo
-            addressPickerMarker = L.marker([defaultLat, defaultLng], {
-              draggable: true
-            }).addTo(addressPickerMap);
-            
-            // Cập nhật tọa độ khi kéo marker
-            addressPickerMarker.on('dragend', function(e) {
-              const pos = addressPickerMarker.getLatLng();
-              document.getElementById('Latitude').value = pos.lat;
-              document.getElementById('Longitude').value = pos.lng;
-            });
-            
-            // Nhấn vào bản đồ để di chuyển marker
-            addressPickerMap.on('click', function(e) {
-              const lat = e.latlng.lat;
-              const lng = e.latlng.lng;
+            try {
+              console.log('Creating new map...');
+              // Khởi tạo Leaflet Map
+              addressPickerMap = L.map('addressMapPicker', {
+                center: [defaultLat, defaultLng],
+                zoom: 13
+              });
               
-              document.getElementById('Latitude').value = lat;
-              document.getElementById('Longitude').value = lng;
+              console.log('Map created:', addressPickerMap);
               
-              // Di chuyển marker đến vị trí mới
-              addressPickerMarker.setLatLng([lat, lng]);
-            });
+              // Thêm tile layer (OpenStreetMap)
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+              }).addTo(addressPickerMap);
+              
+              console.log('Tile layer added');
+              
+              // Thêm marker có thể kéo
+              addressPickerMarker = L.marker([defaultLat, defaultLng], {
+                draggable: true
+              }).addTo(addressPickerMap);
+              
+              console.log('Marker added');
+              
+              // Cập nhật tọa độ khi kéo marker
+              addressPickerMarker.on('dragend', function(e) {
+                const pos = addressPickerMarker.getLatLng();
+                console.log('Marker dragged to:', pos.lat, pos.lng);
+                if (latInput) latInput.value = pos.lat;
+                if (lngInput) lngInput.value = pos.lng;
+              });
+              
+              // Nhấn vào bản đồ để di chuyển marker
+              addressPickerMap.on('click', function(e) {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                
+                console.log('Map clicked at:', lat, lng);
+                
+                if (latInput) latInput.value = lat;
+                if (lngInput) lngInput.value = lng;
+                
+                // Di chuyển marker đến vị trí mới
+                if (addressPickerMarker) {
+                  addressPickerMarker.setLatLng([lat, lng]);
+                }
+              });
+              
+              // Invalidate size để đảm bảo map render đúng
+              setTimeout(() => {
+                if (addressPickerMap) {
+                  console.log('Invalidating map size...');
+                  addressPickerMap.invalidateSize();
+                  console.log('Map size invalidated');
+                }
+              }, 200);
+              
+              console.log('✅ Map initialized successfully');
+            } catch (error) {
+              console.error('❌ Error initializing map:', error);
+              console.error('Error stack:', error.stack);
+              alert('Không thể khởi tạo bản đồ. Vui lòng mở Console (F12) để xem chi tiết lỗi.');
+            }
           } else {
+            console.log('Map already exists, updating position...');
             // Cập nhật vị trí nếu map đã được khởi tạo
             addressPickerMap.setView([defaultLat, defaultLng], 13);
             if (addressPickerMarker) {
               addressPickerMarker.setLatLng([defaultLat, defaultLng]);
             }
+            // Invalidate size để đảm bảo map render đúng sau khi modal mở
+            setTimeout(() => {
+              if (addressPickerMap) {
+                console.log('Invalidating existing map size...');
+                addressPickerMap.invalidateSize();
+              }
+            }, 200);
           }
         }
         
         // Nút "Lấy địa chỉ từ vị trí đã chọn" - Reverse Geocoding (Nominatim API)
         document.addEventListener('click', function(e) {
-          if (e.target && e.target.id === 'btnGeocode') {
-            const lat = document.getElementById('Latitude').value;
-            const lng = document.getElementById('Longitude').value;
+          // Kiểm tra nếu click vào nút geocode hoặc các phần tử bên trong (span, icon, etc.)
+          const btnGeocode = e.target.closest('#btnGeocode') || (e.target.id === 'btnGeocode' ? e.target : null);
+          if (!btnGeocode) return;
+          
+          console.log('btnGeocode clicked', btnGeocode);
+          
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Kiểm tra nếu đang loading thì không làm gì
+          if (btnGeocode.disabled || btnGeocode.classList.contains('loading')) {
+            console.log('Button is disabled or loading');
+            return;
+          }
+          
+          const latInput = document.getElementById('Latitude');
+          const lngInput = document.getElementById('Longitude');
+          const lat = latInput ? latInput.value.trim() : '';
+          const lng = lngInput ? lngInput.value.trim() : '';
+          
+          console.log('Latitude:', lat, 'Longitude:', lng);
             
-            // Kiểm tra nếu đang loading thì không làm gì
-            if (this.disabled || this.classList.contains('loading')) {
-              return;
+          if (!lat || !lng) {
+            console.log('No coordinates selected');
+            const errorEl = document.getElementById('upsertFormError');
+            if (errorEl) {
+              errorEl.textContent = '⚠️ Vui lòng chọn vị trí trên bản đồ trước (nhấn vào bản đồ hoặc kéo marker)';
+              errorEl.style.display = 'block';
+              errorEl.style.visibility = 'visible';
+              errorEl.style.opacity = '1';
+              setTimeout(() => {
+                errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 100);
+              setTimeout(() => {
+                errorEl.style.display = 'none';
+                errorEl.style.visibility = 'hidden';
+                errorEl.style.opacity = '0';
+              }, 5000);
             }
-            
-            const lat = document.getElementById('Latitude')?.value;
-            const lng = document.getElementById('Longitude')?.value;
-            
-            if (!lat || !lng) {
-              const errorEl = document.getElementById('upsertFormError');
-              if (errorEl) {
-                errorEl.textContent = '⚠️ Vui lòng chọn vị trí trên bản đồ trước';
-                errorEl.style.display = 'block';
-                errorEl.style.visibility = 'visible';
-                errorEl.style.opacity = '1';
-                setTimeout(() => {
-                  errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
-                setTimeout(() => {
-                  errorEl.style.display = 'none';
-                  errorEl.style.visibility = 'hidden';
-                  errorEl.style.opacity = '0';
-                }, 3000);
-              }
-              return;
-            }
+            return;
+          }
             
             // Immediate feedback - disable và loading state ngay lập tức
-            const btn = this;
+            const btn = btnGeocode;
             const originalText = btn.innerHTML;
             btn.disabled = true;
             btn.classList.add('loading');
@@ -1670,9 +2023,14 @@
                 btn.innerHTML = originalText;
               });
         });
-        }
-        function openEditAddressForm(btn){
+        // Override hàm từ script inline với implementation đầy đủ
+        window.openEditAddressForm = function(btn){
           const row = btn.closest('.addr-item');
+          if (!row) {
+            console.error('Cannot find addr-item from button');
+            return;
+          }
+          
           console.log('=== openEditAddressForm called ===');
           console.log('Row dataset:', row.dataset);
           
@@ -1697,8 +2055,10 @@
           // Set tọa độ nếu có
           const lat = row.dataset.latitude || '';
           const lng = row.dataset.longitude || '';
-          document.getElementById('Latitude').value = lat;
-          document.getElementById('Longitude').value = lng;
+          const latInput = document.getElementById('Latitude');
+          const lngInput = document.getElementById('Longitude');
+          if (latInput) latInput.value = lat;
+          if (lngInput) lngInput.value = lng;
           
           // Reset thông báo lỗi
           const formError = document.getElementById('upsertFormError');
@@ -1720,20 +2080,72 @@
             phoneError.textContent = '';
           }
           
-          // Mở modal và khởi tạo bản đồ với tọa độ (nếu có)
-          document.getElementById('addressUpsertModal').classList.add('open');
+          // MỞ MODAL TRƯỚC để element có kích thước
+          const modal = document.getElementById('addressUpsertModal');
+          if (modal) {
+            modal.classList.add('open');
+          }
           
-          // Khởi tạo bản đồ với tọa độ đã có
+          // Khởi tạo bản đồ SAU KHI modal đã được hiển thị
           setTimeout(() => {
-            initAddressPickerMap();
-            // Set marker tại vị trí đã có (nếu có tọa độ)
-            if (lat && lng && addressPickerMap && addressPickerMarker) {
-              addressPickerMap.setView([parseFloat(lat), parseFloat(lng)], 15);
-              addressPickerMarker.setLatLng([parseFloat(lat), parseFloat(lng)]);
+            console.log('Initializing map for edit after modal open...');
+            const mapContainer = document.getElementById('addressMapPicker');
+            if (mapContainer) {
+              console.log('Map container found, dimensions:', {
+                width: mapContainer.offsetWidth,
+                height: mapContainer.offsetHeight
+              });
+              // Đảm bảo container có kích thước trước khi khởi tạo map
+              if (mapContainer.offsetHeight === 0) {
+                mapContainer.style.height = '400px';
+                console.log('Set map container height to 400px');
+              }
             }
-          }, 300);
+            
+            if (typeof initAddressPickerMap === 'function') {
+              initAddressPickerMap();
+              // Set marker tại vị trí đã có (nếu có tọa độ) sau khi map được khởi tạo
+              if (lat && lng) {
+                setTimeout(() => {
+                  if (addressPickerMap) {
+                    const latNum = parseFloat(lat);
+                    const lngNum = parseFloat(lng);
+                    if (!isNaN(latNum) && !isNaN(lngNum)) {
+                      console.log('Setting map view to:', latNum, lngNum);
+                      addressPickerMap.setView([latNum, lngNum], 15);
+                      if (addressPickerMarker) {
+                        addressPickerMarker.setLatLng([latNum, lngNum]);
+                      }
+                      addressPickerMap.invalidateSize();
+                      // Thử lại sau 300ms nữa
+                      setTimeout(() => {
+                        if (addressPickerMap) {
+                          addressPickerMap.invalidateSize();
+                        }
+                      }, 300);
+                    }
+                  }
+                }, 400);
+              } else {
+                // Nếu không có tọa độ, đảm bảo map được render đúng
+                setTimeout(() => {
+                  if (addressPickerMap) {
+                    addressPickerMap.invalidateSize();
+                    setTimeout(() => {
+                      if (addressPickerMap) {
+                        addressPickerMap.invalidateSize();
+                      }
+                    }, 300);
+                  }
+                }, 300);
+              }
+            } else {
+              console.error('initAddressPickerMap function not found');
+            }
+          }, 400);
         }
-            function closeUpsertModal(){ 
+        // Override hàm từ script inline
+        window.closeUpsertModal = function(){ 
               const modal = document.getElementById('addressUpsertModal');
               if (modal) modal.classList.remove('open');
               
