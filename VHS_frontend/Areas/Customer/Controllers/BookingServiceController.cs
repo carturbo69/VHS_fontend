@@ -773,7 +773,17 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 // Giả định _bookingServiceCustomer đã cập nhật API call phù hợp BE
                 // Kiểm tra lại status trước khi submit (để tránh submit nhầm)
                 // Sử dụng cả NormalizedStatus và Status gốc để xử lý cả tiếng Anh và tiếng Việt
-                var bookingDetail = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, model.BookingId);
+                HistoryBookingDetailDTO? bookingDetail = null;
+                try
+                {
+                    bookingDetail = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, model.BookingId, jwtToken);
+                }
+                catch (HttpRequestException ex)
+                {
+                    TempData["ToastError"] = $"Không thể kiểm tra trạng thái đơn hàng: {ex.Message}";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+                
                 if (bookingDetail != null)
                 {
                     var rawStatus = (bookingDetail.Status ?? "").Trim();
@@ -858,7 +868,18 @@ namespace VHS_frontend.Areas.Customer.Controllers
             try
             {
                 // Lấy thông tin booking detail
-                var bookingDetail = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, bookingId);
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                HistoryBookingDetailDTO? bookingDetail = null;
+                try
+                {
+                    bookingDetail = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, bookingId, jwtToken);
+                }
+                catch (HttpRequestException ex)
+                {
+                    TempData["ToastError"] = $"Không thể tải thông tin đơn hàng: {ex.Message}";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+                
                 if (bookingDetail == null)
                 {
                     TempData["ToastError"] = "Không tìm thấy đơn hàng.";
@@ -1100,8 +1121,48 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 ["Cancelled"] = "Đã hủy"
             };
 
-            var vm = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, id);
-            if (vm == null) return NotFound();
+            HistoryBookingDetailDTO? vm = null;
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                vm = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, id, jwtToken);
+                if (vm == null)
+                {
+                    TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                // Xử lý lỗi từ backend (400, 500, etc.)
+                var errorMessage = "Không thể tải thông tin đơn hàng. ";
+                if (ex.Message.Contains("500") || ex.Message.Contains("Internal Server Error"))
+                {
+                    errorMessage += "Có lỗi xảy ra ở server. Vui lòng thử lại sau.";
+                }
+                else if (ex.Message.Contains("404") || ex.Message.Contains("Not Found"))
+                {
+                    errorMessage += "Không tìm thấy đơn hàng.";
+                }
+                else if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
+                {
+                    errorMessage += "Bạn cần đăng nhập lại.";
+                    return RedirectToAction("Login", "Account", new { area = "" });
+                }
+                else
+                {
+                    errorMessage += ex.Message;
+                }
+                
+                TempData["ToastError"] = errorMessage;
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+            catch (Exception ex)
+            {
+                // Xử lý các lỗi khác
+                TempData["ToastError"] = "Đã xảy ra lỗi không xác định khi tải thông tin đơn hàng.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
 
             var currentStatus = vm.NormalizedStatus;
 
@@ -1143,9 +1204,27 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Unauthorized();
 
             // Lấy thông tin booking đã hủy từ service (bao gồm refund info)
-            var vm = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, id);
-            if (vm == null)
-                return NotFound();
+            HistoryBookingDetailDTO? vm = null;
+            try
+            {
+                var jwtToken = HttpContext.Session.GetString("JWToken");
+                vm = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, id, jwtToken);
+                if (vm == null)
+                {
+                    TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
+                    return RedirectToAction(nameof(ListHistoryBooking));
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                TempData["ToastError"] = $"Không thể tải thông tin đơn hàng: {ex.Message}";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastError"] = "Đã xảy ra lỗi không xác định khi tải thông tin đơn hàng.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
 
             return View(vm);
         }

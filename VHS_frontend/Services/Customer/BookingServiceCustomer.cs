@@ -211,16 +211,48 @@ namespace VHS_frontend.Services.Customer
         {
             SetAuthHeader(jwtToken);
 
-
             var url = $"api/Bookings/by-account/{accountId}/bookings/{bookingId}";
             using var resp = await _httpClient.GetAsync(url, cancellationToken);
-
 
             if (resp.StatusCode == HttpStatusCode.NotFound)
                 return null;
 
+            // Kiểm tra lỗi trước khi đảm bảo success
+            if (!resp.IsSuccessStatusCode)
+            {
+                var errorContent = await resp.Content.ReadAsStringAsync(cancellationToken);
+                var errorMessage = $"Response status code does not indicate success: {(int)resp.StatusCode} ({resp.StatusCode}).";
+                if (!string.IsNullOrWhiteSpace(errorContent))
+                {
+                    // Thử parse JSON error message từ backend
+                    try
+                    {
+                        using var jsonDoc = System.Text.Json.JsonDocument.Parse(errorContent);
+                        if (jsonDoc.RootElement.TryGetProperty("message", out var messageProp))
+                        {
+                            errorMessage = messageProp.GetString() ?? errorMessage;
+                        }
+                        else if (jsonDoc.RootElement.TryGetProperty("error", out var errorProp))
+                        {
+                            errorMessage = errorProp.GetString() ?? errorMessage;
+                        }
+                        else if (jsonDoc.RootElement.TryGetProperty("Message", out var messageProp2))
+                        {
+                            errorMessage = messageProp2.GetString() ?? errorMessage;
+                        }
+                    }
+                    catch
+                    {
+                        // Nếu không parse được JSON, sử dụng errorContent trực tiếp (có thể là plain text)
+                        if (!string.IsNullOrWhiteSpace(errorContent) && errorContent.Length < 500)
+                        {
+                            errorMessage = errorContent;
+                        }
+                    }
+                }
+                throw new HttpRequestException(errorMessage);
+            }
 
-            resp.EnsureSuccessStatusCode();
             return await resp.Content.ReadFromJsonAsync<HistoryBookingDetailDTO>(cancellationToken: cancellationToken);
         }
 

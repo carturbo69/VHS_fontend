@@ -39,6 +39,17 @@
            class="tab-link @(currentTab == "dashboard" ? "active" : "")">
             <i class="bi bi-speedometer2"></i>
             <span>Tổng quan</span>
+            @{
+                // Tính tổng số thông báo: pending refunds + pending withdrawals + approved refunds + processed withdrawals
+                var totalNotifications = (Model.Dashboard?.PendingRefunds ?? 0) + 
+                                        (Model.PendingWithdrawals?.Count ?? 0) + 
+                                        (Model.ApprovedRefunds?.Count ?? 0) + 
+                                        (Model.ProcessedWithdrawals?.Count ?? 0);
+            }
+            @if (totalNotifications > 0)
+            {
+                <span class="badge badge-primary">@totalNotifications</span>
+            }
         </a>
         <a href="@Url.Action("Index", new { tab = "refunds" })" 
            class="tab-link @(currentTab == "refunds" ? "active" : "")">
@@ -127,7 +138,15 @@
 @section Scripts {
     <script>
         let currentModalContext = null;
-        const adminNoteModal = new bootstrap.Modal(document.getElementById('adminNoteModal'));
+        let adminNoteModal = null;
+        
+        // Initialize modal when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const modalElement = document.getElementById('adminNoteModal');
+            if (modalElement) {
+                adminNoteModal = new bootstrap.Modal(modalElement);
+            }
+        });
 
         // Toast notification function
         function showCenterToast(message, type = 'success') {
@@ -163,6 +182,15 @@
 
         // Approve Refund
         function approveRefund(bookingId) {
+            if (!adminNoteModal) {
+                const modalElement = document.getElementById('adminNoteModal');
+                if (modalElement) {
+                    adminNoteModal = new bootstrap.Modal(modalElement);
+                } else {
+                    console.error('Modal element not found');
+                    return;
+                }
+            }
             currentModalContext = { type: 'approveRefund', bookingId: bookingId };
             document.getElementById('modalActionText').textContent = 'hoàn tiền';
             document.getElementById('adminNoteInput').value = '';
@@ -170,8 +198,36 @@
             adminNoteModal.show();
         }
 
+        // Reject Refund
+        function rejectRefund(bookingId) {
+            if (!adminNoteModal) {
+                const modalElement = document.getElementById('adminNoteModal');
+                if (modalElement) {
+                    adminNoteModal = new bootstrap.Modal(modalElement);
+                } else {
+                    console.error('Modal element not found');
+                    return;
+                }
+            }
+            currentModalContext = { type: 'rejectRefund', bookingId: bookingId };
+            document.getElementById('modalActionText').textContent = 'từ chối hoàn tiền';
+            document.getElementById('adminNoteInput').value = '';
+            document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
+            adminNoteModal.show();
+        }
+
+
         // Approve/Reject Withdrawal
         function handleWithdrawal(withdrawalId, action) {
+            if (!adminNoteModal) {
+                const modalElement = document.getElementById('adminNoteModal');
+                if (modalElement) {
+                    adminNoteModal = new bootstrap.Modal(modalElement);
+                } else {
+                    console.error('Modal element not found');
+                    return;
+                }
+            }
             const actionText = action === 'Approve' ? 'phê duyệt' : 'từ chối';
             currentModalContext = { type: 'handleWithdrawal', withdrawalId: withdrawalId, action: action };
             document.getElementById('modalActionText').textContent = actionText;
@@ -181,19 +237,28 @@
         }
 
         // Handle OK button click
-        document.getElementById('modalOkBtn').addEventListener('click', function() {
-            const adminNote = document.getElementById('adminNoteInput').value.trim();
-            const contextStr = document.getElementById('modalContext').value;
-            if (!contextStr) return;
-            
-            const context = JSON.parse(contextStr);
-            adminNoteModal.hide();
+        document.addEventListener('DOMContentLoaded', function() {
+            const modalOkBtn = document.getElementById('modalOkBtn');
+            if (modalOkBtn) {
+                modalOkBtn.addEventListener('click', function() {
+                    const adminNote = document.getElementById('adminNoteInput').value.trim();
+                    const contextStr = document.getElementById('modalContext').value;
+                    if (!contextStr) return;
+                    
+                    const context = JSON.parse(contextStr);
+                    if (adminNoteModal) {
+                        adminNoteModal.hide();
+                    }
 
-            // Execute action based on context
-            if (context.type === 'approveRefund') {
-                executeApproveRefund(context.bookingId, adminNote);
-            } else if (context.type === 'handleWithdrawal') {
-                executeHandleWithdrawal(context.withdrawalId, context.action, adminNote);
+                    // Execute action based on context
+                    if (context.type === 'approveRefund') {
+                        executeApproveRefund(context.bookingId, adminNote);
+                    } else if (context.type === 'rejectRefund') {
+                        executeRejectRefund(context.bookingId, adminNote);
+                    } else if (context.type === 'handleWithdrawal') {
+                        executeHandleWithdrawal(context.withdrawalId, context.action, adminNote);
+                    }
+                });
             }
         });
 
@@ -209,9 +274,35 @@
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    showCenterToast('Hoàn tiền thành công!', 'success');
+                    showCenterToast('Phê duyệt hoàn tiền thành công!', 'success');
                     setTimeout(() => {
-                    location.reload();
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showCenterToast('Lỗi: ' + (data.message || 'Có lỗi xảy ra'), 'error');
+                }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                showCenterToast('Có lỗi xảy ra khi xử lý yêu cầu', 'error');
+            });
+        }
+
+        function executeRejectRefund(bookingId, adminNote) {
+            fetch('@Url.Action("RejectRefund")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                },
+                body: JSON.stringify({ bookingId, adminNote })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showCenterToast('Từ chối hoàn tiền thành công!', 'success');
+                    setTimeout(() => {
+                        location.reload();
                     }, 1500);
                 } else {
                     showCenterToast('Lỗi: ' + data.message, 'error');
@@ -219,9 +310,10 @@
             })
             .catch(err => {
                 console.error(err);
-                showCenterToast('Đã có lỗi xảy ra', 'error');
+                alert('Đã có lỗi xảy ra');
             });
         }
+
 
         function executeHandleWithdrawal(withdrawalId, action, adminNote) {
             fetch('@Url.Action("ApproveWithdrawal")', {
