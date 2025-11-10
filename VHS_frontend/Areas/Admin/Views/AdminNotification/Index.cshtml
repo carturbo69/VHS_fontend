@@ -46,6 +46,48 @@
             _ => type
         };
     }
+
+    // Helper function to convert DateTime to Vietnam timezone (UTC+7)
+    // Note: Database đã lưu theo giờ Việt Nam (Unspecified), nên không cần convert nữa
+    DateTime? ToVietnamTime(DateTime? dateTime)
+    {
+        if (dateTime == null) return null;
+        
+        try
+        {
+            // Database đã lưu theo giờ Việt Nam (Unspecified kind)
+            // Nếu là Unspecified hoặc Local -> đã là giờ Việt Nam rồi, không cần convert
+            if (dateTime.Value.Kind == DateTimeKind.Unspecified || dateTime.Value.Kind == DateTimeKind.Local)
+            {
+                return dateTime.Value;
+            }
+            
+            // Chỉ convert nếu thực sự là UTC
+            if (dateTime.Value.Kind == DateTimeKind.Utc)
+            {
+                TimeZoneInfo vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+                return TimeZoneInfo.ConvertTimeFromUtc(dateTime.Value, vietnamTimeZone);
+            }
+            
+            return dateTime.Value;
+        }
+        catch
+        {
+            // Fallback: nếu là UTC thì cộng 7 giờ, còn lại giữ nguyên
+            if (dateTime.Value.Kind == DateTimeKind.Utc)
+            {
+                return dateTime.Value.AddHours(7);
+            }
+            return dateTime.Value;
+        }
+    }
+
+    // Helper function to format DateTime to Vietnamese format
+    string FormatVietnamTime(DateTime? dateTime)
+    {
+        var vietnamTime = ToVietnamTime(dateTime);
+        return vietnamTime?.ToString("dd/MM/yyyy HH:mm") ?? "N/A";
+    }
 }
 
 @section Styles {
@@ -241,7 +283,7 @@
                                         </td>
                                         <td class="content-text" title="@notification.Content">@notification.Content</td>
                                         <td class="time-cell">
-                                            <div class="date-line">@(notification.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
+                                            <div class="date-line">@FormatVietnamTime(notification.CreatedAt)</div>
                                         </td>
                                         <td>
                                             @if (notification.IsRead != true)
@@ -327,7 +369,7 @@
                                         </td>
                                         <td class="content-text" title="@notification.Content">@notification.Content</td>
                                         <td class="time-cell">
-                                            <div class="date-line">@(notification.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
+                                            <div class="date-line">@FormatVietnamTime(notification.CreatedAt)</div>
                                         </td>
                                         <td>
                                             @if (notification.IsRead != true)
@@ -853,7 +895,22 @@
                     document.getElementById('detailReceiverName').textContent = notification.receiverName || notification.receiverEmail || 'N/A';
                     document.getElementById('detailReceiverRole').innerHTML = `<span class="badge bg-secondary">${getRoleInVietnamese(notification.receiverRole)}</span>`;
                     document.getElementById('detailNotificationType').innerHTML = `<span class="badge bg-info">${getNotificationTypeInVietnamese(notification.notificationType)}</span>`;
-                    document.getElementById('detailCreatedAt').textContent = notification.createdAt ? new Date(notification.createdAt).toLocaleString('vi-VN') : 'N/A';
+                    // Display time (database đã lưu theo giờ Việt Nam rồi)
+                    if (notification.createdAt) {
+                        const date = new Date(notification.createdAt);
+                        // Database đã lưu theo giờ Việt Nam, chỉ cần format
+                        const formattedDate = date.toLocaleString('vi-VN', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        });
+                        document.getElementById('detailCreatedAt').textContent = formattedDate;
+                    } else {
+                        document.getElementById('detailCreatedAt').textContent = 'N/A';
+                    }
                     document.getElementById('detailContent').textContent = notification.content || 'N/A';
                     
                     // Show status

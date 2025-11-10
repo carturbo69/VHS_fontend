@@ -3,11 +3,38 @@
     ViewData["Title"] = "Quản lý đánh giá";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
 
-    // Tính thống kê dựa trên IsDeleted
-    var total = Model.Count;
-    var visibleCount = Model.Count(f => !f.IsDeleted);
+    // Group feedbacks theo ServiceId
+    var serviceGroups = Model
+        .GroupBy(f => new { f.ServiceId, f.ServiceName, f.ServiceImage, f.ProviderId, f.ProviderName })
+        .Select(g => new
+        {
+            ServiceId = g.Key.ServiceId ?? Guid.Empty,
+            ServiceName = g.Key.ServiceName ?? "Không xác định",
+            ServiceImage = g.Key.ServiceImage, // Lấy ServiceImage từ feedback đầu tiên
+            ProviderId = g.Key.ProviderId,
+            ProviderName = g.Key.ProviderName ?? "N/A",
+            Feedbacks = g.ToList(),
+            TotalFeedbacks = g.Count(),
+            AverageRating = g.Any() ? Math.Round(g.Average(f => f.Rating), 1) : 0.0,
+            FiveStarCount = g.Count(f => f.Rating == 5),
+            FourStarCount = g.Count(f => f.Rating == 4),
+            ThreeStarCount = g.Count(f => f.Rating == 3),
+            TwoStarCount = g.Count(f => f.Rating == 2),
+            OneStarCount = g.Count(f => f.Rating == 1)
+        })
+        .OrderByDescending(g => g.TotalFeedbacks)
+        .ToList();
+
+    // Tính thống kê tổng thể
+    var totalFeedbacks = Model.Count;
+    var visibleCount = Model.Count(f => !f.IsDeleted && f.IsVisible);
     var deletedCount = Model.Count(f => f.IsDeleted);
-    var avgRating = Model.Count > 0 ? Math.Round(Model.Average(f => f.Rating), 1) : 0;
+    var avgRating = Model.Any() ? Math.Round(Model.Average(f => f.Rating), 1) : 0.0;
+    var fiveStarCount = Model.Count(f => f.Rating == 5);
+    var fourStarCount = Model.Count(f => f.Rating == 4);
+    var threeStarCount = Model.Count(f => f.Rating == 3);
+    var twoStarCount = Model.Count(f => f.Rating == 2);
+    var oneStarCount = Model.Count(f => f.Rating == 1);
 }
 
 @section Styles {
@@ -15,7 +42,7 @@
 }
 
 <div class="admin-feedback-container">
-    <!-- Header -->
+    <!-- Header Section -->
     <div class="page-header">
         <div class="header-content">
             <div class="header-title">
@@ -25,7 +52,7 @@
                     </div>
                     <div class="title-content">
                         <h1>Quản lý đánh giá</h1>
-                        <p>Quản lý và theo dõi phản hồi từ khách hàng</p>
+                        <p>Tổng hợp đánh giá và phản hồi từ khách hàng cho tất cả dịch vụ</p>
                     </div>
                 </div>
             </div>
@@ -38,15 +65,27 @@
         </div>
     </div>
 
-    <!-- Stats Cards -->
+    <!-- Overall Stats -->
     <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-star-fill"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">@avgRating</span>
+                <span class="stat-label">Đánh giá trung bình</span>
+            </div>
+            <div class="stat-decoration">
+                <i class="bi bi-star-heart"></i>
+            </div>
+        </div>
         <div class="stat-card">
             <div class="stat-icon">
                 <i class="bi bi-chat-dots-fill"></i>
             </div>
             <div class="stat-content">
-                <span class="stat-value">@total</span>
-                <span class="stat-label">Tổng đánh giá</span>
+                <span class="stat-value">@totalFeedbacks</span>
+                <span class="stat-label">Tổng phản hồi</span>
             </div>
             <div class="stat-decoration">
                 <i class="bi bi-chat-square-heart"></i>
@@ -66,147 +105,223 @@
         </div>
         <div class="stat-card">
             <div class="stat-icon">
-                <i class="bi bi-eye-slash-fill"></i>
+                <i class="bi bi-award"></i>
             </div>
             <div class="stat-content">
-                <span class="stat-value">@deletedCount</span>
-                <span class="stat-label">Đã ẩn / Đã xóa</span>
+                <span class="stat-value">@serviceGroups.Count</span>
+                <span class="stat-label">Dịch vụ được đánh giá</span>
             </div>
             <div class="stat-decoration">
-                <i class="bi bi-eye-slash"></i>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">
-                <i class="bi bi-star-fill"></i>
-            </div>
-            <div class="stat-content">
-                <span class="stat-value">@avgRating</span>
-                <span class="stat-label">Đánh giá TB</span>
-            </div>
-            <div class="stat-decoration">
-                <i class="bi bi-star-heart"></i>
+                <i class="bi bi-trophy"></i>
             </div>
         </div>
     </div>
 
-    <!-- Feedback List -->
-    <div class="feedback-list-container">
-        <div class="list-header">
-            <h2>Danh sách đánh giá</h2>
-            <div class="filter-controls">
-                <select class="filter-select" onchange="filterFeedbacks(this.value)">
-                    <option value="all">Tất cả</option>
-                    <option value="visible">Đang hiển thị</option>
-                    <option value="deleted">Đã ẩn / Đã xóa</option>
-                </select>
+    <!-- Rating Distribution -->
+    <div class="rating-distribution-card mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Phân bố đánh giá</h5>
+            </div>
+            <div class="card-body">
+                <div class="rating-distribution">
+                    @for (int i = 5; i >= 1; i--)
+                    {
+                        var count = i switch
+                        {
+                            5 => fiveStarCount,
+                            4 => fourStarCount,
+                            3 => threeStarCount,
+                            2 => twoStarCount,
+                            1 => oneStarCount,
+                            _ => 0
+                        };
+                        var percentage = totalFeedbacks > 0 ? (count * 100.0 / totalFeedbacks) : 0;
+
+                        <div class="rating-bar">
+                            <div class="rating-label">
+                                <span class="rating-stars">
+                                    @for (int j = 1; j <= i; j++)
+                                    {
+                                        <i class="bi bi-star-fill"></i>
+                                    }
+                                </span>
+                                <span class="rating-count">@count</span>
+                            </div>
+                            <div class="rating-progress">
+                                <div class="progress">
+                                    <div class="progress-bar" style="width: @percentage%"></div>
+                                </div>
+                                <span class="rating-percentage">@percentage.ToString("F0")%</span>
+                            </div>
+                        </div>
+                    }
+            </div>
             </div>
         </div>
+    </div>
 
-        <div class="feedback-list">
-            @if (Model.Any())
-            {
-                @foreach (var feedback in Model)
-                {
-                    var statusCss = feedback.IsDeleted ? "deleted" : "visible";
-                    <div class="feedback-item @(statusCss)" data-status="@(statusCss)">
-                        <div class="feedback-header">
+    <!-- Service Feedback Groups -->
+    <div class="service-feedbacks">
+        @foreach (var serviceGroup in serviceGroups)
+        {
+            var hasFeedback = serviceGroup.TotalFeedbacks > 0 && serviceGroup.Feedbacks.Any();
+            var serviceIdStr = serviceGroup.ServiceId != Guid.Empty ? serviceGroup.ServiceId.ToString() : $"unknown-{serviceGroup.ServiceName.GetHashCode()}";
+
+            <div class="service-feedback-group mb-4">
+                <div class="card">
+                    <div class="card-header service-header">
                             <div class="service-info">
-                                @if (!string.IsNullOrEmpty(feedback.ServiceName))
+                            <div class="service-icon">
+                                @* Nếu có ServiceImage -> hiển thị ảnh, ngược lại dùng icon *@
+                                @if (!string.IsNullOrEmpty(serviceGroup.ServiceImage))
                                 {
-                                    <p><strong>Dịch vụ:</strong> @feedback.ServiceName</p>
+                                    <img src="@serviceGroup.ServiceImage"
+                                         alt="@serviceGroup.ServiceName"
+                                         class="service-icon-img"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                    <i class="bi bi-briefcase-fill" style="display: none;"></i>
                                 }
-                                @if (!string.IsNullOrEmpty(feedback.ProviderName))
+                                else
                                 {
-                                    <p><strong>Nhà cung cấp:</strong> @feedback.ProviderName</p>
+                                    <i class="bi bi-briefcase-fill"></i>
                                 }
                             </div>
-                            <div class="feedback-header-bottom">
-                                <div class="customer-info">
-                                    <div class="customer-avatar">
-                                        @if (!string.IsNullOrEmpty(feedback.CustomerEmail))
+                            <div class="service-details">
+                                <h5 class="service-name">@serviceGroup.ServiceName</h5>
+                                @if (!string.IsNullOrEmpty(serviceGroup.ProviderName))
+                                {
+                                    <p class="service-provider"><strong>Nhà cung cấp:</strong> @serviceGroup.ProviderName</p>
+                                }
+                                <div class="service-rating">
+                                    <div class="rating-stars">
+                                        @for (int i = 1; i <= 5; i++)
                                         {
-                                            <img src="https://ui-avatars.com/api/?name=@Uri.EscapeDataString(feedback.CustomerName)&background=1abc9c&color=fff&size=60&bold=true"
-                                                 alt="@feedback.CustomerName"
-                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                                            <i class="bi bi-person-circle" style="display: none;"></i>
+                                            if (i <= Math.Floor(serviceGroup.AverageRating))
+                                            {
+                                                <i class="bi bi-star-fill"></i>
+                                            }
+                                            else if (i - 0.5 <= serviceGroup.AverageRating)
+                                            {
+                                                <i class="bi bi-star-half"></i>
                                         }
                                         else
                                         {
-                                            <i class="bi bi-person-circle"></i>
+                                                <i class="bi bi-star"></i>
+                                            }
                                         }
+                                        <span class="rating-value">@serviceGroup.AverageRating.ToString("F1")</span>
                                     </div>
-                                    <div class="customer-details">
-                                        <h4>@feedback.CustomerName</h4>
-                                        <p>@feedback.CustomerEmail</p>
-                                    </div>
-                                </div>
-                                <div class="feedback-meta">
-                                    <span class="rating">
-                                        @for (int i = 1; i <= 5; i++)
-                                        {
-                                            <i class="bi bi-star@(i <= feedback.Rating ? "-fill" : "")"></i>
-                                        }
-                                    </span>
-                                    <span class="date">@feedback.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
-                                    <span class="status status-@(statusCss)">
-                                        @feedback.Status
-                                    </span>
+                                    <span class="rating-count">(@serviceGroup.TotalFeedbacks đánh giá)</span>
                                 </div>
                             </div>
                         </div>
+                        <button class="btn btn-outline-primary btn-sm" type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#service-@serviceIdStr">
+                            <i class="bi bi-chevron-down"></i>
+                        </button>
+                                    </div>
 
-                        <div class="feedback-content">
-                            <div class="comment">
+                    <div class="collapse" id="service-@serviceIdStr" data-has-feedback="@(hasFeedback)">
+                        <div class="card-body p-0">
+                            @if (!hasFeedback)
+                            {
+                                <div class="p-4 text-muted fst-italic">
+                                    Chưa có đánh giá nào cho dịch vụ này.
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="feedbacks-list">
+                                    @foreach (var feedback in serviceGroup.Feedbacks)
+                                    {
+                                        var statusCss = feedback.IsDeleted ? "deleted" : (feedback.IsVisible ? "visible" : "hidden");
+                                        <div class="feedback-item @statusCss" data-status="@statusCss">
+                                            <div class="feedback-content">
+                                                <div class="feedback-header">
+                                                    <div class="feedback-avatar" title="@feedback.CustomerName">
+                                                        @{
+                                                            string initials = "";
+                                                            if (!string.IsNullOrEmpty(feedback.CustomerName))
+                                                            {
+                                                                initials = GetInitials(feedback.CustomerName);
+                                                            }
+                                                            else if (!string.IsNullOrEmpty(feedback.CustomerEmail))
+                                                            {
+                                                                // Lấy 2 chữ cái đầu từ email (phần trước @)
+                                                                var emailPart = feedback.CustomerEmail.Split('@')[0];
+                                                                initials = GetInitials(emailPart);
+                                                            }
+                                                            else
+                                                            {
+                                                                initials = "??";
+                                                            }
+                                                        }
+                                                        <span class="avatar-initials">@initials</span>
+                                                    </div>
+                                                    <div class="customer-info-header">
+                                                        <h6 class="customer-name">@feedback.CustomerName</h6>
+                                                        @if (!string.IsNullOrEmpty(feedback.CustomerEmail))
+                                                        {
+                                                            <span class="customer-email">@feedback.CustomerEmail</span>
+                                                        }
+                                                    </div>
+                                                    <div class="feedback-rating">
+                                                        @for (int i = 1; i <= 5; i++)
+                                                        {
+                                                            <i class="bi bi-star@(i <= feedback.Rating ? "-fill" : "") @(i <= feedback.Rating ? "filled" : "empty")"></i>
+                                                        }
+                                                    </div>
+                                                    <div class="feedback-meta">
+                                                        <span class="feedback-date">@feedback.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                                                        <span class="status status-@statusCss">
+                                                            @if (feedback.IsVisible)
+                                                            {
+                                                                <text>Đang hiển thị</text>
+                                                            }
+                                                            else
+                                                            {
+                                                                <text>Đã ẩn</text>
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="feedback-comment">
                                 <p>@feedback.Comment</p>
                             </div>
 
                             @if (feedback.Images != null && feedback.Images.Any())
                             {
                                 <div class="feedback-images">
-                                    <h5><i class="bi bi-image"></i> Hình ảnh đính kèm</h5>
-                                    <div class="images-grid">
-                                        @{
-                                            for (int i = 0; i < feedback.Images.Count; i++)
-                                            {
-                                                var image = feedback.Images[i];
-                                                <div class="image-item" onclick="openLightbox('@image', @i, this)">
-                                                    <img src="@image" alt="Feedback image" />
-                                                    <div class="image-overlay">
-                                                        <i class="bi bi-zoom-in"></i>
-                                                    </div>
+                                                        <div class="image-gallery">
+                                                            @foreach (var imgUrl in feedback.Images)
+                                                            {
+                                                                <div class="image-item" data-full="@imgUrl" onclick="openImageModal('@feedback.Id','@imgUrl')">
+                                                                    <img src="@imgUrl" alt="feedback-image" class="gallery-thumbnail" loading="lazy" />
+                                                                    <div class="image-overlay"><i class="bi bi-zoom-in"></i></div>
                                                 </div>
-                                            }
                                         }
                                     </div>
                                 </div>
                             }
-                        </div>
 
                         <div class="feedback-actions">
-                            @if (!feedback.IsDeleted)
+                            @if (feedback.IsVisible)
                             {
-                                <form asp-area="Admin" asp-controller="AdminFeedback" asp-action="Hide" method="post" style="display: inline;">
+                                <form asp-area="Admin" asp-controller="AdminFeedback" asp-action="Hide" method="post" style="display: inline;" class="hide-feedback-form" data-feedback-id="@feedback.Id">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@feedback.Id" />
-                                    <button type="submit" class="btn-action btn-hide" onclick="return confirm('Bạn có chắc muốn ẩn feedback này?')">
+                                    <button type="submit" class="btn-action btn-hide">
                                         <i class="bi bi-eye-slash"></i>
                                         Ẩn
-                                    </button>
-                                </form>
-
-                                <form asp-area="Admin" asp-controller="AdminFeedback" asp-action="Delete" method="post" style="display: inline;">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@feedback.Id" />
-                                    <button type="submit" class="btn-action btn-delete" onclick="return confirm('Bạn có chắc muốn xóa feedback này? Hành động này không thể hoàn tác!')">
-                                        <i class="bi bi-trash"></i>
-                                        Xóa
                                     </button>
                                 </form>
                             }
                             else
                             {
-                                <form asp-area="Admin" asp-controller="AdminFeedback" asp-action="Show" method="post" style="display: inline;">
+                                <form asp-area="Admin" asp-controller="AdminFeedback" asp-action="Show" method="post" style="display: inline;" class="show-feedback-form" data-feedback-id="@feedback.Id">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="id" value="@feedback.Id" />
                                     <button type="submit" class="btn-action btn-show">
@@ -216,10 +331,19 @@
                                 </form>
                             }
                         </div>
+                                            </div>
+                                        </div>
+                                    }
                     </div>
                 }
+                        </div>
+                    </div>
+                </div>
+            </div>
             }
-            else
+    </div>
+
+    @if (!serviceGroups.Any())
             {
                 <div class="empty-state">
                     <div class="empty-icon">
@@ -235,111 +359,280 @@
                 </div>
             }
         </div>
+
+<!-- Toast Notification -->
+<div id="toastNotification" class="toast-notification">
+    <div class="toast-content">
+        <i class="toast-icon"></i>
+        <span class="toast-message"></span>
     </div>
 </div>
 
-<!-- Lightbox Modal -->
-<div id="lightbox" class="lightbox" onclick="closeLightbox()">
-    <div class="lightbox-content" onclick="event.stopPropagation();">
-        <span class="lightbox-close" onclick="event.stopPropagation(); closeLightbox();">&times;</span>
-        <img id="lightbox-image" src="" alt="Feedback image" />
-        <div class="lightbox-nav">
-            <button class="lightbox-prev" onclick="event.stopPropagation(); previousImage();">❮</button>
-            <button class="lightbox-next" onclick="event.stopPropagation(); nextImage();">❯</button>
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalLabel">Hình ảnh feedback</h5>
+                <div class="image-counter">
+                    <span id="currentImageIndex">1</span> / <span id="totalImages">1</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center position-relative">
+                <button class="btn btn-outline-light btn-nav btn-prev" onclick="previousImage()" id="prevBtn">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <div class="image-container">
+                    <img id="modalImage" src="" alt="" class="img-fluid modal-main-image">
+                </div>
+                <button class="btn btn-outline-light btn-nav btn-next" onclick="nextImage()" id="nextBtn">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+    </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg"></i> Đóng
+                </button>
+                <a id="downloadImage" href="" download class="btn btn-primary">
+                    <i class="bi bi-download"></i> Tải xuống
+                </a>
+</div>
         </div>
-        <div class="lightbox-counter" id="lightbox-counter"></div>
     </div>
 </div>
+
+@functions {
+    string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "??";
+        
+        var words = name.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        if (words.Length == 0)
+            return "??";
+        
+        if (words.Length == 1)
+        {
+            var word = words[0].Trim();
+            if (word.Length == 0)
+                return "??";
+            else if (word.Length == 1)
+                return word.ToUpper();
+            else
+                return word.Substring(0, Math.Min(2, word.Length)).ToUpper();
+        }
+        else
+        {
+            var first = words[0].Trim();
+            var last = words[words.Length - 1].Trim();
+            
+            if (string.IsNullOrEmpty(first) || string.IsNullOrEmpty(last))
+                return "??";
+            
+            var firstChar = first[0].ToString().ToUpper();
+            var lastChar = last[0].ToString().ToUpper();
+            
+            return firstChar + lastChar;
+        }
+    }
+
+    bool IsUrl(string? v) =>
+        !string.IsNullOrWhiteSpace(v) &&
+        (v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+         v.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+}
 
 @section Scripts {
     <script>
-        function filterFeedbacks(status) {
-            const items = document.querySelectorAll('.feedback-item');
-            items.forEach(item => {
-                const s = item.dataset.status; // "visible" | "deleted"
-                if (status === 'all' || s === status) {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-        }
-
-        // Auto refresh every 30 seconds
-        setInterval(() => {
-            location.reload();
-        }, 30000);
-
-        // Lightbox
-        let currentImageIndex = 0;
-        let currentImages = [];
-
-        function openLightbox(imageSrc, imageIndex, element) {
-            const lightbox = document.getElementById('lightbox');
-            const lightboxImg = document.getElementById('lightbox-image');
-            const counter = document.getElementById('lightbox-counter');
-
-            // Lấy toàn bộ ảnh của feedback hiện tại
-            const currentFeedback = element.closest('.feedback-item');
-            const imageItems = currentFeedback.querySelectorAll('.image-item');
-            currentImages = [];
-
-            imageItems.forEach(item => {
-                const img = item.querySelector('img');
-                if (img && img.src) currentImages.push(img.src);
-            });
-
-            currentImageIndex = parseInt(imageIndex);
-            lightboxImg.src = imageSrc;
-            lightbox.style.display = 'flex';
-
-            const prevBtn = document.querySelector('.lightbox-prev');
-            const nextBtn = document.querySelector('.lightbox-next');
-
-            if (currentImages.length > 1) {
-                prevBtn.style.display = 'flex';
-                nextBtn.style.display = 'flex';
-                counter.style.display = 'block';
-                counter.textContent = `${currentImageIndex + 1} / ${currentImages.length}`;
+        // Toast Notification Handler
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toastNotification');
+            const toastMessage = toast.querySelector('.toast-message');
+            const toastIcon = toast.querySelector('.toast-icon');
+            
+            // Set message
+            toastMessage.textContent = message;
+            
+            // Set icon based on type
+            toastIcon.className = 'toast-icon';
+            if (type === 'success') {
+                toastIcon.classList.add('bi', 'bi-check-circle-fill');
+                toast.classList.remove('toast-error', 'toast-warning');
+                toast.classList.add('toast-success');
+            } else if (type === 'error') {
+                toastIcon.classList.add('bi', 'bi-x-circle-fill');
+                toast.classList.remove('toast-success', 'toast-warning');
+                toast.classList.add('toast-error');
             } else {
-                prevBtn.style.display = 'none';
-                nextBtn.style.display = 'none';
-                counter.style.display = 'none';
+                toastIcon.classList.add('bi', 'bi-exclamation-triangle-fill');
+                toast.classList.remove('toast-success', 'toast-error');
+                toast.classList.add('toast-warning');
             }
+            
+            // Show toast
+            toast.classList.add('show');
+            
+            // Auto hide after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
         }
 
-        function closeLightbox() {
-            document.getElementById('lightbox').style.display = 'none';
+        // Handle form submission with AJAX
+        document.addEventListener('DOMContentLoaded', function () {
+            // Handle Hide form
+            document.querySelectorAll('.hide-feedback-form').forEach(form => {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    const feedbackId = this.getAttribute('data-feedback-id');
+                    
+                    try {
+                        const response = await fetch(this.action, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (response.ok) {
+                            showToast('Đã ẩn feedback thành công!', 'success');
+                            // Reload page after 500ms to update UI
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 500);
+                        } else {
+                            showToast('Có lỗi xảy ra khi ẩn feedback!', 'error');
+                        }
+                    } catch (error) {
+                        showToast('Có lỗi xảy ra khi ẩn feedback!', 'error');
+                    }
+                });
+            });
+            
+            // Handle Show form
+            document.querySelectorAll('.show-feedback-form').forEach(form => {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    const feedbackId = this.getAttribute('data-feedback-id');
+                    
+                    try {
+                        const response = await fetch(this.action, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (response.ok) {
+                            showToast('Đã hiển thị feedback thành công!', 'success');
+                            // Reload page after 500ms to update UI
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 500);
+                        } else {
+                            showToast('Có lỗi xảy ra khi hiển thị feedback!', 'error');
+                        }
+                    } catch (error) {
+                        showToast('Có lỗi xảy ra khi hiển thị feedback!', 'error');
+                    }
+                });
+            });
+            
+            // Tự mở nhóm đầu tiên có feedback; nếu không có thì mở nhóm đầu tiên
+            const collapses = Array.from(document.querySelectorAll('.collapse'));
+            let target = collapses.find(c => c.getAttribute('data-has-feedback') === 'True' || c.getAttribute('data-has-feedback') === 'true');
+            if (!target && collapses.length > 0) target = collapses[0];
+            if (target) {
+                target.classList.add('show');
+
+                // Đồng bộ chevron ngay khi mở ban đầu
+                const btn = document.querySelector(`[data-bs-target="#${target.id}"]`);
+                const chev = btn?.querySelector('i');
+                if (chev && chev.classList.contains('bi-chevron-down')) {
+                    chev.classList.replace('bi-chevron-down', 'bi-chevron-up');
+                }
+        }
+
+            // Toggle chevron khi click
+            document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const target = document.querySelector(this.getAttribute('data-bs-target'));
+                    const chevron = this.querySelector('i');
+                    setTimeout(() => {
+                        if (target.classList.contains('show')) {
+                            chevron.classList.replace('bi-chevron-down', 'bi-chevron-up');
+                        } else {
+                            chevron.classList.replace('bi-chevron-up', 'bi-chevron-down');
+                        }
+                    }, 100);
+                });
+            });
+        });
+
+        // ====== Image modal ======
+        let currentImages = [];
+        let currentImageIndex = 0;
+
+        function openImageModal(feedbackId, imageUrl) {
+            currentImages = [];
+            const feedbackItem = document.querySelector(`[data-full="${imageUrl}"]`)?.closest('.feedback-item');
+            const scope = feedbackItem || document;
+            scope.querySelectorAll('.image-gallery .image-item').forEach(it => {
+                const url = it.getAttribute('data-full');
+                if (url) currentImages.push(url);
+            });
+
+            currentImageIndex = currentImages.indexOf(imageUrl);
+            if (currentImageIndex < 0) currentImageIndex = 0;
+
+            updateModalContent();
+            new bootstrap.Modal(document.getElementById('imageModal')).show();
+        }
+
+        function updateModalContent() {
+            if (!currentImages.length) return;
+            const modalImage = document.getElementById('modalImage');
+            const downloadLink = document.getElementById('downloadImage');
+            const currentIndexSpan = document.getElementById('currentImageIndex');
+            const totalImagesSpan = document.getElementById('totalImages');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+
+            const url = currentImages[currentImageIndex];
+            modalImage.style.opacity = '0.5';
+            modalImage.onload = () => modalImage.style.opacity = '1';
+            modalImage.src = url;
+            modalImage.alt = 'feedback-image';
+            downloadLink.href = url;
+
+            currentIndexSpan.textContent = (currentImageIndex + 1).toString();
+            totalImagesSpan.textContent = currentImages.length.toString();
+
+            const multi = currentImages.length > 1;
+            prevBtn.style.display = multi ? 'block' : 'none';
+            nextBtn.style.display = multi ? 'block' : 'none';
         }
 
         function previousImage() {
-            if (currentImages.length > 1) {
+            if (currentImages.length <= 1) return;
                 currentImageIndex = (currentImageIndex - 1 + currentImages.length) % currentImages.length;
-                document.getElementById('lightbox-image').src = currentImages[currentImageIndex];
-                updateCounter();
-            }
+            updateModalContent();
         }
 
         function nextImage() {
-            if (currentImages.length > 1) {
+            if (currentImages.length <= 1) return;
                 currentImageIndex = (currentImageIndex + 1) % currentImages.length;
-                document.getElementById('lightbox-image').src = currentImages[currentImageIndex];
-                updateCounter();
-            }
+            updateModalContent();
         }
 
-        function updateCounter() {
-            const counter = document.getElementById('lightbox-counter');
-            if (currentImages.length > 1) {
-                counter.textContent = `${currentImageIndex + 1} / ${currentImages.length}`;
+        // Keyboard navigation
+        document.addEventListener('keydown', function (e) {
+            const modal = document.getElementById('imageModal');
+            if (modal && modal.classList.contains('show')) {
+                if (e.key === 'ArrowLeft') { e.preventDefault(); previousImage(); }
+                else if (e.key === 'ArrowRight') { e.preventDefault(); nextImage(); }
+                else if (e.key === 'Escape') { e.preventDefault(); bootstrap.Modal.getInstance(modal)?.hide(); }
             }
-        }
-
-        // ESC + điều hướng
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') closeLightbox();
-            if (event.key === 'ArrowLeft') { event.preventDefault(); previousImage(); }
-            if (event.key === 'ArrowRight') { event.preventDefault(); nextImage(); }
         });
     </script>
 }

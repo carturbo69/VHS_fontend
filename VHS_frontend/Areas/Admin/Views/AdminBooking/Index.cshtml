@@ -157,8 +157,8 @@
                                         <small class="text-muted">@booking.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
                                     </td>
                                     <td>
-                                        <div>@booking.CustomerName</div>
-                                        <small class="text-muted">@booking.CustomerPhone</small>
+                                        <div>@(!string.IsNullOrEmpty(booking.CustomerName) ? booking.CustomerName : "N/A")</div>
+                                        <small class="text-muted">@(!string.IsNullOrEmpty(booking.CustomerPhone) ? booking.CustomerPhone : "")</small>
                                     </td>
                                     <td>@booking.ServiceName</td>
                                     <td>@booking.BookingTime.ToString("dd/MM/yyyy HH:mm")</td>
@@ -173,8 +173,12 @@
                                         }
                                     </td>
                                     <td>
-                                        <span class="badge status-badge status-@booking.Status.ToLower()">
-                                            @GetStatusText(booking.Status)
+                                        @{
+                                            var statusClass = !string.IsNullOrEmpty(booking.Status) ? $"status-{booking.Status.ToLower()}" : "status-unknown";
+                                            var statusText = GetStatusText(booking.Status);
+                                        }
+                                        <span class="badge status-badge @statusClass">
+                                            @statusText
                                         </span>
                                     </td>
                                     <td>
@@ -273,12 +277,18 @@
 @functions {
     string GetStatusText(string status)
     {
-        return status switch
+        if (string.IsNullOrWhiteSpace(status))
         {
-            "Pending" => "Chờ xử lý",
-            "Confirmed" => "Đã xác nhận",
-            "Completed" => "Hoàn thành",
-            "Canceled" => "Đã hủy",
+            return "Chưa xác định";
+        }
+        
+        return status.ToLower() switch
+        {
+            "pending" => "Chờ xử lý",
+            "confirmed" => "Đã xác nhận",
+            "completed" => "Hoàn thành",
+            "canceled" => "Đã hủy",
+            "cancelled" => "Đã hủy",
             _ => status
         };
     }

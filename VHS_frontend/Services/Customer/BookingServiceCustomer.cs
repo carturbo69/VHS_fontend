@@ -1,12 +1,70 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
 using static System.Net.WebRequestMethods;
 
 namespace VHS_frontend.Services.Customer
 {
+    /// <summary>
+    /// JsonConverter để serialize DateTime với timezone offset +07:00 (giờ Việt Nam)
+    /// Đảm bảo giá trị được gửi lên API với timezone info rõ ràng
+    /// </summary>
+    public class VietnamTimeZoneJsonConverter : JsonConverter<DateTime>
+    {
+        public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            // Khi đọc từ JSON, parse như bình thường
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                var dateString = reader.GetString();
+                if (DateTime.TryParse(dateString, out var date))
+                {
+                    return date;
+                }
+            }
+            throw new JsonException($"Unable to parse DateTime from {reader.GetString()}");
+        }
+
+        public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+        {
+            // Khi viết vào JSON, serialize với timezone offset +07:00 (giờ Việt Nam)
+            // Mục tiêu: gửi giá trị với timezone info rõ ràng để backend biết đây là giờ Việt Nam
+            DateTime dateTime = value;
+            DateTime vietnamTime;
+            
+            if (dateTime.Kind == DateTimeKind.Unspecified)
+            {
+                // Unspecified từ datetime-local input: giả định đây là giờ Việt Nam
+                // Giữ nguyên giá trị và thêm timezone offset +07:00
+                vietnamTime = dateTime;
+            }
+            else if (dateTime.Kind == DateTimeKind.Utc)
+            {
+                // UTC: convert về giờ Việt Nam bằng cách thêm 7 giờ
+                vietnamTime = dateTime.AddHours(7);
+            }
+            else // DateTimeKind.Local
+            {
+                // Local: giả định là giờ Việt Nam (nếu server timezone = Vietnam)
+                // Hoặc convert về UTC rồi về Vietnam timezone
+                // Để đơn giản, giữ nguyên giá trị và coi như giờ Việt Nam
+                vietnamTime = dateTime;
+            }
+            
+            // Serialize với format ISO 8601 kèm timezone offset +07:00
+            // Format: "yyyy-MM-ddTHH:mm:ss+07:00" hoặc "yyyy-MM-ddTHH:mm+07:00" (nếu không có giây)
+            var format = vietnamTime.Second == 0 && vietnamTime.Millisecond == 0
+                ? "yyyy-MM-ddTHH:mm+07:00"
+                : "yyyy-MM-ddTHH:mm:ss+07:00";
+            var vietnamTimeString = vietnamTime.ToString(format);
+            writer.WriteStringValue(vietnamTimeString);
+        }
+    }
+
     public class BookingServiceCustomer
     {
         private readonly HttpClient _httpClient;
@@ -62,7 +120,16 @@ namespace VHS_frontend.Services.Customer
 
             var url = "api/Bookings/create-many";
 
-            using var resp = await _httpClient.PostAsJsonAsync(url, dto, cancellationToken);
+            // Sử dụng JsonSerializerOptions với VietnamTimeZoneJsonConverter
+            // để serialize DateTime với timezone offset +07:00 (giờ Việt Nam)
+            var jsonOptions = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                WriteIndented = false,
+                Converters = { new VietnamTimeZoneJsonConverter() }
+            };
+
+            using var resp = await _httpClient.PostAsJsonAsync(url, dto, jsonOptions, cancellationToken);
 
             // Trả lỗi rõ ràng cho 400
             if (resp.StatusCode == System.Net.HttpStatusCode.BadRequest)
@@ -125,6 +192,8 @@ namespace VHS_frontend.Services.Customer
 
         /// <summary>
         /// Map từ BookingViewModel (FE) sang CreateManyBookingsDto (API).
+        /// Giữ nguyên BookingTime là giờ Việt Nam (từ datetime-local input) để gửi lên API.
+        /// Backend sẽ xử lý và lưu trực tiếp giờ Việt Nam vào database.
         /// </summary>
         public static CreateManyBookingsDto MapFromViewModel(BookingViewModel vm, Guid accountId)
         {
@@ -138,15 +207,40 @@ namespace VHS_frontend.Services.Customer
                                         .Distinct()
                                         .ToList();
 
-                // (tuỳ chọn) fallback nhẹ từ Options nếu OptionIds trống — nếu bạn muốn “chỉ hiển thị mới lưu”
-                // thì KHÔNG làm fallback này.
-                // if (pickedOptionIds.Count == 0 && it.Options?.Any() == true)
-                //     pickedOptionIds = it.Options.Select(o => o.OptionId).Distinct().ToList();
+                // datetime-local input trả về DateTime với Kind = Unspecified
+                // Giá trị này đã là giờ Việt Nam (theo timezone của browser)
+                // Giữ nguyên giá trị và Kind = Unspecified để backend xử lý như giờ Việt Nam
+                DateTime bookingTimeVietnam;
+                
+                if (it.BookingTime.Kind == DateTimeKind.Unspecified)
+                {
+                    // Giữ nguyên giá trị Unspecified (đã là giờ Việt Nam từ input)
+                    bookingTimeVietnam = it.BookingTime;
+                }
+                else if (it.BookingTime.Kind == DateTimeKind.Local)
+                {
+                    // Nếu là Local, giả định là giờ Việt Nam, convert sang Unspecified
+                    // Lấy giá trị local time và đặt lại Kind = Unspecified
+                    bookingTimeVietnam = DateTime.SpecifyKind(it.BookingTime, DateTimeKind.Unspecified);
+                }
+                else if (it.BookingTime.Kind == DateTimeKind.Utc)
+                {
+                    // Nếu là UTC, convert về giờ Việt Nam (UTC+7)
+                    // Thêm 7 giờ để có giờ Việt Nam
+                    bookingTimeVietnam = DateTime.SpecifyKind(
+                        it.BookingTime.AddHours(7), 
+                        DateTimeKind.Unspecified);
+                }
+                else
+                {
+                    // Fallback: giữ nguyên
+                    bookingTimeVietnam = it.BookingTime;
+                }
 
                 items.Add(new CreateBookingItemDto
                 {
                     ServiceId = it.ServiceId,
-                    BookingTime = it.BookingTime,
+                    BookingTime = bookingTimeVietnam, // Gửi giờ Việt Nam (Unspecified) lên API
                     OptionIds = pickedOptionIds
                 });
             }

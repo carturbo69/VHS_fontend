@@ -1,20 +1,28 @@
 @model List<VHS_frontend.Areas.Admin.Models.Payment.UnconfirmedBookingRefundDTO>
 
-<div class="refunds-content">
-    <div class="section-header">
-        <h2>Đã hoàn tiền</h2>
-        <p>Danh sách các đơn hàng đã được hoàn tiền thành công</p>
+<div>
+    <div class="card-x mb-4">
+        <div class="card-header">
+            <span><i class="bi bi-check-circle me-2"></i>Đã hoàn tiền</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-0">Danh sách các đơn hàng đã được hoàn tiền thành công</p>
+        </div>
     </div>
 
     @if (Model != null && Model.Any())
     {
-        <div class="bookings-list">
+        <div>
             @foreach (var booking in Model)
             {
                 <div class="booking-card">
                     <div class="booking-header">
                         <div class="booking-id">
-                            <span class="badge">Đơn hàng #@booking.BookingId.ToString().Substring(0, 8)</span>
+                            <div class="booking-id-icon"><i class="bi bi-receipt-cutoff"></i></div>
+                            <div class="booking-id-content">
+                                <span class="booking-id-label">Mã đơn hàng</span>
+                                <span class="badge booking-id-badge">#@booking.BookingId.ToString().Substring(0, 8)</span>
+                            </div>
                         </div>
                         <div class="booking-status">
                             <span class="status-badge status-completed">
@@ -27,34 +35,34 @@
                     <div class="booking-content">
                         <div class="booking-info-row">
                             <div class="info-item">
-                                <i class="bi bi-person-circle"></i>
-                                <div>
-                                    <strong>Khách hàng:</strong>
-                                    <div>@booking.CustomerName</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-person-circle"></i></div>
+                                <div class="info-content">
+                                    <strong>Khách hàng</strong>
+                                    <div class="info-value">@booking.CustomerName</div>
                                     <small>@booking.CustomerEmail</small>
                                 </div>
                             </div>
                             <div class="info-item">
-                                <i class="bi bi-gear"></i>
-                                <div>
-                                    <strong>Dịch vụ:</strong>
-                                    <div>@booking.ServiceName</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-gear"></i></div>
+                                <div class="info-content">
+                                    <strong>Dịch vụ</strong>
+                                    <div class="info-value">@booking.ServiceName</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="booking-info-row">
                             <div class="info-item">
-                                <i class="bi bi-calendar3"></i>
-                                <div>
-                                    <strong>Ngày đặt:</strong>
-                                    <div>@booking.BookingDate.ToString("dd/MM/yyyy HH:mm")</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-calendar3"></i></div>
+                                <div class="info-content">
+                                    <strong>Ngày đặt</strong>
+                                    <div class="info-value">@booking.BookingDate.ToString("dd/MM/yyyy HH:mm")</div>
                                 </div>
                             </div>
                             <div class="info-item">
-                                <i class="bi bi-cash-stack"></i>
-                                <div>
-                                    <strong>Số tiền đã hoàn:</strong>
+                                <div class="info-icon-wrapper"><i class="bi bi-cash-stack"></i></div>
+                                <div class="info-content">
+                                    <strong>Số tiền đã hoàn</strong>
                                     <div class="amount highlight">@booking.PaymentAmount.ToString("N0") VNĐ</div>
                                 </div>
                             </div>
@@ -62,32 +70,51 @@
 
                         @if (booking.PaymentCreatedAt.HasValue)
                         {
-                            <div class="payment-info">
-                                <small>
-                                    <i class="bi bi-clock"></i>
-                                    Ngày hoàn tiền: @booking.PaymentCreatedAt.Value.ToString("dd/MM/yyyy HH:mm")
-                                </small>
+                            <div class="payment-info-section">
+                                <div class="payment-status-info">
+                                    <div class="payment-info-icon-wrapper"><i class="bi bi-clock"></i></div>
+                                    <div class="payment-info-content">
+                                        <strong>Ngày hoàn tiền</strong>
+                                        <div class="payment-info-value">@booking.PaymentCreatedAt.Value.ToString("dd/MM/yyyy HH:mm")</div>
+                                    </div>
+                                </div>
                             </div>
                         }
 
                         @if (!string.IsNullOrWhiteSpace(booking.CancelReason))
                         {
-                            <div class="cancel-info mt-2 p-2 bg-light rounded">
-                                <strong><i class="bi bi-info-circle"></i> Lý do hủy:</strong>
-                                <div>@booking.CancelReason</div>
+                            <div class="cancel-info">
+                                <div class="cancel-info-header">
+                                    <div class="cancel-info-header-icon"><i class="bi bi-info-circle"></i></div>
+                                    <strong>Lý do hủy đơn hàng</strong>
+                                </div>
+                                <div class="cancel-info-content">@booking.CancelReason</div>
                             </div>
                         }
 
                         @if (!string.IsNullOrWhiteSpace(booking.BankAccount))
                         {
-                            <div class="bank-info mt-2 p-2 bg-light rounded">
-                                <strong><i class="bi bi-bank"></i> Thông tin ngân hàng:</strong>
-                                <div>
-                                    <div>STK: @booking.BankAccount</div>
-                                    <div>Ngân hàng: @booking.BankName</div>
+                            <div class="bank-info">
+                                <div class="bank-info-header bank-info-toggle" onclick="toggleBankInfo(this)">
+                                    <div class="bank-info-header-icon"><i class="bi bi-bank"></i></div>
+                                    <strong>Thông tin ngân hàng nhận hoàn tiền</strong>
+                                    <i class="bi bi-chevron-down bank-info-chevron"></i>
+                                </div>
+                                <div class="bank-info-content bank-info-collapsible collapsed">
+                                    <div class="bank-detail-item">
+                                        <span class="bank-detail-label">Số tài khoản:</span>
+                                        <span class="bank-detail-value">@booking.BankAccount</span>
+                                    </div>
+                                    <div class="bank-detail-item">
+                                        <span class="bank-detail-label">Ngân hàng:</span>
+                                        <span class="bank-detail-value">@booking.BankName</span>
+                                    </div>
                                     @if (!string.IsNullOrWhiteSpace(booking.AccountHolderName))
                                     {
-                                        <div>Chủ tài khoản: @booking.AccountHolderName</div>
+                                        <div class="bank-detail-item">
+                                            <span class="bank-detail-label">Chủ tài khoản:</span>
+                                            <span class="bank-detail-value">@booking.AccountHolderName</span>
+                                        </div>
                                     }
                                 </div>
                             </div>
@@ -99,12 +126,12 @@
     }
     else
     {
-        <div class="empty-state">
-            <div class="empty-icon">
-                <i class="bi bi-check-circle"></i>
+        <div class="card-x">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-check-circle" style="font-size: 3rem; opacity: 0.3;"></i>
+                <h3 class="mt-3 mb-0">Chưa có đơn hàng nào được hoàn tiền</h3>
+                <p class="mt-2 mb-0">Danh sách các đơn hàng đã được hoàn tiền sẽ hiển thị ở đây.</p>
             </div>
-            <h3>Chưa có đơn hàng nào được hoàn tiền</h3>
-            <p>Danh sách các đơn hàng đã được hoàn tiền sẽ hiển thị ở đây.</p>
         </div>
     }
 </div>

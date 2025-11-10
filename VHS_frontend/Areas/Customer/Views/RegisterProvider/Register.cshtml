@@ -446,7 +446,7 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
 
             <div class="actions center">
                 <a href="javascript:history.back()" class="btn ghost">Hủy</a>
-                <button type="submit" class="btn primary" id="btnSubmit">Đăng ký nhà cung cấp</button>
+                <button type="button" class="btn primary" id="btnSubmit">Đăng ký nhà cung cấp</button>
             </div>
         </form>
     </div>
@@ -876,12 +876,22 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               setTimeout(() => existingToast.remove(), 300);
             }
 
+            // Escape HTML để tránh XSS
+            function escapeHtml(text) {
+              const div = document.createElement('div');
+              div.textContent = text;
+              return div.innerHTML;
+            }
+            
+            // Escape HTML và giữ nguyên newline (sẽ được xử lý bởi white-space: pre-line)
+            const safeMessage = escapeHtml(String(message || ''));
+
             const toast = document.createElement('div');
             toast.className = `rp-toast rp-toast-${type}`;
             toast.innerHTML = `
               <div class="rp-toast-content">
                 <i class="bi ${type === 'error' ? 'bi-exclamation-circle' : 'bi-check-circle'}"></i>
-                <span>${message}</span>
+                <span style="white-space: pre-line; word-wrap: break-word;">${safeMessage}</span>
                 <button type="button" class="rp-toast-close" aria-label="Đóng">&times;</button>
               </div>
             `;
@@ -897,11 +907,11 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             // Show toast
             setTimeout(() => toast.classList.add('show'), 10);
 
-            // Auto remove after 5 seconds
+            // Auto remove after 8 seconds (tăng thời gian để đọc message dài)
             const autoRemove = setTimeout(() => {
               toast.classList.remove('show');
               setTimeout(() => toast.remove(), 300);
-            }, 5000);
+            }, 8000);
 
             // Clear timeout on hover
             toast.addEventListener('mouseenter', () => clearTimeout(autoRemove));
@@ -928,7 +938,24 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
 
           // Submit AJAX JSON — loại bỏ redirect/banner
           const form = document.getElementById("providerForm");
-          form?.addEventListener("submit", async (ev) => {
+          
+          // QUAN TRỌNG: Prevent default form submission ngay từ đầu
+          let isSubmitting = false; // Flag để prevent double submit
+          
+          // Function xử lý submit
+          async function handleSubmit(ev) {
+            // Ngăn submit mặc định nếu có event
+            if (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+            }
+            
+            // Prevent double submit
+            if (isSubmitting) {
+              console.warn('⚠️ Form đang được submit, bỏ qua request này');
+              return;
+            }
+            
             // comprehensive validation for resubmit (Rejected)
             const errors = [];
 
@@ -1086,29 +1113,54 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
 
             console.log('=== SUBMIT DEBUG ===');
             console.log('Profile image:', fileInput?.files?.length || 0);
+            if (fileInput?.files?.[0]) {
+              console.log(`  - Profile image: ${fileInput.files[0].name} (${(fileInput.files[0].size / 1024 / 1024).toFixed(2)} MB)`);
+            }
             console.log('Business licenses:', licenseFiles.length);
+            licenseFiles.forEach((f, idx) => {
+              console.log(`  - License[${idx}]: ${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`);
+            });
+            console.log('Selected categories:', selectedCategories.length);
+            selectedCategories.forEach((cat, idx) => {
+              const catId = cat.value;
+              const catName = cat.dataset.categoryName || '';
+              const tagsCount = document.querySelectorAll(`[data-category="${catId}"] input[name="SelectedTags"]:checked`).length;
+              console.log(`  - Category[${idx}]: ${catName} (${tagsCount} tags)`);
+            });
             console.log('Total files to submit:', allFiles.length);
 
-            allFiles.forEach(f => {
-              if (!f.type.startsWith('image/')) errors.push({ msg: 'Tệp không hợp lệ (không phải ảnh).', el: null });
+            allFiles.forEach((f, idx) => {
+              if (!f.type.startsWith('image/')) {
+                errors.push({ msg: `Tệp "${f.name}" không hợp lệ (không phải ảnh).`, el: null });
+              }
               totalBytes += f.size;
+              console.log(`  File[${idx}]: ${f.name} - ${(f.size / 1024 / 1024).toFixed(2)} MB - ${f.type}`);
             });
+            
+            const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
+            console.log(`Total size: ${totalMB} MB (max: ${(MAX_TOTAL / 1024 / 1024).toFixed(2)} MB)`);
+            
             if (totalBytes > MAX_TOTAL) {
-              errors.push({ msg: 'Tổng dung lượng tệp vượt quá 50MB.', el: null });
+              errors.push({ msg: `Tổng dung lượng tệp (${totalMB} MB) vượt quá giới hạn 50MB.`, el: null });
             }
 
             if (errors.length > 0) {
-              ev.preventDefault();
-
               // Scroll đến trường có lỗi đầu tiên và focus
               const firstError = errors[0];
+              
+              // Hiển thị lỗi đầu tiên bằng toast
+              if (firstError.msg) {
+                showToast(firstError.msg, 'error');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+              
               if (firstError.el) {
                 // Special handling for terms checkbox
                 if (firstError.el === agreeTermsEl) {
                   scrollToTermsError();
                 } else {
-                  firstError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   setTimeout(() => {
+                    firstError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     if (typeof firstError.el.focus === 'function') {
                       firstError.el.focus();
                     }
@@ -1119,6 +1171,9 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               return;
             }
 
+            // Đánh dấu đang submit
+            isSubmitting = true;
+            
             // trim values before submit
             if (nameEl) nameEl.value = providerName;
             if (phoneEl) phoneEl.value = phoneTrim;
@@ -1126,11 +1181,48 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             // QUAN TRỌNG: Sync files vào input trước khi submit
             syncLicenseFiles();
             console.log(`Final sync - License files:`, licenseInput?.files?.length || 0);
+            
+            // Validate lại một lần nữa sau khi sync
+            if (licenseFiles.length === 0) {
+              console.error('❌ Validation failed: No license files after sync');
+              showToast('Vui lòng tải lên ít nhất 1 hình giấy phép kinh doanh.', 'error');
+              isSubmitting = false;
+              return;
+            }
+            
+            // Validate categories và tags
+            const finalSelectedCategories = document.querySelectorAll('.category-checkbox:checked');
+            if (finalSelectedCategories.length === 0) {
+              console.error('❌ Validation failed: No categories selected');
+              showToast('Vui lòng chọn ít nhất 1 danh mục dịch vụ.', 'error');
+              isSubmitting = false;
+              return;
+            }
+            
+            // Validate tags cho mỗi category
+            let hasTagsError = false;
+            finalSelectedCategories.forEach(catCheckbox => {
+              const categoryId = catCheckbox.value;
+              const tagsChecked = document.querySelectorAll(`[data-category="${categoryId}"] input[name="SelectedTags"]:checked`);
+              if (tagsChecked.length === 0) {
+                hasTagsError = true;
+                const categoryName = catCheckbox.dataset.categoryName || 'danh mục này';
+                console.error(`❌ Validation failed: No tags selected for category: ${categoryName}`);
+              }
+            });
+            
+            if (hasTagsError) {
+              showToast('Vui lòng chọn ít nhất 1 dịch vụ cụ thể cho mỗi danh mục đã chọn.', 'error');
+              isSubmitting = false;
+              return;
+            }
 
-            ev.preventDefault();
             btnSubmit.disabled = true;
             const oldText = btnSubmit.textContent;
             btnSubmit.textContent = "Đang gửi...";
+            
+            console.log('🚀 Starting AJAX submit...');
+            console.log(`📊 Final validation: ${finalSelectedCategories.length} categories, ${licenseFiles.length} license files`);
 
             try {
               // Map từ SelectedCategories + SelectedTags sang Certificates[] structure cho backend
@@ -1173,7 +1265,17 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               }
 
               // Map categories sang Certificates structure
-              selectedCategories.forEach((catCheckbox, index) => {
+              console.log('📋 Mapping categories to certificates...');
+              
+              // Lấy lại selected categories (có thể đã thay đổi)
+              const currentSelectedCategories = document.querySelectorAll('.category-checkbox:checked');
+              console.log('Selected categories count:', currentSelectedCategories.length);
+              
+              if (currentSelectedCategories.length === 0) {
+                throw new Error('Không có danh mục nào được chọn. Vui lòng chọn ít nhất 1 danh mục dịch vụ.');
+              }
+              
+              currentSelectedCategories.forEach((catCheckbox, index) => {
                 const categoryId = catCheckbox.value;
                 const categoryName = catCheckbox.dataset.categoryName || '';
 
@@ -1190,12 +1292,15 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                   };
                 });
 
+                console.log(`  Certificate[${index}]: CategoryId=${categoryId}, Tags=${tagsForCategory.length}`);
+
                 // Create Certificate entry
                 fd.append(`Certificates[${index}].CategoryId`, categoryId);
 
                 // *** QUAN TRỌNG: Gửi TagIds cho từng certificate ***
                 tagsForCategory.forEach(tag => {
                   fd.append(`Certificates[${index}].TagIds`, tag.id);
+                  console.log(`    - TagId: ${tag.id} (${tag.name})`);
                 });
 
                 // ✅ KHÔNG GỬI Description - field này không dùng nữa
@@ -1204,71 +1309,195 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
 
               // ✅ Add business license files cho TẤT CẢ certificates (dùng chung)
               // Đảm bảo mỗi certificate đều có đầy đủ business licenses
-              selectedCategories.forEach((catCheckbox, certIndex) => {
-                licenseFiles.forEach((file) => {
+              const finalCertCount = currentSelectedCategories.length;
+              console.log(`📎 Adding business license files (${licenseFiles.length} files) to ${finalCertCount} certificates...`);
+              
+              if (licenseFiles.length === 0) {
+                throw new Error('Không có file giấy phép kinh doanh. Vui lòng tải lên ít nhất 1 hình giấy phép.');
+              }
+              
+              currentSelectedCategories.forEach((catCheckbox, certIndex) => {
+                licenseFiles.forEach((file, fileIndex) => {
                   fd.append(`Certificates[${certIndex}].BusinessLicenses`, file);
+                  console.log(`    Certificate[${certIndex}].BusinessLicenses[${fileIndex}]: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
                 });
               });
-
-              // Debug: log FormData contents
-              console.log('=== FORMDATA DEBUG ===');
-              for (let [key, value] of fd.entries()) {
-                if (value instanceof File) {
-                  console.log(`${key}: File(${value.name}, ${value.size} bytes)`);
-                } else {
-                  console.log(`${key}: ${value}`);
+              
+              console.log(`✅ Total certificates to send: ${finalCertCount}`);
+              console.log(`✅ Total business license files: ${licenseFiles.length * finalCertCount} (${licenseFiles.length} files × ${finalCertCount} certificates)`);
+              
+              // Final validation: Đảm bảo có ít nhất 1 certificate với ít nhất 1 tag và 1 file
+              let validCertCount = 0;
+              currentSelectedCategories.forEach((catCheckbox, index) => {
+                const categoryId = catCheckbox.value;
+                const tagsForCategory = document.querySelectorAll(`[data-category="${categoryId}"] input[name="SelectedTags"]:checked`);
+                if (tagsForCategory.length > 0 && licenseFiles.length > 0) {
+                  validCertCount++;
                 }
+              });
+              
+              if (validCertCount === 0) {
+                throw new Error('Không có certificate hợp lệ. Mỗi danh mục phải có ít nhất 1 dịch vụ và ít nhất 1 file giấy phép.');
               }
+              
+              console.log(`✅ Valid certificates: ${validCertCount}/${finalCertCount}`);
 
               // GỬI ĐẾN MVC CONTROLLER - Controller sẽ gọi service
-              const res = await fetch(form.action, {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: fd
-              });
+              console.log('📤 Sending request to:', form.action);
+              
+              // Log FormData size estimate và chi tiết
+              console.log('=== FORMDATA DETAILS ===');
+              let formDataSize = 0;
+              let fileCount = 0;
+              let entryCount = 0;
+              
+              for (const [key, value] of fd.entries()) {
+                entryCount++;
+                if (value instanceof File) {
+                  fileCount++;
+                  formDataSize += value.size;
+                  console.log(`  [${entryCount}] ${key}: File(${value.name}, ${(value.size / 1024 / 1024).toFixed(2)} MB)`);
+                } else {
+                  formDataSize += String(value).length;
+                  const valueStr = String(value);
+                  if (valueStr.length < 100) {
+                    console.log(`  [${entryCount}] ${key}: ${valueStr}`);
+                  } else {
+                    console.log(`  [${entryCount}] ${key}: ${valueStr.substring(0, 100)}... (${valueStr.length} chars)`);
+                  }
+                }
+              }
+              
+              console.log(`📊 FormData Summary: ${entryCount} entries, ${fileCount} files, ${(formDataSize / 1024 / 1024).toFixed(2)} MB total`);
+              
+              let res;
+              try {
+                // Thêm timeout để tránh chờ quá lâu (120 seconds cho file upload)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 seconds
+                
+                res = await fetch(form.action, {
+                  method: 'POST',
+                  headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                  body: fd,
+                  signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                console.log('📥 Response received - Status:', res.status, res.statusText);
+              } catch (fetchError) {
+                console.error('❌ Fetch error:', fetchError);
+                if (fetchError.name === 'AbortError') {
+                  throw new Error('Yêu cầu quá thời gian chờ (120 giây). Có thể do file quá lớn hoặc kết nối chậm. Vui lòng thử lại với file nhỏ hơn.');
+                }
+                throw new Error(`Lỗi kết nối: ${fetchError.message}. Vui lòng kiểm tra kết nối mạng và thử lại.`);
+              }
+
+              // Kiểm tra Content-Type trước khi đọc response
+              const contentType = res.headers.get('content-type') || '';
+              console.log('📋 Response Content-Type:', contentType);
+              
+              // Đọc response text trước để debug
+              let responseText;
+              try {
+                responseText = await res.text();
+                console.log('📄 Response text length:', responseText.length);
+                console.log('📄 Response text (first 500 chars):', responseText.substring(0, 500));
+              } catch (textError) {
+                console.error('❌ Error reading response text:', textError);
+                throw new Error('Không thể đọc phản hồi từ server. Vui lòng thử lại.');
+              }
+
+              // Kiểm tra nếu response là HTML (có thể là error page)
+              if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+                console.error('❌ Server returned HTML instead of JSON - possible error page');
+                throw new Error('Server trả về trang lỗi. Có thể do lỗi nghiêm trọng trên server. Vui lòng thử lại sau.');
+              }
 
               if (res.status === 200) {
-                const ok = await res.json(); // { ok: true, providerId, status, refresh } OR { ok:false,... }
+                let ok;
+                try {
+                  ok = JSON.parse(responseText);
+                  console.log('✅ Parsed response:', ok);
+                } catch (parseError) {
+                  console.error('❌ JSON parse error:', parseError);
+                  console.error('❌ Response text:', responseText);
+                  throw new Error('Lỗi xử lý phản hồi từ server. Vui lòng thử lại.');
+                }
+                
                 if (!ok || ok.ok !== true) {
-                  alert(ok?.message || 'Đăng ký thất bại.');
+                  const errorMsg = ok?.message || ok?.Message || 'Đăng ký thất bại.';
+                  console.error('❌ Registration failed:', errorMsg);
+                  showToast(errorMsg, 'error');
+                  // Scroll to top để người dùng thấy toast
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  // KHÔNG reload trang - chỉ hiển thị lỗi
+                  return;
                 } else if (ok.refresh) {
                   localStorage.removeItem('myProvider');
                   window.location.reload();
+                  return;
                 } else {
-                  window.location.href = `${form.getAttribute('data-success') || '/Customer/RegisterProvider/Success'}?id=${encodeURIComponent(ok.providerId)}&stat=${encodeURIComponent(ok.status)}`;
+                  const successUrl = `${form.getAttribute('data-success') || '/Customer/RegisterProvider/Success'}?id=${encodeURIComponent(ok.providerId)}&stat=${encodeURIComponent(ok.status)}`;
+                  console.log('✅ Registration successful, redirecting to:', successUrl);
+                  window.location.href = successUrl;
+                  return;
                 }
-                return;
               }
 
-              // lỗi 409 hoặc 400
-              let err; try { err = await res.json(); } catch { err = { Message: 'Đăng ký thất bại.' }; }
-              const msg = err?.Message || err?.message || 'Đăng ký thất bại.';
-              const detail = err?.Detail || err?.detail;
-              const errorType = err?.Type || '';
+              // Xử lý lỗi từ server (status !== 200)
+              console.error('❌ Server returned error status:', res.status);
+              let err;
+              try {
+                err = JSON.parse(responseText);
+                console.error('❌ Parsed error response:', err);
+              } catch (parseError) {
+                console.error('❌ Failed to parse error response as JSON:', parseError);
+                console.error('❌ Raw response:', responseText);
+                // Nếu không parse được JSON, tạo error object từ response text
+                err = { 
+                  Message: responseText || `Lỗi server (${res.status}): ${res.statusText}`,
+                  Detail: 'Không thể đọc phản hồi từ server'
+                };
+              }
+
+              const msg = err?.Message || err?.message || `Lỗi đăng ký (${res.status})`;
+              const detail = err?.Detail || err?.detail || err?.raw || '';
 
               // Log chi tiết để debug
               console.error('=== REGISTRATION ERROR ===');
               console.error('Status:', res.status);
+              console.error('Status Text:', res.statusText);
               console.error('Message:', msg);
               console.error('Detail:', detail);
-              console.error('Type:', errorType);
-              console.error('Full error:', err);
+              console.error('Full error object:', err);
+              console.error('Full response text:', responseText);
 
-              // Hiển thị lỗi trong validation summary
-              const validationSummary = document.querySelector('.validation-summary-errors ul') ||
-                                       document.querySelector('.alert.alert-danger');
-              if (validationSummary && validationSummary.tagName === 'UL') {
-                validationSummary.innerHTML = `<li>${msg}${detail ? ` - ${detail}` : ''}</li>`;
-                validationSummary.closest('.validation-summary-errors')?.classList.remove('d-none');
-                validationSummary.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              } else {
-                // Fallback: show alert if no validation summary
-                alert(detail ? `${msg}\n\nChi tiết: ${detail}` : msg);
+              // Hiển thị lỗi bằng toast
+              // Nếu có detail và detail khác với message, hiển thị cả hai
+              let displayMessage = msg;
+              if (detail && detail !== msg && detail.length > 0) {
+                displayMessage = `${msg}\n\nChi tiết: ${detail}`;
               }
+              
+              // Xử lý đặc biệt cho TaskCanceledException (database timeout)
+              if (msg.includes('TaskCanceledException') || msg.includes('task was canceled') || 
+                  msg.includes('canceled') || detail.includes('TaskCanceledException')) {
+                displayMessage = 'Kết nối đến database bị timeout.\n\nNguyên nhân có thể:\n- Database server đang quá tải\n- Kết nối mạng không ổn định\n- File upload quá lớn\n\nVui lòng:\n1. Thử lại với file nhỏ hơn\n2. Đợi vài phút rồi thử lại\n3. Liên hệ admin nếu vấn đề tiếp tục';
+              }
+              
+              showToast(displayMessage, 'error');
+              
+              // Scroll to top để người dùng thấy toast
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              
+              // QUAN TRỌNG: KHÔNG reload trang - chỉ hiển thị lỗi và để người dùng sửa
+              console.log('⚠️ Error displayed to user - page will NOT reload');
 
-              // map Errors[].Field
+              // map Errors[].Field để highlight các field có lỗi
               if (Array.isArray(err?.Errors) || Array.isArray(err?.errors)) {
                 const list = err.Errors || err.errors;
+                console.log('📋 Field errors:', list);
                 const m = (field) => {
                   if (!field) return null;
                   const fieldUpper = field.toUpperCase();
@@ -1283,16 +1512,64 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 };
                 const first = list.find(e => !!(e.Field || e.field));
                 const el = first ? m(first.Field || first.field) : null;
-                if (el && el.classList) el.classList.add('is-invalid');
-                if (el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth',block:'center'});
-                if (el && el.focus) el.focus();
+                if (el) {
+                  if (el.classList) el.classList.add('is-invalid');
+                  if (el.scrollIntoView) {
+                    setTimeout(() => {
+                      el.scrollIntoView({behavior:'smooth',block:'center'});
+                      if (el.focus && typeof el.focus === 'function') el.focus();
+                    }, 500);
+                  }
+                }
               }
             } catch (ex) {
-              alert('Không thể gửi đăng ký. Vui lòng thử lại.');
+              // Xử lý các lỗi khác (network, timeout, parse, v.v.)
+              console.error('❌ Exception during registration:', ex);
+              console.error('❌ Error name:', ex.name);
+              console.error('❌ Error message:', ex.message);
+              console.error('❌ Error stack:', ex.stack);
+              
+              let userMessage = 'Không thể gửi đăng ký. Vui lòng thử lại.';
+              
+              if (ex.message) {
+                userMessage = ex.message;
+              } else if (ex.name === 'TypeError' && ex.message.includes('fetch')) {
+                userMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet và thử lại.';
+              } else if (ex.name === 'AbortError') {
+                userMessage = 'Yêu cầu quá thời gian chờ (120 giây). Có thể do:\n- File quá lớn\n- Kết nối mạng chậm\n- Server đang xử lý\n\nVui lòng thử lại với file nhỏ hơn hoặc kiểm tra kết nối mạng.';
+              } else if (ex.name === 'TimeoutError' || ex.message?.includes('timeout') || ex.message?.includes('canceled')) {
+                userMessage = 'Yêu cầu quá thời gian chờ. Có thể do file quá lớn hoặc kết nối chậm. Vui lòng thử lại với file nhỏ hơn.';
+              } else if (ex.message?.includes('TaskCanceledException') || ex.message?.includes('task was canceled')) {
+                userMessage = 'Kết nối đến database bị timeout. Vui lòng:\n1. Kiểm tra kết nối mạng\n2. Thử lại với file nhỏ hơn\n3. Đợi vài phút rồi thử lại\n4. Liên hệ admin nếu vấn đề tiếp tục';
+              } else if (ex.message?.includes('HTML') || ex.message?.includes('error page')) {
+                userMessage = 'Server trả về trang lỗi. Có thể do:\n- Database timeout\n- Server quá tải\n- Lỗi hệ thống\n\nVui lòng thử lại sau vài phút hoặc liên hệ admin.';
+              }
+              
+              console.error('❌ Showing error to user:', userMessage);
+              showToast(userMessage, 'error');
+              
+              // Scroll to top để người dùng thấy toast
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              
+              // QUAN TRỌNG: KHÔNG reload trang - chỉ hiển thị lỗi
+              console.log('⚠️ Exception handled - page will NOT reload');
             } finally {
+              // Reset submitting flag
+              isSubmitting = false;
               btnSubmit.disabled = false;
-              btnSubmit.textContent = oldText || 'Đăng ký Provider';
+              btnSubmit.textContent = oldText || 'Đăng ký nhà cung cấp';
+              console.log('✅ Submit button re-enabled, isSubmitting = false');
             }
+          }
+          
+          // Attach event listener cho form submit (nếu có)
+          form?.addEventListener("submit", handleSubmit);
+          
+          // Attach event listener cho button click
+          btnSubmit?.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            handleSubmit(ev);
           });
 
           // ===== COLLAPSIBLE TERMS & INSURANCE HANDLERS =====

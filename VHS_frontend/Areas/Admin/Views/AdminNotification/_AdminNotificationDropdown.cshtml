@@ -26,6 +26,48 @@
             _ => "bi-bell-fill"
         };
     }
+
+    // Helper function to convert DateTime to Vietnam timezone (UTC+7)
+    // Note: Database đã lưu theo giờ Việt Nam (Unspecified), nên không cần convert nữa
+    DateTime? ToVietnamTime(DateTime? dateTime)
+    {
+        if (dateTime == null) return null;
+        
+        try
+        {
+            // Database đã lưu theo giờ Việt Nam (Unspecified kind)
+            // Nếu là Unspecified hoặc Local -> đã là giờ Việt Nam rồi, không cần convert
+            if (dateTime.Value.Kind == DateTimeKind.Unspecified || dateTime.Value.Kind == DateTimeKind.Local)
+            {
+                return dateTime.Value;
+            }
+            
+            // Chỉ convert nếu thực sự là UTC
+            if (dateTime.Value.Kind == DateTimeKind.Utc)
+            {
+                TimeZoneInfo vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+                return TimeZoneInfo.ConvertTimeFromUtc(dateTime.Value, vietnamTimeZone);
+            }
+            
+            return dateTime.Value;
+        }
+        catch
+        {
+            // Fallback: nếu là UTC thì cộng 7 giờ, còn lại giữ nguyên
+            if (dateTime.Value.Kind == DateTimeKind.Utc)
+            {
+                return dateTime.Value.AddHours(7);
+            }
+            return dateTime.Value;
+        }
+    }
+
+    // Helper function to format DateTime to Vietnamese format
+    string FormatVietnamTime(DateTime? dateTime)
+    {
+        var vietnamTime = ToVietnamTime(dateTime);
+        return vietnamTime?.ToString("dd/MM/yyyy HH:mm") ?? "N/A";
+    }
 }
 
 <li class="notif-header">
@@ -72,7 +114,7 @@ else
                         <div class="notification-meta">
                             <div class="notification-time">
                                 <i class="bi bi-clock me-1"></i>
-                                <span>@(notification.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</span>
+                                <span>@FormatVietnamTime(notification.CreatedAt)</span>
                             </div>
                             @if (!string.IsNullOrEmpty(notification.NotificationType))
                             {

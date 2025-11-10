@@ -25,6 +25,15 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
         public DateTime CreatedAt { get; set; }
         public string? CancelReason { get; set; }  // ✨ Lý do hủy đơn
 
+        // Address Details từ UserAddresses
+        public Guid? AddressId { get; set; }
+        public string? ProvinceName { get; set; }
+        public string? DistrictName { get; set; }
+        public string? WardName { get; set; }
+        public string? StreetAddress { get; set; }
+        public string? RecipientName { get; set; }
+        public string? RecipientPhone { get; set; }
+
         // Options
         public List<BookingOptionDetailDTO> Options { get; set; } = new();
 

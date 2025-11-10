@@ -127,7 +127,7 @@
                                     <div class="top-right">
                                         <!-- CHIP ĐẾM TAG (DƯỚI) -->
                                         <span class="chip chip-mini chip-count-bottom" data-count-for="@item.CategoryId">0</span>
-                                        <button class="btn btn-ghost sm soft btn-add-tag" data-category-id="@item.CategoryId">
+                                        <button class="btn btn-sm btn-outline-success soft btn-add-tag" data-category-id="@item.CategoryId">
                                             <i class="bi bi-plus-lg"></i> Thêm tag
                                         </button>
                                     </div>
@@ -589,32 +589,42 @@
         const tagErr = document.getElementById('tagError');
         tagNameEl.addEventListener('input', ()=> { if (tagNameEl.value.trim()) tagNameEl.classList.remove('is-invalid'); });
 
-        // Add tag
-        document.querySelectorAll('.tags-box').forEach(pane=>{
-          pane.addEventListener('click', (e)=>{
+        // Add tag - Using event delegation to handle dynamically added buttons
+        document.addEventListener('click', (e)=>{
             const btn = e.target.closest('.btn-add-tag');
             if (!btn) return;
             const catId = btn.getAttribute('data-category-id');
+          if (!catId) return;
             document.getElementById('tagModalTitle').textContent = 'Thêm tag';
             tagIdEl.value = ''; tagCatIdEl.value = catId; tagNameEl.value = '';
             tagErr.textContent = ''; tagNameEl.classList.remove('is-invalid');
             tagModal.show();
           });
-        });
 
-        // List tag events
-        document.querySelectorAll('.tag-list').forEach(ul=>{
-          ul.addEventListener('click', async (e)=>{
-            const btn = e.target.closest('button'); if (!btn) return;
-            const li = btn.closest('.tag-item'); const tagId = li?.dataset?.tagId; if (!tagId) return;
-            const pane = btn.closest('.tags-box'); const catId = pane.getAttribute('data-category-id');
+        // List tag events - Using event delegation to handle dynamically added tags
+        document.addEventListener('click', async (e)=>{
+          // Check if clicked element is inside a tag-list
+          const tagList = e.target.closest('.tag-list');
+          if (!tagList) return;
+          
+          const btn = e.target.closest('button'); 
+          if (!btn) return;
+          
+          const li = btn.closest('.tag-item'); 
+          const tagId = li?.dataset?.tagId; 
+          if (!tagId) return;
+          
+          const pane = btn.closest('.tags-box'); 
+          const catId = pane?.getAttribute('data-category-id');
+          if (!catId) return;
 
             if (btn.classList.contains('btn-edit-tag')) {
               document.getElementById('tagModalTitle').textContent = 'Sửa tag';
               tagIdEl.value = tagId; tagCatIdEl.value = catId;
               tagNameEl.value = li.querySelector('.tag-name').textContent.trim();
               tagErr.textContent = ''; tagNameEl.classList.remove('is-invalid');
-              tagModal.show(); return;
+            tagModal.show(); 
+            return;
             }
 
             if (btn.classList.contains('btn-delete-tag')) {
@@ -640,7 +650,6 @@
               }
               return;
             }
-          });
         });
 
         // Save tag
@@ -748,7 +757,7 @@
                    '</div>' +
                    '<div class="top-right">' +
                      '<span class="chip chip-mini chip-count-bottom" data-count-for="' + dto.categoryId + '">0</span>' +
-                     '<button class="btn btn-ghost sm soft btn-add-tag" data-category-id="' + dto.categoryId + '">' +
+                     '<button class="btn btn-sm btn-outline-success soft btn-add-tag" data-category-id="' + dto.categoryId + '">' +
                        '<i class="bi bi-plus-lg"></i> Thêm tag' +
                      '</button>' +
                    '</div>' +
