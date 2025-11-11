@@ -181,14 +181,66 @@ namespace VHS_frontend.Services.Admin
         }
 
 
-        public async Task SendMessageAsync(
-      Guid conversationId,
-      Guid accountId,
-      string? body,
-      IFormFile? image,
-      Guid? replyToMessageId = null,
-      string? jwtToken = null,
-      CancellationToken ct = default)
+        //  public async Task SendMessageAsync(
+        //Guid conversationId,
+        //Guid accountId,
+        //string? body,
+        //IFormFile? image,
+        //Guid? replyToMessageId = null,
+        //string? jwtToken = null,
+        //CancellationToken ct = default)
+        //  {
+        //      if (conversationId == Guid.Empty) throw new ArgumentException("conversationId is required", nameof(conversationId));
+        //      if (accountId == Guid.Empty) throw new ArgumentException("accountId is required", nameof(accountId));
+
+        //      SetAuthHeader(jwtToken);
+
+        //      var url = $"api/Messages";
+
+        //      using var form = new MultipartFormDataContent();
+
+        //      // ⚠️ Phải trùng tên field với [FromForm] bên backend
+        //      form.Add(new StringContent(conversationId.ToString()), "conversationId");
+        //      form.Add(new StringContent(accountId.ToString()), "accountId");
+
+        //      // body có thể null; nếu muốn để null đúng nghĩa, có thể bỏ hẳn field này.
+        //      // Ở đây gửi chuỗi rỗng cho tiện UI.
+        //      form.Add(new StringContent(body ?? string.Empty, Encoding.UTF8), "body");
+
+        //      if (replyToMessageId.HasValue)
+        //      {
+        //          form.Add(new StringContent(replyToMessageId.Value.ToString()), "replyToMessageId");
+        //      }
+
+        //      if (image != null && image.Length > 0)
+        //      {
+        //          var streamContent = new StreamContent(image.OpenReadStream());
+        //          streamContent.Headers.ContentType =
+        //              new MediaTypeHeaderValue(image.ContentType ?? "application/octet-stream");
+        //          form.Add(streamContent, "image", image.FileName);
+        //      }
+
+        //      using var resp = await _httpClient.PostAsync(url, form, ct);
+
+        //      if (!resp.IsSuccessStatusCode)
+        //      {
+        //          var respBody = await resp.Content.ReadAsStringAsync(ct);
+        //          throw new HttpRequestException(
+        //              $"POST {url} failed: {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {respBody}");
+        //      }
+
+        //      // Backend trả { message = "Sent successfully" } – không cần đọc cũng được
+        //      // var result = await resp.Content.ReadFromJsonAsync<{ string message }>(_jsonOptions, ct);
+        //  }
+
+        public async Task<MessageDto> SendMessageAsync(
+  Guid conversationId,
+  Guid accountId,
+  string? body,
+  IFormFile? image,
+  Guid? replyToMessageId = null,
+  string? jwtToken = null,
+  CancellationToken ct = default)
         {
             if (conversationId == Guid.Empty) throw new ArgumentException("conversationId is required", nameof(conversationId));
             if (accountId == Guid.Empty) throw new ArgumentException("accountId is required", nameof(accountId));
@@ -198,19 +250,12 @@ namespace VHS_frontend.Services.Admin
             var url = $"api/Messages";
 
             using var form = new MultipartFormDataContent();
-
-            // ⚠️ Phải trùng tên field với [FromForm] bên backend
             form.Add(new StringContent(conversationId.ToString()), "conversationId");
             form.Add(new StringContent(accountId.ToString()), "accountId");
-
-            // body có thể null; nếu muốn để null đúng nghĩa, có thể bỏ hẳn field này.
-            // Ở đây gửi chuỗi rỗng cho tiện UI.
             form.Add(new StringContent(body ?? string.Empty, Encoding.UTF8), "body");
 
             if (replyToMessageId.HasValue)
-            {
                 form.Add(new StringContent(replyToMessageId.Value.ToString()), "replyToMessageId");
-            }
 
             if (image != null && image.Length > 0)
             {
@@ -229,8 +274,11 @@ namespace VHS_frontend.Services.Admin
                     $"POST {url} failed: {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {respBody}");
             }
 
-            // Backend trả { message = "Sent successfully" } – không cần đọc cũng được
-            // var result = await resp.Content.ReadFromJsonAsync<{ string message }>(_jsonOptions, ct);
+            var dto = await resp.Content.ReadFromJsonAsync<MessageDto>(_jsonOptions, ct);
+            if (dto == null)
+                throw new InvalidOperationException("Empty MessageDto returned from API.");
+
+            return dto;
         }
 
         public async Task<int> GetUnreadTotalAsync(
@@ -257,6 +305,34 @@ CancellationToken ct = default)
             var payload = await resp.Content.ReadFromJsonAsync<UnreadTotalResponse>(_jsonOptions, ct);
             return payload?.Total ?? 0;
         }
+
+        public async Task MarkConversationReadAsync(
+  Guid conversationId,
+  Guid accountId,
+  string? jwtToken,
+  CancellationToken ct = default)
+        {
+            if (conversationId == Guid.Empty)
+                throw new ArgumentException("conversationId is required", nameof(conversationId));
+            if (accountId == Guid.Empty)
+                throw new ArgumentException("accountId is required", nameof(accountId));
+
+            SetAuthHeader(jwtToken);
+
+            // Ví dụ endpoint backend: POST /api/messages/conversations/{id}/read?viewerAccountId=...
+            var url = $"api/messages/conversations/{conversationId}/read?viewerAccountId={accountId}";
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, url);
+            using var response = await _httpClient.SendAsync(request, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct);
+                throw new HttpRequestException(
+                    $"POST {url} failed: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {body}");
+            }
+        }
+
 
         private sealed class UnreadTotalResponse
         {

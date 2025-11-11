@@ -105,53 +105,67 @@
     <div id="order-list" class="d-flex flex-column gap-3">
         @foreach (var o in Model.Items)
         {
-            // o.Status là EN (Pending/Accepted/InProgress/Completed/Cancelled)
             var price = $"{o.TotalPrice:N0}đ";
-            var isDone = string.Equals(o.Status?.Trim(), "Completed", StringComparison.OrdinalIgnoreCase);
-            var statusText = statusViMap.TryGetValue(o.Status ?? "", out var viText) ? viText : (o.Status ?? "");
-            // Chuẩn hóa code trạng thái về EN để lọc/tô màu nhất quán; chấp nhận cả VI và EN từ backend
+
+            // Raw từ DB (chỉ có Status, không có NormalizedStatus)
             var stRaw = (o.Status ?? "").Trim();
-            string stCode = stRaw; // fallback
-            
-            // Kiểm tra Cancelled/Canceled TRƯỚC để đảm bảo bắt được tất cả các biến thể
+            string stCode = stRaw;
+
+            // cờ riêng cho ServiceCompleted
+            var isServiceCompleted =
+            stRaw.Equals("ServiceCompleted", StringComparison.OrdinalIgnoreCase) ||
+            stRaw.Equals("Service Completed", StringComparison.OrdinalIgnoreCase);
+
+            // Text hiển thị ban đầu
+            var statusText = statusViMap.TryGetValue(stRaw, out var viText) ? viText : stRaw;
+
+            // Chuẩn hoá trạng thái
             if (stRaw.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
-                || stRaw.Equals("Canceled", StringComparison.OrdinalIgnoreCase)
-                || stRaw.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)
-                || stRaw.Equals("Đã huỷ", StringComparison.OrdinalIgnoreCase)
-                || stRaw.Contains("hủy", StringComparison.OrdinalIgnoreCase)
-                || stRaw.Contains("huy", StringComparison.OrdinalIgnoreCase))
+            || stRaw.Equals("Canceled", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Equals("Đã huỷ", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Contains("hủy", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Contains("huy", StringComparison.OrdinalIgnoreCase))
             {
                 stCode = "Cancelled";
                 statusText = statusViMap["Cancelled"];
             }
             else if (stRaw.Equals("Pending", StringComparison.OrdinalIgnoreCase)
-                || stRaw.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase)
-                || stRaw.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase)
-                || stRaw.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase))
+            || stRaw.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Equals("Chờ xử lý", StringComparison.OrdinalIgnoreCase))
             {
                 stCode = "Pending";
                 statusText = "Chờ xác nhận";
             }
             else if (stRaw.Equals("Confirmed", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Xác nhận", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Đã xác nhận", StringComparison.OrdinalIgnoreCase))
+            || stRaw.Equals("Xác nhận", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Equals("Đã xác nhận", StringComparison.OrdinalIgnoreCase))
             {
                 stCode = "Confirmed";
                 statusText = statusViMap["Confirmed"];
             }
             else if (stRaw.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Bắt đầu làm việc", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Đang thực hiện", StringComparison.OrdinalIgnoreCase))
+            || stRaw.Equals("Bắt đầu làm việc", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Equals("Đang thực hiện", StringComparison.OrdinalIgnoreCase))
             {
                 stCode = "InProgress";
                 statusText = statusViMap["InProgress"];
             }
             else if (stRaw.Equals("Completed", StringComparison.OrdinalIgnoreCase)
-                     || stRaw.Equals("Hoàn thành", StringComparison.OrdinalIgnoreCase))
+            || stRaw.Equals("Hoàn thành", StringComparison.OrdinalIgnoreCase)
+            || isServiceCompleted)
             {
+                // Gộp cả ServiceCompleted vào Completed để hiển thị
                 stCode = "Completed";
                 statusText = statusViMap["Completed"];
             }
+
+            // ✅ Cờ logic
+            var isCompleted = stCode.Equals("Completed", StringComparison.OrdinalIgnoreCase);
+            var canReview = isCompleted && !isServiceCompleted;
+            var isDone = isCompleted;
+
             var isReviewed = o.HasReview; // đã có review hay chưa
 
             <div class="shop-row order-card" data-status="@stCode" data-title="@o.ServiceTitle @o.ProviderName">
@@ -167,18 +181,24 @@
                     <a asp-area="" asp-controller="ServiceShop" asp-action="Index" asp-route-providerId="@o.ProviderId" class="btn btn-sm btn-outline-secondary">Xem Shop</a>
 
                     <div class="ms-auto d-flex align-items-center gap-3">
+
                         <div class="status-pill">
                             <i class="bi bi-truck"></i>
-                            @(isDone ? "Hoàn thành dịch vụ" : statusText)
-                        </div>
-                        @if (isDone && !isReviewed)
+                            @(
+                                                    isServiceCompleted
+                                                    ? "XÁC NHẬN HOÀN THÀNH"     // ✅ nếu là trạng thái ServiceCompleted
+                                                    : (isDone ? "Hoàn thành dịch vụ" : statusText)
+                                                    )
+                    </div>
+
+                    @if (canReview && !isReviewed)
                         {
                             <a class="text-danger text-decoration-none fw-bold"
                                href="javascript:void(0)"
                                data-bs-toggle="modal"
                                data-bs-target="#reviewModal-@o.BookingId">ĐÁNH GIÁ</a>
                         }
-                        else if (isDone && isReviewed)
+                        else if (isCompleted && isReviewed)
                         {
                             <span class="text-muted">Đã đánh giá</span>
                         }
@@ -274,6 +294,22 @@
 
                     @if (isDone) // Completed
                     {
+                        // ✅ Nút XÁC NHẬN HOÀN THÀNH chỉ cho trạng thái ServiceCompleted
+                        @if (isServiceCompleted)
+                        {
+                            <form asp-area="Customer"
+                                  asp-controller="BookingService"
+                                  asp-action="ConfirmServiceCompleted"
+                                  method="post"
+                                  class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="BookingId" value="@o.BookingId" />
+                                <button type="submit" class="btn btn-success">
+                                    Xác nhận hoàn thành
+                                </button>
+                            </form>
+                        }
+
                         <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="bookingId" value="@o.BookingId" />
@@ -294,7 +330,8 @@
                            class="btn btn-outline-danger btn-report">
                             Báo cáo
                         </a>
-                        @if (!isReviewed)
+
+                        @if (canReview && !isReviewed)
                         {
                             <button class="btn btn-outline-danger"
                                     data-bs-toggle="modal"
@@ -302,7 +339,6 @@
                                 Đánh giá
                             </button>
                         }
-
                     }
                     else if (st.Equals("Pending", StringComparison.OrdinalIgnoreCase))
                     {
@@ -337,7 +373,7 @@
 
             </div>
 
-    @if (isDone && !isReviewed)
+            @if (isDone && !isReviewed)
     {
             <!-- Modal Đánh Giá -->
             <div class="modal fade" id="reviewModal-@o.BookingId" tabindex="-1" aria-labelledby="reviewModalLabel-@o.BookingId" aria-hidden="true">

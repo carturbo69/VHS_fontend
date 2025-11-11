@@ -102,7 +102,7 @@
                     <span class="search-icon"><i class="bi bi-search"></i></span>
                     <input type="text" class="search-input" placeholder="Tìm theo tên hoặc nội dung…" />
                 </div>
-                </div>
+            </div>
 
             <div class="conversations-header">
                 <div class="conversations-title">
@@ -112,57 +112,52 @@
                 <span class="conversations-count">@Model.Conversations.Count</span>
             </div>
 
-            <div class="chat-scroll">
+            <div class="chat-scroll px-2" id="conversationList">
                 @foreach (var c in Model.Conversations
                                 .OrderByDescending(x => x.IsPinned)
                                 .ThenByDescending(x => x.LastMessageAt))
                 {
                     var isActive = c.ConversationId == Model.SelectedConversationId;
 
-                    // Dùng avatar trực tiếp từ database (conversation list item)
-                    // Ưu tiên: c.AvatarUrl từ database > otherInSelected.AvatarUrl (nếu active) > fallback
                     string? avatarUrlToUse = null;
-                    
-                    // Ưu tiên 1: Avatar từ conversation list item (từ database - backend đã xử lý)
                     if (!string.IsNullOrWhiteSpace(c.AvatarUrl))
                     {
                         avatarUrlToUse = c.AvatarUrl;
                     }
-                    // Ưu tiên 2: Nếu conversation đang active và không có c.AvatarUrl, dùng avatar từ participant
                     else if (isActive && hasSelection && otherInSelected != null && !string.IsNullOrWhiteSpace(otherInSelected.AvatarUrl))
                     {
                         avatarUrlToUse = otherInSelected.AvatarUrl;
                     }
-                    // Fallback: Dùng ảnh mặc định
-                    else
-                    {
-                        avatarUrlToUse = null; // Sẽ dùng fallbackImg
-                    }
 
-                    <a class="conv-item @(isActive ? "active" : "")"
+                    <a class="d-flex align-items-start gap-2 p-2 rounded conv-item @(isActive ? "bg-light" : "")"
                        href="@Url.Action("Index", "ChatAdmin", new { area = "Admin", id = c.ConversationId })"
+                       data-search-title="@(c.Title?.ToLower() ?? "")"
+                       data-search-snippet="@(c.LastMessageSnippet?.ToLower() ?? "")"
                        data-conversation-id="@c.ConversationId"
                        data-avatar-url="@(avatarUrlToUse ?? "")"
                        data-conversation-url="@Url.Action("Index", "ChatAdmin", new { area = "Admin", id = c.ConversationId })">
+
                         <img class="avatar"
                              src="@(avatarUrlToUse ?? fallbackImg)"
                              alt=""
-                             loading="lazy" 
-                             decoding="async" 
+                             loading="lazy"
+                             decoding="async"
                              referrerpolicy="no-referrer"
                              onerror="this.onerror=null;this.src='@fallbackImg';" />
 
-                        <div class="conv-content">
-                            <div class="conv-header">
-                                <div class="conv-title">@c.Title</div>
-                                <div class="conv-time">@ToVnHHmm(c.LastMessageAt)</div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex">
+                                <div class="conv-header">
+                                    <div class="conv-title">@c.Title</div>
+                                    <div class="conv-time">@ToVnHHmm(c.LastMessageAt)</div>
+                                </div>
                             </div>
-                            <div class="conv-snippet">@c.LastMessageSnippet</div>
+                            <div class="small text-muted text-ellipsis-1 conv-snippet">@c.LastMessageSnippet</div>
                         </div>
 
                         @if (c.UnreadCount > 0)
                         {
-                            <span class="unread-badge">@c.UnreadCount</span>
+                            <span class="badge rounded-pill bg-danger ms-2 conv-unread">@c.UnreadCount</span>
                         }
                     </a>
                 }
@@ -184,8 +179,8 @@
                     <img class="avatar"
                          src="@(otherInSelected?.AvatarUrl ?? fallbackImg)"
                          alt=""
-                         loading="lazy" 
-                         decoding="async" 
+                         loading="lazy"
+                         decoding="async"
                          referrerpolicy="no-referrer"
                          onerror="this.onerror=null;this.src='@fallbackImg';" />
 
@@ -207,7 +202,7 @@
 
                         <div class="dropdown-menu hidden" id="headerMenu">
                             <form method="post"
-                                  action='@Url.Action("DeleteConversation","ChatAdmin", new { area="Admin", id = Model.SelectedConversationId, hide = true })'>
+                                  action='@Url.Action("DeleteConversation", "ChatAdmin", new { area = "Admin", id = Model.SelectedConversationId, hide = true })'>
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="dropdown-item delete-item">Xóa cuộc trò chuyện</button>
                             </form>
@@ -259,8 +254,8 @@
                                     {
                                         <img src="@m.ImageUrl"
                                              class="msg-image"
-                                             loading="lazy" 
-                                             decoding="async" 
+                                             loading="lazy"
+                                             decoding="async"
                                              referrerpolicy="no-referrer"
                                              onerror="this.onerror=null;this.src='@fallbackImg';" />
                                     }
@@ -306,14 +301,14 @@
                         <div id="attachPreview" class="attach-preview hidden">
                             <div class="attach-preview-box">
                                 <div class="attach-thumb-wrapper">
-                                <img id="attachThumb"
-                                     src=""
-                                     alt="Xem trước"
+                                    <img id="attachThumb"
+                                         src=""
+                                         alt="Xem trước"
                                          class="attach-thumb"
-                                     onerror="this.onerror=null;this.src='@fallbackImg';" />
+                                         onerror="this.onerror=null;this.src='@fallbackImg';" />
                                     <button type="button" id="removeAttachBtn" class="remove-attach-btn" title="Xóa ảnh">
                                         <i class="bi bi-x-lg"></i>
-                                </button>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -356,14 +351,14 @@
             try {
                 var fallbackImg = '@fallbackImg';
                 var STORAGE_KEY = 'chat_avatars_admin';
-                
+
                 // Khởi tạo storage nếu chưa có
                 function initStorage() {
                     if (!sessionStorage.getItem(STORAGE_KEY)) {
                         sessionStorage.setItem(STORAGE_KEY, JSON.stringify({}));
                     }
                 }
-                
+
                 // Lấy avatar từ storage
                 function getAvatarFromStorage(convId) {
                     try {
@@ -373,7 +368,7 @@
                         return null;
                     }
                 }
-                
+
                 // Lưu avatar vào storage
                 function saveAvatarToStorage(convId, avatarUrl) {
                     try {
@@ -389,17 +384,17 @@
                     }
                     return false;
                 }
-                
+
                 // Cập nhật avatar trong conversation item
                 function updateAvatarInListItem(convItem, avatarUrl) {
                     if (!convItem || !avatarUrl) return;
-                    
+
                     var avatarImg = convItem.querySelector('.avatar');
                     if (!avatarImg) return;
-                    
+
                     var currentSrc = avatarImg.getAttribute('src') || '';
-                    var isFallback = !currentSrc || currentSrc === fallbackImg || currentSrc.indexOf('vhs_logo.png') > -1;
-                    
+                    var isFallback = !currentSrc || currentSrc === fallbackImg || currentSrc.indexOf('VeSinh.jpg') > -1;
+
                     // Cập nhật nếu đang hiển thị fallback hoặc URL khác
                     if (isFallback || (currentSrc && currentSrc !== avatarUrl && !currentSrc.includes(avatarUrl.split('?')[0]))) {
                         var separator = avatarUrl.indexOf('?') > -1 ? '&' : '?';
@@ -408,7 +403,7 @@
                         convItem.setAttribute('data-avatar-url', avatarUrl);
                     }
                 }
-                
+
                 // Áp dụng avatar từ storage cho tất cả conversations
                 function applyStoredAvatars() {
                     var convItems = document.querySelectorAll('.conv-item[data-conversation-id]');
@@ -422,17 +417,17 @@
                         }
                     });
                 }
-                
+
                 // Khởi tạo
                 initStorage();
-                
+
                 // Áp dụng avatar từ storage ngay khi trang load
                 if (document.readyState === 'loading') {
                     document.addEventListener('DOMContentLoaded', applyStoredAvatars);
                 } else {
                     applyStoredAvatars();
                 }
-                
+
                 // Lưu hàm vào window để sử dụng từ các script khác
                 window.chatAvatarManager = {
                     save: saveAvatarToStorage,
@@ -445,7 +440,7 @@
             }
         })();
     </script>
-    
+
     @* Lưu avatar từ selected conversation vào storage *@
     @if (hasSelection && otherInSelected != null && Model.SelectedConversationId.HasValue && !string.IsNullOrWhiteSpace(otherInSelected.AvatarUrl))
     {
@@ -454,17 +449,17 @@
                 try {
                     var selectedConvId = '@Model.SelectedConversationId.Value';
                     var correctAvatarUrl = '@(Html.Raw(otherInSelected.AvatarUrl?.Replace("'", "\\'").Replace("\"", "&quot;") ?? ""))';
-                    
+
                     if (selectedConvId && correctAvatarUrl && window.chatAvatarManager) {
                         // Lưu vào storage
                         window.chatAvatarManager.save(selectedConvId, correctAvatarUrl);
-                        
+
                         // Cập nhật ngay trong list
                         var selectedConvItem = document.querySelector('.conv-item[data-conversation-id="' + selectedConvId + '"]');
                         if (selectedConvItem) {
                             window.chatAvatarManager.update(selectedConvItem, correctAvatarUrl);
                         }
-                        
+
                         // Áp dụng lại cho tất cả conversations (để đảm bảo)
                         setTimeout(function() {
                             window.chatAvatarManager.applyAll();
@@ -476,64 +471,65 @@
             })();
         </script>
     }
-    
+
     @* Ngăn reload khi click vào conversation và load qua AJAX *@
     <script>
         (function() {
             var isLoading = false;
-            
+
             // Lắng nghe khi có conversation được click
             document.addEventListener('click', function(e) {
                 var convItem = e.target.closest('.conv-item[data-conversation-id]');
                 if (!convItem) return;
-                
+
                 // Ngăn navigation mặc định
                 e.preventDefault();
                 e.stopPropagation();
-                
+
                 // Nếu đang loading, bỏ qua
                 if (isLoading) {
                     console.log('[Chat] Already loading, ignoring click');
                     return;
                 }
-                
+
                 var convId = convItem.getAttribute('data-conversation-id');
                 var convUrl = convItem.getAttribute('data-conversation-url') || convItem.getAttribute('href');
                 var avatarUrl = convItem.getAttribute('data-avatar-url');
-                
+
                 if (!convId || !convUrl) {
                     console.warn('[Chat] Missing conversation ID or URL');
                     return;
                 }
-                
+
                 // Lưu avatar vào storage nếu có
                 if (window.chatAvatarManager && avatarUrl && avatarUrl.trim()) {
                     window.chatAvatarManager.save(convId, avatarUrl);
                 }
-                
+
                 // Cập nhật active state trong sidebar
                 document.querySelectorAll('.conv-item').forEach(function(item) {
                     item.classList.remove('active');
                 });
                 convItem.classList.add('active');
-                
-                // Ẩn unread badge
-                var unreadBadge = convItem.querySelector('.unread-badge');
-                if (unreadBadge) {
-                    unreadBadge.style.display = 'none';
-                    unreadBadge.remove();
-                }
-                
+
+                       // Ẩn unread badge
+        var unreadBadge = convItem.querySelector('.conv-unread');
+        if (unreadBadge) {
+            unreadBadge.style.display = 'none';
+            unreadBadge.remove();
+        }
+
+
                 // Load conversation qua AJAX
                 isLoading = true;
                 var chatMain = document.querySelector('.chat-main');
                 var chatWrapper = document.querySelector('.chat-wrapper');
-                
+
                 // Hiển thị loading state
                 if (chatMain) {
                     chatMain.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666;"><div style="text-align: center;"><div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"><span class="visually-hidden">Loading...</span></div><div style="margin-top: 1rem;">Đang tải cuộc trò chuyện...</div></div></div>';
                 }
-                
+
                 // Fetch conversation mới
                 fetch(convUrl, {
                     method: 'GET',
@@ -553,25 +549,25 @@
                     // Parse HTML response
                     var parser = new DOMParser();
                     var doc = parser.parseFromString(html, 'text/html');
-                    
+
                     // Extract chat-main từ response
                     var newChatMain = doc.querySelector('.chat-main');
                     if (newChatMain && chatMain) {
                         // Update chat-main content (không include scripts để tránh duplicate execution)
                         chatMain.outerHTML = newChatMain.outerHTML;
-                        
+
                         // Update URL với History API (không reload)
                         if (window.history && window.history.pushState) {
                             window.history.pushState({ conversationId: convId }, '', convUrl);
                         }
-                        
+
                         // Re-init SignalR sau khi scripts đã execute
                         if (window.__initAdminChatRealtime) {
                             setTimeout(function() {
                                 window.__initAdminChatRealtime();
                             }, 200);
                         }
-                        
+
                         // Re-init reply UI và file attach handlers
                         setTimeout(function() {
                             // File attach preview
@@ -581,13 +577,13 @@
                             var imgEl = document.getElementById('attachThumb');
                             var removeBtn = document.getElementById('removeAttachBtn');
                             var objectUrl = null;
-                            
+
                             if (pickBtn && fileInput) {
                                 pickBtn.addEventListener('click', function() { fileInput.click(); });
-                                
+
                                 fileInput.addEventListener('change', function() {
                                     if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-                                    
+
                                     if (fileInput.files && fileInput.files.length > 0) {
                                         var f = fileInput.files[0];
                                         if (!f.type || !f.type.startsWith('image/')) {
@@ -603,7 +599,7 @@
                                         if (previewWrap) previewWrap.classList.add('hidden');
                                     }
                                 });
-                                
+
                                 if (removeBtn) {
                                     removeBtn.addEventListener('click', function() {
                                         if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
@@ -613,7 +609,7 @@
                                     });
                                 }
                             }
-                            
+
                             // Reply UI
                             var pageMain = document.querySelector('main.chat-main[data-selected-conv]');
                             if (pageMain) {
@@ -624,7 +620,7 @@
                                 var replyingToName = document.getElementById('replyingToName');
                                 var replyingSnippet = document.getElementById('replyingSnippet');
                                 var cancelReplyBtn = document.getElementById('cancelReplyBtn');
-                                
+
                                 function showReplyPreview(id, name, snippet) {
                                     if (!replyHidden || !replyPreview) return;
                                     replyHidden.value = id || '';
@@ -633,35 +629,35 @@
                                     replyPreview.classList.remove('hidden');
                                     if (bodyInput) bodyInput.focus();
                                 }
-                                
+
                                 function clearReplyPreview() {
                                     if (replyHidden) replyHidden.value = '';
                                     if (replyingToName) replyingToName.textContent = '';
                                     if (replyingSnippet) replyingSnippet.textContent = '';
                                     if (replyPreview) replyPreview.classList.add('hidden');
                                 }
-                                
+
                                 if (cancelReplyBtn) {
                                     cancelReplyBtn.addEventListener('click', function(e) {
                                         e.preventDefault();
                                         clearReplyPreview();
                                     });
                                 }
-                                
+
                                 pageMain.addEventListener('click', function(e) {
                                     var btn = e.target.closest('.reply-btn');
                                     if (!btn) return;
                                     var bubble = btn.closest('.bubble');
                                     if (!bubble) return;
-                                    
+
                                     var id = bubble.getAttribute('data-message-id') || '';
                                     var name = bubble.getAttribute('data-sender-name') || '—';
                                     var sn = bubble.getAttribute('data-snippet') || '';
-                                    
+
                                     showReplyPreview(id, name, sn);
                                 }, {passive: true});
                             }
-                            
+
                             // Menu header toggle
                             var headerMenuBtn = document.getElementById('headerMenuBtn');
                             var headerMenu = document.getElementById('headerMenu');
@@ -674,7 +670,7 @@
                                     headerMenu.classList.remove('hidden');
                                     headerMenuBtn.setAttribute('aria-expanded', 'true');
                                 }
-                                
+
                                 headerMenuBtn.addEventListener('click', function(e) {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -684,26 +680,26 @@
                                         closeMenu();
                                     }
                                 });
-                                
+
                                 headerMenu.addEventListener('click', function(e) {
                                     e.stopPropagation();
                                     if (e.target.closest('button[type="submit"]')) {
                                         setTimeout(closeMenu, 100);
                                     }
                                 });
-                                
+
                                 document.addEventListener('click', function(e) {
                                     if (headerMenu.contains(e.target) || e.target === headerMenuBtn || headerMenuBtn.contains(e.target) || e.target.closest('.dropdown-menu')) {
                                         return;
                                     }
                                     closeMenu();
                                 }, { passive: true });
-                                
+
                                 document.addEventListener('keydown', function(e) {
                                     if (e.key === 'Escape') closeMenu();
                                 });
                             }
-                            
+
                             // Auto-scroll to bottom
                             setTimeout(function() {
                                 var msgList = document.getElementById('msgList');
@@ -729,7 +725,7 @@
             }, true); // Use capture phase to intercept early
         })();
     </script>
-    
+
     @* Auto-scroll khi đã chọn hội thoại *@
     @if (hasSelection)
     {
@@ -742,7 +738,7 @@
                   el.scrollTop = el.scrollHeight;
                 }
               }, 100);
-              
+
               // Scroll lại sau khi images load xong
               var imgEls = document.querySelectorAll('#msgList img');
               var loadedCount = 0;
@@ -759,7 +755,7 @@
                   });
                 }
               });
-              
+
               if (loadedCount === imgEls.length && imgEls.length > 0) {
                 setTimeout(function() {
               var el = document.getElementById('msgList');
@@ -772,36 +768,36 @@
 
     <script>
         // ===== Ẩn badge unread khi click vào conversation và scroll xuống tin nhắn mới nhất =====
-        (function() {
-          document.addEventListener('click', function(e) {
-            var convItem = e.target.closest('.conv-item');
-            if (!convItem) return;
-            
-            var unreadBadge = convItem.querySelector('.unread-badge');
-            if (unreadBadge) {
-              // Ẩn badge ngay lập tức
-              unreadBadge.style.display = 'none';
-              unreadBadge.remove();
-            }
-            
+             (function() {
+        document.addEventListener('click', function(e) {
+          var convItem = e.target.closest('.conv-item');
+          if (!convItem) return;
+
+          var unreadBadge = convItem.querySelector('.conv-unread');
+          if (unreadBadge) {
+            // Ẩn badge ngay lập tức
+            unreadBadge.style.display = 'none';
+            unreadBadge.remove();
+          }
+
             // Khi click vào conversation, sau khi page load sẽ scroll xuống tin nhắn mới nhất
             // Logic này sẽ được thực hiện trong phần auto-scroll ở trên
           });
         })();
-        
+
         // ===== Menu header toggle (khởi tạo ngay, không cần SignalR) =====
         (function () {
           var btn = document.getElementById('headerMenuBtn');
           var menu = document.getElementById('headerMenu');
           if (!btn || !menu) return;
 
-          function closeMenu(){ 
-            menu.classList.add('hidden'); 
-            btn.setAttribute('aria-expanded','false'); 
+          function closeMenu(){
+            menu.classList.add('hidden');
+            btn.setAttribute('aria-expanded','false');
           }
-          function openMenu(){ 
-            menu.classList.remove('hidden'); 
-            btn.setAttribute('aria-expanded','true'); 
+          function openMenu(){
+            menu.classList.remove('hidden');
+            btn.setAttribute('aria-expanded','true');
           }
 
           btn.addEventListener('click', function(e){
@@ -816,7 +812,7 @@
               console.log('Menu closed');
             }
           });
-          
+
           // Không đóng menu khi click vào menu item hoặc form
           menu.addEventListener('click', function(e){
             e.stopPropagation();
@@ -828,7 +824,7 @@
               return;
             }
           });
-          
+
           document.addEventListener('click', function(e){
             // Không đóng menu nếu click vào menu, button, hoặc form
             if (menu.contains(e.target) || e.target === btn || btn.contains(e.target) || e.target.closest('.dropdown-menu')) {
@@ -836,7 +832,7 @@
             }
             closeMenu();
           }, { passive:true });
-          
+
           document.addEventListener('keydown', function(e){
             if (e.key === 'Escape') closeMenu();
           });
@@ -963,210 +959,387 @@
         })();
     </script>
 
-    @* ====== SignalR realtime (Admin) ====== *@
-    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+
+
     <script>
-        window.__initAdminChatRealtime = function () {
-          var pageMain = document.querySelector('main.chat-main[data-selected-conv]');
-          if (!pageMain) { console.debug('[admin-chat] no selection, skip signalR'); return; }
+        // Helper: lấy conversationId đang mở (lowercase để so sánh)
+        function __adminChatGetCurrentConvId() {
+            const main = document.querySelector('main.chat-main[data-selected-conv]');
+            if (!main) return '';
+            const attr = main.getAttribute('data-selected-conv') || '';
+            return attr.toLowerCase();
+        }
 
-          const me = '@(Model.CurrentAccount?.AccountId.ToString())';
-          const selectedConversationId = '@Model.SelectedConversationId';
-          const GUID_EMPTY = '00000000-0000-0000-0000-000000000000';
-          if (!me || me.toLowerCase() === GUID_EMPTY) {
-            console.warn('[admin-chat] me is empty GUID, skip signalR init');
-            return;
-          }
+        // Helper: lấy conversationId đang mở (raw, dùng cho API)
+        function __adminChatGetCurrentConvIdRaw() {
+            const main = document.querySelector('main.chat-main[data-selected-conv]');
+            if (!main) return '';
+            return main.getAttribute('data-selected-conv') || '';
+        }
 
-          function parseIso(s){ return s ? new Date(s) : null; }
-          function statusHtml(status){
+        // Gọi MarkRead cho hội thoại hiện tại
+        function __adminChatMarkReadCurrent() {
+            const convId = __adminChatGetCurrentConvIdRaw();
+            if (!convId) return;
+
+            const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenEl ? tokenEl.value : '';
+
+            const url = '@Url.Action("MarkRead", "ChatAdmin", new { area = "Admin" })' + '?conversationId=' + encodeURIComponent(convId);
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': token
+                },
+                credentials: 'same-origin'
+            })
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json().catch(() => ({}));
+                })
+                .then(d => console.log('[admin-chat] ✅ MarkRead OK', d))
+                .catch(err => console.error('[admin-chat] ❌ MarkRead lỗi', err));
+        }
+
+        // ===== Các helper dùng trong handler =====
+        function __adminParseIso(s) {
+            return s ? new Date(s) : null;
+        }
+
+        function __adminStatusHtml(status) {
             let icon = '', text = '';
-            switch(status){
-              case 'Pending':   icon = '<i class="bi bi-clock-history"></i>'; text = 'Đang gửi'; break;
-              case 'Sent':      icon = '<i class="bi bi-check"></i>';         text = 'Đã gửi';   break;
-              case 'Delivered': icon = '<i class="bi bi-check2-all"></i>';    text = 'Đã nhận';  break;
-              case 'Seen':      icon = '<i class="bi bi-check2-all"></i>';    text = 'Đã xem';   break;
+            switch (status) {
+                case 'Pending':   icon = '<i class="bi bi-clock-history"></i>'; text = 'Đang gửi'; break;
+                case 'Sent':      icon = '<i class="bi bi-check"></i>';         text = 'Đã gửi';   break;
+                case 'Delivered': icon = '<i class="bi bi-check2-all"></i>';    text = 'Đã nhận';  break;
+                case 'Seen':      icon = '<i class="bi bi-check2-all"></i>';    text = 'Đã xem';   break;
             }
-            return '<span class="msg-status" data-status="'+status+'">'+icon+'<span class="status-text">'+text+'</span></span>';
-          }
-          function setBubbleStatus(bubble, status){
+            return '<span class="msg-status" data-status="' + status + '">' +
+                   icon + '<span class="status-text">' + text + '</span></span>';
+        }
+
+        function __adminSetBubbleStatus(bubble, status) {
             if (!bubble) return;
             bubble.setAttribute('data-status', status);
             const meta = bubble.querySelector('.msg-meta');
             if (!meta) return;
-            let statusEl = meta.querySelector('.msg-status');
-            if (!statusEl){
-              if (bubble.dataset.isMine === 'true'){
-                meta.insertAdjacentHTML('beforeend', statusHtml(status));
-              }
-            } else {
-              statusEl.outerHTML = statusHtml(status);
-            }
-          }
-          function applyReadUpTo(lastReadAtIso){
-            const lastReadAt = parseIso(lastReadAtIso);
-            if (!lastReadAt) return;
-            document.querySelectorAll('.bubble[data-is-mine="true"]').forEach(b => {
-              const created = parseIso(b.getAttribute('data-created-at'));
-              if (created && created <= lastReadAt){ setBubbleStatus(b, 'Delivered'); }
-            });
-          }
 
-          // ===== Chèn tham chiếu reply khi nhận tin mới từ server =====
-          function attachReplyRefIfAny(bubbleEl, msg){
+            let statusEl = meta.querySelector('.msg-status');
+            if (!statusEl) {
+                if (bubble.dataset.isMine === 'true') {
+                    meta.insertAdjacentHTML('beforeend', __adminStatusHtml(status));
+                }
+            } else {
+                statusEl.outerHTML = __adminStatusHtml(status);
+            }
+        }
+
+        function __adminApplyReadUpTo(lastReadAtIso) {
+            const lastReadAt = __adminParseIso(lastReadAtIso);
+            if (!lastReadAt) return;
+
+            // Chỉ cập nhật bubble của mình
+            document.querySelectorAll('.bubble[data-is-mine="true"]').forEach(b => {
+                const created = __adminParseIso(b.getAttribute('data-created-at'));
+                if (created && created <= lastReadAt) {
+                    __adminSetBubbleStatus(b, 'Delivered');
+                }
+            });
+        }
+
+        function __adminAttachReplyRefIfAny(bubbleEl, msg) {
             if (!msg || !msg.replyToMessageId) return;
 
-            // ✅ Sửa: KHÔNG .toLowerCase() — giữ định dạng GUID đúng với data-message-id render từ Razor
-            var refId = String(msg.replyToMessageId);
-            var parent = document.querySelector('.bubble[data-message-id="'+refId+'"]');
+            const refId = String(msg.replyToMessageId);
+            const parent = document.querySelector('.bubble[data-message-id="' + refId + '"]');
 
-            var name = parent?.getAttribute('data-sender-name') || (msg.replyToSenderName || '—');
-            var sn   = parent?.getAttribute('data-snippet')      || (msg.replyToSnippet || '(Không có nội dung)');
+            const name = parent?.getAttribute('data-sender-name') || (msg.replyToSenderName || '—');
+            const sn   = parent?.getAttribute('data-snippet')      || (msg.replyToSnippet || '(Không có nội dung)');
 
-            var wrap = document.createElement('div');
+            const wrap = document.createElement('div');
             wrap.className = 'reply-ref';
 
-            var nameEl = document.createElement('div');
+            const nameEl = document.createElement('div');
             nameEl.className = 'reply-ref-name';
             nameEl.textContent = name;
 
-            var snEl = document.createElement('div');
+            const snEl = document.createElement('div');
             snEl.className = 'reply-ref-text';
             snEl.textContent = sn;
 
             wrap.appendChild(nameEl);
             wrap.appendChild(snEl);
             bubbleEl.insertAdjacentElement('afterbegin', wrap);
-          }
+        }
 
-          // ===== SignalR =====
-          const connection = new signalR.HubConnectionBuilder()
-            .withUrl('/chathub')
-            .withAutomaticReconnect()
-            .configureLogging(signalR.LogLevel.Information)
-            .build();
+        // Hàm khởi tạo realtime cho trang Chat Admin
+        window.__initAdminChatRealtime = function () {
+            console.log('[admin-chat] 🚀 __initAdminChatRealtime được gọi');
 
-          connection.on('conversation:readUpTo', payload => {
-            if (!payload) return;
-            if (String(payload.conversationId).toLowerCase() !== String(selectedConversationId).toLowerCase()) return;
-            applyReadUpTo(payload.lastReadAt);
-          });
+            const me = '@(Model.CurrentAccount?.AccountId.ToString() ?? Guid.Empty.ToString())'.toLowerCase();
+            const GUID_EMPTY = '00000000-0000-0000-0000-000000000000';
 
-          connection.on('message:created', msg => {
-            // Lưu avatar từ sender vào storage nếu có
-            if (msg.conversationId && msg.sender && msg.sender.avatarUrl && window.chatAvatarManager) {
-              window.chatAvatarManager.save(msg.conversationId, msg.sender.avatarUrl);
-              // Cập nhật avatar trong list ngay lập tức
-              var convItem = document.querySelector('.conv-item[data-conversation-id="' + msg.conversationId + '"]');
-              if (convItem) {
-                window.chatAvatarManager.update(convItem, msg.sender.avatarUrl);
-              }
-            }
-            if (!msg) return;
-            if (String(msg.conversationId).toLowerCase() !== String(selectedConversationId).toLowerCase()) return;
-
-            const list = document.getElementById('msgList');
-            if (!list) return;
-
-            const isMine = String(msg.senderAccountId).toLowerCase() === String(me).toLowerCase();
-
-            const wrap = document.createElement('div');
-            wrap.className = 'msg-wrapper ' + (isMine ? 'msg-me' : 'msg-other');
-
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble ' + (isMine ? 'me' : 'other');
-            bubble.setAttribute('data-message-id', msg.messageId); // giữ nguyên
-            bubble.setAttribute('data-created-at', msg.createdAt);
-            bubble.setAttribute('data-is-mine', isMine ? 'true' : 'false');
-            bubble.setAttribute('data-status', msg.status || 'Sent');
-
-            const senderName = isMine ? 'Bạn' : (msg.senderName || 'Đối tác');
-            const snippetThis = msg.body ? msg.body : (msg.imageUrl ? '[Ảnh]' : '(Không có nội dung)');
-            bubble.setAttribute('data-sender-name', senderName);
-            bubble.setAttribute('data-snippet', snippetThis);
-
-            attachReplyRefIfAny(bubble, msg);
-
-            if (msg.body){
-              const bodyEl = document.createElement('div');
-              bodyEl.className = 'msg-body';
-              bodyEl.textContent = msg.body;
-              bubble.appendChild(bodyEl);
-            }
-            if (msg.imageUrl){
-              const img = document.createElement('img');
-              // Giống ServiceShop: dùng trực tiếp imageUrl, backend đã xử lý domain rồi
-              img.src = msg.imageUrl;
-              img.className = 'msg-image';
-              img.loading = 'lazy';
-              img.decoding = 'async';
-              img.referrerPolicy = 'no-referrer';
-              img.onerror = function() {
-                this.onerror = null;
-                this.src = '@fallbackImg';
-              };
-              bubble.appendChild(img);
+            if (!me || me === GUID_EMPTY) {
+                console.warn('[admin-chat] me là GUID rỗng, bỏ qua SignalR init');
+                return;
             }
 
-            const meta = document.createElement('div');
-            meta.className = 'msg-meta';
-                   const fmtVN = new Intl.DateTimeFormat('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-          timeZone: 'Asia/Ho_Chi_Minh'
-        });
-        const d = new Date(msg.createdAt);   // ISO-UTC từ server
-        const hhmm = isNaN(d) ? '' : fmtVN.format(d);
+            // Lấy connection global do layout / wrapper tạo
+            let connection = window.__chatConnection;
+            if (!connection) {
+                console.log('[admin-chat] ⏳ Chưa có window.__chatConnection, sẽ thử lại sau');
+                if (!window.__adminChatRetryCount) window.__adminChatRetryCount = 0;
+                if (window.__adminChatRetryCount < 50) { // tăng số lần thử cho chắc
+                    window.__adminChatRetryCount++;
+                    setTimeout(window.__initAdminChatRealtime, 300);
+                } else {
+                    console.error('[admin-chat] ❌ Không tìm thấy window.__chatConnection sau 50 lần thử');
+                }
+                return;
+            }
 
-        meta.innerHTML =
-          '<button type="button" class="reply-btn" title="Trả lời"><i class="bi bi-reply"></i> <span class="reply-text">Reply</span></button>'
-          + '<span class="msg-time">' + hhmm + '</span>'
-          + (isMine ? statusHtml(msg.status || 'Sent') : '');
+            console.log('[admin-chat] ✅ Dùng lại window.__chatConnection, state =', connection.state);
 
-            bubble.appendChild(meta);
+            // ====== GẮN HANDLER CHO CONNECTION (chỉ 1 lần) — KHÔNG phụ thuộc việc đã chọn hội thoại ======
+            if (!connection.__adminHandlersAttached) {
+                connection.__adminHandlersAttached = true;
+                console.log('[admin-chat] Gắn handlers SignalR cho Admin Chat');
 
-            wrap.appendChild(bubble);
-            list.appendChild(wrap);
-            // Scroll xuống tin nhắn mới nhất với smooth scroll
-            setTimeout(function() {
-            list.scrollTop = list.scrollHeight;
-            }, 50);
-          });
+                // 1) Người ta đọc đến đâu
+                connection.on('conversation:readUpTo', payload => {
+                    console.log('[admin-chat] conversation:readUpTo', payload);
+                    if (!payload) return;
 
-          // reconnect lifecycle
-          connection.onreconnecting((err) => { console.info('[admin-chat] reconnecting...', err); });
-          connection.onreconnected(async (connectionId) => {
-            console.info('[admin-chat] reconnected as', connectionId, '— re-registering…');
-            try { await connection.invoke('Register', me); }
-            catch (e) { console.error('[admin-chat] re-register failed', e); }
-          });
-          connection.onclose(async (err) => {
-            console.warn('[admin-chat] connection closed, restarting…', err);
-            try { await connection.start(); await connection.invoke('Register', me); }
-            catch (e) { console.error('[admin-chat] restart failed', e); }
-          });
+                    const currentConvId = __adminChatGetCurrentConvId();
+                    if (!currentConvId) return;
 
-          (async function startAndRegister(){
-            try { await connection.start(); await connection.invoke('Register', me); }
-            catch (e) { console.error('[admin-chat] initial start failed, retrying in 2s…', e); setTimeout(startAndRegister, 2000); }
-          })();
+                    const payloadConvId = String(
+                        payload.conversationId ?? payload.ConversationId ?? ''
+                    ).toLowerCase();
+
+                    if (!payloadConvId || payloadConvId !== currentConvId) {
+                        return;
+                    }
+
+                    const lastReadAt = payload.lastReadAt ?? payload.LastReadAt ?? null;
+                    __adminApplyReadUpTo(lastReadAt);
+                });
+
+                // 2) Tin nhắn mới
+                connection.on('message:created', msg => {
+                    console.log('[admin-chat] message:created', msg);
+                    if (!msg) return;
+
+                    const currentConvId = __adminChatGetCurrentConvId();
+                    if (!currentConvId) return;
+
+                    const msgConvId = String(
+                        msg.conversationId ?? msg.ConversationId ?? ''
+                    ).toLowerCase();
+                    if (!msgConvId || msgConvId !== currentConvId) {
+                        // thuộc hội thoại khác -> bỏ qua phần body, nhưng sidebar vẫn sẽ được update bởi 'conversationList:update'
+                        return;
+                    }
+
+                    const list = document.getElementById('msgList');
+                    if (!list) return;
+
+                    const senderId = String(msg.senderAccountId ?? msg.SenderAccountId ?? '').toLowerCase();
+                    const isMine = senderId === me;
+
+                    const messageId = msg.messageId ?? msg.MessageId;
+                    const createdAt = msg.createdAt ?? msg.CreatedAt;
+                    const body      = msg.body ?? msg.Body;
+                    const imageUrl  = msg.imageUrl ?? msg.ImageUrl;
+                    const status    = msg.status ?? msg.Status ?? 'Sent';
+
+                    const replyToId = msg.replyToMessageId ?? msg.ReplyToMessageId;
+
+                    const wrap = document.createElement('div');
+                    wrap.className = 'msg-wrapper ' + (isMine ? 'msg-me' : 'msg-other');
+
+                    const bubble = document.createElement('div');
+                    bubble.className = 'bubble ' + (isMine ? 'me' : 'other');
+                    bubble.setAttribute('data-message-id', messageId);
+                    bubble.setAttribute('data-created-at', createdAt);
+                    bubble.setAttribute('data-is-mine', isMine ? 'true' : 'false');
+                    bubble.setAttribute('data-status', status);
+
+                    const senderName = isMine ? 'Bạn' : (msg.senderName ?? msg.SenderName ?? 'Đối tác');
+                    const snippetThis = body ? body : (imageUrl ? '[Ảnh]' : '(Không có nội dung)');
+
+                    bubble.setAttribute('data-sender-name', senderName);
+                    bubble.setAttribute('data-snippet', snippetThis);
+
+                    __adminAttachReplyRefIfAny(bubble, {
+                        replyToMessageId: replyToId,
+                        replyToSenderName: msg.replyToSenderName ?? msg.ReplyToSenderName,
+                        replyToSnippet: msg.replyToSnippet ?? msg.ReplyToSnippet
+                    });
+
+                    if (body) {
+                        const bodyEl = document.createElement('div');
+                        bodyEl.className = 'msg-body';
+                        bodyEl.textContent = body;
+                        bubble.appendChild(bodyEl);
+                    }
+
+                    if (imageUrl) {
+                        const img = document.createElement('img');
+                        img.src = imageUrl;
+                        img.className = 'msg-image';
+                        img.loading = 'lazy';
+                        img.decoding = 'async';
+                        img.referrerPolicy = 'no-referrer';
+                        img.onerror = function () {
+                            this.onerror = null;
+                            this.src = '@fallbackImg';
+                        };
+                        bubble.appendChild(img);
+                    }
+
+                    const meta = document.createElement('div');
+                    meta.className = 'msg-meta';
+
+                    const fmtVN = new Intl.DateTimeFormat('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                        timeZone: 'Asia/Ho_Chi_Minh'
+                    });
+
+                    const d = new Date(createdAt);
+                    const hhmm = isNaN(d) ? '' : fmtVN.format(d);
+
+                    meta.innerHTML =
+                        '<button type="button" class="reply-btn" title="Trả lời">' +
+                            '<i class="bi bi-reply"></i> <span class="reply-text">Reply</span>' +
+                        '</button>' +
+                        '<span class="msg-time">' + hhmm + '</span>' +
+                        (isMine ? __adminStatusHtml(status) : '');
+
+                    bubble.appendChild(meta);
+                    wrap.appendChild(bubble);
+                    list.appendChild(wrap);
+
+                    // Scroll xuống cuối
+                    setTimeout(() => {
+                        list.scrollTop = list.scrollHeight;
+                    }, 50);
+
+                    // Tin của người kia -> auto MarkRead
+                    if (!isMine) {
+                        __adminChatMarkReadCurrent();
+                    }
+                });
+
+                // 3) Cập nhật sidebar trong trang Chat Admin
+                connection.on('conversationList:update', item => {
+                    console.log('[admin-chat] conversationList:update', item);
+                    if (!item) return;
+
+                    const list = document.querySelector('.chat-sidebar .chat-scroll');
+                    if (!list) return;
+
+                    const convId = String(item.conversationId ?? '');
+                    if (!convId) return;
+
+                    const row = list.querySelector('.conv-item[data-conversation-id="' + convId + '"]');
+                    if (!row) return;
+
+                    const titleEl = row.querySelector('.conv-title');
+                    if (titleEl) titleEl.textContent = item.title || '';
+
+                    const snEl = row.querySelector('.conv-snippet');
+                    if (snEl) snEl.textContent = item.lastMessageSnippet || '';
+
+                    const timeEl = row.querySelector('.conv-time');
+                    if (timeEl && item.lastMessageAt) {
+                        const d2 = new Date(item.lastMessageAt);
+                        const fmtVN2 = new Intl.DateTimeFormat('vi-VN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false,
+                            timeZone: 'Asia/Ho_Chi_Minh'
+                        });
+                        timeEl.textContent = isNaN(d2) ? '' : fmtVN2.format(d2);
+                    }
+
+                    // CHÚ Ý: class trong markup của bạn là "conv-unread", không phải "unread-badge"
+                    let badge = row.querySelector('.conv-unread');
+                    let unread = item.unreadCount || 0;
+
+                    const currentConvId = __adminChatGetCurrentConvId();
+                    if (currentConvId && convId.toLowerCase() === currentConvId) {
+                        unread = 0; // đang mở thì không hiển thị unread
+                    }
+
+                    if (badge) {
+                        if (unread > 0) {
+                            badge.textContent = unread;
+                            badge.style.display = '';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                });
+
+                // 4) Tổng số chưa đọc trên header chat (badge ở topbar Admin)
+                connection.on('totalUnread:update', payload => {
+                    console.log('[admin-chat] totalUnread:update', payload);
+                    const total = (payload && typeof payload.total === 'number')
+                        ? payload.total
+                        : (typeof payload === 'number' ? payload : 0);
+
+                    const badge = document.querySelector('[data-chat-count]');
+                    if (!badge) return;
+
+                    const num = Number(total || 0);
+                    badge.textContent = num;
+
+                    if (num > 0) {
+                        badge.style.display = 'inline-flex';
+                        badge.classList.remove('is-empty');
+                    } else {
+                        badge.style.display = 'none';
+                        badge.classList.add('is-empty');
+                    }
+                });
+            }
+
+            // ===== Phần per-conversation (MarkRead, tránh gắn nhiều lần cho 1 main) =====
+            const main = document.querySelector('main.chat-main[data-selected-conv]');
+            if (main && !main.__adminHandlersAttached) {
+                main.__adminHandlersAttached = true;
+                // Vừa mở hội thoại -> MarkRead luôn
+                __adminChatMarkReadCurrent();
+            }
+
+            // Nếu connection hỗ trợ sự kiện reconnect thì sau reconnect mark read lại
+            if (connection && !connection.__adminReconnectedHooked && connection.onreconnected) {
+                connection.__adminReconnectedHooked = true;
+                connection.onreconnected(() => {
+                    console.log('[admin-chat] 🔁 onreconnected -> MarkRead lại hội thoại đang mở');
+                    __adminChatMarkReadCurrent();
+                });
+            }
         };
 
-        // Nạp/khởi tạo SignalR
-        (function ensureSignalRReady(){
-          if (window.signalR?.HubConnectionBuilder) {
-            window.__initAdminChatRealtime();
-            return;
-          }
-          var s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.5/signalr.min.js';
-          s.defer = true;
-          s.onload = function(){ window.__initAdminChatRealtime(); };
-          s.onerror = function(){ console.error('[admin-chat] failed to load signalr.min.js'); };
-          document.head.appendChild(s);
+        // Gọi init sau khi DOM sẵn sàng (và connection có thể tạo sau)
+        (function () {
+            function start() {
+                window.__initAdminChatRealtime();
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', start);
+            } else {
+                start();
+            }
         })();
     </script>
+
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 }

@@ -711,7 +711,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 ["InProgress"] = "Bắt Đầu Làm Việc",
                 ["Completed"] = "Hoàn thành",
                 ["Cancelled"] = "Đã hủy",
-                ["All"] = "Tất cả"
+                ["All"] = "Tất cả",
+                ["ServiceCompleted"] = "Hoàn thành"
             };
 
             Guid accountId;
@@ -721,7 +722,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 accountId = GetAccountId();
 
             if (accountId == Guid.Empty)
-                return Unauthorized("Không tìm thấy accountId. Vui lòng đăng nhập hoặc truyền accountId qua query.");
+               return RedirectToAction("Login", "Account", new { area = "" });
 
             var jwt = HttpContext.Session.GetString("JWToken");
 
@@ -1123,7 +1124,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 ["Confirmed"] = "Xác Nhận",
                 ["InProgress"] = "Bắt Đầu Làm Việc",
                 ["Completed"] = "Hoàn thành",
-                ["Cancelled"] = "Đã hủy"
+                ["Cancelled"] = "Đã hủy",
+                ["ServiceCompleted"] = "Hoàn thành"
             };
 
             HistoryBookingDetailDTO? vm = null;
@@ -1136,23 +1138,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
-                // Bổ sung thông tin liên hệ nhân viên nếu có StaffId
-                if (vm.StaffId.HasValue)
-                {
-                    try
-                    {
-                        var staff = await _staffService.GetStaffByIdAsync(vm.StaffId.Value.ToString(), jwtToken);
-                        if (staff != null)
-                        {
-                            if (string.IsNullOrWhiteSpace(vm.StaffPhone)) vm.StaffPhone = staff.PhoneNumber ?? string.Empty;
-                            if (string.IsNullOrWhiteSpace(vm.StaffAddress)) vm.StaffAddress = staff.Address ?? string.Empty;
-                        }
-                    }
-                    catch { /* ignore if cannot load staff */ }
-                }
-                // Đưa ra ViewBag để view có thể fallback, chuẩn hóa về null khi trống
-                ViewBag.StaffPhone = string.IsNullOrWhiteSpace(vm.StaffPhone) ? null : vm.StaffPhone;
-                ViewBag.StaffAddress = string.IsNullOrWhiteSpace(vm.StaffAddress) ? null : vm.StaffAddress;
             }
             catch (HttpRequestException ex)
             {
@@ -1175,7 +1160,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 {
                     errorMessage += ex.Message;
                 }
-                
+
                 TempData["ToastError"] = errorMessage;
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
@@ -1285,6 +1270,51 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
+        }
+
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmServiceCompleted(Guid BookingId, CancellationToken ct)
+        {
+            // id = BookingId
+            var accountId = GetAccountId(); // bạn đã dùng trong ListHistoryBooking
+            if (accountId == Guid.Empty)
+            {
+                TempData["ToastError"] = "Không tìm thấy tài khoản. Vui lòng đăng nhập lại.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+
+            var jwt = HttpContext.Session.GetString("JWToken");
+
+            try
+            {
+                var ok = await _bookingServiceCustomer.ConfirmBookingCompletedAsync(
+                    accountId,
+                    BookingId,
+                    jwt,
+                    ct);
+
+                if (ok)
+                {
+                    TempData["ToastSuccess"] = "Bạn đã xác nhận hoàn thành dịch vụ.";
+                }
+                else
+                {
+                    TempData["ToastError"] =
+                        "Không thể xác nhận hoàn thành. Đơn có thể không tồn tại, không thuộc về bạn hoặc không ở trạng thái chờ xác nhận.";
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                TempData["ToastError"] = "Lỗi khi xác nhận hoàn thành: " + ex.Message;
+            }
+            catch (Exception ex)
+            {
+                TempData["ToastError"] = "Đã xảy ra lỗi không xác định: " + ex.Message;
+            }
+
+            return RedirectToAction(nameof(ListHistoryBooking));
         }
 
         // ===== Helpers: load dữ liệu thật =====
