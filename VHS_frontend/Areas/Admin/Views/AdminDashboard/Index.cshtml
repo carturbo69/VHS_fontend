@@ -216,6 +216,30 @@
                 </div>
             </div>
         </div>
+
+        <div class="stat-card providers">
+            <div class="stat-header">
+                <div class="stat-icon">
+                    <i class="bi bi-briefcase"></i>
+                </div>
+                <div class="stat-menu">
+                    <button class="btn-menu" onclick="toggleStatMenu(this)">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">@Model.TotalServices</div>
+                <div class="stat-label">Tổng dịch vụ</div>
+                <div class="stat-change neutral">
+                    <i class="bi bi-dash"></i>
+                    Toàn hệ thống
+                </div>
+                <div class="stat-progress">
+                    <div class="progress-bar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Charts Section -->
@@ -256,7 +280,7 @@
                     <div class="chart-summary">
                         <span class="summary-item">
                             <i class="bi bi-info-circle"></i>
-                            <span>5 loại dịch vụ</span>
+                            <span>@(Model.ServiceDistributions?.Count ?? 0) loại dịch vụ</span>
                         </span>
                     </div>
                 </div>
@@ -364,6 +388,7 @@
 
     <!-- Additional Charts Section -->
     <div class="additional-charts-section">
+        <div class="charts-grid">
         <div class="chart-container">
             <div class="chart-header">
                 <div class="chart-title">
@@ -371,13 +396,22 @@
                     <div class="chart-summary">
                         <span class="summary-item">
                             <i class="bi bi-calendar-month"></i>
-                            <span>12 tháng qua</span>
+                            <span>@(Model.SelectedMonths == 12 ? $"Năm {Model.SelectedYear}" : "6 tháng gần nhất")</span>
                         </span>
                     </div>
                 </div>
                 <div class="chart-controls">
-                    <button class="btn btn-sm btn-outline-primary active" data-period="12m">12 tháng</button>
-                    <button class="btn btn-sm btn-outline-primary" data-period="6m">6 tháng</button>
+                    <select id="yearSelect" class="form-select form-select-sm" style="width:auto; display:@(Model.SelectedMonths==12 ? "inline-block" : "none"); margin-right:8px;">
+                        @{
+                            var currentYear = DateTime.Now.Year;
+                            for (int y = currentYear; y >= currentYear - 4; y--)
+                            {
+                                <option value="@y" selected="@(Model.SelectedYear==y)">@y</option>
+                            }
+                        }
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary @(Model.SelectedMonths==12 ? "active" : "")" data-period="12m">12 tháng</button>
+                    <button class="btn btn-sm btn-outline-primary @(Model.SelectedMonths==6 ? "active" : "")" data-period="6m">6 tháng</button>
                 </div>
             </div>
             <div class="chart-content">
@@ -392,7 +426,7 @@
                     <div class="chart-summary">
                         <span class="summary-item">
                             <i class="bi bi-person-plus"></i>
-                            <span>30 ngày qua</span>
+                            <span>15 ngày qua</span>
                         </span>
                     </div>
                 </div>
@@ -402,6 +436,7 @@
             </div>
         </div>
 
+        <!-- Hàng 2: Đánh giá dịch vụ | Đơn hàng theo tuần -->
         <div class="chart-container">
             <div class="chart-header">
                 <div class="chart-title">
@@ -434,6 +469,7 @@
             <div class="chart-content">
                 <canvas id="weeklyOrdersChart"></canvas>
             </div>
+        </div>
         </div>
     </div>
 
@@ -762,78 +798,68 @@
             }
         });
 
-        // Chart period controls
+        // Ensure all charts resize correctly when layout width changes (e.g., sidebar toggle)
+        const allCharts = [revenueChart, serviceChart, ordersChart, monthlyRevenueChart, newCustomersChart, ratingChart, weeklyOrdersChart];
+        function debounce(fn, delay = 150) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); }; }
+        function resizeCharts() { allCharts.forEach(c => { try { c.resize(); } catch(e){} }); }
+        window.addEventListener('resize', debounce(resizeCharts, 150));
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(debounce(resizeCharts, 50));
+            document.querySelectorAll('.dashboard-container, .charts-section, .additional-charts-section').forEach(el => ro.observe(el));
+        }
+        document.addEventListener('click', (e) => {
+            const sel = '.sidebar-toggle, .menu-toggle, .navbar-toggler, [data-bs-target="#sidebar"], [data-toggle="sidebar"]';
+            if (e.target.closest(sel)) {
+                setTimeout(resizeCharts, 350);
+            }
+        });
+
+        // Chart period controls for Monthly Revenue
         document.querySelectorAll('[data-period]').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('[data-period]').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
-                // Here you would update the chart data based on the selected period
+                const period = this.getAttribute('data-period');
+                const url = new URL(window.location.href);
+                if (period === '12m') {
+                    url.searchParams.set('months', '12');
+                    const yearSel = document.getElementById('yearSelect');
+                    if (yearSel) {
+                        yearSel.style.display = 'inline-block';
+                        url.searchParams.set('year', yearSel.value);
+                    }
+                } else {
+                    url.searchParams.set('months', '6');
+                    url.searchParams.delete('year');
+                }
+                window.location.href = url.toString();
             });
         });
+        const yearSelect = document.getElementById('yearSelect');
+        if (yearSelect) {
+            yearSelect.addEventListener('change', function () {
+                const url = new URL(window.location.href);
+                url.searchParams.set('months', '12');
+                url.searchParams.set('year', this.value);
+                window.location.href = url.toString();
+            });
+        }
 
         // Additional functions
         function refreshDashboard() {
             const btn = document.querySelector('.btn-refresh');
-            const originalContent = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Đang tải...';
-            btn.disabled = true;
-            
-            // Simulate data refresh
-            setTimeout(() => {
-                // Update stats with new values
-                updateStats();
-                // Update charts
-                updateCharts();
-                
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-                showNotice('Dữ liệu đã được cập nhật!', 'success');
-            }, 2000);
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Đang tải...';
+            }
+            // Reload toàn bộ trang để lấy dữ liệu thật từ server (không random)
+            window.location.reload();
         }
 
-        function updateStats() {
-            // Simulate updating stat values
-            const statValues = document.querySelectorAll('.stat-value');
-            statValues.forEach((value, index) => {
-                const currentValue = value.textContent;
-                // Add some random variation
-                const variation = (Math.random() - 0.5) * 0.1;
-                if (currentValue.includes('₫')) {
-                    const numValue = parseInt(currentValue.replace(/[₫,]/g, ''));
-                    const newValue = Math.round(numValue * (1 + variation));
-                    value.textContent = '₫' + newValue.toLocaleString('vi-VN');
-                } else if (currentValue.includes('%')) {
-                    const numValue = parseFloat(currentValue.replace('%', ''));
-                    const newValue = Math.round((numValue * (1 + variation)) * 10) / 10;
-                    value.textContent = newValue + '%';
-                } else if (currentValue.includes('/')) {
-                    // Rating format
-                    const numValue = parseFloat(currentValue.split('/')[0]);
-                    const newValue = Math.round((numValue * (1 + variation)) * 10) / 10;
-                    value.textContent = newValue + '/5';
-                } else {
-                    const numValue = parseInt(currentValue.replace(/,/g, ''));
-                    const newValue = Math.round(numValue * (1 + variation));
-                    value.textContent = newValue.toLocaleString('vi-VN');
-                }
-            });
-        }
+        // Ngừng mô phỏng số liệu ngẫu nhiên để tránh “nhảy tào lao”
+        function updateStats() { /* no-op: dữ liệu được làm mới qua reload */ }
 
-        function updateCharts() {
-            // Update revenue chart with new data
-            if (typeof revenueChart !== 'undefined') {
-                const newData = Array.from({length: 7}, () => Math.floor(Math.random() * 2000000) + 1000000);
-                revenueChart.data.datasets[0].data = newData;
-                revenueChart.update('active');
-            }
-            
-            // Update orders chart
-            if (typeof ordersChart !== 'undefined') {
-                const newData = Array.from({length: 6}, () => Math.floor(Math.random() * 20) + 1);
-                ordersChart.data.datasets[0].data = newData;
-                ordersChart.update('active');
-            }
-        }
+        function updateCharts() { /* no-op: dữ liệu được làm mới qua reload */ }
 
         function exportChart() {
             showNotice('Đang xuất biểu đồ...', 'info');

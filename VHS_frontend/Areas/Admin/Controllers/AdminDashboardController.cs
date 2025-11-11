@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Admin.Models.Dashboard;
 using VHS_frontend.Services.Admin;
+using VHS_frontend.Services.Provider;
 
 namespace VHS_frontend.Areas.Admin.Controllers
 {
@@ -12,19 +13,34 @@ namespace VHS_frontend.Areas.Admin.Controllers
         private readonly AdminRegisterProviderService _registerProviderService;
         private readonly AdminVoucherService _voucherService;
         private readonly AdminBookingService _bookingService;
+        private readonly AdminFeedbackService _feedbackService;
+        private readonly CategoryAdminService _categoryService;
+        private readonly PaymentManagementService _paymentService;
+        private readonly ServiceManagementService _serviceManagementService;
+        private readonly ProviderProfileService _providerProfileService;
 
         public AdminDashboardController(
             CustomerAdminService customerService,
             ProviderAdminService providerService,
             AdminRegisterProviderService registerProviderService,
             AdminVoucherService voucherService,
-            AdminBookingService bookingService)
+            AdminBookingService bookingService,
+            AdminFeedbackService feedbackService,
+            CategoryAdminService categoryService,
+            PaymentManagementService paymentService,
+            ServiceManagementService serviceManagementService,
+            ProviderProfileService providerProfileService)
         {
             _customerService = customerService;
             _providerService = providerService;
             _registerProviderService = registerProviderService;
             _voucherService = voucherService;
             _bookingService = bookingService;
+            _feedbackService = feedbackService;
+            _categoryService = categoryService;
+            _paymentService = paymentService;
+            _serviceManagementService = serviceManagementService;
+            _providerProfileService = providerProfileService;
         }
 
         public async Task<IActionResult> Index()
@@ -50,6 +66,9 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 _providerService.SetBearerToken(token);
                 _voucherService.SetBearerToken(token);
                 _bookingService.SetBearerToken(token);
+                _feedbackService.SetBearerToken(token);
+                _paymentService.SetBearerToken(token);
+                // provider services use token per call; handled inside services
             }
             
             // Lấy dữ liệu thật từ API với error handling
@@ -57,12 +76,17 @@ namespace VHS_frontend.Areas.Admin.Controllers
             var providers = new List<VHS_frontend.Areas.Admin.Models.Provider.ProviderDTO>();
             var registerProviders = new List<VHS_frontend.Areas.Admin.Models.RegisterProvider.AdminProviderItemDTO>();
             var vouchers = new List<VHS_frontend.Areas.Admin.Models.Voucher.AdminVoucherItemDTO>();
+            var categories = new List<VHS_frontend.Areas.Admin.Models.Category.CategoryDTO>();
+            var recentWithdrawals = new List<VHS_frontend.Areas.Admin.Models.Payment.ProviderWithdrawalDTO>();
+            var recentApprovedRefunds = new List<VHS_frontend.Areas.Admin.Models.Payment.UnconfirmedBookingRefundDTO>();
+            var totalServices = 0;
             
             // Booking/Payment statistics
             VHS_frontend.Areas.Admin.Models.Booking.AdminBookingStatisticsDTO? todayStats = null;
             VHS_frontend.Areas.Admin.Models.Booking.AdminBookingStatisticsDTO? yesterdayStats = null;
             var revenueChartData = new List<VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO>();
             var ordersByHour = new List<VHS_frontend.Areas.Admin.Models.Booking.OrdersByHourDTO>();
+            var allFeedbacks = new List<VHS_frontend.Areas.Admin.Models.Feedback.FeedbackDTO>();
             
             try
             {
@@ -73,6 +97,38 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // Log error hoặc sử dụng dữ liệu mặc định
                 customers = new List<VHS_frontend.Areas.Admin.Models.Customer.CustomerDTO>();
             }
+            
+            // Lấy danh sách feedback để tính đánh giá trung bình
+            try
+            {
+                allFeedbacks = await _feedbackService.GetAllAsync();
+            }
+            catch (Exception ex)
+            {
+                allFeedbacks = new List<VHS_frontend.Areas.Admin.Models.Feedback.FeedbackDTO>();
+            }
+            
+            // Lấy danh mục dịch vụ (Category) để hiển thị “Phân bố dịch vụ”
+            try
+            {
+                categories = await _categoryService.GetAllAsync(includeDeleted: false);
+            }
+            catch (Exception ex)
+            {
+                categories = new List<VHS_frontend.Areas.Admin.Models.Category.CategoryDTO>();
+            }
+            
+            // Lấy hoạt động thanh toán gần đây
+            try
+            {
+                recentWithdrawals = await _paymentService.GetProcessedWithdrawalsAsync(page: 1, pageSize: 5, orderBy: "ProcessedDate desc");
+            }
+            catch { recentWithdrawals = new(); }
+            try
+            {
+                recentApprovedRefunds = await _paymentService.GetApprovedRefundsAsync(page: 1, pageSize: 5, orderBy: "PaymentCreatedAt desc");
+            }
+            catch { recentApprovedRefunds = new(); }
             
             try
             {
@@ -127,6 +183,58 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 System.Diagnostics.Debug.WriteLine($"❌ Error getting booking stats: {ex.Message}");
             }
             
+            // Fallback: nếu API statistics trả về null hoặc 0, tự tính từ danh sách bookings
+            if (todayStats == null || (todayStats.TotalBookings == 0 && todayStats.TotalRevenue == 0))
+            {
+                try
+                {
+                    var today = DateTime.Today;
+                    var endOfDay = today.AddDays(1).AddTicks(-1);
+                    
+                    var filter = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                    {
+                        FromDate = today,
+                        ToDate = endOfDay,
+                        PageNumber = 1,
+                        PageSize = 10000
+                    };
+                    var listResult = await _bookingService.GetAllBookingsAsync(filter);
+                    if (listResult != null)
+                    {
+                        // Dùng BookingTime để tính toán đúng theo “đơn hôm nay”
+                        var itemsToday = listResult.Items
+                            .Where(b => b.BookingTime >= today && b.BookingTime <= endOfDay)
+                            .ToList();
+                        
+                        var calcTotalBookings = itemsToday.Count;
+                        // Tổng số tiền của tất cả đơn hôm nay (không phân biệt trạng thái thanh toán)
+                        var calcTotalRevenue = itemsToday.Sum(i => i.Amount);
+                        var calcCompletedCount = itemsToday.Count(i => string.Equals(i.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+                                                                 || string.Equals(i.Status, "Hoàn thành", StringComparison.OrdinalIgnoreCase));
+                        var calcPendingCount = itemsToday.Count(i => string.Equals(i.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                                                                 || string.Equals(i.Status, "Chờ xử lý", StringComparison.OrdinalIgnoreCase));
+                        var calcCanceledCount = itemsToday.Count(i => string.Equals(i.Status, "Canceled", StringComparison.OrdinalIgnoreCase)
+                                                                 || string.Equals(i.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
+                                                                 || string.Equals(i.Status, "Đã hủy", StringComparison.OrdinalIgnoreCase));
+                        
+                        todayStats = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingStatisticsDTO
+                        {
+                            StartDate = today,
+                            EndDate = endOfDay,
+                            TotalBookings = calcTotalBookings,
+                            CompletedBookings = calcCompletedCount,
+                            PendingBookings = calcPendingCount,
+                            CancelledBookings = calcCanceledCount,
+                            TotalRevenue = calcTotalRevenue
+                        };
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"❌ Fallback stats error: {ex.Message}");
+                }
+            }
+            
             try
             {
                 revenueChartData = await _bookingService.GetRevenueChartAsync(days: 7);
@@ -142,6 +250,33 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 revenueChartData = new List<VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO>();
             }
             
+            // Chuẩn hóa dữ liệu doanh thu 7 ngày: ngày nào không có thu nhập => 0
+            var normalizedRevenueLabels = new List<string>();
+            var normalizedRevenueData = new List<decimal>();
+            try
+            {
+                const int chartDays = 7;
+                var start = DateTime.Today.AddDays(-(chartDays - 1));
+                var byDate = revenueChartData
+                    .GroupBy(x => x.Date.Date)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.Revenue));
+                
+                for (int i = 0; i < chartDays; i++)
+                {
+                    var day = start.AddDays(i).Date;
+                    normalizedRevenueLabels.Add(day.ToString("dd/MM"));
+                    normalizedRevenueData.Add(byDate.TryGetValue(day, out var rev) ? rev : 0m);
+                }
+            }
+            catch
+            {
+                // fallback an toàn
+                normalizedRevenueLabels = Enumerable.Range(0, 7)
+                    .Select(i => DateTime.Today.AddDays(-6 + i).ToString("dd/MM"))
+                    .ToList();
+                normalizedRevenueData = Enumerable.Repeat(0m, 7).ToList();
+            }
+            
             try
             {
                 ordersByHour = await _bookingService.GetOrdersByHourAsync();
@@ -151,6 +286,85 @@ namespace VHS_frontend.Areas.Admin.Controllers
             {
                 System.Diagnostics.Debug.WriteLine($"❌ Error getting orders by hour: {ex.Message}");
                 ordersByHour = new List<VHS_frontend.Areas.Admin.Models.Booking.OrdersByHourDTO>();
+            }
+            
+            // Chuẩn hóa dữ liệu "Đơn hàng theo giờ" theo 6 khung 4 giờ: 00,04,08,12,16,20.
+            // Hỗ trợ nhiều định dạng Period từ API: "16:00 - 20:00", "16:00", "16h", "16", ...
+            var fixedHourLabels = new List<string> { "00:00", "04:00", "08:00", "12:00", "16:00", "20:00" };
+            var normalizedOrdersLabels = new List<string>();
+            var normalizedOrdersData = new List<int>();
+            try
+            {
+                // Parse giờ từ Period và quy về đầu khung 4 giờ gần nhất
+                int NormalizeToBucketStartHour(string? period)
+                {
+                    if (string.IsNullOrWhiteSpace(period)) return 0;
+                    var p = period.Trim().ToLower();
+                    
+                    // Ưu tiên bắt HH:mm đầu tiên
+                    var match = System.Text.RegularExpressions.Regex.Match(p, "(\\d{1,2}):(\\d{2})");
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out var h1))
+                        return Math.Max(0, Math.Min(20, (h1 / 4) * 4));
+                    
+                    // Thử bắt số giờ đơn lẻ "16h" hoặc "16"
+                    match = System.Text.RegularExpressions.Regex.Match(p, "(\\d{1,2})\\s*h?");
+                    if (match.Success && int.TryParse(match.Groups[1].Value, out var h2))
+                        return Math.Max(0, Math.Min(20, (h2 / 4) * 4));
+                    
+                    return 0;
+                }
+                
+                var bucketToCount = new Dictionary<int, int>(); // key = 0,4,8,12,16,20
+                foreach (var item in ordersByHour)
+                {
+                    var bucketStart = NormalizeToBucketStartHour(item.Period);
+                    if (!bucketToCount.ContainsKey(bucketStart)) bucketToCount[bucketStart] = 0;
+                    bucketToCount[bucketStart] += item.Orders;
+                }
+                
+                foreach (var label in fixedHourLabels)
+                {
+                    normalizedOrdersLabels.Add(label);
+                    var hour = int.Parse(label.Substring(0, 2));
+                    normalizedOrdersData.Add(bucketToCount.TryGetValue(hour, out var val) ? val : 0);
+                }
+            }
+            catch
+            {
+                normalizedOrdersLabels = fixedHourLabels;
+                normalizedOrdersData = Enumerable.Repeat(0, fixedHourLabels.Count).ToList();
+            }
+            
+            // Luôn ưu tiên thống kê theo danh sách booking 24h qua (dựa trên CreatedAt) để tránh lệch boundary
+            try
+            {
+                var last24hStart = DateTime.Now.AddHours(-24);
+                var now = DateTime.Now;
+                var filter24 = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                {
+                    FromDate = last24hStart,
+                    ToDate = now,
+                    PageNumber = 1,
+                    PageSize = 10000
+                };
+                var list24 = await _bookingService.GetAllBookingsAsync(filter24);
+                if (list24 != null && list24.Items.Any())
+                {
+                    var counts = new Dictionary<int, int> { {0,0},{4,0},{8,0},{12,0},{16,0},{20,0} };
+                    var seen = new HashSet<Guid>();
+                    foreach (var b in list24.Items.Where(x => x.CreatedAt >= last24hStart && x.CreatedAt <= now))
+                    {
+                        if (!seen.Add(b.BookingId)) continue; // tránh đếm trùng
+                        var bucket = (b.CreatedAt.Hour / 4) * 4; // 16:23 -> 16
+                        if (counts.ContainsKey(bucket)) counts[bucket]++; else counts[bucket] = 1;
+                    }
+                    normalizedOrdersLabels = fixedHourLabels.ToList();
+                    normalizedOrdersData = fixedHourLabels.Select(l => counts[int.Parse(l.Substring(0,2))]).ToList();
+                }
+            }
+            catch
+            {
+                // ignore fallback errors
             }
             
             // Tính toán dữ liệu thật
@@ -189,6 +403,113 @@ namespace VHS_frontend.Areas.Admin.Controllers
             var conversionChange = yesterdayConversion > 0
                 ? Math.Round(conversionRate - yesterdayConversion, 1)
                 : (conversionRate > 0 ? conversionRate : 0);
+
+            // Tổng số dịch vụ (gộp của tất cả provider)
+            try
+            {
+                var tokenStr = HttpContext.Session.GetString("JWToken");
+                if (!string.IsNullOrWhiteSpace(tokenStr) && providers != null && providers.Any())
+                {
+                    foreach (var p in providers)
+                    {
+                        // p.Id là AccountId -> cần ProviderId
+                        var providerId = await _providerProfileService.GetProviderIdByAccountAsync(p.Id.ToString(), tokenStr);
+                        if (!string.IsNullOrEmpty(providerId))
+                        {
+                            var list = await _serviceManagementService.GetServicesByProviderAsync(providerId, tokenStr);
+                            if (list != null) totalServices += list.Count;
+                        }
+                    }
+                }
+            }
+            catch { /* ignore errors, keep zero */ }
+            
+            // Tính điểm đánh giá trung bình (toàn hệ thống) và % thay đổi so với tháng trước
+            double averageRating = 0;
+            double ratingChange = 0;
+            var ratingDistributions = new List<RatingDistribution>
+            {
+                new RatingDistribution { Stars = 5, Count = 0, Percentage = 0 },
+                new RatingDistribution { Stars = 4, Count = 0, Percentage = 0 },
+                new RatingDistribution { Stars = 3, Count = 0, Percentage = 0 },
+                new RatingDistribution { Stars = 2, Count = 0, Percentage = 0 },
+                new RatingDistribution { Stars = 1, Count = 0, Percentage = 0 }
+            };
+            if (allFeedbacks.Any())
+            {
+                var visible = allFeedbacks.Where(f => !f.IsDeleted && f.IsVisible).ToList();
+                if (visible.Any())
+                {
+                    averageRating = Math.Round(visible.Average(f => f.Rating), 1);
+                    
+                    // Build distribution 1..5 stars
+                    var totalFb = visible.Count;
+                    var dist = new List<RatingDistribution>();
+                    for (int star = 5; star >= 1; star--)
+                    {
+                        var c = visible.Count(f => f.Rating == star);
+                        var p = totalFb > 0 ? Math.Round((double)c / totalFb * 100, 1) : 0;
+                        dist.Add(new RatingDistribution { Stars = star, Count = c, Percentage = p });
+                    }
+                    ratingDistributions = dist;
+                    
+                    var now = DateTime.Now;
+                    var thisMonth = visible.Where(f => f.CreatedAt.Year == now.Year && f.CreatedAt.Month == now.Month).ToList();
+                    var prevMonthDate = now.AddMonths(-1);
+                    var prevMonth = visible.Where(f => f.CreatedAt.Year == prevMonthDate.Year && f.CreatedAt.Month == prevMonthDate.Month).ToList();
+                    
+                    var thisAvg = thisMonth.Any() ? thisMonth.Average(f => f.Rating) : averageRating;
+                    var prevAvg = prevMonth.Any() ? prevMonth.Average(f => f.Rating) : thisAvg;
+                    ratingChange = Math.Round(thisAvg - prevAvg, 1);
+                }
+            }
+            
+            // Tính khách hàng mới trong 30 ngày gần nhất
+            var daysWindow = 15;
+            var startDate30 = DateTime.Today.AddDays(-(daysWindow - 1));
+            var newCustomersByDay = Enumerable.Range(0, daysWindow)
+                .Select(i => startDate30.AddDays(i))
+                .ToList();
+            var customerCounts = newCustomersByDay.Select(d =>
+            {
+                var dayStart = d;
+                var dayEnd = d.AddDays(1).AddTicks(-1);
+                return customers.Count(c => c.CreatedAt.HasValue &&
+                                            c.CreatedAt.Value >= dayStart &&
+                                            c.CreatedAt.Value <= dayEnd &&
+                                            !c.IsDeleted);
+            }).ToList();
+            var customerLabels = newCustomersByDay.Select(d => $"{d.Day}/{d.Month}").ToList();
+            
+            // Đơn hàng theo tuần (4 tuần trong tháng hiện tại)
+            var weeklyLabels = new List<string> { "Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4" };
+            var weeklyCounts = new List<int> { 0, 0, 0, 0 };
+            try
+            {
+                var nowDt = DateTime.Now;
+                var monthStart = new DateTime(nowDt.Year, nowDt.Month, 1);
+                var monthEnd = monthStart.AddMonths(1).AddTicks(-1);
+                var filterMonth = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                {
+                    FromDate = monthStart,
+                    ToDate = monthEnd,
+                    PageNumber = 1,
+                    PageSize = 100000
+                };
+                var monthBookings = await _bookingService.GetAllBookingsAsync(filterMonth);
+                if (monthBookings != null)
+                {
+                    foreach (var b in monthBookings.Items.Where(x => x.BookingTime >= monthStart && x.BookingTime <= monthEnd))
+                    {
+                        var weekIndex = Math.Min((b.BookingTime.Day - 1) / 7, 3); // 0..3
+                        weeklyCounts[weekIndex]++;
+                    }
+                }
+            }
+            catch
+            {
+                // keep default zeros
+            }
             
             // Tạo Model với dữ liệu thật
             var model = new DashboardViewModel
@@ -211,49 +532,37 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 ProvidersProgress = CalculateProvidersProgress(activeProviders), // Progress dựa trên mục tiêu
                 
                 ActiveVouchers = activeVouchers, // Dữ liệu thật
+                TotalServices = totalServices,
                 
                 ConversionRate = conversionRate, // Tỷ lệ booking hoàn thành / tổng booking
                 ConversionChange = conversionChange,
                 
-                AverageRating = 0, // TODO: Lấy từ API ratings
-                RatingChange = 0,
+                AverageRating = averageRating,
+                RatingChange = ratingChange,
                 
                 // Charts Data - Dữ liệu thật từ API
-                RevenueChartData = revenueChartData.Any() 
-                    ? revenueChartData.Select(r => r.Revenue).ToList()
-                    : Enumerable.Repeat(0m, 7).ToList(),
-                RevenueChartLabels = revenueChartData.Any()
-                    ? revenueChartData.Select(r => r.Date.ToString("dd/MM")).ToList()
-                    : Enumerable.Range(0, 7).Select(i => DateTime.Today.AddDays(-6 + i).ToString("dd/MM")).ToList(),
+                RevenueChartData = normalizedRevenueData,
+                RevenueChartLabels = normalizedRevenueLabels,
                 
-                OrdersChartData = ordersByHour.Any()
-                    ? ordersByHour.Select(o => o.Orders).ToList()
-                    : Enumerable.Repeat(0, 6).ToList(),
-                OrdersChartLabels = ordersByHour.Any()
-                    ? ordersByHour.Select(o => o.Period).ToList()
-                    : new List<string> { "00:00", "04:00", "08:00", "12:00", "16:00", "20:00" },
+                OrdersChartData = normalizedOrdersData,
+                OrdersChartLabels = normalizedOrdersLabels,
                 
-                NewCustomersChartData = new List<int> { 0, 0, 0, 0, 0, 0, 0 },
-                NewCustomersChartLabels = new List<string> { "1/1", "5/1", "10/1", "15/1", "20/1", "25/1", "30/1" },
+                NewCustomersChartData = customerCounts,
+                NewCustomersChartLabels = customerLabels,
                 
-                MonthlyRevenueData = new List<decimal> { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-                MonthlyRevenueLabels = new List<string> { "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12" },
+                MonthlyRevenueData = new List<decimal>(),
+                MonthlyRevenueLabels = new List<string>(),
+                SelectedMonths = 6,
+                SelectedYear = DateTime.Now.Year,
                 
-                WeeklyOrdersData = new List<int> { 0, 0, 0, 0, 0, 0, 0, 0 },
-                WeeklyOrdersLabels = new List<string> { "Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4", "Tuần 5", "Tuần 6", "Tuần 7", "Tuần 8" },
+                WeeklyOrdersData = weeklyCounts,
+                WeeklyOrdersLabels = weeklyLabels,
                 
-                // Service Distribution - Dữ liệu thật với % tính đúng
-                ServiceDistributions = CalculateServiceDistribution(activeCustomers),
+                // Service Distribution - Dựa trên danh mục (Category), không dùng Tag
+                ServiceDistributions = BuildServiceDistributionFromCategories(categories),
                 
                 // Rating Distribution - Dữ liệu 0 (chờ API thật)
-                RatingDistributions = new List<RatingDistribution>
-                {
-                    new RatingDistribution { Stars = 5, Count = 0, Percentage = 0 },
-                    new RatingDistribution { Stars = 4, Count = 0, Percentage = 0 },
-                    new RatingDistribution { Stars = 3, Count = 0, Percentage = 0 },
-                    new RatingDistribution { Stars = 2, Count = 0, Percentage = 0 },
-                    new RatingDistribution { Stars = 1, Count = 0, Percentage = 0 }
-                },
+                RatingDistributions = ratingDistributions,
                 
                 // Recent Activities - Dữ liệu thật
                 RecentActivities = registerProviders.Take(3).Select((r, index) => new RecentActivity
@@ -284,6 +593,118 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     Status = NormalizeStatus(r.Status)
                 }).ToList()
             };
+            
+            // Bổ sung hoạt động thanh toán vào RecentActivities
+            var paymentActivities = new List<RecentActivity>();
+            if (recentWithdrawals != null && recentWithdrawals.Any())
+            {
+                paymentActivities.AddRange(recentWithdrawals.Select(w => new RecentActivity
+                {
+                    Title = string.Equals(w.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+                        ? "Rút tiền đã hoàn tất" : "Rút tiền bị từ chối",
+                    Description = $"{w.ProviderName} - {w.Amount:N0} VND",
+                    CreatedAt = w.ProcessedDate ?? w.RequestDate,
+                    ActivityType = string.Equals(w.Status, "Completed", StringComparison.OrdinalIgnoreCase) ? "success" : "warning"
+                }));
+            }
+            if (recentApprovedRefunds != null && recentApprovedRefunds.Any())
+            {
+                paymentActivities.AddRange(recentApprovedRefunds.Select(rf => new RecentActivity
+                {
+                    Title = "Hoàn tiền cho đơn hàng",
+                    Description = $"{rf.CustomerName} - {rf.ServiceName} - {rf.PaymentAmount:N0} VND",
+                    CreatedAt = rf.PaymentCreatedAt ?? rf.BookingDate,
+                    ActivityType = "info"
+                }));
+            }
+            model.RecentActivities = model.RecentActivities
+                .Concat(paymentActivities)
+                .OrderByDescending(a => a.CreatedAt)
+                .Take(6)
+                .ToList();
+            
+            // ==== Build Monthly Revenue (default last 6 months, optional 12 months by year) ====
+            try
+            {
+                var monthsParam = (Request.Query["months"].ToString() ?? "").Trim().ToLower();
+                var monthsCount = (monthsParam == "12" || monthsParam == "12m") ? 12 : 6;
+                var now = DateTime.Now;
+                int selectedYear;
+                if (monthsCount == 12)
+                {
+                    selectedYear = int.TryParse(Request.Query["year"], out var y) ? y : now.Year;
+                }
+                else
+                {
+                    selectedYear = now.Year;
+                }
+                
+                List<string> monthLabels;
+                List<decimal> monthRevenues;
+                
+                if (monthsCount == 12)
+                {
+                    var start = new DateTime(selectedYear, 1, 1);
+                    var end = new DateTime(selectedYear, 12, 31, 23, 59, 59, 999);
+                    
+                    var filter = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                    {
+                        FromDate = start,
+                        ToDate = end,
+                        PageNumber = 1,
+                        PageSize = 100000
+                    };
+                    var list = await _bookingService.GetAllBookingsAsync(filter) 
+                               ?? new VHS_frontend.Areas.Provider.Models.Booking.BookingListResultDTO { Items = new List<VHS_frontend.Areas.Provider.Models.Booking.BookingListItemDTO>() };
+                    
+                    monthLabels = Enumerable.Range(1, 12).Select(m => $"Tháng {m}").ToList();
+                    monthRevenues = Enumerable.Range(1, 12)
+                        .Select(m =>
+                        {
+                            var mStart = new DateTime(selectedYear, m, 1);
+                            var mEnd = m == 12 ? new DateTime(selectedYear + 1, 1, 1).AddTicks(-1) : new DateTime(selectedYear, m + 1, 1).AddTicks(-1);
+                            return list.Items
+                                .Where(b => b.BookingTime >= mStart && b.BookingTime <= mEnd)
+                                .Sum(b => b.Amount);
+                        }).ToList();
+                }
+                else
+                {
+                    var currentMonthStart = new DateTime(now.Year, now.Month, 1);
+                    var start = currentMonthStart.AddMonths(-5);
+                    var end = currentMonthStart.AddMonths(1).AddTicks(-1);
+                    
+                    var filter = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                    {
+                        FromDate = start,
+                        ToDate = end,
+                        PageNumber = 1,
+                        PageSize = 100000
+                    };
+                    var list = await _bookingService.GetAllBookingsAsync(filter) 
+                               ?? new VHS_frontend.Areas.Provider.Models.Booking.BookingListResultDTO { Items = new List<VHS_frontend.Areas.Provider.Models.Booking.BookingListItemDTO>() };
+                    
+                    var months = Enumerable.Range(0, 6).Select(i => start.AddMonths(i)).ToList();
+                    monthLabels = months.Select(d => $"Tháng {d.Month}").ToList();
+                    monthRevenues = months.Select(d =>
+                    {
+                        var mStart = new DateTime(d.Year, d.Month, 1);
+                        var mEnd = mStart.AddMonths(1).AddTicks(-1);
+                        return list.Items
+                            .Where(b => b.BookingTime >= mStart && b.BookingTime <= mEnd)
+                            .Sum(b => b.Amount);
+                    }).ToList();
+                }
+                
+                model.MonthlyRevenueLabels = monthLabels;
+                model.MonthlyRevenueData = monthRevenues;
+                model.SelectedMonths = monthsCount;
+                model.SelectedYear = selectedYear;
+            }
+            catch
+            {
+                // keep defaults if any error
+            }
             
             return View(model);
         }
@@ -375,6 +796,47 @@ namespace VHS_frontend.Areas.Admin.Controllers
             // Mục tiêu: 50 provider = 100%
             const int targetProviders = 50;
             return Math.Min((double)currentProviders / targetProviders * 100, 100);
+        }
+        
+        /// <summary>
+        /// Xây danh sách phân bố dịch vụ dựa trên danh mục (Category), không dùng Tag
+        /// </summary>
+        private List<ServiceDistribution> BuildServiceDistributionFromCategories(
+            List<VHS_frontend.Areas.Admin.Models.Category.CategoryDTO> categories)
+        {
+            if (categories == null || categories.Count == 0)
+            {
+                return new List<ServiceDistribution>
+                {
+                    new ServiceDistribution { ServiceName = "Vệ sinh nhà cửa", Count = 0, Percentage = 0 },
+                    new ServiceDistribution { ServiceName = "Sửa chữa điện", Count = 0, Percentage = 0 },
+                    new ServiceDistribution { ServiceName = "Làm vườn", Count = 0, Percentage = 0 },
+                    new ServiceDistribution { ServiceName = "Dịch vụ khác", Count = 0, Percentage = 0 }
+                };
+            }
+            
+            // Lấy tối đa 6 danh mục để hiển thị gọn gàng
+            var top = categories
+                .Where(c => !string.IsNullOrWhiteSpace(c.Name))
+                .Take(6)
+                .ToList();
+            
+            var percentageEach = Math.Round(100.0 / Math.Max(top.Count, 1), 1);
+            var result = top.Select(c => new ServiceDistribution
+            {
+                ServiceName = c.Name!,
+                Count = 1, // mỗi danh mục tính là 1 đơn vị để tổng = số danh mục
+                Percentage = percentageEach
+            }).ToList();
+            
+            // Nếu tổng phần trăm chưa tròn 100 do làm tròn, điều chỉnh phần tử đầu tiên
+            var diff = 100.0 - result.Sum(r => r.Percentage);
+            if (result.Count > 0 && Math.Abs(diff) > 0.001)
+            {
+                result[0].Percentage = Math.Round(result[0].Percentage + diff, 1);
+            }
+            
+            return result;
         }
         
         private double CalculateRevenueProgress(decimal currentRevenue)
