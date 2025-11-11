@@ -1,3 +1,7 @@
+@using Microsoft.Extensions.Configuration
+@using Microsoft.AspNetCore.Http
+@inject IConfiguration Configuration
+
 <!DOCTYPE html>
 <html lang="vi" class="preload">
  <!-- Thêm .preload để chặn transition khi khởi động -->
@@ -174,6 +178,16 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+    <script src="~/js/chat-hub-signalr.js" asp-append-version="true"></script>
+
+    @{
+        var accIdClaim = User.FindFirst("AccountID")?.Value;
+        var accIdSession = Context.Session.GetString("AccountID");
+        var accId = !string.IsNullOrWhiteSpace(accIdClaim) ? accIdClaim : accIdSession;
+        var chatHubUrl = (Configuration["Apis:Backend"]?.TrimEnd('/') ?? "") + "/chathub";
+    }
 
     <script>
 
@@ -718,8 +732,93 @@
         })();
     </script>
 
+    <script>
+        (function () {
+            const hubUrl = '@chatHubUrl';
+            const currentAccountId = '@accId';
+
+            // Dùng lại function updateProviderChatUnreadCount() có sẵn của bạn
+            async function safeUpdateUnread() {
+                if (typeof updateProviderChatUnreadCount === 'function') {
+                    try {
+                        await updateProviderChatUnreadCount();
+                    } catch (e) {
+                        console.error('[Provider ChatHub] Lỗi khi gọi updateProviderChatUnreadCount:', e);
+                    }
+                } else {
+                    console.warn('[Provider ChatHub] updateProviderChatUnreadCount chưa sẵn sàng');
+                }
+            }
+
+            async function initProviderChatHub() {
+                if (!currentAccountId) {
+                    console.warn('[Provider ChatHub] Không có AccountID → bỏ qua SignalR');
+                    return;
+                }
+
+                if (!window.signalR) {
+                    console.error('[Provider ChatHub] signalR chưa load');
+                    return;
+                }
+
+                if (!window.__chatHub) {
+                    console.error('[Provider ChatHub] __chatHub wrapper chưa load (~/js/chat-hub-signalr.js)');
+                    return;
+                }
+
+                // tránh init nhiều lần
+                if (window.__providerChatHubInitialized) return;
+                window.__providerChatHubInitialized = true;
+
+                try {
+                    // Kết nối tới /chathub và đăng ký account
+                    await window.__chatHub.start(hubUrl, currentAccountId);
+                    console.log('[Provider ChatHub] ✅ Connected & Registered');
+
+                    const conn =
+                        (window.__chatHub.getConnection && window.__chatHub.getConnection()) || null;
+
+                    const handleTotalUnread = async payload => {
+                        const total =
+                            (payload && typeof payload.total === 'number')
+                                ? payload.total
+                                : (typeof payload === 'number' ? payload : 0);
+
+                        console.log('[Provider ChatHub] totalUnread:update =', total);
+                        // Gọi lại API để đảm bảo đồng bộ
+                        await safeUpdateUnread();
+                    };
+
+                    const handleConversationListUpdate = async item => {
+                        console.log('[Provider ChatHub] conversationList:update', item);
+                        await safeUpdateUnread();
+                    };
+
+                    if (conn) {
+                        conn.on('totalUnread:update', handleTotalUnread);
+                        conn.on('conversationList:update', handleConversationListUpdate);
+                    } else {
+                        // fallback dùng wrapper nếu không lấy được conn
+                        window.__chatHub.on('totalUnread:update', handleTotalUnread);
+                        window.__chatHub.on('conversationList:update', handleConversationListUpdate);
+                    }
+                } catch (e) {
+                    console.error('[Provider ChatHub] Không thể khởi tạo SignalR:', e);
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                // Polling cũ của bạn vẫn chạy
+                // Bây giờ thêm realtime qua SignalR
+                initProviderChatHub();
+            });
+        })();
+    </script>
+
     <!-- Staff Management CSS -->
     <link rel="stylesheet" href="~/css/staff-management.css" asp-append-version="true" />
+
+   
 
     @RenderSection("Scripts", required: false)
 </body>

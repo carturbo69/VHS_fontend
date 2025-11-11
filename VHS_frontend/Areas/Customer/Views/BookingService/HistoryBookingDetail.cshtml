@@ -16,15 +16,25 @@
     var statusCode = string.IsNullOrWhiteSpace(Model?.NormalizedStatus) ? "Pending" : Model.NormalizedStatus;
     var statusVi = statusViMap.TryGetValue(statusCode, out var vi) ? vi : statusCode;
 
+    var rawStatus = (Model?.Status ?? "").Trim();
+
+    // DB có thể lưu "ServiceCompleted" hoặc "Service Completed"
+    var IsServiceCompleted =
+        rawStatus.Equals("ServiceCompleted", StringComparison.OrdinalIgnoreCase)
+     || rawStatus.Equals("Service Completed", StringComparison.OrdinalIgnoreCase);
+
     // Sử dụng IsPendingStatus property để check cả tiếng Anh và tiếng Việt
     var IsPending = Model?.IsPendingStatus ?? statusCode.Equals("Pending", StringComparison.OrdinalIgnoreCase);
     var IsConfirmed = statusCode.Equals("Confirmed", StringComparison.OrdinalIgnoreCase);
     var IsWorking = statusCode.Equals("InProgress", StringComparison.OrdinalIgnoreCase);
-    var IsCompleted = statusCode.Equals("Completed", StringComparison.OrdinalIgnoreCase);
+    var IsCompleted = statusCode.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                  || IsServiceCompleted; // <-- thêm điều kiện này
     var IsCancelled = statusCode.Equals("Cancelled", StringComparison.OrdinalIgnoreCase);
 
-    var IsReviewed = Model?.HasReview == true; // NEW
+    var IsReviewed = Model?.HasReview == true;
 
+    // ✅ Chỉ đơn Hoàn thành thật sự (không phải ServiceCompleted) mới được phép đánh giá
+    var canReview = IsCompleted && !IsServiceCompleted;
 
     // Steps chỉ áp dụng cho 4 trạng thái chính
     var IsFourStates = IsPending || IsConfirmed || IsWorking || IsCompleted;
@@ -82,6 +92,10 @@
 
     string StatusHeadline(string code) => (code ?? "").Trim() switch
     {
+        // ✅ Nếu rawStatus là ServiceCompleted → câu riêng
+        _ when rawStatus.Equals("ServiceCompleted", StringComparison.OrdinalIgnoreCase)
+            => "Đang chờ bạn xác nhận hoàn thành",
+
         "Pending" => "Đang chờ xác nhận",
         "Confirmed" => "Đã xác nhận",
         "InProgress" => "Đang thực hiện",
@@ -112,6 +126,12 @@
     };
     var currentIndex = order.TryGetValue(statusCode, out var idx) ? idx : -1;
 
+    // ✅ Nếu là ServiceCompleted thì ép currentIndex về bước Completed
+    if (IsServiceCompleted)
+    {
+        currentIndex = order["Completed"];
+    }
+
     Func<string, string> StepClass = key =>
     {
         if (!order.TryGetValue(key, out var k)) return "";
@@ -121,7 +141,8 @@
         return "";
     };
 
-    DateTimeOffset? bookingTime = ViewBag.BookingTime as DateTimeOffset?;
+    DateTimeOffset? bookingTime = timeOf("Check Out");
+
     bookingTime ??= timeOf("InProgress");
 }
 
@@ -158,6 +179,23 @@
             {
                 var hasReport = ViewBag.HasReport == true;
                 var reportId = ViewBag.ReportId as Guid?;
+                var isServiceCompleted = IsServiceCompleted; // dùng flag phía trên
+
+                @* ✅ Nếu là ServiceCompleted: hiện nút "Xác nhận hoàn thành" *@
+                @if (isServiceCompleted)
+                {
+                    <form asp-area="Customer"
+                          asp-controller="BookingService"
+                          asp-action="ConfirmServiceCompleted"
+                          method="post"
+                          class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="BookingId" value="@Model.BookingId" />
+                        <button type="submit" class="btn btn-success">
+                            Xác nhận hoàn thành
+                        </button>
+                    </form>
+                }
 
                 <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">
                     @Html.AntiForgeryToken()
@@ -186,15 +224,20 @@
                     </a>
                 }
 
-                if (!IsReviewed)  // chỉ hiện khi CHƯA review
+                if (canReview)
                 {
-                    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reviewModal-@Model.BookingId">
-                        Đánh giá
-                    </button>
-                }
-                else
-                {
-                    <span class="btn btn-outline-success disabled">Đã đánh giá</span>
+                    if (!IsReviewed)
+                    {
+                        <button class="btn btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#reviewModal-@Model.BookingId">
+                            Đánh giá
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="btn btn-outline-success disabled">Đã đánh giá</span>
+                    }
                 }
             }
 
@@ -286,8 +329,7 @@
                 <div class="icon"><i class="bi bi-receipt"></i></div>
                 <div class="label">Chờ xác nhận</div>
                 <div class="meta">
-                    <span><span class="label">Cập nhật:</span> @fmt(timeOf("Pending"))</span>
-                    <span><span class="label">Đã thanh toán:</span> @((Model?.PaidAmount ?? 0m).ToString("N0")) đ</span>
+                    <span><span class="label">Đã thanh toán:</span> @currency(grandTotal) đ</span>
                 </div>
             </div>
 
@@ -303,8 +345,6 @@
                 <div class="label">Xác Nhận</div>
 
                 <div class="meta">
-                    <span><span class="label">Cập nhật:</span> @fmt(timeOf("CONFIRMED"))</span>
-
                     @if (!string.IsNullOrWhiteSpace(stepStaffName))
                     {
                         <span class="d-inline-flex align-items-center gap-2 flex-wrap">
@@ -331,7 +371,7 @@
                 <div class="icon"><i class="bi bi-hammer"></i></div>
                 <div class="label">Bắt Đầu Làm Việc</div>
                 <div class="meta">
-                    <span><span class="label">Cập nhật:</span> @fmt(timeOf("InProgress"))</span>
+                    <span><span class="label">Thời Gian:</span> @fmt(timeOf("Check In"))</span>
                 </div>
             </div>
 
@@ -339,7 +379,7 @@
                 <div class="icon"><i class="bi bi-star"></i></div>
                 <div class="label">Hoàn thành</div>
                 <div class="meta">
-                    <span><span class="label">Cập nhật:</span> @fmt(timeOf("COMPLETED"))</span>
+                    <span><span class="label">Thời Gian:</span> @fmt(timeOf("Check Out"))</span>
                 </div>
             </div>
         </div>
@@ -368,8 +408,20 @@
                     @foreach (var e in (Model?.Timeline ?? new List<VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTO.TrackingEventDTO>()).OrderBy(t => t.Time))
                     {
                         var code = (e.Code ?? "").Trim().ToUpperInvariant();
-                        var onlyShowProofFor = code == "CONFIRMED" || code == "INPROGRESS" || code == "COMPLETED";
-                        var showStaffFor = code == "CONFIRMED" || code == "INPROGRESS" || code == "COMPLETED";
+
+                        // Cho CONFIRMED, INPROGRESS, COMPLETED, CHECK IN, CHECK OUT đều hiện ảnh + staff
+                        var onlyShowProofFor = code == "CONFIRMED"
+                        || code == "INPROGRESS"
+                        || code == "COMPLETED"
+                        || code == "CHECK IN"
+                        || code == "CHECK OUT";
+
+                        var showStaffFor = code == "CONFIRMED"
+                        || code == "INPROGRESS"
+                        || code == "COMPLETED"
+                        || code == "CHECK IN"
+                        || code == "CHECK OUT";
+
 
                         var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
                         var staffImage = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;

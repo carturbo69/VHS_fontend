@@ -169,15 +169,14 @@ namespace VHS_frontend.Areas.Provider.Controllers
             // Mở thẳng hội thoại vừa tìm/khởi tạo
             return RedirectToAction(nameof(Index), new { id = conversationId });
         }
-
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Send(
-     Guid conversationId,
-     string? body,
-     IFormFile? image,
-     Guid? replyToMessageId,            // 👈 thêm tham số này để nhận từ form
-     CancellationToken ct)
+       Guid conversationId,
+       string? body,
+       IFormFile? image,
+       Guid? replyToMessageId,
+       CancellationToken ct)
         {
             if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
 
@@ -185,15 +184,35 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
             await _chatService.SendMessageAsync(
                 conversationId: conversationId,
-                accountId: myId,             
+                accountId: myId,
                 body: body,
                 image: image,
-                replyToMessageId: replyToMessageId, 
+                replyToMessageId: replyToMessageId,
                 jwtToken: jwt,
                 ct: ct
             );
 
             return RedirectToAction(nameof(Index), new { id = conversationId });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkRead(Guid conversationId, CancellationToken ct)
+        {
+            // Ép login nếu chưa có AccountID
+            if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
+
+            var jwt = GetJwtFromRequest();
+
+            await _chatService.MarkConversationReadAsync(
+                conversationId: conversationId,
+                accountId: myId,
+                jwtToken: jwt,
+                ct: ct
+            );
+
+            // Frontend chỉ cần 200 OK là đủ
+            return Ok(new { success = true });
         }
     }
 }

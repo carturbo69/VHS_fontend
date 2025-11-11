@@ -532,6 +532,54 @@ namespace VHS_frontend.Services.Customer
             return response;
         }
 
+        public async Task<bool> ConfirmBookingCompletedAsync(
+Guid accountId,
+Guid bookingId,
+string? jwtToken = null,
+CancellationToken cancellationToken = default)
+        {
+            SetAuthHeader(jwtToken);
+
+            // Trùng với route backend:
+            // [HttpPost("{bookingId:guid}/confirm-completed")]
+            var url = $"api/Bookings/{bookingId}/confirm-completed?accountId={accountId}";
+
+            using var resp = await _httpClient.PostAsync(url, content: null, cancellationToken);
+
+            // Backend đang trả 400 với message rõ ràng -> giữ pattern như CreateMany/CancelUnpaid
+            if (resp.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var msg = await resp.Content.ReadAsStringAsync(cancellationToken);
+                throw new HttpRequestException(string.IsNullOrWhiteSpace(msg) ? "BadRequest" : msg);
+            }
+
+            resp.EnsureSuccessStatusCode();
+
+            // Có thể đọc JSON trả về nếu muốn, nhưng ở đây chỉ cần biết là thành công
+            // { success = true, message = "Xác nhận hoàn thành thành công." }
+            try
+            {
+                var payload = await resp.Content.ReadFromJsonAsync<ConfirmCompletedResponse>(
+                    cancellationToken: cancellationToken);
+
+                return payload?.Success ?? true;
+            }
+            catch
+            {
+                // Nếu parsing fail nhưng status code OK thì vẫn coi là thành công
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Model nhỏ để đọc response từ API /confirm-completed
+        /// </summary>
+        private sealed class ConfirmCompletedResponse
+        {
+            public bool Success { get; set; }
+            public string? Message { get; set; }
+        }
+
         public class ApiResponse<T>
         {
             public bool Success { get; set; }

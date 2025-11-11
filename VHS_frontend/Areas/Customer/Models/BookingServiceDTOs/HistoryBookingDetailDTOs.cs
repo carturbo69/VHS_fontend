@@ -77,6 +77,7 @@
                 if (s.Equals("Completed", StringComparison.OrdinalIgnoreCase)) return "Completed";
                 if (s.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)) return "Cancelled";
                 if (s.Equals("All", StringComparison.OrdinalIgnoreCase)) return "All";
+                if (s.Equals("ServiceCompleted", StringComparison.OrdinalIgnoreCase)) return "Completed";
                 // Tiếng Việt -> chuẩn hóa sang tiếng Anh
                 if (s.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase)) return "Pending";
                 if (s.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase)) return "Pending";
