@@ -123,12 +123,7 @@
                 <div>
                 <a asp-area="Provider" asp-controller="ChatProvider" asp-action="Index"
                    class="icon-btn chat-btn" aria-label="Chat">
-                    <svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 4h16v12H5.17L4 17.17V4z" fill="none" stroke="currentColor" stroke-width="2" />
-                        <circle cx="8" cy="10" r="1.5" />
-                        <circle cx="12" cy="10" r="1.5" />
-                        <circle cx="16" cy="10" r="1.5" />
-                    </svg>
+                    <i class="bi bi-chat-dots fs-5"></i>
                     <span class="chat-badge" data-chat-count>0</span>
                 </a>
                 </div>
@@ -197,20 +192,17 @@
             const data = await resp.json();
             const badge = document.querySelector('[data-chat-count]');
 
-                    if (badge) {
-          const total = Number(data?.total ?? 0);
-          // luôn hiển thị
-          badge.style.display = 'inline-flex';
-          // đổi màu theo trạng thái (ví dụ)
-          badge.classList.toggle('is-empty', total === 0);
-          badge.textContent = total;
-        }
-
-
             if (badge) {
               const total = Number(data?.total ?? 0);
               badge.textContent = total;
-              badge.style.display = total > 0 ? 'inline-flex' : 'none';
+              // Hiển thị badge khi có tin nhắn chưa đọc, ẩn khi = 0
+              if (total > 0) {
+                badge.style.display = 'inline-flex';
+                badge.classList.remove('is-empty');
+              } else {
+                badge.style.display = 'none';
+                badge.classList.add('is-empty');
+              }
             }
 
           } catch (e) {
@@ -372,15 +364,12 @@
                     setTimeout(() => dot.remove(), 300);
                   }
                 }
-
+                
                 // Cập nhật unread count
                 await loadUnreadCount();
-
-                // Chỉ reload dropdown nếu không có item nào (để refresh nếu cần)
-                // Không reload để tránh làm mất trạng thái UI
                 
-                // Cập nhật trang notification nếu đang mở
-                updateNotificationPage(id, 'read');
+                // Thông báo cho trang notification nếu đang mở
+                notifyProviderNotificationPage('markRead', { id: id });
               }
             } catch (e) {
               console.error('Error marking as read:', e);
@@ -414,12 +403,46 @@
 
                 // Cập nhật unread count
                 await loadUnreadCount();
-
-                // Cập nhật trang notification nếu đang mở
-                updateNotificationPage(null, 'readAll');
+                
+                // Thông báo cho trang notification nếu đang mở
+                notifyProviderNotificationPage('markAllRead', {});
               }
             } catch (e) {
               console.error('Error marking all as read:', e);
+            }
+          }
+          
+          // Function để thông báo cho trang notification khi có thay đổi
+          function notifyProviderNotificationPage(action, data) {
+            console.log('[ProviderLayout] Notifying notification page:', action, data);
+            
+            // Nếu đang ở trang notification, trigger custom event để trang notification lắng nghe
+            if (window.location.pathname.includes('/Provider/ProviderNotification')) {
+              console.log('[ProviderLayout] Same page, dispatching custom event');
+              window.dispatchEvent(new CustomEvent('notificationMarkedRead', {
+                detail: { action: action, data: data }
+              }));
+            }
+            
+            // Sử dụng BroadcastChannel để sync giữa các tabs/windows
+            try {
+              const channel = new BroadcastChannel('provider_notification_sync');
+              channel.postMessage({
+                action: action,
+                data: data,
+                timestamp: Date.now()
+              });
+              console.log('[ProviderLayout] Sent via BroadcastChannel');
+              channel.close();
+            } catch (e) {
+              console.log('[ProviderLayout] BroadcastChannel not supported, using localStorage fallback');
+              // Fallback: sử dụng localStorage event
+              localStorage.setItem('provider_notification_update', JSON.stringify({
+                action: action,
+                data: data,
+                timestamp: Date.now()
+              }));
+              localStorage.removeItem('provider_notification_update');
             }
           }
 
@@ -465,7 +488,14 @@
           }
           async function openMenu() {
             if (!isOpen()) {
-              await loadNotifications();
+              // Check if we have latest HTML from real-time update
+              const latestHtml = notifMenu.getAttribute('data-latest-html');
+              if (latestHtml) {
+                notifMenu.innerHTML = latestHtml;
+                notifMenu.removeAttribute('data-latest-html');
+              } else {
+                await loadNotifications();
+              }
               notifMenu.style.display = 'block';
               notifBtn.setAttribute('aria-expanded', 'true');
             }
@@ -517,6 +547,173 @@
             loadUnreadCount();
             // Cập nhật mỗi 30 giây
             setInterval(loadUnreadCount, 30000);
+          });
+        })();
+
+        // ===== SignalR Real-time Notifications for Provider Dropdown =====
+        (function() {
+          let notificationConnection = null;
+
+          async function initNotificationSignalR() {
+            try {
+              // Load SignalR if not already loaded
+              if (typeof signalR === 'undefined') {
+                await new Promise((resolve, reject) => {
+                  const script = document.createElement('script');
+                  script.src = 'https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js';
+                  script.onload = resolve;
+                  script.onerror = reject;
+                  document.head.appendChild(script);
+                });
+              }
+
+              // Get backend URL from meta tag or default
+              const metaBackendUrl = document.querySelector('meta[name="backend-url"]')?.getAttribute('content');
+              const backendUrl = metaBackendUrl || 'http://localhost:5154';
+              const hubUrl = `${backendUrl}/hubs/notification`;
+
+              // Create connection
+              notificationConnection = new signalR.HubConnectionBuilder()
+                .withUrl(hubUrl, {
+                  skipNegotiation: false,
+                  transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling
+                })
+                .withAutomaticReconnect({
+                  nextRetryDelayInMilliseconds: retryContext => {
+                    if (retryContext.elapsedMilliseconds < 60000) {
+                      return 2000;
+                    } else {
+                      return 10000;
+                    }
+                  }
+                })
+                .configureLogging(signalR.LogLevel.Warning)
+                .build();
+
+              // Handle connection events
+              notificationConnection.onreconnecting(() => {
+                console.log('[NotificationHub] Reconnecting...');
+              });
+
+              notificationConnection.onreconnected(() => {
+                console.log('[NotificationHub] Reconnected');
+              });
+
+              notificationConnection.onclose(() => {
+                console.log('[NotificationHub] Connection closed');
+              });
+
+              // Listen for new notifications
+              notificationConnection.on('ReceiveNotification', (notification) => {
+                console.log('[NotificationHub] Received notification in Provider dropdown:', notification);
+                handleNewNotification(notification);
+              });
+
+              // Start connection
+              await notificationConnection.start();
+              console.log('[NotificationHub] Connected successfully for Provider dropdown');
+
+            } catch (error) {
+              console.error('[NotificationHub] Error initializing SignalR for Provider dropdown:', error);
+            }
+          }
+
+          function handleNewNotification(notification) {
+            if (!notification) return;
+
+            // Update unread count badge immediately
+            const notifBadge = document.getElementById('notificationBadge');
+            if (notifBadge) {
+              // Increment count immediately for better UX
+              const currentCount = parseInt(notifBadge.textContent) || 0;
+              const newCount = currentCount + 1;
+              notifBadge.textContent = newCount;
+              notifBadge.style.setProperty('display', 'inline-flex', 'important');
+              
+              // Then sync with server to get accurate count
+              fetch('/Provider/ProviderNotification/GetUnreadCount')
+                .then(response => response.json())
+                .then(data => {
+                  const serverCount = data?.count || 0;
+                  if (serverCount > 0) {
+                    notifBadge.textContent = serverCount;
+                    notifBadge.style.setProperty('display', 'inline-flex', 'important');
+                  } else {
+                    notifBadge.style.setProperty('display', 'none', 'important');
+                  }
+                })
+                .catch(err => {
+                  console.error('Error updating unread count:', err);
+                });
+            }
+
+            // Always reload notification dropdown to show new notification
+            const notifMenu = document.getElementById('notificationMenu');
+            if (notifMenu) {
+              fetch('/Provider/ProviderNotification/GetNotificationsPartial')
+                .then(response => response.text())
+                .then(html => {
+                  // Only update if dropdown is currently visible or if it will be opened
+                  if (notifMenu.style.display === 'block' || notifMenu.offsetParent !== null) {
+                    notifMenu.innerHTML = html;
+                  }
+                  // Store the latest HTML for when dropdown is opened
+                  notifMenu.setAttribute('data-latest-html', html);
+                })
+                .catch(err => console.error('Error updating notification dropdown:', err));
+            }
+
+            // Show toast notification
+            showNotificationToast(notification);
+          }
+
+          function showNotificationToast(notification) {
+            // Create toast notification
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            toast.innerHTML = `
+              <div class="toast-content">
+                <div class="toast-icon">
+                  <i class="bi bi-bell-fill"></i>
+                </div>
+                <div class="toast-body">
+                  <div class="toast-title">Thông báo mới</div>
+                  <div class="toast-message">${escapeHtml(notification.content || notification.Content || '')}</div>
+                </div>
+                <button class="toast-close" onclick="this.parentElement.parentElement.remove()">
+                  <i class="bi bi-x"></i>
+                </button>
+              </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+              toast.classList.remove('show');
+              setTimeout(() => toast.remove(), 300);
+            }, 3000);
+          }
+
+          function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+          }
+
+          // Initialize SignalR when page loads
+          document.addEventListener('DOMContentLoaded', () => {
+            initNotificationSignalR();
+          });
+
+          // Cleanup on page unload
+          window.addEventListener('beforeunload', () => {
+            if (notificationConnection) {
+              notificationConnection.stop();
+            }
           });
         })();
     </script>

@@ -125,7 +125,10 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     return RedirectToAction("Login", "Account", new { area = "" });
                 }
 
-                // Xử lý file upload
+                // ✅ Validation client-side đã được xử lý ở frontend
+                // File sẽ được gửi trực tiếp lên backend, không lưu ở frontend
+
+                // Kiểm tra file nếu có
                 if (model.ImageFile != null && model.ImageFile.Length > 0)
                 {
                     // Kiểm tra kích thước file (5MB)
@@ -142,33 +145,6 @@ namespace VHS_frontend.Areas.Provider.Controllers
                         ModelState.AddModelError("ImageFile", "Chỉ chấp nhận file JPG, PNG, GIF");
                         return View(model);
                     }
-
-                    // Tạo tên file unique
-                    var fileName = $"{Guid.NewGuid()}_{model.ImageFile.FileName}";
-                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "provider-images");
-                    
-                    // Tạo thư mục nếu chưa tồn tại
-                    if (!Directory.Exists(uploadsFolder))
-                    {
-                        Directory.CreateDirectory(uploadsFolder);
-                    }
-
-                    var filePath = Path.Combine(uploadsFolder, fileName);
-                    
-                    // Lưu file
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await model.ImageFile.CopyToAsync(stream);
-                    }
-
-                    // Cập nhật URL hình ảnh
-                    model.Images = $"/uploads/provider-images/{fileName}";
-                    Console.WriteLine($"[DEBUG] File uploaded: {model.Images}");
-                }
-                else
-                {
-                    // Nếu không có file mới, giữ nguyên URL cũ
-                    Console.WriteLine($"[DEBUG] No new file uploaded, keeping existing: {model.Images}");
                 }
 
                 if (!ModelState.IsValid)
@@ -176,7 +152,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     return View(model);
                 }
 
-                // Gọi API để cập nhật profile
+                // ✅ Gọi API để cập nhật profile - File sẽ được gửi lên backend và lưu ở đó
                 var token = HttpContext.Session.GetString("JWToken");
                 Console.WriteLine($"[DEBUG] Calling UpdateProfileAsync with AccountID: {accountId}, Token: {token?.Substring(0, 10)}...");
                 var response = await _providerProfileService.UpdateProfileAsync(accountId, model, token);
@@ -189,8 +165,25 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 }
                 else
                 {
-                    Console.WriteLine($"[DEBUG] Profile update failed: {response.StatusCode}");
-                    TempData["Error"] = "Cập nhật profile thất bại!";
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[DEBUG] Profile update failed: {response.StatusCode}, Error: {errorContent}");
+                    
+                    // Parse error message nếu có
+                    string errorMessage = "Cập nhật profile thất bại!";
+                    try
+                    {
+                        var errorJson = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(errorContent);
+                        if (errorJson != null && errorJson.ContainsKey("message"))
+                        {
+                            errorMessage = errorJson["message"].ToString() ?? errorMessage;
+                        }
+                    }
+                    catch
+                    {
+                        errorMessage = errorContent;
+                    }
+                    
+                    TempData["Error"] = errorMessage;
                     return View(model);
                 }
             }
@@ -264,7 +257,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         // GET: Provider/ProviderProfile/ChangePassword
-        public IActionResult ChangePassword()
+        public async Task<IActionResult> ChangePassword()
         {
             try
             {
@@ -274,12 +267,114 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     return RedirectToAction("Login", "Account", new { area = "" });
                 }
 
-                return View(new ChangePasswordDTO());
+                // Lấy email từ profile
+                var token = HttpContext.Session.GetString("JWToken");
+                var profile = await _providerProfileService.GetProfileAsync(accountId, token);
+                var model = new ChangePasswordDTO
+                {
+                    Email = profile?.Email ?? string.Empty
+                };
+
+                return View(model);
             }
             catch (Exception ex)
             {
                 TempData["Error"] = "Có lỗi xảy ra: " + ex.Message;
                 return RedirectToAction("Index");
+            }
+        }
+
+        // POST: Provider/ProviderProfile/ValidatePasswordAndSendOTP
+        [HttpPost]
+        public async Task<IActionResult> ValidatePasswordAndSendOTP([FromBody] ValidatePasswordAndSendOTPDTO dto)
+        {
+            try
+            {
+                var accountId = HttpContext.Session.GetString("AccountID");
+                if (string.IsNullOrEmpty(accountId))
+                {
+                    return Json(new { success = false, message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
+                }
+
+                if (!ModelState.IsValid)
+                {
+                    return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
+                }
+
+                // Gọi API để validate password và gửi OTP
+                var token = HttpContext.Session.GetString("JWToken");
+                var response = await _providerProfileService.ValidatePasswordAndSendOTPAsync(accountId, dto, token);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                    return Json(new { success = true, message = result?["message"]?.ToString() ?? "Mã OTP đã được gửi đến email của bạn." });
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    try
+                    {
+                        var errorJson = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(errorContent);
+                        var errorMessage = errorJson?["message"]?.ToString() ?? "Mật khẩu hiện tại không đúng hoặc không thể gửi OTP. Vui lòng kiểm tra lại thông tin.";
+                        return Json(new { success = false, message = errorMessage });
+                    }
+                    catch
+                    {
+                        return Json(new { success = false, message = "Mật khẩu hiện tại không đúng hoặc không thể gửi OTP. Vui lòng kiểm tra lại thông tin." });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Có lỗi xảy ra: " + ex.Message });
+            }
+        }
+
+        // POST: Provider/ProviderProfile/SendOTP
+        [HttpPost]
+        public async Task<IActionResult> SendOTP([FromBody] SendOTPRequestDTO request)
+        {
+            try
+            {
+                var accountId = HttpContext.Session.GetString("AccountID");
+                if (string.IsNullOrEmpty(accountId))
+                {
+                    return Json(new { success = false, message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
+                }
+
+                if (!ModelState.IsValid)
+                {
+                    return Json(new { success = false, message = "Email không hợp lệ." });
+                }
+
+                // Gọi API để gửi OTP
+                var token = HttpContext.Session.GetString("JWToken");
+                var response = await _providerProfileService.SendOTPForChangePasswordAsync(accountId, request, token);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                    return Json(new { success = true, message = result?["message"]?.ToString() ?? "Mã OTP đã được gửi đến email của bạn." });
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    try
+                    {
+                        var errorJson = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(errorContent);
+                        var errorMessage = errorJson?["message"]?.ToString() ?? "Không thể gửi mã OTP. Vui lòng thử lại sau.";
+                        return Json(new { success = false, message = errorMessage });
+                    }
+                    catch
+                    {
+                        return Json(new { success = false, message = "Không thể gửi mã OTP. Vui lòng thử lại sau." });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Có lỗi xảy ra: " + ex.Message });
             }
         }
 
@@ -312,8 +407,17 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 }
                 else
                 {
-                    var errorMessage = await response.Content.ReadAsStringAsync();
-                    TempData["Error"] = "Không thể thay đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.";
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    try
+                    {
+                        var errorJson = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(errorContent);
+                        var errorMessage = errorJson?["message"]?.ToString() ?? "Không thể thay đổi mật khẩu. Vui lòng kiểm tra lại thông tin.";
+                        TempData["Error"] = errorMessage;
+                    }
+                    catch
+                    {
+                        TempData["Error"] = "Không thể thay đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại, mã OTP hoặc thông tin tài khoản.";
+                    }
                     return View(model);
                 }
             }

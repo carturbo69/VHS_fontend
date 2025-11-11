@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace VHS_frontend.Areas.Provider.Models.Profile
 {
-    public class ChangePasswordDTO
+    public class ValidatePasswordAndSendOTPDTO
     {
         [Required(ErrorMessage = "Mật khẩu hiện tại không được để trống")]
         [Display(Name = "Mật khẩu hiện tại")]
@@ -18,14 +18,10 @@ namespace VHS_frontend.Areas.Provider.Models.Profile
         [Display(Name = "Xác nhận mật khẩu mới")]
         public string ConfirmPassword { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Mã OTP không được để trống")]
-        [StringLength(6, MinimumLength = 6, ErrorMessage = "Mã OTP phải có 6 chữ số")]
-        [Display(Name = "Mã OTP")]
-        public string OTP { get; set; } = string.Empty;
-
         [Required(ErrorMessage = "Email không được để trống")]
         [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
         [Display(Name = "Email")]
         public string Email { get; set; } = string.Empty;
     }
 }
+

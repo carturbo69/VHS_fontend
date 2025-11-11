@@ -414,6 +414,299 @@
         window.deleteNotification = deleteNotification;
         window.markAllNotificationsRead = markAllNotificationsRead;
 
+        // ===== SignalR Real-time Notifications =====
+        let notificationConnection = null;
+
+        async function initNotificationSignalR() {
+            try {
+                // Load SignalR if not already loaded
+                if (typeof signalR === 'undefined') {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+
+                // Get backend URL from meta tag or default
+                const metaBackendUrl = document.querySelector('meta[name="backend-url"]')?.getAttribute('content');
+                const backendUrl = metaBackendUrl || 'http://localhost:5154';
+                const hubUrl = `${backendUrl}/hubs/notification`;
+
+                // Create connection
+                notificationConnection = new signalR.HubConnectionBuilder()
+                    .withUrl(hubUrl, {
+                        skipNegotiation: false,
+                        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling
+                    })
+                    .withAutomaticReconnect({
+                        nextRetryDelayInMilliseconds: retryContext => {
+                            if (retryContext.elapsedMilliseconds < 60000) {
+                                return 2000;
+                            } else {
+                                return 10000;
+                            }
+                        }
+                    })
+                    .configureLogging(signalR.LogLevel.Warning)
+                    .build();
+
+                // Handle connection events
+                notificationConnection.onreconnecting(() => {
+                    console.log('[NotificationHub] Reconnecting...');
+                });
+
+                notificationConnection.onreconnected(() => {
+                    console.log('[NotificationHub] Reconnected');
+                });
+
+                notificationConnection.onclose(() => {
+                    console.log('[NotificationHub] Connection closed');
+                });
+
+                // Listen for new notifications
+                notificationConnection.on('ReceiveNotification', (notification) => {
+                    console.log('[NotificationHub] Received notification:', notification);
+                    handleNewNotification(notification);
+                });
+
+                // Start connection
+                await notificationConnection.start();
+                console.log('[NotificationHub] Connected successfully');
+
+            } catch (error) {
+                console.error('[NotificationHub] Error initializing SignalR:', error);
+            }
+        }
+
+        function handleNewNotification(notification) {
+            if (!notification) return;
+
+            // Show toast notification
+            showNotificationToast(notification);
+
+            // Reload page to show new notification (after a delay to show toast)
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        }
+
+        function showNotificationToast(notification) {
+            // Create toast notification
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            toast.innerHTML = `
+                <div class="toast-content">
+                    <div class="toast-icon">
+                        <i class="bi bi-bell-fill"></i>
+                    </div>
+                    <div class="toast-body">
+                        <div class="toast-title">Thông báo mới</div>
+                        <div class="toast-message">${escapeHtml(notification.content || notification.Content || '')}</div>
+                    </div>
+                    <button class="toast-close" onclick="this.parentElement.parentElement.remove()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize SignalR when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initNotificationSignalR();
+            
+            // Lắng nghe event từ dropdown khi đánh dấu đã đọc
+            setupProviderNotificationSync();
+        });
+        
+        // ===== Sync với dropdown khi đánh dấu đã đọc =====
+        function setupProviderNotificationSync() {
+            console.log('[ProviderNotificationSync] Setting up sync listeners');
+            
+            // Lắng nghe custom event từ layout
+            window.addEventListener('notificationMarkedRead', function(event) {
+                console.log('[ProviderNotificationSync] Received custom event:', event.detail);
+                const { action, data } = event.detail;
+                handleProviderNotificationMarkedRead(action, data);
+            });
+            
+            // Lắng nghe BroadcastChannel để sync giữa các tabs
+            try {
+                const channel = new BroadcastChannel('provider_notification_sync');
+                channel.addEventListener('message', function(event) {
+                    console.log('[ProviderNotificationSync] Received BroadcastChannel message:', event.data);
+                    const { action, data } = event.data;
+                    handleProviderNotificationMarkedRead(action, data);
+                });
+                console.log('[ProviderNotificationSync] BroadcastChannel listener set up');
+            } catch (e) {
+                console.log('[ProviderNotificationSync] BroadcastChannel not supported');
+            }
+            
+            // Lắng nghe localStorage event (fallback)
+            window.addEventListener('storage', function(event) {
+                if (event.key === 'provider_notification_update') {
+                    console.log('[ProviderNotificationSync] Received storage event');
+                    try {
+                        const update = JSON.parse(event.newValue);
+                        if (update) {
+                            handleProviderNotificationMarkedRead(update.action, update.data);
+                        }
+                    } catch (e) {
+                        console.error('[ProviderNotificationSync] Error parsing notification update:', e);
+                    }
+                }
+            });
+        }
+        
+        // Xử lý khi notification được đánh dấu đã đọc từ dropdown
+        async function handleProviderNotificationMarkedRead(action, data) {
+            console.log('[ProviderNotificationSync] Received:', action, data);
+            
+            if (action === 'markRead' && data.id) {
+                // Cập nhật UI cho notification cụ thể
+                const notificationCard = document.querySelector(`.notification-card[data-notification-id="${data.id}"]`);
+                if (notificationCard) {
+                    console.log('[ProviderNotificationSync] Found card, updating UI');
+                    
+                    // Xóa indicator dot
+                    const indicator = notificationCard.querySelector('.notification-indicator');
+                    if (indicator) {
+                        indicator.style.transition = 'opacity 0.3s ease';
+                        indicator.style.opacity = '0';
+                        setTimeout(() => indicator.remove(), 300);
+                    }
+                    
+                    // Xóa badge "Mới"
+                    const newBadge = notificationCard.querySelector('.badge-new');
+                    if (newBadge) {
+                        newBadge.style.transition = 'opacity 0.3s ease';
+                        newBadge.style.opacity = '0';
+                        setTimeout(() => newBadge.remove(), 300);
+                    }
+                    
+                    // Cập nhật class
+                    notificationCard.classList.remove('unread');
+                    notificationCard.classList.add('read');
+                    
+                    // Ẩn nút "Đánh dấu đã đọc" nếu có
+                    const markReadBtn = notificationCard.querySelector('.btn-mark-read');
+                    if (markReadBtn) {
+                        markReadBtn.style.transition = 'opacity 0.3s ease';
+                        markReadBtn.style.opacity = '0';
+                        setTimeout(() => markReadBtn.remove(), 300);
+                    }
+                    
+                    // Cập nhật số lượng unread trong stats
+                    updateNotificationStats();
+                } else {
+                    console.log('[ProviderNotificationSync] Card not found, will reload page');
+                    // Nếu không tìm thấy, reload trang sau một chút
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                }
+            } else if (action === 'markAllRead') {
+                console.log('[ProviderNotificationSync] Marking all as read');
+                
+                // Cập nhật tất cả notifications thành "Đã đọc"
+                const unreadCards = document.querySelectorAll('.notification-card.unread');
+                unreadCards.forEach((card, index) => {
+                    setTimeout(() => {
+                        // Xóa indicator dot
+                        const indicator = card.querySelector('.notification-indicator');
+                        if (indicator) {
+                            indicator.style.transition = 'opacity 0.3s ease';
+                            indicator.style.opacity = '0';
+                            setTimeout(() => indicator.remove(), 300);
+                        }
+                        
+                        // Xóa badge "Mới"
+                        const newBadge = card.querySelector('.badge-new');
+                        if (newBadge) {
+                            newBadge.style.transition = 'opacity 0.3s ease';
+                            newBadge.style.opacity = '0';
+                            setTimeout(() => newBadge.remove(), 300);
+                        }
+                        
+                        // Cập nhật class
+                        card.classList.remove('unread');
+                        card.classList.add('read');
+                        
+                        // Ẩn nút "Đánh dấu đã đọc" nếu có
+                        const markReadBtn = card.querySelector('.btn-mark-read');
+                        if (markReadBtn) {
+                            markReadBtn.style.transition = 'opacity 0.3s ease';
+                            markReadBtn.style.opacity = '0';
+                            setTimeout(() => markReadBtn.remove(), 300);
+                        }
+                    }, index * 50);
+                });
+                
+                // Ẩn nút "Đánh dấu tất cả đã đọc"
+                const markAllReadBtn = document.querySelector('.btn-mark-all-read');
+                if (markAllReadBtn) {
+                    markAllReadBtn.style.display = 'none';
+                }
+                
+                // Cập nhật số lượng unread trong stats
+                updateNotificationStats();
+            }
+        }
+        
+        // Function để cập nhật stats
+        function updateNotificationStats() {
+            const unreadCards = document.querySelectorAll('.notification-card.unread');
+            const readCards = document.querySelectorAll('.notification-card.read');
+            const totalCards = document.querySelectorAll('.notification-card');
+            
+            // Cập nhật số lượng trong stats cards
+            const unreadStat = document.querySelector('.stat-unread .stat-number');
+            const readStat = document.querySelector('.stat-read .stat-number');
+            const totalStat = document.querySelector('.stat-total .stat-number');
+            
+            if (unreadStat) {
+                unreadStat.textContent = unreadCards.length;
+            }
+            if (readStat) {
+                readStat.textContent = readCards.length;
+            }
+            if (totalStat) {
+                totalStat.textContent = totalCards.length;
+            }
+            
+            // Ẩn/hiện nút "Đánh dấu tất cả đã đọc"
+            const markAllReadBtn = document.querySelector('.btn-mark-all-read');
+            if (markAllReadBtn) {
+                markAllReadBtn.style.display = unreadCards.length > 0 ? 'flex' : 'none';
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (notificationConnection) {
+                notificationConnection.stop();
+            }
+        });
     </script>
 }
 

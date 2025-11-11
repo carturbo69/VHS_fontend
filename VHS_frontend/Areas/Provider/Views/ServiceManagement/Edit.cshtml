@@ -14,15 +14,20 @@
 }
 
 <div class="service-management-container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3>
-            <i class="bi bi-pencil me-2"></i>
-            Chỉnh sửa Dịch vụ
-        </h3>
-        <a asp-action="Index" class="btn btn-secondary">
-            <i class="bi bi-arrow-left me-1"></i>
-            Quay lại
-        </a>
+    <!-- Header Card -->
+    <div class="card shadow-sm mb-3 create-page-header">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-pencil me-2"></i>
+                    Chỉnh sửa Dịch vụ
+                </h4>
+                <a asp-action="Index" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>
+                    Quay lại
+                </a>
+            </div>
+        </div>
     </div>
 
     @if (TempData["Error"] != null)
@@ -33,52 +38,75 @@
         </div>
     }
 
-    <div class="card shadow-sm">
-        <div class="card-header bg-warning text-dark">
-            <h5 class="mb-0">Thông tin Dịch vụ</h5>
+    <!-- Form Card -->
+    <div class="card shadow-sm form-card">
+        <div class="card-header form-card-header">
+            <h6 class="mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                Thông tin Dịch vụ
+            </h6>
         </div>
         <div class="card-body">
-            <form asp-action="Edit" asp-route-id="@serviceId" method="post" enctype="multipart/form-data">
+            <form asp-action="Edit" asp-route-id="@serviceId" method="post" enctype="multipart/form-data" id="editServiceForm">
                 @Html.AntiForgeryToken()
 
-                <div class="row">
+                <script>
+                    // Validation functions - must be defined before form fields
+                    function validateBaseUnit(field) {
+                        const value = parseFloat(field.value);
+                        if (!field.value || field.value === '' || field.value === null || field.value === undefined) {
+                            field.setCustomValidity('Vui lòng nhập số lượng tối thiểu.');
+                        } else if (isNaN(value) || value < 1) {
+                            field.setCustomValidity('Số lượng tối thiểu phải từ 1 trở lên.');
+                        } else {
+                            field.setCustomValidity('');
+                        }
+                    }
+                </script>
+
+                <div class="row g-3">
                     <!-- Category (Read-only) -->
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-6">
                         <label class="form-label">Danh mục</label>
                         <input type="text" class="form-control" value="@categoryName" readonly />
-                        <small class="form-text text-muted">Danh mục không thể thay đổi sau khi tạo.</small>
+                        <small class="form-text text-muted small">Danh mục không thể thay đổi sau khi tạo.</small>
                     </div>
 
                     <!-- Title -->
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-6">
                         <label asp-for="Title" class="form-label">Tên dịch vụ <span class="text-danger">*</span></label>
                         <input asp-for="Title" class="form-control" placeholder="VD: Dọn dẹp nhà ở" required />
-                        <span asp-validation-for="Title" class="text-danger"></span>
+                        <span asp-validation-for="Title" class="text-danger small"></span>
                     </div>
                 </div>
 
                 <!-- Description -->
-                <div class="mb-3">
-                    <label asp-for="Description" class="form-label">Mô tả</label>
-                    <textarea asp-for="Description" class="form-control" rows="4" placeholder="Mô tả chi tiết về dịch vụ..."></textarea>
-                    <span asp-validation-for="Description" class="text-danger"></span>
+                <div class="mt-3">
+                    <label asp-for="Description" class="form-label">Mô tả <span class="text-danger">*</span></label>
+                    <textarea asp-for="Description" name="Description" id="Description" class="form-control" rows="3" placeholder="Mô tả chi tiết về dịch vụ..." 
+                              data-val="true" 
+                              data-val-required="Vui lòng nhập mô tả dịch vụ."
+                              required
+                              oninvalid="this.setCustomValidity('Vui lòng nhập mô tả dịch vụ.')"
+                              oninput="this.setCustomValidity('')"></textarea>
+                    <span asp-validation-for="Description" class="text-danger small"></span>
                 </div>
 
-                <div class="row">
+                <div class="row g-3 mt-0">
                     <!-- Price -->
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-4">
                         <label asp-for="Price" class="form-label">Giá (VNĐ) <span class="text-danger">*</span></label>
                         <input asp-for="Price" asp-format="{0:0}" type="number" class="form-control" min="0" step="1000" placeholder="0" required />
-                        <span asp-validation-for="Price" class="text-danger"></span>
+                        <span asp-validation-for="Price" class="text-danger small"></span>
                     </div>
 
                     <!-- Unit Type -->
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-4">
                         <label asp-for="UnitType" class="form-label">
-                            <i class="bi bi-rulers me-1"></i>Đơn vị tính giá <span class="text-danger">*</span>
+                            <i class="bi bi-rulers me-1"></i>Đơn vị <span class="text-danger">*</span>
                         </label>
                         <select asp-for="UnitType" class="form-select" id="unitTypeSelect" required>
-                            <option value="">-- Chọn đơn vị tính giá --</option>
+                            <option value="">-- Chọn đơn vị --</option>
                             <option value="Hour">Giờ</option>
                             <option value="Day">Ngày</option>
                             <option value="Visit">Lần</option>
@@ -89,37 +117,38 @@
                             <option value="Package">Gói</option>
                             <option value="Event">Sự kiện</option>
                         </select>
-                        <small class="form-text text-muted">
-                            <i class="bi bi-info-circle me-1"></i>Đơn vị sẽ hiển thị cùng giá (VD: 200.000 VNĐ/Giờ hoặc 500.000 VNĐ/Gói).
-                        </small>
-                        <span asp-validation-for="UnitType" class="text-danger"></span>
+                        <span asp-validation-for="UnitType" class="text-danger small"></span>
                     </div>
 
                     <!-- Base Unit -->
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-4">
                         <label asp-for="BaseUnit" class="form-label">
                             <i class="bi bi-123 me-1"></i>Số lượng tối thiểu <span class="text-danger">*</span>
                         </label>
-                        <input asp-for="BaseUnit" type="number" class="form-control" min="1" step="1" placeholder="1" required />
-                        <small class="form-text text-muted">
-                            <i class="bi bi-info-circle me-1"></i>Nhập số lượng tối thiểu khách phải đặt theo đơn vị bên cạnh (VD: cần tối thiểu 2 Giờ hoặc 1 Gói).
-                        </small>
-                        <span asp-validation-for="BaseUnit" class="text-danger"></span>
+                        <input asp-for="BaseUnit" name="BaseUnit" id="BaseUnit" type="number" class="form-control" min="1" step="1" placeholder="1" 
+                               data-val="true" 
+                               data-val-required="Vui lòng nhập số lượng tối thiểu."
+                               data-val-min="Số lượng tối thiểu phải từ 1 trở lên."
+                               data-val-min-min="1"
+                               required
+                               oninvalid="validateBaseUnit(this)"
+                               oninput="this.setCustomValidity('')" />
+                        <span asp-validation-for="BaseUnit" class="text-danger small"></span>
                     </div>
                 </div>
 
                 <!-- Status -->
-                <div class="mb-3">
+                <div class="mt-3">
                     <label asp-for="Status" class="form-label">Trạng thái</label>
                     <select asp-for="Status" class="form-select">
                         <option value="Active">Hoạt động</option>
                         <option value="Inactive">Tạm dừng</option>
                     </select>
-                    <span asp-validation-for="Status" class="text-danger"></span>
+                    <span asp-validation-for="Status" class="text-danger small"></span>
                 </div>
 
                 <!-- Images (Gộp avatar + ảnh mô tả) -->
-                <div class="mb-3">
+                <div class="mt-3">
                     <label class="form-label">Hình ảnh dịch vụ</label>
                     @{
                         var imagesCsv = currentImageUrl ?? string.Empty;
@@ -130,7 +159,7 @@
                     }
 
                     <!-- Hình ảnh hiện tại (gộp avatar + mô tả) -->
-                    <div class="mb-3">
+                    <div class="mb-2">
                         <div class="image-inline-gallery" id="imageGalleryContainer">
                             @if (!string.IsNullOrEmpty(avatar))
                             {
@@ -163,23 +192,26 @@
                         <div class="file-input-wrapper">
                             <input name="Images" type="file" id="imageInputEdit" class="form-control mt-3" accept="image/*" multiple />
                         </div>
-                        <span asp-validation-for="Images" class="text-danger"></span>
-                        <small class="form-text text-muted">Chọn 1 hoặc nhiều ảnh mới. Ảnh mới sẽ được thêm vào cuối; ảnh đại diện hiện tại không thay đổi trừ khi bạn chọn Avatar riêng.</small>
+                        <span asp-validation-for="Images" class="text-danger small"></span>
+                        <small class="form-text text-muted small">Chọn 1 hoặc nhiều ảnh mới. Ảnh mới sẽ được thêm vào cuối; ảnh đại diện hiện tại không thay đổi trừ khi bạn chọn Avatar riêng.</small>
                     </div>
                 </div>
 
                 <!-- Tags Section -->
-                <div class="mb-3">
-                    <label class="form-label">Tags (Từ khóa)</label>
-                    <div class="border rounded p-3">
+                <div class="mt-3">
+                    <label class="form-label fw-bold section-label">
+                        <i class="bi bi-tags me-2"></i>
+                        Tags (Từ khóa)
+                    </label>
+                    <div id="tagsContainer" class="tags-options-container">
                         @if (tags.Any())
                         {
-                            <div class="row">
+                            <div class="row tags-options-row">
                                 @foreach (var tag in tags)
                                 {
                                     var isChecked = Model.TagIds.Contains(tag.TagId);
-                                    <div class="col-md-4 mb-2">
-                                        <div class="form-check">
+                                    <div class="col-12 col-sm-6 col-md-6">
+                                        <div class="tag-option-item">
                                             <input class="form-check-input" type="checkbox" name="TagIds" value="@tag.TagId" id="tag_@tag.TagId" @(isChecked ? "checked" : "") />
                                             <label class="form-check-label" for="tag_@tag.TagId">
                                                 @tag.Name
@@ -191,38 +223,62 @@
                         }
                         else
                         {
-                            <p class="text-muted">Không có tags nào cho danh mục này.</p>
+                            <p class="text-muted mb-0 small">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Không có tags nào cho danh mục này.
+                            </p>
                         }
                     </div>
-                    <small class="form-text text-muted">Chọn các tags liên quan đến dịch vụ của bạn.</small>
                 </div>
 
                 <!-- Options Section -->
-                <div class="mb-3">
+                <div class="mt-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="form-label">Options (Lựa chọn bổ sung)</label>
-                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#createOptionModalEdit">
-                            <i class="bi bi-plus-circle me-1"></i> Tạo Option mới
+                        <label class="form-label fw-bold section-label mb-0">
+                            <i class="bi bi-list-check me-2"></i>
+                            Options (Lựa chọn bổ sung)
+                        </label>
+                        <button type="button" class="btn btn-success btn-sm btn-create-option" data-bs-toggle="modal" data-bs-target="#createOptionModalEdit">
+                            <i class="bi bi-plus-circle me-1"></i>
+                            Tạo Option
                         </button>
                     </div>
-                    <div id="optionsContainer" class="border rounded p-3">
+                    <div id="optionsContainer" class="tags-options-container">
                         @if (options.Any())
                         {
-                            <div class="row">
+                            <div class="row tags-options-row">
                                 @foreach (var option in options)
                                 {
                                     var isChecked = Model.OptionIds.Contains(option.OptionId);
-                                    <div class="col-md-4 mb-2">
-                                        <div class="d-flex align-items-center">
-                                            <div class="form-check flex-grow-1">
-                                                <input class="form-check-input" type="checkbox" name="OptionIds" value="@option.OptionId" id="option_@option.OptionId" @(isChecked ? "checked" : "") />
-                                                <label class="form-check-label" for="option_@option.OptionId">
-                                                    @option.OptionName
-                                                    <br />
-                                                    <small class="text-muted">@option.Description - @option.Price.ToString("N0") VNĐ/@option.UnitType</small>
-                                                </label>
-                                            </div>
-                                            <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-option-btn" data-option-id="@option.OptionId" data-option-name="@option.OptionName" title="Xóa option khỏi danh sách">
+                                    <div class="col-12 col-sm-6 col-md-6">
+                                        <div class="tag-option-item">
+                                            <input class="form-check-input" type="checkbox" name="OptionIds" value="@option.OptionId" id="option_@option.OptionId" @(isChecked ? "checked" : "") />
+                                            <label class="form-check-label" for="option_@option.OptionId">
+                                                @option.OptionName
+                                                @{
+                                                    var unitTypeVietnamese = "";
+                                                    switch (option.UnitType)
+                                                    {
+                                                        case "Hour": unitTypeVietnamese = "Giờ"; break;
+                                                        case "Day": unitTypeVietnamese = "Ngày"; break;
+                                                        case "Visit": unitTypeVietnamese = "Lần"; break;
+                                                        case "Apartment": unitTypeVietnamese = "Căn"; break;
+                                                        case "Room": unitTypeVietnamese = "Phòng"; break;
+                                                        case "SquareMeter": unitTypeVietnamese = "Mét vuông (m²)"; break;
+                                                        case "Person": unitTypeVietnamese = "Người"; break;
+                                                        case "Package": unitTypeVietnamese = "Gói"; break;
+                                                        case "Event": unitTypeVietnamese = "Sự kiện"; break;
+                                                    }
+                                                }
+                                                @if (!string.IsNullOrEmpty(option.Description) || option.Price > 0)
+                                                {
+                                                    <small>
+                                                        @(!string.IsNullOrEmpty(option.Description) ? option.Description : "")
+                                                        @(option.Price > 0 ? (!string.IsNullOrEmpty(option.Description) ? " - " : "") + option.Price.ToString("N0") + " VNĐ/" + unitTypeVietnamese : "")
+                                                    </small>
+                                                }
+                                            </label>
+                                            <button type="button" class="remove-option-btn" data-option-id="@option.OptionId" data-option-name="@option.OptionName" title="Xóa option khỏi danh sách">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -232,16 +288,21 @@
                         }
                         else
                         {
-                            <p class="text-muted">Chưa có option nào.</p>
+                            <p class="text-muted mb-0 small">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Chưa có option nào.
+                            </p>
                         }
                     </div>
-                    <small class="form-text text-muted">Chọn các lựa chọn bổ sung cho dịch vụ.</small>
                 </div>
 
-                <div class="d-flex justify-content-end">
-                    <a asp-action="Index" class="btn btn-secondary me-2">Hủy</a>
-                    <button type="submit" class="btn btn-warning">
-                        <i class="bi bi-save me-1"></i>
+                <div class="d-flex justify-content-center gap-2 mt-4 pt-3 border-top">
+                    <a asp-action="Index" class="btn btn-secondary">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Hủy
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>
                         Lưu thay đổi
                     </button>
                 </div>
@@ -251,8 +312,32 @@
 </div>
 
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
-    
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script>
+        // Override jQuery Validation messages to Vietnamese IMMEDIATELY after jQuery Validation loads
+        // This MUST happen before unobtrusive validation is loaded
+        if (typeof jQuery !== 'undefined' && jQuery.validator) {
+            jQuery.extend(jQuery.validator.messages, {
+                required: "Trường này là bắt buộc.",
+                remote: "Vui lòng sửa trường này.",
+                email: "Vui lòng nhập địa chỉ email hợp lệ.",
+                url: "Vui lòng nhập URL hợp lệ.",
+                date: "Vui lòng nhập ngày hợp lệ.",
+                dateISO: "Vui lòng nhập ngày hợp lệ (ISO).",
+                number: "Vui lòng nhập số hợp lệ.",
+                digits: "Vui lòng chỉ nhập chữ số.",
+                equalTo: "Vui lòng nhập cùng một giá trị.",
+                maxlength: jQuery.validator.format("Vui lòng nhập không quá {0} ký tự."),
+                minlength: jQuery.validator.format("Vui lòng nhập ít nhất {0} ký tự."),
+                rangelength: jQuery.validator.format("Vui lòng nhập giá trị từ {0} đến {1} ký tự."),
+                range: jQuery.validator.format("Vui lòng nhập giá trị từ {0} đến {1}."),
+                max: jQuery.validator.format("Vui lòng nhập giá trị nhỏ hơn hoặc bằng {0}."),
+                min: jQuery.validator.format("Vui lòng nhập giá trị lớn hơn hoặc bằng {0}."),
+                step: jQuery.validator.format("Vui lòng nhập bội số của {0}.")
+            });
+        }
+    </script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
     <script>
         // Image Preview Function
         function previewImage(input) {
@@ -369,16 +454,114 @@
             }
         });
 
-        // Create Option (Edit) handler - Đợi DOM load xong
-        document.addEventListener('DOMContentLoaded', function() {
-            const createOptionFormEdit = document.getElementById('createOptionFormEdit');
-            if (!createOptionFormEdit) {
-                console.error('createOptionFormEdit form not found!');
-                return;
+        // Helper functions for validation messages in modal
+        function showFieldErrorEdit(fieldId, errorId, message) {
+            const field = document.getElementById(fieldId);
+            const errorDiv = document.getElementById(errorId);
+            if (field && errorDiv) {
+                field.classList.add('is-invalid');
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function hideFieldErrorEdit(fieldId, errorId) {
+            const field = document.getElementById(fieldId);
+            const errorDiv = document.getElementById(errorId);
+            if (field && errorDiv) {
+                field.classList.remove('is-invalid');
+                errorDiv.style.display = 'none';
+            }
+        }
+
+        function clearAllModalErrorsEdit() {
+            hideFieldErrorEdit('optionNameEdit', 'optionNameEditError');
+            hideFieldErrorEdit('optionPriceEdit', 'optionPriceEditError');
+            hideFieldErrorEdit('optionUnitTypeEdit', 'optionUnitTypeEditError');
+        }
+
+        // Function to convert UnitType from English to Vietnamese
+        function getUnitTypeVietnamese(unitType) {
+            const unitMap = {
+                'Hour': 'Giờ',
+                'Day': 'Ngày',
+                'Visit': 'Lần',
+                'Apartment': 'Căn',
+                'Room': 'Phòng',
+                'SquareMeter': 'Mét vuông (m²)',
+                'Person': 'Người',
+                'Package': 'Gói',
+                'Event': 'Sự kiện'
+            };
+            return unitMap[unitType] || unitType;
+        }
+
+        // Notification function - hiển thị ở giữa màn hình
+        function showNotification(message, type) {
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+            const iconClass = type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill';
+            
+            // Xóa thông báo cũ nếu có
+            const existingNotification = document.querySelector('.center-notification');
+            if (existingNotification) {
+                existingNotification.remove();
             }
             
-            createOptionFormEdit.addEventListener('submit', async function (e) {
+            const notification = document.createElement('div');
+            notification.className = `alert ${alertClass} center-notification notification-show`;
+            notification.innerHTML = `
+                <i class="bi ${iconClass} me-2"></i>
+                ${message}
+            `;
+            document.body.appendChild(notification);
+            
+            // Tự động ẩn sau 2 giây
+            setTimeout(() => {
+                notification.classList.add('notification-hide');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 2000);
+        }
+
+        // Clear errors on input - Setup event listeners và Create Option handler
+        document.addEventListener('DOMContentLoaded', function() {
+            // Setup input event listeners
+            const optionName = document.getElementById('optionNameEdit');
+            const optionPrice = document.getElementById('optionPriceEdit');
+            const optionUnitType = document.getElementById('optionUnitTypeEdit');
+
+            if (optionName) {
+                optionName.addEventListener('input', function() {
+                    hideFieldErrorEdit('optionNameEdit', 'optionNameEditError');
+                });
+            }
+
+            if (optionPrice) {
+                optionPrice.addEventListener('input', function() {
+                    hideFieldErrorEdit('optionPriceEdit', 'optionPriceEditError');
+                });
+            }
+
+            if (optionUnitType) {
+                optionUnitType.addEventListener('change', function() {
+                    hideFieldErrorEdit('optionUnitTypeEdit', 'optionUnitTypeEditError');
+                });
+            }
+
+        });
+
+        // Create Option (Edit) handler - Sử dụng event delegation để đảm bảo hoạt động
+        // Attach event listener trên document để catch submit từ form trong modal
+        document.addEventListener('submit', async function (e) {
+            const form = e.target;
+            if (form && form.id === 'createOptionFormEdit') {
                 e.preventDefault();
+                e.stopPropagation();
+                
+                // Clear previous errors
+                clearAllModalErrorsEdit();
+
                 const optionData = {
                     OptionName: document.getElementById('optionNameEdit').value.trim(),
                     Description: document.getElementById('optionDescriptionEdit').value.trim(),
@@ -386,10 +569,36 @@
                     UnitType: document.getElementById('optionUnitTypeEdit').value
                 };
 
-                if (!optionData.OptionName) { alert('Vui lòng nhập tên option!'); return; }
-                if (optionData.OptionName.length > 50) { alert('Tên option không được vượt quá 50 ký tự!'); return; }
-                if (!optionData.UnitType) { alert('Vui lòng chọn đơn vị!'); return; }
-                if (optionData.Price < 0) { alert('Giá phải >= 0!'); return; }
+                let hasError = false;
+
+                // Validate Option Name
+                if (!optionData.OptionName) {
+                    showFieldErrorEdit('optionNameEdit', 'optionNameEditError', 'Vui lòng nhập tên option!');
+                    hasError = true;
+                } else if (optionData.OptionName.length > 50) {
+                    showFieldErrorEdit('optionNameEdit', 'optionNameEditError', 'Tên option không được vượt quá 50 ký tự!');
+                    hasError = true;
+                }
+
+                // Validate Price
+                const priceInput = document.getElementById('optionPriceEdit');
+                if (!priceInput.value || priceInput.value.trim() === '') {
+                    showFieldErrorEdit('optionPriceEdit', 'optionPriceEditError', 'Vui lòng nhập giá!');
+                    hasError = true;
+                } else if (optionData.Price < 0 || isNaN(optionData.Price)) {
+                    showFieldErrorEdit('optionPriceEdit', 'optionPriceEditError', 'Giá phải lớn hơn hoặc bằng 0!');
+                    hasError = true;
+                }
+
+                // Validate Unit Type
+                if (!optionData.UnitType) {
+                    showFieldErrorEdit('optionUnitTypeEdit', 'optionUnitTypeEditError', 'Vui lòng chọn đơn vị!');
+                    hasError = true;
+                }
+
+                if (hasError) {
+                    return;
+                }
 
                 try {
                     const resp = await fetch('/Provider/ServiceManagement/CreateOption', {
@@ -398,64 +607,62 @@
                         body: JSON.stringify(optionData)
                     });
                     const result = await resp.json();
+                    
                     if (result && result.success) {
                         const modalElement = document.getElementById('createOptionModalEdit');
                         const modal = bootstrap.Modal.getInstance(modalElement) ?? new bootstrap.Modal(modalElement);
                         modal.hide();
-                        this.reset();
+                        form.reset();
+                        clearAllModalErrorsEdit();
                         
                         // Thêm option vừa tạo vào danh sách và auto-tick
                         const opt = result.data;
                         const container = document.getElementById('optionsContainer');
                         
-                        // Kiểm tra xem option này đã tồn tại chưa (tránh duplicate)
-                        const existingCheckbox = container.querySelector(`input[type="checkbox"][value="${opt.optionId}"]`);
-                        if (existingCheckbox) {
-                            alert('Option này đã được thêm vào danh sách!');
+                        if (!container) {
+                            console.error('optionsContainer not found!');
+                            showNotification('Có lỗi xảy ra khi thêm option vào danh sách!', 'error');
                             return;
                         }
                         
-                        // Nếu container chỉ có text-muted (chưa có option nào), xóa nó và tạo row mới
-                        const textMuted = container.querySelector('.text-muted');
-                        if (textMuted && !container.querySelector('.row')) {
-                            container.innerHTML = '';
-                            const row = document.createElement('div');
-                            row.className = 'row';
-                            container.appendChild(row);
+                        // Kiểm tra xem option này đã tồn tại chưa (tránh duplicate)
+                        const existingCheckbox = container.querySelector(`input[type="checkbox"][value="${opt.optionId}"][name="OptionIds"]`);
+                        if (existingCheckbox) {
+                            showNotification('Option này đã được thêm vào danh sách!', 'success');
+                            return;
                         }
                         
                         // Tìm row hiện có hoặc tạo mới
-                        let row = container.querySelector('.row');
+                        let row = container.querySelector('.tags-options-row');
+                        
+                        // Nếu không có row, tạo mới
                         if (!row) {
+                            // Kiểm tra xem có text-muted (empty message) không
+                            const textMuted = container.querySelector('.text-muted');
+                            if (textMuted) {
+                                // Xóa text-muted và tạo row mới
+                                container.innerHTML = '';
+                            }
+                            // Tạo row mới
                             row = document.createElement('div');
-                            row.className = 'row';
-                            container.appendChild(row);
-                        }
-                        
-                        // Đếm số col hiện có trong row để quyết định có cần row mới không
-                        const colsInRow = row.querySelectorAll('.col-md-4').length;
-                        
-                        // Nếu row hiện tại đã đầy (3 cols vì dùng col-md-4), tạo row mới
-                        if (colsInRow >= 3) {
-                            row = document.createElement('div');
-                            row.className = 'row';
+                            row.className = 'row tags-options-row';
                             container.appendChild(row);
                         }
 
                         // Tạo col mới cho option
                         const col = document.createElement('div');
-                        col.className = 'col-md-4 mb-2';
+                        col.className = 'col-12 col-sm-6 col-md-6';
+                        const descriptionText = opt.description ? opt.description + (opt.price !== undefined ? ' - ' : '') : '';
+                        const unitTypeVietnamese = opt.unitType ? getUnitTypeVietnamese(opt.unitType) : '';
+                        const priceText = opt.price !== undefined ? parseInt(opt.price).toLocaleString() + ' VNĐ/' + unitTypeVietnamese : '';
                         col.innerHTML = `
-                            <div class="d-flex align-items-center">
-                                <div class="form-check flex-grow-1">
-                                    <input class="form-check-input" type="checkbox" name="OptionIds" value="${opt.optionId}" id="option_${opt.optionId}" checked />
-                                    <label class="form-check-label" for="option_${opt.optionId}">
-                                        ${opt.optionName}
-                                        <br />
-                                        <small class="text-muted">${opt.description ?? ''} ${opt.price !== undefined ? '- ' + parseInt(opt.price).toLocaleString() + ' VNĐ/' + opt.unitType : ''}</small>
-                                    </label>
-                                </div>
-                                <button type="button" class="btn btn-sm btn-outline-danger ms-2 remove-option-btn" data-option-id="${opt.optionId}" data-option-name="${opt.optionName}" title="Xóa option khỏi danh sách">
+                            <div class="tag-option-item">
+                                <input class="form-check-input" type="checkbox" name="OptionIds" value="${opt.optionId}" id="option_${opt.optionId}" checked />
+                                <label class="form-check-label" for="option_${opt.optionId}">
+                                    ${opt.optionName}
+                                    ${descriptionText || priceText ? `<small>${descriptionText}${priceText}</small>` : ''}
+                                </label>
+                                <button type="button" class="remove-option-btn" data-option-id="${opt.optionId}" data-option-name="${opt.optionName}" title="Xóa option khỏi danh sách">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>`;
@@ -467,15 +674,29 @@
                             removeOptionFromList(opt.optionId, opt.optionName);
                         });
                         
-                        alert('Tạo option thành công!');
+                        showNotification('Tạo option thành công!', 'success');
                     } else {
-                        alert(result?.message || 'Có lỗi xảy ra khi tạo option!');
+                        showNotification(result?.message || 'Có lỗi xảy ra khi tạo option!', 'error');
                     }
                 } catch (err) {
                     console.error('Error creating option:', err);
-                    alert('Có lỗi xảy ra khi tạo option!');
+                    showNotification('Có lỗi xảy ra khi tạo option!', 'error');
                 }
-            });
+            }
+        });
+
+        // Reset form và clear errors when modal is closed
+        document.addEventListener('DOMContentLoaded', function() {
+            const createOptionModalEdit = document.getElementById('createOptionModalEdit');
+            if (createOptionModalEdit) {
+                createOptionModalEdit.addEventListener('hidden.bs.modal', function() {
+                    const form = document.getElementById('createOptionFormEdit');
+                    if (form) {
+                        form.reset();
+                        clearAllModalErrorsEdit();
+                    }
+                });
+            }
         });
 
         // Remove option from list (chỉ xóa khỏi UI, không xóa khỏi database)
@@ -485,22 +706,25 @@
             }
             
             // Tìm và xóa option khỏi UI
-            const checkbox = document.querySelector(`input[type="checkbox"][value="${optionId}"]`);
+            const checkbox = document.querySelector(`input[type="checkbox"][value="${optionId}"][name="OptionIds"]`);
             if (checkbox) {
-                const col = checkbox.closest('.col-md-4');
-                if (col) {
-                    col.remove();
-                    // Nếu row trống, xóa row
-                    const row = col.closest('.row');
-                    if (row && row.querySelectorAll('.col-md-4').length === 0) {
-                        row.remove();
+                const tagOptionItem = checkbox.closest('.tag-option-item');
+                if (tagOptionItem) {
+                    const col = tagOptionItem.closest('[class*="col-"]');
+                    if (col) {
+                        col.remove();
+                        // Nếu row trống, xóa row
+                        const row = col.closest('.tags-options-row');
+                        if (row && row.querySelectorAll('[class*="col-"]').length === 0) {
+                            row.remove();
+                        }
+                        // Nếu container trống, hiển thị message
+                        const container = document.getElementById('optionsContainer');
+                        if (container && container.querySelectorAll('.tags-options-row').length === 0) {
+                            container.innerHTML = '<p class="text-muted mb-0 small"><i class="bi bi-info-circle me-1"></i>Chưa có option nào.</p>';
+                        }
+                        showNotification(`Đã xóa option "${optionName}" khỏi danh sách!`, 'success');
                     }
-                    // Nếu container trống, hiển thị message
-                    const container = document.getElementById('optionsContainer');
-                    if (container && container.querySelectorAll('.row').length === 0) {
-                        container.innerHTML = '<p class="text-muted">Chưa có option nào.</p>';
-                    }
-                    alert(`Đã xóa option "${optionName}" khỏi danh sách!`);
                 }
             }
         }
@@ -518,93 +742,39 @@
         });
     </script>
     
-    <style>
-        /* Gallery ảnh: hiển thị ngang, tự wrap, khoảng cách đều */
-        .image-inline-gallery {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: flex-start;
-        }
-
-        .removable-image {
-            position: relative;
-            width: 180px;
-            height: 180px;
-            flex: 0 0 auto;
-        }
-
-        .removable-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: .5rem;
-            box-shadow: 0 2px 6px rgba(0,0,0,.08);
-        }
-
-        .removable-image .remove-image-btn {
-            position: absolute;
-            top: 6px;
-            right: 6px;
-            line-height: 1;
-            padding: 2px 6px;
-        }
-
-        .no-image-placeholder-large {
-            width: 200px;
-            height: 200px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            border-radius: 0.5rem;
-            border: 2px dashed var(--bs-gray-400);
-            color: var(--bs-gray-600);
-        }
-        
-        .no-image-placeholder-large i {
-            font-size: 3rem;
-        }
-        
-        .no-image-placeholder-large p {
-            margin: 0;
-            font-size: 0.9rem;
-        }
-    </style>
-    
     <!-- Create Option Modal (Edit) -->
     <div class="modal fade" id="createOptionModalEdit" tabindex="-1" aria-labelledby="createOptionModalEditLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modern-modal">
+                <div class="modal-header modern-modal-header">
                     <h5 class="modal-title" id="createOptionModalEditLabel">
                         <i class="bi bi-gear me-2"></i>
                         Tạo Option mới
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="createOptionFormEdit">
+                <form id="createOptionFormEdit" novalidate>
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="optionNameEdit" class="form-label">Tên Option <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="optionNameEdit" required placeholder="VD: Thêm 2 giờ">
+                            <input type="text" class="form-control" id="optionNameEdit" name="optionName" required placeholder="VD: Thêm 2 giờ">
+                            <div class="text-danger small mt-1" id="optionNameEditError" style="display: none;"></div>
                         </div>
                         <div class="mb-3">
                             <label for="optionDescriptionEdit" class="form-label">Mô tả</label>
-                            <textarea class="form-control" id="optionDescriptionEdit" rows="3" placeholder="Mô tả chi tiết về option..."></textarea>
+                            <textarea class="form-control" id="optionDescriptionEdit" name="description" rows="3" placeholder="Mô tả chi tiết về option..."></textarea>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="optionPriceEdit" class="form-label">Giá (VNĐ) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="optionPriceEdit" required min="0" step="1000" placeholder="100000">
+                                <input type="number" class="form-control" id="optionPriceEdit" name="price" required min="0" step="1000" placeholder="100000">
+                                <div class="text-danger small mt-1" id="optionPriceEditError" style="display: none;"></div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="optionUnitTypeEdit" class="form-label">
                                     <i class="bi bi-rulers me-1"></i>Đơn vị tính giá <span class="text-danger">*</span>
                                 </label>
-                                <select class="form-select" id="optionUnitTypeEdit" required>
+                                <select class="form-select" id="optionUnitTypeEdit" name="unitType" required>
                                     <option value="">-- Chọn đơn vị tính giá --</option>
                                     <option value="Hour">Giờ</option>
                                     <option value="Day">Ngày</option>
@@ -616,13 +786,14 @@
                                     <option value="Package">Gói</option>
                                     <option value="Event">Sự kiện</option>
                                 </select>
-                                <small class="form-text text-muted">
+                                <small class="form-text text-muted small d-block mt-1">
                                     <i class="bi bi-info-circle me-1"></i>Đơn vị tính giá cho option này
                                 </small>
+                                <div class="text-danger small mt-1" id="optionUnitTypeEditError" style="display: none;"></div>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer justify-content-center">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
                         <button type="submit" class="btn btn-success">
                             <i class="bi bi-check-circle me-1"></i>

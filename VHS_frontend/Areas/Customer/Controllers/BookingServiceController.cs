@@ -8,6 +8,8 @@ using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
 using VHS_frontend.Areas.Customer.Models.VoucherDTOs;
 using VHS_frontend.Areas.Customer.Models.ReportDTOs;
 using VHS_frontend.Services.Customer;
+using VHS_frontend.Services.Provider;
+using VHS_frontend.Areas.Provider.Models.Staff;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
@@ -19,6 +21,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         private readonly BookingServiceCustomer _bookingServiceCustomer;
         private readonly UserAddressService _userAddressService;
         private readonly ReportService _reportService;
+        private readonly StaffManagementService _staffService;
 
         // Session keys để giữ lựa chọn trong flow checkout
         private const string SS_SELECTED_IDS = "CHECKOUT_SELECTED_IDS";
@@ -34,12 +37,14 @@ namespace VHS_frontend.Areas.Customer.Controllers
             CartServiceCustomer cartService, 
             BookingServiceCustomer bookingServiceCustomer, 
             UserAddressService userAddressService,
-            ReportService reportService)
+            ReportService reportService,
+            StaffManagementService staffService)
         {
             _cartService = cartService;
             _bookingServiceCustomer = bookingServiceCustomer;
             _userAddressService = userAddressService;
             _reportService = reportService;
+            _staffService = staffService;
         }
 
         // Helper: lấy AccountId từ claim/session với retry logic
@@ -1131,6 +1136,23 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
+                // Bổ sung thông tin liên hệ nhân viên nếu có StaffId
+                if (vm.StaffId.HasValue)
+                {
+                    try
+                    {
+                        var staff = await _staffService.GetStaffByIdAsync(vm.StaffId.Value.ToString(), jwtToken);
+                        if (staff != null)
+                        {
+                            if (string.IsNullOrWhiteSpace(vm.StaffPhone)) vm.StaffPhone = staff.PhoneNumber ?? string.Empty;
+                            if (string.IsNullOrWhiteSpace(vm.StaffAddress)) vm.StaffAddress = staff.Address ?? string.Empty;
+                        }
+                    }
+                    catch { /* ignore if cannot load staff */ }
+                }
+                // Đưa ra ViewBag để view có thể fallback, chuẩn hóa về null khi trống
+                ViewBag.StaffPhone = string.IsNullOrWhiteSpace(vm.StaffPhone) ? null : vm.StaffPhone;
+                ViewBag.StaffAddress = string.IsNullOrWhiteSpace(vm.StaffAddress) ? null : vm.StaffAddress;
             }
             catch (HttpRequestException ex)
             {

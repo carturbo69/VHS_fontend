@@ -1,11 +1,13 @@
 @model VHS_frontend.Areas.Provider.Models.Profile.ProviderProfileDTO
+@inject IConfiguration Configuration
 @{
-    ViewData["Title"] = "Thông tin Profile";
+    ViewData["Title"] = "Thông tin nhà cung cấp";
     Layout = "~/Areas/Provider/Views/_ProviderLayout.cshtml";
 }
+@using VHS_frontend.Helpers
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/profile-buttons.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/provider-profile-index.css" asp-append-version="true" />
 }
 
 @functions {
@@ -32,23 +34,25 @@
                         <i class="bi bi-person-circle"></i>
                     </div>
                     <div class="header-content">
-                        <h1 class="header-title">Thông tin Profile Provider</h1>
-                        <p class="header-subtitle">Quản lý hồ sơ dịch vụ của bạn</p>
+                        <h1 class="header-title">Thông tin nhà cung cấp</h1>
+                        <p class="header-subtitle">Quản lý hồ sơ trang dịch vụ của bạn</p>
                     </div>
                 </div>
 
                 @if (TempData["Success"] != null)
                 {
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="bi bi-check-circle me-2"></i>
                         @TempData["Success"]
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 }
                 @if (TempData["Error"] != null)
                 {
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
                         @TempData["Error"]
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 }
 
@@ -59,9 +63,15 @@
                         <div class="col-md-4 col-lg-3">
                             <div class="profile-image-section">
                                 <div class="profile-image-wrapper">
-                                    @if (!string.IsNullOrEmpty(Model.Images))
+                                    @{
+                                        var profileImageUrl = !string.IsNullOrEmpty(Model.Images) 
+                                            ? ImageHelper.GetImageUrl(Model.Images, Configuration) 
+                                            : string.Empty;
+                                    }
+                                    @if (!string.IsNullOrEmpty(profileImageUrl))
                                     {
-                                        <img src="@Model.Images" alt="@Model.ProviderName" class="profile-main-image" />
+                                        <img src="@profileImageUrl" alt="@Model.ProviderName" class="profile-main-image" 
+                                             onerror="this.onerror=null; this.src='/images/placeholder-avatar.png'; this.parentElement.innerHTML='<div class=\\'profile-image-placeholder\\'><i class=\\'bi bi-building\\'></i></div>';" />
                                     }
                                     else
                                     {
@@ -69,13 +79,23 @@
                                             <i class="bi bi-building"></i>
                                         </div>
                                     }
-                                    <!-- Status Badge -->
-                                    <div class="status-badge-overlay">
-                                        <span class="status-badge-modern status-@(Model.Status?.ToLower() ?? "pending")">
-                                            <i class="bi bi-check-circle-fill"></i>
-                                            @GetStatusText(Model.Status)
-                                        </span>
-                                    </div>
+                                </div>
+                                <!-- Status Badge - Nằm dưới ảnh -->
+                                <div class="status-badge-container">
+                                    @{
+                                        var statusLower = Model.Status?.ToLower() ?? "pending";
+                                        var statusIcon = statusLower switch
+                                        {
+                                            "approved" => "bi-check-circle-fill",
+                                            "pending" => "bi-clock-fill",
+                                            "rejected" => "bi-x-circle-fill",
+                                            _ => "bi-question-circle-fill"
+                                        };
+                                    }
+                                    <span class="status-badge-modern status-@statusLower">
+                                        <i class="bi @statusIcon"></i>
+                                        @GetStatusText(Model.Status)
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -85,11 +105,13 @@
                             <div class="profile-details-section">
                                 <!-- Provider Name -->
                                 <h2 class="provider-name-title">@Model.ProviderName</h2>
-                                <p class="provider-account-name">@@@Model.AccountName</p>
 
                                 <!-- Provider ID -->
                                 <div class="info-field">
-                                    <label class="info-label">PROVIDER ID</label>
+                                    <label class="info-label">
+                                        <i class="bi bi-person-badge"></i>
+                                        PROVIDER ID
+                                    </label>
                                     <div class="info-value-pill">
                                         <span>@Model.ProviderId</span>
                                     </div>
@@ -97,26 +119,33 @@
 
                                 <!-- Account Name -->
                                 <div class="info-field">
-                                    <label class="info-label">TÊN TÀI KHOẢN</label>
+                                    <label class="info-label">
+                                        <i class="bi bi-person-circle"></i>
+                                        TÊN TÀI KHOẢN
+                                    </label>
                                     <div class="info-value-text">@Model.AccountName</div>
                                 </div>
 
                                 <!-- Contact Info Row -->
-                                <div class="row g-3 mt-2">
-                                    <div class="col-md-6">
-                                        <div class="info-field">
-                                            <label class="info-label">
-                                                <i class="bi bi-envelope me-2"></i>EMAIL
-                                            </label>
-                                            <div class="info-value-text">@Model.Email</div>
+                                <div class="info-field-row">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <div class="info-field">
+                                                <label class="info-label">
+                                                    <i class="bi bi-envelope"></i>
+                                                    EMAIL
+                                                </label>
+                                                <div class="info-value-text">@(string.IsNullOrEmpty(Model.Email) ? "Chưa có email" : Model.Email)</div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="info-field">
-                                            <label class="info-label">
-                                                <i class="bi bi-telephone me-2"></i>SỐ ĐIỆN THOẠI
-                                            </label>
-                                            <div class="info-value-text">@Model.PhoneNumber</div>
+                                        <div class="col-md-6">
+                                            <div class="info-field info-field-last">
+                                                <label class="info-label">
+                                                    <i class="bi bi-telephone"></i>
+                                                    SỐ ĐIỆN THOẠI
+                                                </label>
+                                                <div class="info-value-text">@(string.IsNullOrEmpty(Model.PhoneNumber) ? "Chưa có số điện thoại" : Model.PhoneNumber)</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

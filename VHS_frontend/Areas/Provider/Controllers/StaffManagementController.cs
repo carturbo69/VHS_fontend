@@ -59,12 +59,26 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     .ThenBy(s => s.StaffName)  // Sắp xếp theo tên trong cùng trạng thái
                     .ToList();
                 
+                // Nếu là AJAX request, trả về partial view chỉ có staff list
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return PartialView("_StaffList", sortedStaffList);
+                }
+
                 return View(sortedStaffList);
             }
             catch (Exception ex)
             {
                 TempData["Error"] = "Không thể tải danh sách nhân viên: " + ex.Message;
-                return View(new List<StaffDTO>());
+                var emptyList = new List<StaffDTO>();
+                
+                // Nếu là AJAX request, trả về partial view
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return PartialView("_StaffList", emptyList);
+                }
+                
+                return View(emptyList);
             }
         }
 
@@ -94,6 +108,34 @@ namespace VHS_frontend.Areas.Provider.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(StaffCreateDTO model)
         {
+            // Validate image files
+            if (model.FaceImage != null)
+            {
+                ValidateImageFile(model.FaceImage, "FaceImage", "Ảnh chân dung");
+            }
+            else
+            {
+                ModelState.AddModelError("FaceImage", "Ảnh chân dung là bắt buộc");
+            }
+            
+            if (model.CitizenIDFrontImage != null)
+            {
+                ValidateImageFile(model.CitizenIDFrontImage, "CitizenIDFrontImage", "Ảnh mặt trước CCCD");
+            }
+            else
+            {
+                ModelState.AddModelError("CitizenIDFrontImage", "Ảnh mặt trước CCCD là bắt buộc");
+            }
+            
+            if (model.CitizenIDBackImage != null)
+            {
+                ValidateImageFile(model.CitizenIDBackImage, "CitizenIDBackImage", "Ảnh mặt sau CCCD");
+            }
+            else
+            {
+                ModelState.AddModelError("CitizenIDBackImage", "Ảnh mặt sau CCCD là bắt buộc");
+            }
+
             if (!ModelState.IsValid)
             {
                 return View(model);
@@ -118,7 +160,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     return RedirectToAction("Create");
                 }
 
-                // Create MultipartFormDataContent for Backend API
+                // Create MultipartFormDataContent for Backend API - Images will be saved on backend
                 var formData = new MultipartFormDataContent();
                 formData.Add(new StringContent(model.StaffName), "StaffName");
                 formData.Add(new StringContent(model.Password), "Password");
@@ -134,20 +176,29 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     formData.Add(new StringContent(model.PhoneNumber), "PhoneNumber");
                 }
                 
+                // Add image files with proper ContentType headers - Files will be uploaded to backend
                 if (model.FaceImage != null)
                 {
-                    formData.Add(new StreamContent(model.FaceImage.OpenReadStream()), "FaceImage", model.FaceImage.FileName);
+                    var faceImageContent = new StreamContent(model.FaceImage.OpenReadStream());
+                    faceImageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(model.FaceImage.ContentType);
+                    formData.Add(faceImageContent, "FaceImage", model.FaceImage.FileName);
                 }
+                
                 if (model.CitizenIDFrontImage != null)
                 {
-                    formData.Add(new StreamContent(model.CitizenIDFrontImage.OpenReadStream()), "CitizenIDFrontImage", model.CitizenIDFrontImage.FileName);
+                    var frontImageContent = new StreamContent(model.CitizenIDFrontImage.OpenReadStream());
+                    frontImageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(model.CitizenIDFrontImage.ContentType);
+                    formData.Add(frontImageContent, "CitizenIDFrontImage", model.CitizenIDFrontImage.FileName);
                 }
+                
                 if (model.CitizenIDBackImage != null)
                 {
-                    formData.Add(new StreamContent(model.CitizenIDBackImage.OpenReadStream()), "CitizenIDBackImage", model.CitizenIDBackImage.FileName);
+                    var backImageContent = new StreamContent(model.CitizenIDBackImage.OpenReadStream());
+                    backImageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(model.CitizenIDBackImage.ContentType);
+                    formData.Add(backImageContent, "CitizenIDBackImage", model.CitizenIDBackImage.FileName);
                 }
 
-                // Call Backend API
+                // Call Backend API - Backend will save images to wwwroot/uploads/staff
                 var result = await _staffManagementService.CreateStaffAsync(providerId, formData, token);
                 
                 if (result.IsSuccessStatusCode)
@@ -158,7 +209,28 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 else
                 {
                     var errorContent = await result.Content.ReadAsStringAsync();
-                    TempData["Error"] = "Lỗi: " + errorContent;
+                    string errorMessage = "Lỗi khi tạo nhân viên";
+                    
+                    try
+                    {
+                        // Try to parse JSON error response
+                        var errorJson = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(errorContent);
+                        if (errorJson != null && errorJson.ContainsKey("message"))
+                        {
+                            errorMessage = errorJson["message"].ToString() ?? errorMessage;
+                        }
+                        else
+                        {
+                            errorMessage = errorContent;
+                        }
+                    }
+                    catch
+                    {
+                        // If not JSON, use the error content directly
+                        errorMessage = errorContent;
+                    }
+                    
+                    TempData["Error"] = errorMessage;
                     return RedirectToAction("Create");
                 }
             }
@@ -415,7 +487,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 if (string.IsNullOrEmpty(token))
                 {
                     Console.WriteLine("❌ No token found in session");
-                    return Json(new { error = "Session hết hạn. Vui lòng đăng nhập lại." });
+                    return StatusCode(401, new { error = "Session hết hạn. Vui lòng đăng nhập lại.", success = false });
                 }
 
                 Console.WriteLine($"✅ Token found: {token.Substring(0, 20)}...");
@@ -426,19 +498,60 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 if (result.IsSuccessStatusCode)
                 {
                     Console.WriteLine("✅ Lock successful");
-                    return Json(new { success = true, message = "Đã khóa tài khoản nhân viên thành công!" });
+                    var responseContent = await result.Content.ReadAsStringAsync();
+                    Console.WriteLine($"📄 Response content: {responseContent}");
+                    
+                    // Parse JSON response from backend
+                    try
+                    {
+                        var backendResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                        var message = backendResponse.TryGetProperty("message", out var msgProp) 
+                            ? msgProp.GetString() 
+                            : "Đã khóa tài khoản nhân viên thành công!";
+                        
+                        return Json(new { success = true, message = message });
+                    }
+                    catch
+                    {
+                        return Json(new { success = true, message = "Đã khóa tài khoản nhân viên thành công!" });
+                    }
                 }
                 else
                 {
+                    // Backend trả về lỗi (400, 404, 500, etc)
                     var errorContent = await result.Content.ReadAsStringAsync();
                     Console.WriteLine($"❌ Backend error: {errorContent}");
-                    return Json(new { error = errorContent });
+                    
+                    // Parse JSON error response from backend
+                    string errorMessage = "Không thể khóa tài khoản nhân viên";
+                    try
+                    {
+                        var errorResponse = JsonSerializer.Deserialize<JsonElement>(errorContent);
+                        if (errorResponse.TryGetProperty("message", out var msgProp))
+                        {
+                            errorMessage = msgProp.GetString() ?? errorMessage;
+                        }
+                        else if (errorResponse.TryGetProperty("error", out var errProp))
+                        {
+                            errorMessage = errProp.GetString() ?? errorMessage;
+                        }
+                    }
+                    catch
+                    {
+                        // Nếu không parse được JSON, sử dụng errorContent trực tiếp
+                        errorMessage = errorContent;
+                    }
+                    
+                    // Trả về HTTP status code tương ứng với backend (400, 404, 500, etc)
+                    return StatusCode((int)result.StatusCode, new { error = errorMessage, success = false });
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"💥 Exception in LockStaff: {ex.Message}");
-                return Json(new { error = ex.Message });
+                Console.WriteLine($"💥 Stack trace: {ex.StackTrace}");
+                // Trả về HTTP 500 Internal Server Error khi có exception
+                return StatusCode(500, new { error = ex.Message, success = false });
             }
         }
 
@@ -455,7 +568,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 if (string.IsNullOrEmpty(token))
                 {
                     Console.WriteLine("❌ No token found in session");
-                    return Json(new { error = "Session hết hạn. Vui lòng đăng nhập lại." });
+                    return StatusCode(401, new { error = "Session hết hạn. Vui lòng đăng nhập lại.", success = false });
                 }
 
                 Console.WriteLine($"✅ Token found: {token.Substring(0, 20)}...");
@@ -466,19 +579,60 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 if (result.IsSuccessStatusCode)
                 {
                     Console.WriteLine("✅ Unlock successful");
-                    return Json(new { success = true, message = "Đã mở khóa tài khoản nhân viên thành công!" });
+                    var responseContent = await result.Content.ReadAsStringAsync();
+                    Console.WriteLine($"📄 Response content: {responseContent}");
+                    
+                    // Parse JSON response from backend
+                    try
+                    {
+                        var backendResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                        var message = backendResponse.TryGetProperty("message", out var msgProp) 
+                            ? msgProp.GetString() 
+                            : "Đã mở khóa tài khoản nhân viên thành công!";
+                        
+                        return Json(new { success = true, message = message });
+                    }
+                    catch
+                    {
+                        return Json(new { success = true, message = "Đã mở khóa tài khoản nhân viên thành công!" });
+                    }
                 }
                 else
                 {
+                    // Backend trả về lỗi (400, 404, 500, etc)
                     var errorContent = await result.Content.ReadAsStringAsync();
                     Console.WriteLine($"❌ Backend error: {errorContent}");
-                    return Json(new { error = errorContent });
+                    
+                    // Parse JSON error response from backend
+                    string errorMessage = "Không thể mở khóa tài khoản nhân viên";
+                    try
+                    {
+                        var errorResponse = JsonSerializer.Deserialize<JsonElement>(errorContent);
+                        if (errorResponse.TryGetProperty("message", out var msgProp))
+                        {
+                            errorMessage = msgProp.GetString() ?? errorMessage;
+                        }
+                        else if (errorResponse.TryGetProperty("error", out var errProp))
+                        {
+                            errorMessage = errProp.GetString() ?? errorMessage;
+                        }
+                    }
+                    catch
+                    {
+                        // Nếu không parse được JSON, sử dụng errorContent trực tiếp
+                        errorMessage = errorContent;
+                    }
+                    
+                    // Trả về HTTP status code tương ứng với backend (400, 404, 500, etc)
+                    return StatusCode((int)result.StatusCode, new { error = errorMessage, success = false });
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"💥 Exception in UnlockStaff: {ex.Message}");
-                return Json(new { error = ex.Message });
+                Console.WriteLine($"💥 Stack trace: {ex.StackTrace}");
+                // Trả về HTTP 500 Internal Server Error khi có exception
+                return StatusCode(500, new { error = ex.Message, success = false });
             }
         }
 

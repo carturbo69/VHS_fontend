@@ -24,6 +24,32 @@
     }
 }
 
+<style>
+    /* FIX: Force white cho notification-time-white - Priority cao nhất */
+    .notification-time-white,
+    .item-time.notification-time-white,
+    #notificationDropdown .notification-time-white,
+    .notification-dropdown .notification-time-white,
+    .notification-items .notification-time-white,
+    .notification-item .notification-time-white,
+    .item-content .notification-time-white,
+    .notification-item .item-content .notification-time-white,
+    .dark .notification-time-white,
+    .dark .item-time.notification-time-white,
+    .dark #notificationDropdown .notification-time-white,
+    .dark .notification-dropdown .notification-time-white,
+    html .notification-time-white,
+    html body .notification-time-white,
+    html.dark .notification-time-white,
+    html.dark body .notification-time-white {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 12px !important;
+        opacity: 1 !important;
+    }
+</style>
+
 <div class="notification-dropdown" id="notificationDropdown">
     <div class="dropdown-header">
         <h3>Thông báo</h3>
@@ -72,7 +98,7 @@
                         
                         <div class="item-content">
                             <div class="content-text">@notification.Content</div>
-                            <div class="item-time">@ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm")</div>
+                            <span class="item-time notification-time-white" style="display: block; color: #ffffff !important; font-weight: 600 !important; font-size: 12px !important; opacity: 1 !important; -webkit-text-fill-color: #ffffff !important;">@ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm")</span>
                         </div>
                         
                         @if (!notification.IsRead)
@@ -111,3 +137,51 @@
         }
     </div>
 </div>
+
+<script>
+    // Force màu trắng cho notification-time-white - Cách đơn giản nhất
+    (function() {
+        function fixTimeColor() {
+            const items = document.querySelectorAll('.notification-time-white, .item-time.notification-time-white, #notificationDropdown .item-time, .notification-dropdown .item-time');
+            items.forEach(function(el) {
+                // Force với nhiều cách
+                el.style.color = '#ffffff';
+                el.style.setProperty('color', '#ffffff', 'important');
+                el.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
+                el.style.fontWeight = '600';
+                el.style.setProperty('font-weight', '600', 'important');
+                el.style.opacity = '1';
+                el.style.setProperty('opacity', '1', 'important');
+            });
+        }
+        
+        // Chạy ngay
+        fixTimeColor();
+        
+        // Chạy lại nhiều lần
+        [10, 50, 100, 200, 500, 1000].forEach(function(delay) {
+            setTimeout(fixTimeColor, delay);
+        });
+        
+        // Quan sát thay đổi
+        const observer = new MutationObserver(function() {
+            fixTimeColor();
+        });
+        
+        const dropdown = document.getElementById('notificationDropdown');
+        if (dropdown) {
+            observer.observe(dropdown, { 
+                childList: true, 
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class', 'style']
+            });
+        }
+        
+        // Quan sát html để catch dark mode change
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+    })();
+</script>

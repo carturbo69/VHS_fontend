@@ -1138,6 +1138,264 @@ a.chat-btn > #chatIcon {
                 console.error('Error updating notification bell:', error);
             }
         };
+
+        // ===== SignalR Real-time Notifications =====
+        let notificationConnection = null;
+
+        async function initNotificationSignalR() {
+            try {
+                // Load SignalR if not already loaded
+                if (typeof signalR === 'undefined') {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+
+                // Get backend URL from meta tag or default
+                const metaBackendUrl = document.querySelector('meta[name="backend-url"]')?.getAttribute('content');
+                const backendUrl = metaBackendUrl || 'http://localhost:5154';
+                const hubUrl = `${backendUrl}/hubs/notification`;
+
+                // Create connection
+                notificationConnection = new signalR.HubConnectionBuilder()
+                    .withUrl(hubUrl, {
+                        skipNegotiation: false,
+                        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling
+                    })
+                    .withAutomaticReconnect({
+                        nextRetryDelayInMilliseconds: retryContext => {
+                            if (retryContext.elapsedMilliseconds < 60000) {
+                                return 2000;
+                            } else {
+                                return 10000;
+                            }
+                        }
+                    })
+                    .configureLogging(signalR.LogLevel.Warning)
+                    .build();
+
+                // Handle connection events
+                notificationConnection.onreconnecting(() => {
+                    console.log('[NotificationHub] Reconnecting...');
+                });
+
+                notificationConnection.onreconnected(() => {
+                    console.log('[NotificationHub] Reconnected');
+                });
+
+                notificationConnection.onclose(() => {
+                    console.log('[NotificationHub] Connection closed');
+                });
+
+                // Listen for new notifications
+                notificationConnection.on('ReceiveNotification', (notification) => {
+                    console.log('[NotificationHub] Received notification:', notification);
+                    handleNewNotification(notification);
+                });
+
+                // Start connection
+                await notificationConnection.start();
+                console.log('[NotificationHub] Connected successfully');
+
+            } catch (error) {
+                console.error('[NotificationHub] Error initializing SignalR:', error);
+            }
+        }
+
+        function handleNewNotification(notification) {
+            if (!notification) return;
+
+            // Show toast notification
+            showNotificationToast(notification);
+
+            // Reload page to show new notification (after a delay to show toast)
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        }
+
+        function showNotificationToast(notification) {
+            // Create toast notification
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            toast.style.cssText = 'position: fixed; top: 20px; right: 20px; min-width: 320px; max-width: 420px; background: white; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 10000; opacity: 0; transform: translateX(400px); transition: all 0.3s ease;';
+            toast.innerHTML = `
+                <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; position: relative;">
+                    <div style="flex-shrink: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #10b981 0%, #34d399 100%); border-radius: 10px; color: white; font-size: 1.2rem;">
+                        <i class="bi bi-bell-fill"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 700; font-size: 0.95rem; color: #111827; margin-bottom: 4px;">Thông báo mới</div>
+                        <div style="font-size: 0.875rem; color: #6b7280; line-height: 1.5; word-wrap: break-word;">${escapeHtml(notification.content || notification.Content || '')}</div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: #6b7280; cursor: pointer; border-radius: 6px;">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(400px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize SignalR when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initNotificationSignalR();
+            
+            // Lắng nghe event từ dropdown khi đánh dấu đã đọc
+            setupCustomerNotificationSync();
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (notificationConnection) {
+                notificationConnection.stop();
+            }
+        });
+        
+        // ===== Sync với dropdown khi đánh dấu đã đọc =====
+        function setupCustomerNotificationSync() {
+            console.log('[CustomerNotificationSync] Setting up sync listeners');
+            
+            // Lắng nghe custom event từ layout
+            window.addEventListener('notificationMarkedRead', function(event) {
+                console.log('[CustomerNotificationSync] Received custom event:', event.detail);
+                const { action, data } = event.detail;
+                handleCustomerNotificationMarkedRead(action, data);
+            });
+            
+            // Lắng nghe BroadcastChannel để sync giữa các tabs
+            try {
+                const channel = new BroadcastChannel('customer_notification_sync');
+                channel.addEventListener('message', function(event) {
+                    console.log('[CustomerNotificationSync] Received BroadcastChannel message:', event.data);
+                    const { action, data } = event.data;
+                    handleCustomerNotificationMarkedRead(action, data);
+                });
+                console.log('[CustomerNotificationSync] BroadcastChannel listener set up');
+            } catch (e) {
+                console.log('[CustomerNotificationSync] BroadcastChannel not supported');
+            }
+            
+            // Lắng nghe localStorage event (fallback)
+            window.addEventListener('storage', function(event) {
+                if (event.key === 'customer_notification_update') {
+                    console.log('[CustomerNotificationSync] Received storage event');
+                    try {
+                        const update = JSON.parse(event.newValue);
+                        if (update) {
+                            handleCustomerNotificationMarkedRead(update.action, update.data);
+                        }
+                    } catch (e) {
+                        console.error('[CustomerNotificationSync] Error parsing notification update:', e);
+                    }
+                }
+            });
+        }
+        
+        // Xử lý khi notification được đánh dấu đã đọc từ dropdown
+        async function handleCustomerNotificationMarkedRead(action, data) {
+            console.log('[CustomerNotificationSync] Received:', action, data);
+            
+            if (action === 'markRead' && data.id) {
+                // Cập nhật UI cho notification cụ thể
+                const notificationItem = document.querySelector(`.notification-item[data-notification-id="${data.id}"]`);
+                if (notificationItem) {
+                    console.log('[CustomerNotificationSync] Found item, updating UI');
+                    
+                    // Animation đẹp khi đánh dấu đã đọc
+                    notificationItem.style.transition = 'all 0.3s ease-in-out';
+                    notificationItem.style.backgroundColor = 'var(--muted)';
+                    notificationItem.style.transform = 'scale(0.98)';
+                    
+                    setTimeout(() => {
+                        notificationItem.classList.remove('unread');
+                        notificationItem.classList.add('read');
+                        notificationItem.removeAttribute('onclick');
+                        
+                        // Reset style
+                        notificationItem.style.backgroundColor = '';
+                        notificationItem.style.transform = '';
+                    }, 300);
+                    
+                    // Cập nhật số lượng unread ngay lập tức
+                    if (typeof updateNotificationCounts === 'function') {
+                        updateNotificationCounts();
+                    }
+                    
+                    // Cập nhật chuông thông báo
+                    if (typeof updateNotificationBell === 'function') {
+                        updateNotificationBell();
+                    }
+                } else {
+                    console.log('[CustomerNotificationSync] Item not found, will reload page');
+                    // Nếu không tìm thấy, reload trang sau một chút
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                }
+            } else if (action === 'markAllRead') {
+                console.log('[CustomerNotificationSync] Marking all as read');
+                
+                // Cập nhật tất cả notifications thành "Đã đọc"
+                const unreadItems = document.querySelectorAll('.notification-item.unread');
+                unreadItems.forEach((item, index) => {
+                    setTimeout(() => {
+                        item.style.transition = 'all 0.3s ease-in-out';
+                        item.style.backgroundColor = 'var(--muted)';
+                        item.style.transform = 'scale(0.98)';
+                        
+                        setTimeout(() => {
+                            item.classList.remove('unread');
+                            item.classList.add('read');
+                            item.removeAttribute('onclick');
+                            
+                            // Reset style
+                            item.style.backgroundColor = '';
+                            item.style.transform = '';
+                        }, 300);
+                    }, index * 50);
+                });
+                
+                // Ẩn nút "Đánh dấu tất cả đã đọc"
+                const markAllReadBtn = document.getElementById('markAllReadBtn');
+                if (markAllReadBtn) {
+                    markAllReadBtn.style.display = 'none';
+                }
+                
+                // Cập nhật số lượng unread ngay lập tức
+                if (typeof updateNotificationCounts === 'function') {
+                    updateNotificationCounts();
+                }
+                
+                // Cập nhật chuông thông báo
+                if (typeof updateNotificationBell === 'function') {
+                    updateNotificationBell();
+                }
+            }
+        }
     </script>
 }
 

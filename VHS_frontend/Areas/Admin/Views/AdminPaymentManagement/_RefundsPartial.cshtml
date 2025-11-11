@@ -32,8 +32,8 @@
                                       booking.PaymentStatus == "Completed" ? "Đã thanh toán" :
                                       booking.PaymentStatus == "Failed" ? "Thất bại" :
                                       booking.PaymentStatus == "Refunded" ? "Đã hoàn tiền" : booking.PaymentStatus;
-                <div class="booking-card">
-                    <div class="booking-header">
+                <div class="booking-card booking-card-collapsible">
+                    <div class="booking-header booking-header-toggle" onclick="toggleBookingCard(this)">
                         <div class="booking-id">
                             <div class="booking-id-icon"><i class="bi bi-receipt-cutoff"></i></div>
                             <div class="booking-id-content">
@@ -41,22 +41,29 @@
                                 <span class="badge booking-id-badge">#@booking.BookingId.ToString().Substring(0, 8)</span>
                             </div>
                         </div>
-                        <div class="booking-status">
-                            <span class="status-badge @statusClass">
-                                <i class="bi @statusIcon"></i>
-                                <span>@statusText</span>
-                            </span>
+                        <div class="booking-header-right">
+                            <div class="booking-status">
+                                <span class="status-badge @statusClass">
+                                    <i class="bi @statusIcon"></i>
+                                    <span>@statusText</span>
+                                </span>
+                            </div>
+                            <div class="booking-amount-preview">
+                                <span class="amount-preview-label">Số tiền</span>
+                                <span class="amount-preview-value">@booking.PaymentAmount.ToString("N0") VNĐ</span>
+                            </div>
+                            <i class="bi bi-chevron-down booking-chevron"></i>
                         </div>
                     </div>
 
-                    <div class="booking-content">
+                    <div class="booking-content booking-content-collapsible collapsed">
                         <div class="booking-info-row">
                             <div class="info-item">
                                 <div class="info-icon-wrapper"><i class="bi bi-person-circle"></i></div>
                                 <div class="info-content">
                                     <strong>Khách hàng</strong>
-                                    <div class="info-value">@booking.CustomerName</div>
-                                    <small>@booking.CustomerEmail</small>
+                                    <div class="info-value">@(!string.IsNullOrWhiteSpace(booking.CustomerName) ? booking.CustomerName : (!string.IsNullOrWhiteSpace(booking.CustomerEmail) ? booking.CustomerEmail.Split('@')[0] : "Không xác định"))</div>
+                                    <small>@(!string.IsNullOrWhiteSpace(booking.CustomerEmail) ? booking.CustomerEmail : "N/A")</small>
                                 </div>
                             </div>
                             <div class="info-item">
@@ -142,12 +149,12 @@
                         }
                     </div>
 
-                    <div class="booking-actions">
-                        <button class="btn btn-approval btn-approval-approve" onclick="approveRefund('@booking.BookingId')">
+                    <div class="booking-actions" onclick="event.stopPropagation()">
+                        <button class="btn btn-approval btn-approval-approve" onclick="event.stopPropagation(); approveRefund('@booking.BookingId')">
                             <i class="bi bi-check-circle me-1"></i>
                             Chấp nhận hoàn tiền
                         </button>
-                        <button class="btn btn-approval btn-approval-reject" onclick="rejectRefund('@booking.BookingId')">
+                        <button class="btn btn-approval btn-approval-reject" onclick="event.stopPropagation(); rejectRefund('@booking.BookingId')">
                             <i class="bi bi-x-circle me-1"></i>
                             Từ chối hoàn tiền
                         </button>

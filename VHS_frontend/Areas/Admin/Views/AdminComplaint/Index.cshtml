@@ -2,6 +2,20 @@
 @{
     ViewData["Title"] = "Quản lý Khiếu nại";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+    
+    // Helper function để chuyển ComplaintType sang tiếng Việt
+    string GetComplaintTypeVi(string? type)
+    {
+        return type switch
+        {
+            "ServiceQuality" => "Chất lượng dịch vụ",
+            "ProviderBehavior" => "Hành vi nhà cung cấp",
+            "PriceIssue" => "Vấn đề giá",
+            "Delay" => "Trễ hẹn",
+            "Other" => "Khác",
+            _ => type ?? "Khác"
+        };
+    }
 }
 
 @section Styles {
@@ -155,113 +169,117 @@
                 @foreach (var complaint in Model.Complaints)
                     {
                         <div class="complaint-item">
-                            <div class="complaint-header">
-                                <div class="complaint-meta">
-                                    <div class="complaint-id">
-                                        <span class="badge bg-secondary">#@complaint.ComplaintId.ToString().Substring(0, 8)</span>
-                                    </div>
-                                    <div class="complaint-date">
-                                        <i class="bi bi-calendar3 me-1"></i>
-                                        <small>@(complaint.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</small>
-                                    </div>
-                                </div>
-                                <div class="complaint-status">
-                                    @switch(complaint.Status)
-                                    {
-                                        case "Pending":
-                                            <span class="status-badge status-pending">
-                                                <i class="bi bi-hourglass-split"></i><span> Chờ xử lý</span>
-                                            </span>
-                                            break;
-                                        case "InReview":
-                                            <span class="status-badge status-processing">
-                                                <i class="bi bi-search"></i><span> Đang xem xét</span>
-                                            </span>
-                                            break;
-                                        case "Resolved":
-                                            <span class="status-badge status-completed">
-                                                <i class="bi bi-check-circle"></i><span> Đã giải quyết</span>
-                                            </span>
-                                            break;
-                                        case "Rejected":
-                                            <span class="status-badge status-canceled">
-                                                <i class="bi bi-x-circle"></i><span> Đã từ chối</span>
-                                            </span>
-                                            break;
-                                        default:
-                                            <span class="badge bg-secondary">@complaint.Status</span>
-                                            break;
-                                    }
-                                </div>
-                            </div>
-
-                            <div class="complaint-content">
-                                <div class="complaint-title">
-                                    <h5 class="mb-2">@complaint.Title</h5>
-                                    <span class="badge bg-info">@complaint.ComplaintType</span>
-                                </div>
-                                
-                                @if (!string.IsNullOrEmpty(complaint.Description))
-                                {
-                                    <div class="complaint-description">
-                                        <p class="text-muted mb-3" title="@complaint.Description">@complaint.Description</p>
-                                    </div>
-                                }
-
-                                <div class="complaint-details">
-                                    <div class="detail-item">
-                                        <div class="info-icon-wrapper"><i class="bi bi-person-circle"></i></div>
-                                        <div class="info-content">
-                                            <strong>Khách hàng</strong>
-                                            <div class="info-value">@complaint.CustomerName</div>
-                                        </div>
-                                    </div>
-                                    @if (!string.IsNullOrEmpty(complaint.ProviderName))
-                                    {
-                                        <div class="detail-item">
-                                            <div class="info-icon-wrapper"><i class="bi bi-briefcase"></i></div>
-                                            <div class="info-content">
-                                                <strong>Nhà cung cấp</strong>
-                                                <div class="info-value">@complaint.ProviderName</div>
+                            <div class="complaint-layout">
+                                <!-- Left Content -->
+                                <div class="complaint-content-left">
+                                    <div class="complaint-header">
+                                        <div class="complaint-meta">
+                                            <div class="complaint-id">
+                                                <span class="badge bg-secondary">#@complaint.ComplaintId.ToString().Substring(0, 8)</span>
+                                            </div>
+                                            <div class="complaint-date">
+                                                <i class="bi bi-calendar3 me-1"></i>
+                                                <small>@(complaint.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</small>
                                             </div>
                                         </div>
-                                    }
-                                    @if (!string.IsNullOrEmpty(complaint.ServiceName))
-                                    {
-                                        <div class="detail-item">
-                                            <div class="info-icon-wrapper"><i class="bi bi-gear"></i></div>
-                                            <div class="info-content">
-                                                <strong>Dịch vụ</strong>
-                                                <div class="info-value">@complaint.ServiceName</div>
+                                        <div class="complaint-header-right">
+                                            <div class="complaint-status">
+                                                @switch(complaint.Status)
+                                                {
+                                                    case "Pending":
+                                                        <span class="status-badge status-pending">
+                                                            <i class="bi bi-hourglass-split"></i><span> Chờ xử lý</span>
+                                                        </span>
+                                                        break;
+                                                    case "InReview":
+                                                        <span class="status-badge status-processing">
+                                                            <i class="bi bi-search"></i><span> Đang xem xét</span>
+                                                        </span>
+                                                        break;
+                                                    case "Resolved":
+                                                        <span class="status-badge status-completed">
+                                                            <i class="bi bi-check-circle"></i><span> Đã giải quyết</span>
+                                                        </span>
+                                                        break;
+                                                    case "Rejected":
+                                                        <span class="status-badge status-canceled">
+                                                            <i class="bi bi-x-circle"></i><span> Đã từ chối</span>
+                                                        </span>
+                                                        break;
+                                                    default:
+                                                        <span class="badge bg-secondary">@complaint.Status</span>
+                                                        break;
+                                                }
                                             </div>
+                                            <a href="@Url.Action("Details", new { id = complaint.ComplaintId })" 
+                                               class="btn btn-view-details">
+                                                <i class="bi bi-eye me-1"></i>Xem chi tiết
+                                            </a>
                                         </div>
-                                    }
-                                    @if (complaint.DaysSinceCreated > 0)
-                                    {
-                                        <div class="detail-item">
-                                            <div class="info-icon-wrapper"><i class="bi bi-clock-history"></i></div>
-                                            <div class="info-content">
-                                                <strong>Thời gian</strong>
-                                                <div class="info-value">@complaint.DaysSinceCreated ngày trước</div>
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
-
-                                @if (complaint.AttachmentUrls != null && complaint.AttachmentUrls.Any())
-                                {
-                                    <div class="complaint-attachments mt-3">
-                                        <i class="bi bi-paperclip me-2"></i>
-                                        <span class="text-muted">@complaint.AttachmentUrls.Length tệp đính kèm</span>
                                     </div>
-                                }
-                            </div>
 
-                            <div class="complaint-actions">
-                                <a href="@Url.Action("Details", new { id = complaint.ComplaintId })" 
-                                   class="btn btn-outline-primary btn-sm">
-                                    <i class="bi bi-eye me-1"></i>Xem chi tiết
-                                </a>
+                                    <div class="complaint-content">
+                                        <div class="complaint-title">
+                                            <h5 class="mb-1">@complaint.Title</h5>
+                                            <span class="badge bg-info">@GetComplaintTypeVi(complaint.ComplaintType)</span>
+                                        </div>
+                                        
+                                        @if (!string.IsNullOrEmpty(complaint.Description))
+                                        {
+                                            <div class="complaint-description">
+                                                <p class="text-muted mb-2" title="@complaint.Description">@complaint.Description</p>
+                                            </div>
+                                        }
+
+                                        <div class="complaint-details">
+                                            <div class="detail-item">
+                                                <div class="info-icon-wrapper"><i class="bi bi-person-circle"></i></div>
+                                                <div class="info-content">
+                                                    <strong>Khách hàng</strong>
+                                                    <div class="info-value">@(!string.IsNullOrWhiteSpace(complaint.CustomerName) ? complaint.CustomerName : (!string.IsNullOrWhiteSpace(complaint.CustomerEmail) ? complaint.CustomerEmail.Split('@')[0] : "Không xác định"))</div>
+                                                </div>
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(complaint.ProviderName))
+                                            {
+                                                <div class="detail-item">
+                                                    <div class="info-icon-wrapper"><i class="bi bi-briefcase"></i></div>
+                                                    <div class="info-content">
+                                                        <strong>Nhà cung cấp</strong>
+                                                        <div class="info-value">@complaint.ProviderName</div>
+                                                    </div>
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(complaint.ServiceName))
+                                            {
+                                                <div class="detail-item">
+                                                    <div class="info-icon-wrapper"><i class="bi bi-gear"></i></div>
+                                                    <div class="info-content">
+                                                        <strong>Dịch vụ</strong>
+                                                        <div class="info-value">@complaint.ServiceName</div>
+                                                    </div>
+                                                </div>
+                                            }
+                                            @if (complaint.DaysSinceCreated > 0)
+                                            {
+                                                <div class="detail-item">
+                                                    <div class="info-icon-wrapper"><i class="bi bi-clock-history"></i></div>
+                                                    <div class="info-content">
+                                                        <strong>Thời gian</strong>
+                                                        <div class="info-value">@complaint.DaysSinceCreated ngày trước</div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+
+                                        @if (complaint.AttachmentUrls != null && complaint.AttachmentUrls.Any())
+                                        {
+                                            <div class="complaint-attachments mt-2">
+                                                <i class="bi bi-paperclip me-2"></i>
+                                                <span class="text-muted">@complaint.AttachmentUrls.Length tệp đính kèm</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     }

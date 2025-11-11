@@ -83,6 +83,215 @@ function setLoading(isLoading) {
     });
 }
 
+// Validation Helper Functions
+function clearError(fieldId) {
+    const errorElement = document.getElementById(fieldId + '-error');
+    const inputElement = document.getElementById(fieldId);
+    if (errorElement) {
+        errorElement.classList.remove('show');
+        errorElement.textContent = '';
+    }
+    if (inputElement) {
+        inputElement.classList.remove('is-invalid');
+    }
+}
+
+function showError(fieldId, message) {
+    const errorElement = document.getElementById(fieldId + '-error');
+    const inputElement = document.getElementById(fieldId);
+    if (errorElement) {
+        // Clear existing content first to prevent duplicate messages
+        errorElement.textContent = '';
+        errorElement.textContent = message;
+        errorElement.classList.add('show');
+    }
+    if (inputElement) {
+        inputElement.classList.add('is-invalid');
+    }
+}
+
+function clearAllErrors(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    
+    const errorElements = form.querySelectorAll('.error-message');
+    const inputElements = form.querySelectorAll('.schedule-form-control');
+    
+    errorElements.forEach(el => {
+        el.classList.remove('show');
+        el.textContent = '';
+    });
+    
+    inputElements.forEach(el => {
+        el.classList.remove('is-invalid');
+    });
+}
+
+function validateWeeklyForm() {
+    let isValid = true;
+    
+    // Validate days selection
+    const daysSelected = [];
+    for (let i = 0; i <= 6; i++) {
+        if (document.getElementById('day' + i).checked) {
+            daysSelected.push(i);
+        }
+    }
+    
+    if (daysSelected.length === 0) {
+        showError('days', 'Vui lòng chọn ít nhất một ngày trong tuần');
+        isValid = false;
+    } else {
+        clearError('days');
+    }
+    
+    // Validate start time
+    const startTime = document.getElementById('weeklyStartTime').value;
+    if (!startTime) {
+        showError('weeklyStartTime', 'Vui lòng chọn giờ bắt đầu');
+        isValid = false;
+    } else {
+        clearError('weeklyStartTime');
+    }
+    
+    // Validate end time
+    const endTime = document.getElementById('weeklyEndTime').value;
+    if (!endTime) {
+        showError('weeklyEndTime', 'Vui lòng chọn giờ kết thúc');
+        isValid = false;
+    } else {
+        clearError('weeklyEndTime');
+    }
+    
+    // Validate time range
+    if (startTime && endTime && startTime >= endTime) {
+        showError('weeklyEndTime', 'Giờ kết thúc phải lớn hơn giờ bắt đầu');
+        isValid = false;
+    }
+    
+    // Validate booking limit if provided
+    const bookingLimit = document.getElementById('weeklyBookingLimit').value;
+    if (bookingLimit) {
+        const limit = parseInt(bookingLimit);
+        if (isNaN(limit) || limit < 1 || limit > 100) {
+            showError('weeklyBookingLimit', 'Giới hạn đơn phải từ 1 đến 100');
+            isValid = false;
+        } else {
+            clearError('weeklyBookingLimit');
+        }
+    }
+    
+    return isValid;
+}
+
+function validateDailyForm() {
+    let isValid = true;
+    
+    // Validate day of week
+    const dayOfWeek = document.getElementById('dailyDayOfWeek').value;
+    if (!dayOfWeek && dayOfWeek !== '0') {
+        showError('dailyDayOfWeek', 'Vui lòng chọn thứ trong tuần');
+        isValid = false;
+    } else {
+        clearError('dailyDayOfWeek');
+    }
+    
+    // Validate start time
+    const startTime = document.getElementById('dailyStartTime').value;
+    if (!startTime) {
+        showError('dailyStartTime', 'Vui lòng chọn giờ bắt đầu');
+        isValid = false;
+    } else {
+        clearError('dailyStartTime');
+    }
+    
+    // Validate end time
+    const endTime = document.getElementById('dailyEndTime').value;
+    if (!endTime) {
+        showError('dailyEndTime', 'Vui lòng chọn giờ kết thúc');
+        isValid = false;
+    } else {
+        clearError('dailyEndTime');
+    }
+    
+    // Validate time range
+    if (startTime && endTime && startTime >= endTime) {
+        showError('dailyEndTime', 'Giờ kết thúc phải lớn hơn giờ bắt đầu');
+        isValid = false;
+    }
+    
+    // Validate booking limit if provided
+    const bookingLimit = document.getElementById('dailyBookingLimit').value;
+    if (bookingLimit) {
+        const limit = parseInt(bookingLimit);
+        if (isNaN(limit) || limit < 1 || limit > 100) {
+            showError('dailyBookingLimit', 'Giới hạn đơn phải từ 1 đến 100');
+            isValid = false;
+        } else {
+            clearError('dailyBookingLimit');
+        }
+    }
+    
+    return isValid;
+}
+
+function validateTimeOffForm() {
+    let isValid = true;
+    
+    // Validate date
+    const date = document.getElementById('timeOffDate').value;
+    if (!date) {
+        showError('timeOffDate', 'Vui lòng chọn ngày nghỉ');
+        isValid = false;
+    } else {
+        clearError('timeOffDate');
+    }
+    
+    return isValid;
+}
+
+function validateEditScheduleForm() {
+    let isValid = true;
+    
+    // Validate start time
+    const startTime = document.getElementById('editStartTime').value;
+    if (!startTime) {
+        showError('editStartTime', 'Vui lòng chọn giờ bắt đầu');
+        isValid = false;
+    } else {
+        clearError('editStartTime');
+    }
+    
+    // Validate end time
+    const endTime = document.getElementById('editEndTime').value;
+    if (!endTime) {
+        showError('editEndTime', 'Vui lòng chọn giờ kết thúc');
+        isValid = false;
+    } else {
+        clearError('editEndTime');
+    }
+    
+    // Validate time range
+    if (startTime && endTime && startTime >= endTime) {
+        showError('editEndTime', 'Giờ kết thúc phải lớn hơn giờ bắt đầu');
+        isValid = false;
+    }
+    
+    // Validate booking limit if provided
+    const bookingLimit = document.getElementById('editBookingLimit').value;
+    if (bookingLimit) {
+        const limit = parseInt(bookingLimit);
+        if (isNaN(limit) || limit < 1 || limit > 100) {
+            showError('editBookingLimit', 'Giới hạn đơn phải từ 1 đến 100');
+            isValid = false;
+        } else {
+            clearError('editBookingLimit');
+        }
+    }
+    
+    return isValid;
+}
+
 // Delete Schedule with Smart Confirmation (Global)
 window.deleteSchedule = function(id, dayName, startTime, endTime) {
     showConfirmModal({
@@ -303,16 +512,31 @@ $(document).ready(function() {
     // Edit Schedule Form Submit
     const editScheduleForm = document.getElementById('editScheduleForm');
     if (editScheduleForm) {
+        // Clear errors on input
+        ['editStartTime', 'editEndTime', 'editBookingLimit'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', () => clearError(id));
+                input.addEventListener('change', () => clearError(id));
+            }
+        });
+        
         editScheduleForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            clearAllErrors('editScheduleForm');
+            
+            if (!validateEditScheduleForm()) {
+                return;
+            }
             
             const scheduleId = document.getElementById('editScheduleId').value;
             const startTime = document.getElementById('editStartTime').value;
             const endTime = document.getElementById('editEndTime').value;
             const bookingLimit = document.getElementById('editBookingLimit').value;
             
-            if (!scheduleId || !startTime || !endTime) {
-                showToast('error', 'Lỗi nhập liệu', 'Vui lòng điền đầy đủ thông tin!');
+            if (!scheduleId) {
+                showToast('error', 'Lỗi hệ thống', 'Không tìm thấy ID lịch làm việc');
                 return;
             }
             
@@ -354,19 +578,37 @@ $(document).ready(function() {
     // Weekly Form Submit
     const weeklyForm = document.getElementById('weeklyForm');
     if (weeklyForm) {
+        // Clear errors on input
+        ['weeklyStartTime', 'weeklyEndTime', 'weeklyBookingLimit'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', () => clearError(id));
+                input.addEventListener('change', () => clearError(id));
+            }
+        });
+        
+        // Clear days error when checkbox changes
+        for (let i = 0; i <= 6; i++) {
+            const checkbox = document.getElementById('day' + i);
+            if (checkbox) {
+                checkbox.addEventListener('change', () => clearError('days'));
+            }
+        }
+        
         weeklyForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            clearAllErrors('weeklyForm');
+            
+            if (!validateWeeklyForm()) {
+                return;
+            }
             
             const daysSelected = [];
             for (let i = 0; i <= 6; i++) {
                 if (document.getElementById('day' + i).checked) {
                     daysSelected.push(i);
                 }
-            }
-            
-            if (daysSelected.length === 0) {
-                showToast('error', 'Lỗi nhập liệu', 'Vui lòng chọn ít nhất một ngày trong tuần!');
-                return;
             }
             
             const startTime = document.getElementById('weeklyStartTime').value;
@@ -409,18 +651,28 @@ $(document).ready(function() {
     // Daily Form Submit
     const dailyForm = document.getElementById('dailyForm');
     if (dailyForm) {
+        // Clear errors on input
+        ['dailyDayOfWeek', 'dailyStartTime', 'dailyEndTime', 'dailyBookingLimit'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', () => clearError(id));
+                input.addEventListener('change', () => clearError(id));
+            }
+        });
+        
         dailyForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            clearAllErrors('dailyForm');
+            
+            if (!validateDailyForm()) {
+                return;
+            }
             
             const dayOfWeek = parseInt(document.getElementById('dailyDayOfWeek').value);
             const startTime = document.getElementById('dailyStartTime').value;
             const endTime = document.getElementById('dailyEndTime').value;
             const bookingLimit = document.getElementById('dailyBookingLimit').value;
-            
-            if (!dayOfWeek && dayOfWeek !== 0) {
-                showToast('error', 'Lỗi nhập liệu', 'Vui lòng chọn thứ trong tuần!');
-                return;
-            }
             
             const data = {
                 dayOfWeek: dayOfWeek,
@@ -458,8 +710,23 @@ $(document).ready(function() {
     // Time Off Form Submit
     const timeOffForm = document.getElementById('timeOffForm');
     if (timeOffForm) {
+        // Clear errors on input
+        ['timeOffDate', 'timeOffReason'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', () => clearError(id));
+                input.addEventListener('change', () => clearError(id));
+            }
+        });
+        
         timeOffForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            clearAllErrors('timeOffForm');
+            
+            if (!validateTimeOffForm()) {
+                return;
+            }
             
             const date = document.getElementById('timeOffDate').value;
             const reason = document.getElementById('timeOffReason').value;

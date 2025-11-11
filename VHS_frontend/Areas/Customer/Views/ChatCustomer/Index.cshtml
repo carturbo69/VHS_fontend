@@ -661,8 +661,10 @@
                             window.history.pushState({ conversationId: convId }, '', convUrl);
                         }
                         
-                        // Re-init các scripts và event handlers sẽ được thực thi từ script tags trong response
-                        // SignalR và các handlers khác sẽ tự động được khởi tạo lại
+                        // Re-init UI & realtime sau khi DOM đã được thay thế
+                        try { if (window.__initChatComposer) window.__initChatComposer(); } catch(e){ console.error(e); }
+                        try { if (window.__initReplyUi) window.__initReplyUi(); } catch(e){ console.error(e); }
+                        try { if (window.__initChatRealtime) window.__initChatRealtime(); } catch(e){ console.error(e); }
                         
                         // Scroll to top để hiển thị conversation mới
                         window.scrollTo(0, 0);
@@ -1000,6 +1002,7 @@
 
     <script>
         (function () {
+          function initializeComposer(){
           var pickBtn = document.getElementById('pickFileBtn');
           var fileInput = document.getElementById('fileInput');
           var previewWrap = document.getElementById('attachPreview');
@@ -1012,7 +1015,8 @@
           var bodyInput = document.getElementById('messageBodyInput') || form?.querySelector('input[name="body"]');
           var sendBtn = document.getElementById('sendMessageBtn') || form?.querySelector('button[type="submit"]');
 
-          if (!pickBtn || !fileInput) return;
+          // NOTE: Không return sớm nữa để vẫn khởi tạo phần nhập text và trạng thái nút gửi
+          // if (!pickBtn || !fileInput) return;
 
           // Kiểm tra có nội dung để gửi (text hoặc ảnh)
           function hasPayload() {
@@ -1028,48 +1032,51 @@
             }
           }
 
-          pickBtn.addEventListener('click', function () { fileInput.click(); });
+          // ===== Chỉ gắn listener cho phần file nếu các phần tử tồn tại =====
+          if (pickBtn && fileInput) {
+            pickBtn.addEventListener('click', function () { fileInput.click(); });
 
-          fileInput.addEventListener('change', function () {
-            if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+            fileInput.addEventListener('change', function () {
+              if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
 
-            if (fileInput.files && fileInput.files.length > 0) {
-              var f = fileInput.files[0];
+              if (fileInput.files && fileInput.files.length > 0) {
+                var f = fileInput.files[0];
 
-              if (!f.type || !f.type.startsWith('image/')) {
-                alert('Vui lòng chọn file ảnh.');
-                fileInput.value = '';
+                if (!f.type || !f.type.startsWith('image/')) {
+                  alert('Vui lòng chọn file ảnh.');
+                  fileInput.value = '';
+                  previewWrap.classList.add('d-none');
+                  refreshSendState();
+                  return;
+                }
+                
+                // Kiểm tra kích thước file (tối đa 5MB)
+                if (f.size > 5 * 1024 * 1024) {
+                  alert('Kích thước file không được vượt quá 5MB.');
+                  fileInput.value = '';
+                  previewWrap.classList.add('d-none');
+                  refreshSendState();
+                  return;
+                }
+
+                objectUrl = URL.createObjectURL(f);
+                imgEl.src = objectUrl;
+                previewWrap.classList.remove('d-none');
+              } else {
                 previewWrap.classList.add('d-none');
-                refreshSendState();
-                return;
               }
               
-              // Kiểm tra kích thước file (tối đa 5MB)
-              if (f.size > 5 * 1024 * 1024) {
-                alert('Kích thước file không được vượt quá 5MB.');
-                fileInput.value = '';
-                previewWrap.classList.add('d-none');
-                refreshSendState();
-                return;
-              }
+              refreshSendState();
+            });
 
-              objectUrl = URL.createObjectURL(f);
-              imgEl.src = objectUrl;
-              previewWrap.classList.remove('d-none');
-            } else {
+            removeBtn?.addEventListener('click', function () {
+              if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+              fileInput.value = '';
+              imgEl.src = '';
               previewWrap.classList.add('d-none');
-            }
-            
-            refreshSendState();
-          });
-
-          removeBtn?.addEventListener('click', function () {
-            if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-            fileInput.value = '';
-            imgEl.src = '';
-            previewWrap.classList.add('d-none');
-            refreshSendState();
-          });
+              refreshSendState();
+            });
+          }
           
           // Validate form trước khi submit
           if (form) {
@@ -1122,8 +1129,7 @@
                 sendBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...';
               }
               
-              // Clear preview và file input sau khi submit thành công
-              // (Sẽ được clear khi trang reload)
+              // Clear preview và file input sau khi submit thành công (Sẽ được clear khi trang reload)
               
               // Re-enable sau 10 giây nếu có lỗi (timeout) - tăng thời gian để chờ response
               var timeoutId = setTimeout(function() {
@@ -1159,6 +1165,16 @@
           
           // Khởi tạo trạng thái ban đầu
           refreshSendState();
+          }
+
+          // Init now
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeComposer);
+          } else {
+            initializeComposer();
+          }
+          // Export global
+          window.__initChatComposer = initializeComposer;
         })();
     </script>
 
