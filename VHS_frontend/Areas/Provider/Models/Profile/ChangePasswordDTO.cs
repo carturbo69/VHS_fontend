@@ -17,5 +17,15 @@ namespace VHS_frontend.Areas.Provider.Models.Profile
         [Compare("NewPassword", ErrorMessage = "Mật khẩu xác nhận không khớp với mật khẩu mới")]
         [Display(Name = "Xác nhận mật khẩu mới")]
         public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Mã OTP không được để trống")]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "Mã OTP phải có 6 chữ số")]
+        [Display(Name = "Mã OTP")]
+        public string OTP { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email không được để trống")]
+        [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = string.Empty;
     }
 }

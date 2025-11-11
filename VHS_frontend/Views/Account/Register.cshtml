@@ -2,6 +2,14 @@
 @{
     ViewData["Title"] = "Đăng ký";
     Layout = "~/Views/Shared/_AuthLayout.cshtml";
+    // Khai báo biến để dùng trong cả HTML và Script
+    var requestMethod = ViewContext.HttpContext.Request.Method;
+    var otpEmailValue = Context.Session.GetString("PendingActivationEmail") ?? "";
+    var otpEmailJs = otpEmailValue;
+    if (!string.IsNullOrEmpty(otpEmailJs))
+    {
+        otpEmailJs = otpEmailJs.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n");
+    }
 }
 
 @section Styles {
@@ -38,6 +46,10 @@
 
             <!-- Panel phải -->
             <div class="auth-card" role="form">
+                @if (TempData["ShowOTPModal"] != null && (bool)TempData["ShowOTPModal"] && !string.IsNullOrEmpty(otpEmailValue))
+                {
+                    <input type="hidden" id="hiddenOtpEmail" value="@otpEmailValue" />
+                }
                 <h1 class="auth-title">Đăng ký</h1>
                 <p class="auth-desc">
                     Đã có tài khoản?
@@ -107,8 +119,10 @@
                             data-callback="handleGoogleResponse" data-auto_prompt="false" data-ux_mode="popup">
                         </div>
 
-                        <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline"
-                            data-text="continue_with" data-shape="rectangular" data-logo_alignment="left">
+                        <div style="display: flex; justify-content: center;">
+                            <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline"
+                                data-text="continue_with" data-shape="rectangular" data-logo_alignment="left">
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -375,13 +389,76 @@
         })();
 
         (function () {
-          const u = document.getElementById('Username');
-          if (u) { try { u.focus(); } catch(_){} }
-
-          const sum = document.querySelector('.validation-summary-errors');
-          if (sum) {
-            document.querySelector('.auth-card')?.classList.add('has-error');
-            setTimeout(()=>document.querySelector('.auth-card')?.classList.remove('has-error'), 400);
+          // Kiểm tra method request từ server
+          const isPostRequest = '@requestMethod' === 'POST';
+          
+          // Xử lý khi DOM sẵn sàng
+          function handlePageLoad() {
+            // Kiểm tra xem có validation errors thực sự không
+            const validationSummary = document.querySelector('.validation-summary-errors');
+            const hasSummaryErrors = validationSummary && validationSummary.textContent.trim().length > 0;
+            
+            // Kiểm tra field errors
+            const fieldErrors = document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess)');
+            let hasFieldErrors = false;
+            fieldErrors.forEach(function(error) {
+              if (error.textContent.trim().length > 0) {
+                hasFieldErrors = true;
+              }
+            });
+            
+            const hasAnyErrors = hasSummaryErrors || hasFieldErrors;
+            
+            // Nếu là GET request (reload) hoặc không có lỗi thực sự, xóa validation messages
+            if (!isPostRequest || !hasAnyErrors) {
+              // Xóa validation summary
+              if (validationSummary) {
+                validationSummary.innerHTML = '';
+                validationSummary.style.display = 'none';
+              }
+              
+              // Xóa tất cả field validation messages
+              fieldErrors.forEach(function(error) {
+                error.textContent = '';
+                error.style.display = 'none';
+                error.className = error.className.replace('field-validation-error', '').replace('text-danger', '').trim();
+              });
+              
+              // Xóa các validation messages khác
+              const allValidationSpans = document.querySelectorAll('span[data-valmsg-for], span.field-validation-error');
+              allValidationSpans.forEach(function(span) {
+                if (span.id !== 'otpError' && span.id !== 'otpSuccess') {
+                  span.textContent = '';
+                  span.style.display = 'none';
+                }
+              });
+              
+              // Nếu là GET request (reload), chỉ xóa validation messages, giữ nguyên dữ liệu form
+              // Không reset form để người dùng có thể tiếp tục điền form sau khi reload
+            } else {
+              // Có lỗi từ POST request - giữ lại và thêm animation
+              if (hasSummaryErrors) {
+                document.querySelector('.auth-card')?.classList.add('has-error');
+                setTimeout(()=>document.querySelector('.auth-card')?.classList.remove('has-error'), 400);
+              }
+            }
+            
+            // Focus vào input đầu tiên nếu không có lỗi
+            if (!hasAnyErrors) {
+              const u = document.getElementById('Username');
+              if (u) { 
+                try { 
+                  u.focus(); 
+                } catch(_){} 
+              }
+            }
+          }
+          
+          // Chạy khi DOM sẵn sàng
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', handlePageLoad);
+          } else {
+            handlePageLoad();
           }
         })();
 
@@ -400,6 +477,161 @@
           }
         }
 
+        // Hiển thị modal OTP nếu có TempData
+        @if (TempData["ShowOTPModal"] != null && (bool)TempData["ShowOTPModal"])
+        {
+            <text>
+            console.log('[OTP Modal] TempData ShowOTPModal = true');
+            
+            // Lấy email từ hidden input (tránh lỗi Razor parser)
+            const hiddenEmailInput = document.getElementById('hiddenOtpEmail');
+            const pendingEmail = hiddenEmailInput ? hiddenEmailInput.value : '';
+            console.log('[OTP Modal] Email from session:', pendingEmail || '(empty)');
+            
+            // Function để mở OTP modal
+            function openOTPModal() {
+              try {
+                console.log('[OTP Modal] Attempting to open modal...');
+                
+                // Xóa sessionStorage cũ
+                sessionStorage.removeItem('otpModalShown');
+                
+                const otpModal = document.getElementById('otpModal');
+                const otpEmailInput = document.getElementById('otpEmail');
+                const otpEmailDisplay = document.getElementById('otpEmailDisplay');
+                
+                if (!otpModal) {
+                  console.error('[OTP Modal] Modal element #otpModal not found in DOM');
+                  return false;
+                }
+                
+                console.log('[OTP Modal] Modal element found');
+                
+                // Kiểm tra email
+                if (!pendingEmail || pendingEmail.trim() === '') {
+                  console.error('[OTP Modal] Email is empty, cannot show modal');
+                  return false;
+                }
+                
+                // Set email values
+                if (otpEmailInput) {
+                  otpEmailInput.value = pendingEmail;
+                  console.log('[OTP Modal] Email input set:', pendingEmail);
+                }
+                if (otpEmailDisplay) {
+                  otpEmailDisplay.textContent = pendingEmail;
+                }
+                
+                // Mở modal bằng cách thủ công (không phụ thuộc vào hàm openModal)
+                otpModal.removeAttribute('hidden');
+                otpModal.classList.add('show');
+                document.body.style.overflow = 'hidden';
+                console.log('[OTP Modal] Modal opened manually');
+                
+                // Thêm event listeners cho modal (click outside, ESC key)
+                function setupModalListeners() {
+                  // Click outside để đóng modal
+                  function handleBackgroundClick(e) {
+                    if (e.target === otpModal) {
+                      if (typeof closeModal === 'function') {
+                        closeModal('otpModal');
+                      } else {
+                        otpModal.setAttribute('hidden', '');
+                        otpModal.classList.remove('show');
+                        document.body.style.overflow = '';
+                      }
+                    }
+                  }
+                  
+                  // ESC key để đóng modal
+                  function handleEscKey(e) {
+                    if (e.key === 'Escape' && otpModal.classList.contains('show')) {
+                      if (typeof closeModal === 'function') {
+                        closeModal('otpModal');
+                      } else {
+                        otpModal.setAttribute('hidden', '');
+                        otpModal.classList.remove('show');
+                        document.body.style.overflow = '';
+                      }
+                    }
+                  }
+                  
+                  otpModal.addEventListener('click', handleBackgroundClick);
+                  document.addEventListener('keydown', handleEscKey);
+                  
+                  // Lưu handlers để có thể remove sau
+                  otpModal._backgroundClickHandler = handleBackgroundClick;
+                  otpModal._escKeyHandler = handleEscKey;
+                }
+                
+                setupModalListeners();
+                
+                // Đợi một chút rồi bắt đầu timer và focus
+                setTimeout(function() {
+                  // Bắt đầu countdown timer
+                  if (typeof startOTPTimer === 'function') {
+                    startOTPTimer(120);
+                  } else {
+                    console.warn('[OTP Modal] startOTPTimer function not found');
+                  }
+                  
+                  // Focus vào ô OTP đầu tiên
+                  setTimeout(() => {
+                    const firstOtpInput = document.querySelector('.otp-digit');
+                    if (firstOtpInput) {
+                      firstOtpInput.focus();
+                    }
+                  }, 300);
+                }, 100);
+                
+                return true;
+              } catch (error) {
+                console.error('[OTP Modal] Error opening modal:', error);
+                return false;
+              }
+            }
+            
+            // Thử mở modal khi DOM sẵn sàng
+            function initOTPModal() {
+              let attempts = 0;
+              const maxAttempts = 50; // Tối đa 5 giây (50 * 100ms)
+              
+              function tryOpen() {
+                attempts++;
+                if (openOTPModal()) {
+                  console.log('[OTP Modal] Modal opened successfully after', attempts, 'attempts');
+                  return;
+                }
+                
+                // Sử dụng cách so sánh khác để tránh lỗi Razor parser với ký tự <
+                if (attempts >= maxAttempts) {
+                  console.error('[OTP Modal] Failed to open modal after', maxAttempts, 'attempts');
+                  return;
+                }
+                
+                setTimeout(tryOpen, 100);
+              }
+              
+              // Bắt đầu thử mở modal
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                  setTimeout(tryOpen, 100);
+                });
+              } else {
+                // DOM đã sẵn sàng
+                setTimeout(tryOpen, 100);
+              }
+            }
+            
+            // Khởi tạo
+            initOTPModal();
+            </text>
+        } else {
+            <text>
+            console.log('[OTP Modal] TempData ShowOTPModal = false or null');
+            </text>
+        }
+
         // Wire buttons after DOM ready
         document.addEventListener('DOMContentLoaded', function(){
           try {
@@ -416,39 +648,9 @@
                 agree?.focus();
                 return false;
               }
+              // Xóa sessionStorage khi submit form để đảm bảo modal có thể mở sau khi submit thành công
+              sessionStorage.removeItem('otpModalShown');
             });
-
-            // Hiển thị modal OTP nếu có TempData (chỉ khi vừa submit form thành công)
-            // Kiểm tra xem có phải là POST request mới không (tránh reload)
-            @if (TempData["ShowOTPModal"] != null && (bool)TempData["ShowOTPModal"])
-            {
-                <text>
-                // Chỉ mở modal nếu đây là lần đầu tiên (không phải reload)
-                const urlParams = new URLSearchParams(window.location.search);
-                const isFromSubmit = sessionStorage.getItem('otpModalShown') !== 'true';
-                
-                if (isFromSubmit) {
-                  sessionStorage.setItem('otpModalShown', 'true');
-                  const email = '@(Context.Session.GetString("PendingActivationEmail") ?? "")';
-                  if (email) {
-                    document.getElementById('otpEmail').value = email;
-                    document.getElementById('otpEmailDisplay').textContent = email;
-                    openModal('otpModal');
-                    
-                    // Bắt đầu countdown timer (2 phút = 120 giây)
-                    startOTPTimer(120);
-                    
-                    // Focus vào ô OTP đầu tiên
-                    setTimeout(() => {
-                      document.querySelector('.otp-digit')?.focus();
-                    }, 300);
-                  }
-                } else {
-                  // Nếu reload, xóa sessionStorage để lần submit tiếp theo có thể mở modal
-                  sessionStorage.removeItem('otpModalShown');
-                }
-                </text>
-            }
 
             // Xử lý input OTP - tự động chuyển sang ô tiếp theo
             const otpInputs = document.querySelectorAll('.otp-digit');

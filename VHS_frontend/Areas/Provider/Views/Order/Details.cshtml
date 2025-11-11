@@ -6,17 +6,30 @@
 
 <div class="order-detail-container">
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h4 class="mb-1">Đơn hàng @Model.BookingCode</h4>
-            <p class="text-muted mb-0">
-                <i class="bi bi-calendar"></i> Tạo lúc: @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+    <div class="order-detail-header mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="order-detail-title-section">
+                <h3 class="order-detail-main-title mb-3">
+                    <i class="bi bi-file-text me-2"></i>
+                    Chi tiết đơn hàng
+                </h3>
+                <div class="order-detail-info-row">
+                    <div class="order-code-simple">
+                        <i class="bi bi-receipt me-2"></i>
+                        <span class="order-code-label">Mã đơn:</span>
+                        <span class="order-code-value">@Model.BookingCode</span>
+                    </div>
+                    <p class="order-detail-meta mb-0">
+                        <i class="bi bi-calendar3"></i> 
+                        <span>Tạo lúc: @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
             </p>
+                </div>
         </div>
         <div>
-            <a asp-action="Index" class="btn btn-outline-secondary">
+                <a asp-action="Index" class="btn btn-back">
                 <i class="bi bi-arrow-left"></i> Quay lại
             </a>
+            </div>
         </div>
     </div>
 
@@ -24,36 +37,47 @@
         <!-- Left Column -->
         <div class="col-lg-8">
             <!-- Customer Info Card -->
-            <div class="card mb-4">
-                <div class="card-header">
+            <div class="card detail-card mb-4">
+                <div class="card-header detail-card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-person-circle me-2"></i>
                         Thông tin khách hàng
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
+                    <div class="row g-3">
                         <div class="col-md-6">
-                            <p><strong>Họ tên:</strong> @Model.CustomerName</p>
-                            <p><strong>Email:</strong> @Model.CustomerEmail</p>
+                            <div class="detail-info-item">
+                                <span class="detail-label"><i class="bi bi-person me-2"></i>Họ tên:</span>
+                                <span class="detail-value">@Model.CustomerName</span>
+                            </div>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>Số điện thoại:</strong> @Model.CustomerPhone</p>
+                            <div class="detail-info-item">
+                                <span class="detail-label"><i class="bi bi-telephone me-2"></i>Số điện thoại:</span>
+                                <span class="detail-value">@Model.CustomerPhone</span>
+                            </div>
+                        </div>
+                        <div class="col-md-12">
+                            <div class="detail-info-item">
+                                <span class="detail-label"><i class="bi bi-envelope me-2"></i>Email:</span>
+                                <span class="detail-value">@Model.CustomerEmail</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Service Info Card -->
-            <div class="card mb-4">
-                <div class="card-header">
+            <div class="card detail-card mb-4">
+                <div class="card-header detail-card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-briefcase me-2"></i>
                         Thông tin dịch vụ
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex">
+                    <div class="service-detail-wrapper">
                         @if (!string.IsNullOrEmpty(Model.ServiceImages))
                         {
                             string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
@@ -61,29 +85,34 @@
                             var firstUrl = ToUrl(firstImage);
                             if (!string.IsNullOrEmpty(firstUrl))
                             {
-                                <img src="@firstUrl" alt="@Model.ServiceName" class="service-image me-3" />
+                                <div class="service-image-wrapper">
+                                    <img src="@firstUrl" alt="@Model.ServiceName" class="service-image" />
+                                </div>
                             }
                         }
-                        <div class="flex-grow-1">
-                            <h5>@Model.ServiceName</h5>
-                            <p class="text-muted">@Model.ServiceDescription</p>
-                            <p><strong>Giá cơ bản:</strong> <span class="text-primary">@Model.ServicePrice.ToString("N0") VND</span></p>
+                        <div class="service-info-content">
+                            <h5 class="service-name">@Model.ServiceName</h5>
+                            <p class="service-description">@Model.ServiceDescription</p>
+                            <div class="service-price-box">
+                                <span class="price-label">Giá cơ bản:</span>
+                                <span class="price-value">@Model.ServicePrice.ToString("N0") VND</span>
+                            </div>
                             
                             @if (Model.Options.Any())
                             {
-                                <div class="mt-3">
-                                    <strong>Tùy chọn đã chọn:</strong>
-                                    <ul class="list-unstyled mt-2">
+                                <div class="service-options mt-3">
+                                    <strong class="options-title"><i class="bi bi-list-check me-2"></i>Tùy chọn đã chọn:</strong>
+                                    <ul class="options-list">
                                         @foreach (var option in Model.Options)
                                         {
-                                            <li class="mb-2">
-                                                <i class="bi bi-check-circle text-success"></i>
-                                                @option.OptionName
+                                            <li class="option-item">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                                <span class="option-name">@option.OptionName</span>
                                                 @if (!string.IsNullOrEmpty(option.Description))
                                                 {
-                                                    <span class="text-muted">(@option.Description)</span>
+                                                    <span class="option-desc">(@option.Description)</span>
                                                 }
-                                                - <strong>@option.Price.ToString("N0") VND</strong>
+                                                <span class="option-price">+@option.Price.ToString("N0") VND</span>
                                             </li>
                                         }
                                     </ul>
@@ -95,22 +124,86 @@
             </div>
 
             <!-- Booking Info Card -->
-            <div class="card mb-4">
-                <div class="card-header">
+            <div class="card detail-card mb-4">
+                <div class="card-header detail-card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-calendar-check me-2"></i>
                         Thông tin đặt hàng
                     </h5>
                 </div>
                 <div class="card-body">
-                    <p><strong>Thời gian thực hiện:</strong> @Model.BookingTime.ToString("dd/MM/yyyy HH:mm")</p>
-                    <p><strong>Địa chỉ:</strong> @Model.Address</p>
+                    <div class="detail-info-item mb-3">
+                        <span class="detail-label"><i class="bi bi-clock me-2"></i>Thời gian thực hiện:</span>
+                        <span class="detail-value">@Model.BookingTime.ToString("dd/MM/yyyy HH:mm")</span>
+                    </div>
+                    
+                    <!-- Địa chỉ chi tiết từ UserAddresses -->
+                    @if (Model.AddressId.HasValue && (!string.IsNullOrEmpty(Model.ProvinceName) || !string.IsNullOrEmpty(Model.StreetAddress)))
+                    {
+                        <div class="address-detail-section mb-3">
+                            <span class="detail-label mb-2 d-block"><i class="bi bi-geo-alt me-2"></i>Địa chỉ người đặt:</span>
+                            <div class="address-detail-box">
+                                @if (!string.IsNullOrEmpty(Model.RecipientName))
+                                {
+                                    <div class="address-recipient mb-2">
+                                        <strong><i class="bi bi-person me-1"></i>Người nhận:</strong> 
+                                        <span>@Model.RecipientName</span>
+                                        @if (!string.IsNullOrEmpty(Model.RecipientPhone))
+                                        {
+                                            <span class="ms-2 text-muted">
+                                                <i class="bi bi-telephone me-1"></i>@Model.RecipientPhone
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                                
+                                <div class="address-full">
+                                    @if (!string.IsNullOrEmpty(Model.StreetAddress))
+                                    {
+                                        <div class="address-line">
+                                            <i class="bi bi-house-door me-2 text-primary"></i>
+                                            <span>@Model.StreetAddress</span>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(Model.WardName) || !string.IsNullOrEmpty(Model.DistrictName) || !string.IsNullOrEmpty(Model.ProvinceName))
+                                    {
+                                        <div class="address-line">
+                                            <i class="bi bi-geo me-2 text-primary"></i>
+                                            <span>
+                                                @if (!string.IsNullOrEmpty(Model.WardName))
+                                                {
+                                                    <text>@Model.WardName, </text>
+                                                }
+                                                @if (!string.IsNullOrEmpty(Model.DistrictName))
+                                                {
+                                                    <text>@Model.DistrictName, </text>
+                                                }
+                                                @if (!string.IsNullOrEmpty(Model.ProvinceName))
+                                                {
+                                                    <text>@Model.ProvinceName</text>
+                                                }
+                                            </span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Fallback: Hiển thị địa chỉ đơn giản nếu không có thông tin chi tiết -->
+                        <div class="detail-info-item mb-3">
+                            <span class="detail-label"><i class="bi bi-geo-alt me-2"></i>Địa chỉ:</span>
+                            <span class="detail-value">@Model.Address</span>
+                        </div>
+                    }
+                    
                     @if (!string.IsNullOrEmpty(Model.VoucherCode))
                     {
-                        <p>
-                            <strong>Mã giảm giá:</strong> 
-                            <span class="badge bg-success">@Model.VoucherCode</span>
-                        </p>
+                        <div class="detail-info-item">
+                            <span class="detail-label"><i class="bi bi-ticket-perforated me-2"></i>Mã giảm giá:</span>
+                            <span class="voucher-badge">@Model.VoucherCode</span>
+                        </div>
                     }
                 </div>
             </div>
@@ -126,8 +219,8 @@
             @if (!isCompletedOrCancelled)
             {
                 <!-- Staff Assignment Card -->
-                <div class="card mb-4">
-                    <div class="card-header">
+                <div class="card detail-card mb-4">
+                    <div class="card-header detail-card-header">
                         <h5 class="mb-0">
                             <i class="bi bi-people me-2"></i>
                             Phân công nhân viên
@@ -171,6 +264,11 @@
                         @if (ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
                         {
                             <div class="mt-3">
+                                <!-- Thông báo lỗi/thành công -->
+                                <div id="staffAssignmentMessage" class="alert d-none" role="alert">
+                                    <span id="staffAssignmentMessageText"></span>
+                                </div>
+                                
                                 <label class="form-label">Chọn nhân viên:</label>
                                 <div class="input-group">
                                     <select id="staffSelect" class="form-select">
@@ -181,12 +279,28 @@
                                             var isSelected = isConfirmedOrAbove && Model.StaffId.HasValue && 
                                                             Guid.TryParse(staff.StaffId, out var staffGuid) && 
                                                             staffGuid == Model.StaffId.Value;
-                                            <option value="@staff.StaffId" selected="@isSelected">
-                                                @staff.StaffName
+                                            
+                                            @* Logic: 
+                                               - Nếu nhân viên không bị xóa: hiển thị bình thường
+                                               - Nếu nhân viên bị xóa nhưng đã được phân công: vẫn hiển thị để người dùng biết, nhưng disable
+                                               - Nếu nhân viên bị xóa và chưa được phân công: ẩn khỏi danh sách
+                                            *@
+                                            var isAssignedStaff = isSelected;
+                                            var isDeleted = staff.IsDeleted == true;
+                                            var shouldShow = !isDeleted || isAssignedStaff;
+                                            
+                                            @if (shouldShow)
+                                            {
+                                                <option value="@staff.StaffId" 
+                                                        selected="@isSelected"
+                                                        disabled="@isDeleted"
+                                                        data-deleted="@isDeleted.ToString().ToLower()">
+                                                    @staff.StaffName@(isDeleted ? " (Đã xóa)" : "")
                                             </option>
+                                            }
                                         }
                                     </select>
-                                    <button type="button" class="btn btn-primary" onclick="assignStaff()">
+                                    <button type="button" class="btn btn-assign-staff" onclick="assignStaff()">
                                         <i class="bi bi-check"></i> Phân công
                                     </button>
                                 </div>
@@ -199,8 +313,8 @@
             <!-- Checker Records -->
             @if (Model.CheckerRecords.Any())
             {
-                <div class="card mb-4">
-                    <div class="card-header">
+                <div class="card detail-card mb-4">
+                    <div class="card-header detail-card-header">
                         <h5 class="mb-0">
                             <i class="bi bi-camera me-2"></i>
                             Check-in/Check-out
@@ -209,28 +323,32 @@
                     <div class="card-body">
                         @foreach (var record in Model.CheckerRecords)
                         {
-                            <div class="checker-record mb-3 p-3 border rounded">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <strong>@record.ForStatus</strong>
-                                    <small class="text-muted">@record.UploadedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                            <div class="checker-record">
+                                <div class="checker-record-header">
+                                    <span class="checker-status">@record.ForStatus</span>
+                                    <span class="checker-time">@record.UploadedAt.ToString("dd/MM/yyyy HH:mm")</span>
                                 </div>
                                 @if (!string.IsNullOrEmpty(record.StaffName))
                                 {
-                                    <p class="mb-2"><small>Bởi: @record.StaffName</small></p>
+                                    <p class="checker-staff"><i class="bi bi-person me-1"></i>Bởi: @record.StaffName</p>
                                 }
                                 @if (record.MediaType.Contains("image"))
                                 {
-                                    <img src="@record.FileUrl" alt="Checker media" class="img-fluid rounded" />
+                                    <div class="checker-media-wrapper">
+                                        <img src="@record.FileUrl" alt="Checker media" class="checker-media" />
+                                    </div>
                                 }
                                 else if (record.MediaType.Contains("video"))
                                 {
-                                    <video controls class="w-100 rounded">
+                                    <div class="checker-media-wrapper">
+                                        <video controls class="checker-media">
                                         <source src="@record.FileUrl" type="video/mp4" />
                                     </video>
+                                    </div>
                                 }
                                 @if (!string.IsNullOrEmpty(record.Description))
                                 {
-                                    <p class="mt-2 mb-0"><em>@record.Description</em></p>
+                                    <p class="checker-description"><em>@record.Description</em></p>
                                 }
                             </div>
                         }
@@ -242,15 +360,15 @@
         <!-- Right Column -->
         <div class="col-lg-4">
             <!-- Status Card -->
-            <div class="card mb-4">
-                <div class="card-header">
+            <div class="card detail-card status-card mb-4">
+                <div class="card-header detail-card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-info-circle me-2"></i>
                         Trạng thái đơn hàng
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="text-center mb-3">
+                    <div class="status-badge-wrapper mb-4">
                         <span class="status-badge-lg status-@Model.Status.ToLower()">
                             @GetStatusText(Model.Status)
                         </span>
@@ -264,14 +382,41 @@
                                           string.Equals(statusNorm, "Cancelled", StringComparison.OrdinalIgnoreCase);
                         // Hiển thị nút nếu đơn chưa ở các trạng thái cuối cùng
                         bool canAct = !(isConfirmed || isCompleted || isCanceled);
+                        
+                        // Kiểm tra xem có nhân viên nào không bị xóa không
+                        var staffList = ViewBag.StaffList as List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>;
+                        var hasAvailableStaff = staffList != null && staffList.Any(s => s.IsDeleted != true);
                     }
                     @if (canAct)
                     {
-                        <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-success btn-lg" onclick="updateStatus('Confirmed')">
+                        <!-- Thông báo lỗi/thành công cho status -->
+                        <div id="statusUpdateMessage" class="alert d-none mb-3" role="alert">
+                            <span id="statusUpdateMessageText"></span>
+                        </div>
+                        
+                        @if (!hasAvailableStaff)
+                        {
+                            <div class="alert alert-warning mb-3">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <strong>Không có nhân viên nào để phân công.</strong><br>
+                                <small>Vui lòng thêm nhân viên hoặc mở khóa nhân viên trong phần "Quản lí nhân viên" trước khi xác nhận đơn hàng.</small>
+                            </div>
+                        }
+                        
+                        <div class="action-buttons">
+                            @if (hasAvailableStaff)
+                            {
+                                <button type="button" class="btn btn-confirm btn-lg" onclick="updateStatus('Confirmed')">
                                 <i class="bi bi-check-circle"></i> Xác nhận đơn hàng
                             </button>
-                            <button type="button" class="btn btn-danger" onclick="cancelOrder()">
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-confirm btn-lg" disabled>
+                                    <i class="bi bi-check-circle"></i> Xác nhận đơn hàng
+                                </button>
+                            }
+                            <button type="button" class="btn btn-cancel" onclick="cancelOrder()">
                                 <i class="bi bi-x-circle"></i> Từ chối đơn hàng
                             </button>
                         </div>
@@ -328,8 +473,8 @@
             </div>
 
             <!-- Payment Card -->
-            <div class="card mb-4">
-                <div class="card-header">
+            <div class="card detail-card payment-card mb-4">
+                <div class="card-header detail-card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-credit-card me-2"></i>
                         Thanh toán
@@ -337,25 +482,37 @@
                 </div>
                 <div class="card-body">
                     <div class="payment-summary">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Tổng tiền:</span>
-                            <strong class="text-primary">@Model.TotalAmount.ToString("N0") VND</strong>
+                        <div class="payment-item payment-total">
+                            <span class="payment-label">Tổng tiền:</span>
+                            <span class="payment-value">@Model.TotalAmount.ToString("N0") VND</span>
                         </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Phương thức:</span>
-                            <span>@(Model.PaymentMethod ?? "Chưa thanh toán")</span>
+                        <div class="payment-item">
+                            <span class="payment-label"><i class="bi bi-wallet2 me-1"></i>Phương thức:</span>
+                            <span class="payment-method">@GetPaymentMethodText(Model.PaymentMethod)</span>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <span>Trạng thái:</span>
-                            <span class="badge bg-@(Model.PaymentStatus == "Paid" ? "success" : "warning")">
-                                @(Model.PaymentStatus ?? "Chưa thanh toán")
+                        <div class="payment-item">
+                            <span class="payment-label">Trạng thái:</span>
+                            @{
+                                var paymentStatusClass = "unpaid";
+                                var paymentStatusLower = Model.PaymentStatus?.ToLower() ?? "";
+                                if (paymentStatusLower.Contains("paid") || paymentStatusLower.Contains("đã"))
+                                {
+                                    paymentStatusClass = "paid";
+                                }
+                                else if (paymentStatusLower.Contains("unpaid") || paymentStatusLower.Contains("chưa") || paymentStatusLower.Contains("pending"))
+                                {
+                                    paymentStatusClass = "unpaid";
+                                }
+                            }
+                            <span class="badge payment-status-badge payment-@paymentStatusClass">
+                                @GetPaymentStatusText(Model.PaymentStatus)
                             </span>
                         </div>
                         @if (Model.PaymentDate.HasValue)
                         {
-                            <div class="d-flex justify-content-between mt-2">
-                                <span>Ngày thanh toán:</span>
-                                <span>@Model.PaymentDate.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                            <div class="payment-item payment-date">
+                                <span class="payment-label"><i class="bi bi-calendar3 me-1"></i>Ngày thanh toán:</span>
+                                <span class="payment-date-value">@Model.PaymentDate.Value.ToString("dd/MM/yyyy HH:mm")</span>
                             </div>
                         }
                     </div>
@@ -374,8 +531,67 @@
         const bookingId = '@Model.BookingId';
         console.log('Booking ID:', bookingId);
 
+        function showStatusMessage(message, type) {
+            const messageDiv = document.getElementById('statusUpdateMessage');
+            const messageText = document.getElementById('statusUpdateMessageText');
+            
+            if (!messageDiv || !messageText) return;
+            
+            // Xóa các class cũ
+            messageDiv.className = 'alert mb-3';
+            messageDiv.classList.add('alert-' + type);
+            
+            // Set nội dung
+            messageText.innerHTML = message;
+            
+            // Hiển thị
+            messageDiv.classList.remove('d-none');
+            
+            // Scroll vào view
+            messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Tự động ẩn sau 5 giây nếu là thông báo thành công
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageDiv.classList.add('d-none');
+                }, 5000);
+            }
+        }
+
         function updateStatus(newStatus) {
             console.log('[DEBUG] updateStatus called with:', newStatus);
+            
+            // Ẩn thông báo cũ
+            const messageDiv = document.getElementById('statusUpdateMessage');
+            if (messageDiv) {
+                messageDiv.classList.add('d-none');
+            }
+            
+            // ✨ Nếu xác nhận đơn hàng, kiểm tra xem có nhân viên nào không bị xóa không
+            if (newStatus === 'Confirmed') {
+                const staffSelect = document.getElementById('staffSelect');
+                let availableStaffCount = 0;
+                
+                if (staffSelect) {
+                    // Đếm số nhân viên không bị xóa trong dropdown
+                    for (let i = 0; i < staffSelect.options.length; i++) {
+                        const option = staffSelect.options[i];
+                        if (option.value && option.getAttribute('data-deleted') !== 'true') {
+                            availableStaffCount++;
+                        }
+                    }
+                }
+                
+                // Nếu không có nhân viên nào, hiển thị thông báo và dừng
+                if (availableStaffCount === 0) {
+                    showStatusMessage(
+                        '<i class="bi bi-exclamation-triangle me-2"></i><strong>Không có nhân viên nào để phân công.</strong><br>' +
+                        'Vui lòng thêm nhân viên hoặc mở khóa nhân viên trong phần "Quản lí nhân viên" trước khi xác nhận đơn hàng.',
+                        'warning'
+                    );
+                    return;
+                }
+            }
             
             // ✨ Nếu xác nhận đơn hàng, lấy staffId từ dropdown (nếu có)
             let selectedStaffId = null;
@@ -424,15 +640,40 @@
             .then(data => {
                 console.log('[DEBUG] Response data:', data);
                 if (data.success) {
-                    alert('✅ ' + data.message);
+                    showStatusMessage(
+                        '<i class="bi bi-check-circle me-2"></i><strong>' + data.message + '</strong>',
+                        'success'
+                    );
+                    // Reload sau 1.5 giây để user thấy thông báo
+                    setTimeout(() => {
                     location.reload();
+                    }, 1500);
                 } else {
-                    alert('❌ Lỗi: ' + data.message);
+                    // Kiểm tra nếu là lỗi không có nhân viên
+                    let errorMessage = data.message || 'Có lỗi xảy ra khi cập nhật trạng thái';
+                    let messageType = 'danger';
+                    
+                    if (errorMessage.toLowerCase().includes('nhân viên') || 
+                        errorMessage.toLowerCase().includes('staff') ||
+                        errorMessage.toLowerCase().includes('không có') ||
+                        errorMessage.toLowerCase().includes('no staff') ||
+                        errorMessage.toLowerCase().includes('available')) {
+                        errorMessage = '<i class="bi bi-exclamation-triangle me-2"></i><strong>Không có nhân viên nào để phân công.</strong><br>' +
+                                      'Vui lòng thêm nhân viên hoặc mở khóa nhân viên trong phần "Quản lí nhân viên" trước khi xác nhận đơn hàng.';
+                        messageType = 'warning';
+                    } else {
+                        errorMessage = '<i class="bi bi-exclamation-circle me-2"></i>' + errorMessage;
+                    }
+                    
+                    showStatusMessage(errorMessage, messageType);
                 }
             })
             .catch(error => {
                 console.error('[ERROR] Catch error:', error);
-                alert('❌ Có lỗi xảy ra: ' + error.message);
+                showStatusMessage(
+                    '<i class="bi bi-exclamation-circle me-2"></i>Có lỗi xảy ra: ' + error.message,
+                    'danger'
+                );
             });
         }
 
@@ -548,8 +789,41 @@
             console.log('=== [SUBMIT CANCEL] END ===');
         }
 
+        function showStaffMessage(message, type) {
+            const messageDiv = document.getElementById('staffAssignmentMessage');
+            const messageText = document.getElementById('staffAssignmentMessageText');
+            
+            if (!messageDiv || !messageText) return;
+            
+            // Xóa các class cũ
+            messageDiv.className = 'alert';
+            messageDiv.classList.add('alert-' + type);
+            
+            // Set nội dung
+            messageText.innerHTML = message;
+            
+            // Hiển thị
+            messageDiv.classList.remove('d-none');
+            
+            // Scroll vào view
+            messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Tự động ẩn sau 5 giây nếu là thông báo thành công
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageDiv.classList.add('d-none');
+                }, 5000);
+            }
+        }
+
         function assignStaff() {
             console.log('[DEBUG] assignStaff called');
+            
+            // Ẩn thông báo cũ
+            const messageDiv = document.getElementById('staffAssignmentMessage');
+            if (messageDiv) {
+                messageDiv.classList.add('d-none');
+            }
             
             // Kiểm tra trạng thái booking
             const bookingStatus = '@Model.Status'.trim().toLowerCase();
@@ -557,14 +831,22 @@
             // ✨ Chỉ cho phép gán khi status là Confirmed
             if (bookingStatus !== 'confirmed') {
                 if (bookingStatus === 'pending') {
-                    alert('⚠️ Đơn hàng đang ở trạng thái chờ xử lý. Vui lòng xác nhận đơn hàng trước khi phân công nhân viên.\n\n' +
-                          'Bạn có thể:\n' +
-                          '1. Chọn nhân viên, sau đó nhấn "Xác nhận đơn hàng" - hệ thống sẽ gán nhân viên bạn chọn\n' +
-                          '2. Nhấn "Xác nhận đơn hàng" trực tiếp - hệ thống sẽ tự động gán nhân viên rảnh có ít công việc nhất');
+                    showStaffMessage(
+                        '<i class="bi bi-info-circle me-2"></i><strong>Đơn hàng đang ở trạng thái chờ xử lý.</strong><br>' +
+                        'Vui lòng xác nhận đơn hàng trước khi phân công nhân viên.<br>' +
+                        '<small>Bạn có thể: 1) Chọn nhân viên, sau đó nhấn "Xác nhận đơn hàng" - hệ thống sẽ gán nhân viên bạn chọn. 2) Nhấn "Xác nhận đơn hàng" trực tiếp - hệ thống sẽ tự động gán nhân viên rảnh có ít công việc nhất.</small>',
+                        'info'
+                    );
                 } else if (bookingStatus === 'completed' || bookingStatus === 'cancelled' || bookingStatus === 'canceled') {
-                    alert('⚠️ Không thể phân công nhân viên cho đơn hàng đã hoàn thành hoặc đã hủy.');
+                    showStaffMessage(
+                        '<i class="bi bi-exclamation-triangle me-2"></i>Không thể phân công nhân viên cho đơn hàng đã hoàn thành hoặc đã hủy.',
+                        'warning'
+                    );
                 } else {
-                    alert('⚠️ Chỉ có thể phân công nhân viên cho đơn hàng đã được xác nhận.');
+                    showStaffMessage(
+                        '<i class="bi bi-exclamation-triangle me-2"></i>Chỉ có thể phân công nhân viên cho đơn hàng đã được xác nhận.',
+                        'warning'
+                    );
                 }
                 return;
             }
@@ -573,7 +855,10 @@
             
             // Kiểm tra nếu select bị disabled
             if (staffSelect.disabled) {
-                alert('⚠️ Không thể phân công nhân viên cho đơn hàng này.');
+                showStaffMessage(
+                    '<i class="bi bi-exclamation-triangle me-2"></i>Không thể phân công nhân viên cho đơn hàng này.',
+                    'warning'
+                );
                 return;
             }
             
@@ -582,7 +867,22 @@
             console.log('[DEBUG] Selected staff ID:', staffId);
             
             if (!staffId || staffId === '') {
-                alert('⚠️ Vui lòng chọn nhân viên');
+                showStaffMessage(
+                    '<i class="bi bi-exclamation-triangle me-2"></i>Vui lòng chọn nhân viên',
+                    'warning'
+                );
+                return;
+            }
+            
+            // Kiểm tra xem nhân viên có bị xóa không
+            const selectedOption = staffSelect.options[staffSelect.selectedIndex];
+            const isDeleted = selectedOption.getAttribute('data-deleted') === 'true';
+            
+            if (isDeleted) {
+                showStaffMessage(
+                    '<i class="bi bi-trash me-2"></i><strong>Nhân viên này đã bị xóa.</strong><br>Vui lòng chọn nhân viên khác.',
+                    'warning'
+                );
                 return;
             }
 
@@ -613,15 +913,40 @@
             .then(data => {
                 console.log('[DEBUG] Response data:', data);
                 if (data.success) {
-                    alert('✅ ' + data.message);
+                    showStaffMessage(
+                        '<i class="bi bi-check-circle me-2"></i><strong>' + data.message + '</strong>',
+                        'success'
+                    );
+                    // Reload sau 1.5 giây để user thấy thông báo
+                    setTimeout(() => {
                     location.reload();
+                    }, 1500);
                 } else {
-                    alert('❌ Lỗi: ' + data.message);
+                    // Kiểm tra nếu là lỗi nhân viên bị xóa
+                    let errorMessage = data.message || 'Có lỗi xảy ra khi phân công nhân viên';
+                    let messageType = 'danger';
+                    
+                    if (errorMessage.toLowerCase().includes('xóa') || 
+                        errorMessage.toLowerCase().includes('deleted') ||
+                        errorMessage.toLowerCase().includes('khóa') || 
+                        errorMessage.toLowerCase().includes('locked') ||
+                        errorMessage.toLowerCase().includes('disabled') ||
+                        errorMessage.toLowerCase().includes('inactive')) {
+                        errorMessage = '<i class="bi bi-trash me-2"></i><strong>Nhân viên này đã bị xóa hoặc khóa.</strong><br>Vui lòng chọn nhân viên khác.';
+                        messageType = 'warning';
+                    } else {
+                        errorMessage = '<i class="bi bi-exclamation-circle me-2"></i>' + errorMessage;
+                    }
+                    
+                    showStaffMessage(errorMessage, messageType);
                 }
             })
             .catch(error => {
                 console.error('[ERROR] Catch error:', error);
-                alert('❌ Có lỗi xảy ra: ' + error.message);
+                showStaffMessage(
+                    '<i class="bi bi-exclamation-circle me-2"></i>Có lỗi xảy ra: ' + error.message,
+                    'danger'
+                );
             });
         }
 
@@ -692,6 +1017,50 @@
             "Completed" => "Hoàn thành",
             "Canceled" => "Đã hủy",
             _ => status
+        };
+    }
+
+    string GetPaymentMethodText(string? paymentMethod)
+    {
+        if (string.IsNullOrEmpty(paymentMethod))
+            return "Chưa thanh toán";
+
+        var methodLower = paymentMethod.ToLower().Trim();
+        return methodLower switch
+        {
+            "vnpay" => "VNPAY",
+            "refund" => "Hoàn tiền",
+            "cash" => "Tiền mặt",
+            "bank transfer" => "Chuyển khoản",
+            "momo" => "MoMo",
+            "zalo pay" => "ZaloPay",
+            "hoàn tiền" => "Hoàn tiền",
+            "tiền mặt" => "Tiền mặt",
+            "chuyển khoản" => "Chuyển khoản",
+            _ => paymentMethod
+        };
+    }
+
+    string GetPaymentStatusText(string? paymentStatus)
+    {
+        if (string.IsNullOrEmpty(paymentStatus))
+            return "Chưa thanh toán";
+
+        var statusLower = paymentStatus.ToLower().Trim();
+        return statusLower switch
+        {
+            "paid" => "Đã thanh toán",
+            "unpaid" => "Chưa thanh toán",
+            "pending" => "Đang chờ",
+            "refunded" => "Đã hoàn tiền",
+            "cancelled" => "Đã hủy",
+            "canceled" => "Đã hủy",
+            "đã thanh toán" => "Đã thanh toán",
+            "chưa thanh toán" => "Chưa thanh toán",
+            "đang chờ" => "Đang chờ",
+            "đã hoàn tiền" => "Đã hoàn tiền",
+            "đã hủy" => "Đã hủy",
+            _ => paymentStatus
         };
     }
 }

@@ -5,7 +5,75 @@
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/staff-management-index.css" />
+    <link rel="stylesheet" href="~/css/staff-management-index.css" asp-append-version="true" />
+    <style>
+        /* Force override for password modal - Must be after all other CSS */
+        #updatePasswordModal .modal-header.password-modal-header {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            background-color: #f59e0b !important;
+            border-bottom: none !important;
+            color: white !important;
+        }
+        
+        #updatePasswordModal .modal-header.password-modal-header .modal-title,
+        #updatePasswordModal .modal-header.password-modal-header * {
+            color: white !important;
+        }
+        
+        #updatePasswordModal .btn-amber,
+        #updatePasswordModal .modal-footer .btn-amber {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            background-color: #f59e0b !important;
+            border: none !important;
+            color: white !important;
+        }
+        
+        #updatePasswordModal .btn-amber:hover {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+            background-color: #fbbf24 !important;
+            color: white !important;
+        }
+        
+        /* Override any btn-primary in password modal */
+        #updatePasswordModal .btn-primary {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            background-color: #f59e0b !important;
+            border: none !important;
+            color: white !important;
+        }
+        
+        /* Password Modal Form Text - Ensure it appears below input */
+        #updatePasswordModal .form-text {
+            display: block !important;
+            margin-top: 0.5rem !important;
+            font-size: 0.875rem;
+            color: #6c757d;
+            line-height: 1.4;
+        }
+        
+        /* Password Modal Invalid Feedback - Below input */
+        #updatePasswordModal .invalid-feedback {
+            display: block !important;
+            width: 100%;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: #dc3545;
+        }
+        
+        #updatePasswordModal .invalid-feedback[style*="display: none"] {
+            display: none !important;
+        }
+        
+        /* Input validation states */
+        #updatePasswordModal .form-control.is-invalid {
+            border-color: #dc3545;
+            padding-right: calc(1.5em + 0.75rem);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath d='m5.8 3.6 .4.4.4-.4m0 4.8-.4-.4-.4.4'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right calc(0.375em + 0.1875rem) center;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
+    </style>
 }
 
 <div class="staff-management">
@@ -28,23 +96,21 @@
                     </div>
                 }
                 
+                @* Success message will be shown as toast notification *@
                 @if (TempData["Success"] != null)
                 {
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        @TempData["Success"]
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
+                    <div id="successMessage" style="display: none;">@TempData["Success"]</div>
                 }
                 
                 <div class="staff-card">
                     <div class="staff-header">
                         <h3 class="staff-title">
-                            <i class="bi bi-people-fill me-2"></i>
-                            Quản lý Nhân viên
+                            <i class="bi bi-people-fill"></i>
+                            <span>Quản lý Nhân viên</span>
                         </h3>
                         <a href="@Url.Action("Create", "StaffManagement")" class="btn btn-primary">
-                            <i class="bi bi-person-plus me-2"></i>
-                            Thêm nhân viên mới
+                            <i class="bi bi-person-plus"></i>
+                            <span>Thêm nhân viên mới</span>
                         </a>
                     </div>
                     
@@ -58,10 +124,10 @@
                                     <i class="bi bi-people"></i>
                                 </div>
                                 <h4>Chưa có nhân viên nào</h4>
-                                <p>Hãy thêm nhân viên đầu tiên để bắt đầu quản lý</p>
+                                <p>Hãy thêm nhân viên đầu tiên để bắt đầu quản lý đội ngũ của bạn</p>
                                 <a href="@Url.Action("Create", "StaffManagement")" class="btn btn-primary">
                                     <i class="bi bi-person-plus me-2"></i>
-                                    Thêm nhân viên
+                                    Thêm nhân viên mới
                                 </a>
                             </div>
                         }
@@ -78,12 +144,12 @@
                                 {
                                     <div class="staff-section">
                                         <h6 class="section-title">
-                                            <i class="bi bi-person-check me-2"></i>
-                                            Nhân viên hoạt động (@activeStaff.Count)
+                                            <i class="bi bi-person-check"></i>
+                                            <span>Nhân viên hoạt động <strong id="activeStaffCount">(@activeStaff.Count)</strong></span>
                                         </h6>
                                         @foreach (var staff in activeStaff)
                                         {
-                                            <div class="staff-row">
+                                            <div class="staff-row" data-staff-id="@staff.StaffId" data-staff-name="@staff.StaffName">
                                                 <div class="staff-avatar">
                                                     @if (!string.IsNullOrEmpty(staff.FaceImage))
                                                     {
@@ -150,12 +216,12 @@
                                 {
                                     <div class="staff-section">
                                         <h6 class="section-title">
-                                            <i class="bi bi-person-x me-2"></i>
-                                            Nhân viên bị khóa (@lockedStaff.Count)
+                                            <i class="bi bi-person-x"></i>
+                                            <span>Nhân viên bị khóa <strong id="lockedStaffCount">(@lockedStaff.Count)</strong></span>
                                         </h6>
                                         @foreach (var staff in lockedStaff)
                                         {
-                                            <div class="staff-row locked-staff">
+                                            <div class="staff-row locked-staff" data-staff-id="@staff.StaffId" data-staff-name="@staff.StaffName">
                                                 <div class="staff-avatar">
                                                     @if (!string.IsNullOrEmpty(staff.FaceImage))
                                                     {
@@ -227,37 +293,39 @@
 
 <!-- 🔑 Modal Cập nhật mật khẩu -->
 <div class="modal fade" id="updatePasswordModal" tabindex="-1" aria-labelledby="updatePasswordModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header password-modal-header text-white">
                 <h5 class="modal-title" id="updatePasswordModalLabel">
                     <i class="bi bi-key me-2"></i>
                     Cập nhật mật khẩu
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">Nhân viên:</label>
-                    <p class="fw-bold text-primary" id="updatePasswordStaffName"></p>
+                    <p class="fw-bold text-amber" id="updatePasswordStaffName"></p>
                 </div>
                 
                 <div class="mb-3">
                     <label for="newPassword" class="form-label">Mật khẩu mới <span class="text-danger">*</span></label>
                     <input type="password" class="form-control" id="newPassword" placeholder="Nhập mật khẩu mới" required>
-                    <div class="form-text">Mật khẩu phải có ít nhất 6 ký tự</div>
+                    <div class="invalid-feedback" id="newPasswordError" style="display: none;"></div>
+                    <small class="form-text text-muted d-block mt-1">Mật khẩu phải có ít nhất 6 ký tự</small>
                 </div>
                 
                 <div class="mb-3">
                     <label for="confirmPassword" class="form-label">Xác nhận mật khẩu <span class="text-danger">*</span></label>
                     <input type="password" class="form-control" id="confirmPassword" placeholder="Nhập lại mật khẩu mới" required>
+                    <div class="invalid-feedback" id="confirmPasswordError" style="display: none;"></div>
                 </div>
                 
                 <input type="hidden" id="updatePasswordStaffId">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                <button type="button" class="btn btn-primary" onclick="updateStaffPassword()">
+                <button type="button" class="btn btn-amber" onclick="updateStaffPassword(); return false;">
                     <i class="bi bi-check-lg me-2"></i>
                     Cập nhật mật khẩu
                 </button>
@@ -266,14 +334,584 @@
     </div>
 </div>
 
+<!-- 🔒 Modal Xác nhận Khóa tài khoản -->
+<div class="modal fade" id="confirmLockModal" tabindex="-1" aria-labelledby="confirmLockModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header lock-modal-header">
+                <h5 class="modal-title" id="confirmLockModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Xác nhận khóa tài khoản
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-4">
+                    <div class="lock-icon-wrapper">
+                        <i class="bi bi-lock-fill"></i>
+                    </div>
+                </div>
+                <p class="text-center mb-3 fs-5">
+                    Bạn có chắc chắn muốn khóa tài khoản của nhân viên <strong class="text-primary" id="confirmLockStaffName"></strong>?
+                </p>
+                <div class="alert alert-amber mb-0">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <small><strong>Lưu ý:</strong> Không thể khóa tài khoản nhân viên đang có phân công đơn hàng đang xử lý.</small>
+                </div>
+                <input type="hidden" id="confirmLockStaffId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>
+                    Hủy
+                </button>
+                <button type="button" class="btn btn-amber" onclick="confirmLockStaff(); return false;">
+                    <i class="bi bi-lock-fill me-2"></i>
+                    Khóa tài khoản
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🔓 Modal Xác nhận Mở khóa tài khoản -->
+<div class="modal fade" id="confirmUnlockModal" tabindex="-1" aria-labelledby="confirmUnlockModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header unlock-modal-header">
+                <h5 class="modal-title" id="confirmUnlockModalLabel">
+                    <i class="bi bi-unlock-fill me-2"></i>
+                    Xác nhận mở khóa tài khoản
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-4">
+                    <div class="unlock-icon-wrapper">
+                        <i class="bi bi-unlock-fill"></i>
+                    </div>
+                </div>
+                <p class="text-center mb-0 fs-5">
+                    Bạn có chắc chắn muốn mở khóa tài khoản của nhân viên <strong class="text-primary" id="confirmUnlockStaffName"></strong>?
+                </p>
+                <input type="hidden" id="confirmUnlockStaffId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>
+                    Hủy
+                </button>
+                <button type="button" class="btn btn-success" onclick="confirmUnlockStaff(); return false;">
+                    <i class="bi bi-unlock-fill me-2"></i>
+                    Mở khóa tài khoản
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 📢 Toast Notification Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    <div id="toastNotification" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="bi me-2" id="toastIcon"></i>
+            <strong class="me-auto" id="toastTitle">Thông báo</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toastMessage">
+        </div>
+    </div>
+</div>
+
 
 @section Scripts {
     <script>
+        // 🚫 Ngăn reload trang khi submit form hoặc click button
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show success toast if TempData["Success"] exists
+            const successMessage = document.getElementById('successMessage');
+            if (successMessage && successMessage.textContent.trim() !== '') {
+                const message = successMessage.textContent.trim();
+                showToast('success', 'Thành công', message);
+            }
+            // Ngăn tất cả form submit mặc định (nếu có)
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                });
+            });
+            
+            // Đảm bảo tất cả button trong modal có type="button"
+            const modalButtons = document.querySelectorAll('.modal button');
+            modalButtons.forEach(btn => {
+                if (btn.type === 'submit') {
+                    btn.type = 'button';
+                }
+                // Ngăn button trigger form submit
+                btn.addEventListener('click', function(e) {
+                    if (this.type === 'submit') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                });
+            });
+            
+            // Ngăn Enter key submit form trong modal
+            const modalInputs = document.querySelectorAll('.modal input, .modal textarea, .modal select');
+            modalInputs.forEach(input => {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Nếu là input trong password modal và đang ở input cuối cùng, gọi updateStaffPassword
+                        if (this.closest('#updatePasswordModal')) {
+                            // Chỉ gọi nếu đang ở input confirmPassword (input cuối cùng)
+                            if (this.id === 'confirmPassword' && typeof updateStaffPassword === 'function') {
+                                updateStaffPassword(e);
+                            }
+                        }
+                        return false;
+                    }
+                });
+            });
+            
+            // Đảm bảo các button action không gây reload
+            const actionButtons = document.querySelectorAll('.staff-actions button');
+            actionButtons.forEach(btn => {
+                if (btn.type !== 'button') {
+                    btn.type = 'button';
+                }
+                btn.addEventListener('click', function(e) {
+                    if (this.type === 'submit') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                });
+            });
+        });
+
+        // 📢 Toast Notification Helper
+        function showToast(type, title, message) {
+            const toast = document.getElementById('toastNotification');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            // Set icon and colors based on type
+            let iconClass = 'bi-info-circle';
+            let headerClass = '';
+            
+            switch(type) {
+                case 'success':
+                    iconClass = 'bi-check-circle-fill text-success';
+                    headerClass = 'bg-success text-white';
+                    break;
+                case 'error':
+                case 'danger':
+                    iconClass = 'bi-x-circle-fill text-danger';
+                    headerClass = 'bg-danger text-white';
+                    break;
+                case 'warning':
+                    iconClass = 'bi-exclamation-triangle-fill text-warning';
+                    headerClass = 'bg-warning text-dark';
+                    break;
+                case 'info':
+                default:
+                    iconClass = 'bi-info-circle-fill text-info';
+                    headerClass = 'bg-info text-white';
+                    break;
+            }
+            
+            toastIcon.className = `bi ${iconClass}`;
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            
+            // Update header class
+            const toastHeader = toast.querySelector('.toast-header');
+            toastHeader.className = `toast-header ${headerClass}`;
+            
+            // Show toast
+            const bsToast = new bootstrap.Toast(toast, {
+                autohide: true,
+                delay: 2500  // Tự động tắt sau 2.5 giây
+            });
+            bsToast.show();
+        }
+
+        // 🔄 Reload staff list bằng AJAX
+        function reloadStaffList() {
+            // Tìm .staff-content container - đây là container chính chứa staff list
+            const staffContentContainer = document.querySelector('.staff-content');
+            const staffListContainer = document.querySelector('.staff-list');
+            
+            if (!staffContentContainer) {
+                console.error('Staff content container not found, reloading page');
+                location.reload();
+                return;
+            }
+
+            // Lưu AntiForgeryToken để giữ lại sau khi reload
+            const antiForgeryToken = staffContentContainer.querySelector('input[name="__RequestVerificationToken"]');
+            const tokenHTML = antiForgeryToken ? antiForgeryToken.outerHTML : '';
+            const originalHTML = staffContentContainer.innerHTML;
+
+            // Hiển thị loading state
+            const loadingHTML = tokenHTML + `
+                        <div class="text-center py-5" style="min-height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem; border-width: 0.3em;">
+                                <span class="visually-hidden">Đang tải...</span>
+                            </div>
+                            <p class="mt-3 text-muted">Đang tải danh sách nhân viên...</p>
+                        </div>
+            `;
+            
+            // Fade out và hiển thị loading
+            staffContentContainer.style.transition = 'opacity 0.3s ease';
+            staffContentContainer.style.opacity = '0.5';
+            
+            setTimeout(() => {
+                staffContentContainer.innerHTML = loadingHTML;
+            }, 200);
+
+            // Gọi AJAX để reload staff list
+            fetch('/Provider/StaffManagement/Index', {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'text/html'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.text();
+            })
+            .then(html => {
+                console.log('📥 Received HTML response length:', html.length);
+                
+                // Parse HTML response - Partial view trả về trực tiếp HTML của staff-list hoặc empty-state
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html.trim();
+                
+                // Tìm staff-list hoặc empty-state trong response
+                let newStaffListElement = tempDiv.querySelector('.staff-list');
+                let emptyStateElement = tempDiv.querySelector('.empty-state');
+                
+                // Nếu không tìm thấy, có thể element đầu tiên chính là staff-list hoặc empty-state
+                if (!newStaffListElement && !emptyStateElement && tempDiv.firstElementChild) {
+                    const firstChild = tempDiv.firstElementChild;
+                    if (firstChild.classList && firstChild.classList.contains('staff-list')) {
+                        newStaffListElement = firstChild;
+                    } else if (firstChild.classList && firstChild.classList.contains('empty-state')) {
+                        emptyStateElement = firstChild;
+                    }
+                }
+                
+                // Xác định content cần replace
+                // Lưu lại tokenHTML từ scope ngoài (đã được lưu trước khi fetch)
+                const savedTokenHTML = tokenHTML;
+                let newContent = '';
+                
+                if (newStaffListElement) {
+                    // Có staff list - giữ AntiForgeryToken và thêm staff-list
+                    newContent = (savedTokenHTML ? savedTokenHTML + '\n                        ' : '') + newStaffListElement.outerHTML;
+                    console.log('✅ Found staff-list in response');
+                } else if (emptyStateElement) {
+                    // Không có staff - giữ AntiForgeryToken và thêm empty-state
+                    newContent = (savedTokenHTML ? savedTokenHTML + '\n                        ' : '') + emptyStateElement.outerHTML;
+                    console.log('✅ Found empty-state in response');
+                } else {
+                    // Fallback: sử dụng toàn bộ HTML response và thêm AntiForgeryToken
+                    console.warn('⚠️ Could not find .staff-list or .empty-state in response');
+                    console.warn('Response HTML (first 500 chars):', html.substring(0, 500));
+                    // Nếu response không có structure rõ ràng, thử wrap trong staff-list
+                    if (html.trim()) {
+                        newContent = (savedTokenHTML ? savedTokenHTML + '\n                        ' : '') + '<div class="staff-list">' + html.trim() + '</div>';
+                    } else {
+                        throw new Error('Empty response from server');
+                    }
+                }
+                
+                if (newContent && newContent.trim()) {
+                    // Fade out và replace content
+                    staffContentContainer.style.transition = 'opacity 0.3s ease';
+                    staffContentContainer.style.opacity = '0';
+                    
+                    setTimeout(() => {
+                        // Replace content
+                        staffContentContainer.innerHTML = newContent;
+                        
+                        // Fade in animation
+                        setTimeout(() => {
+                            staffContentContainer.style.opacity = '1';
+                            staffContentContainer.style.transition = '';
+                            
+                            // Đảm bảo các button mới sau khi reload có event handler đúng
+                            // Các button đã có onclick attribute trong HTML nên sẽ tự động có event handler
+                            // Nhưng vẫn cần đảm bảo type="button" cho tất cả button
+                            const newButtons = staffContentContainer.querySelectorAll('button');
+                            newButtons.forEach(btn => {
+                                if (btn.type !== 'button') {
+                                    btn.type = 'button';
+                                }
+                            });
+                        }, 50);
+                        
+                        console.log('✅ Staff list reloaded successfully');
+                    }, 300);
+                } else {
+                    throw new Error('Empty content in response');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error reloading staff list:', error);
+                // Restore original content
+                staffContentContainer.style.opacity = '1';
+                staffContentContainer.innerHTML = originalHTML;
+                showToast('error', 'Lỗi', 'Không thể tải lại danh sách nhân viên. Đang tải lại trang...');
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+            });
+        }
+
+        // 🔄 Cập nhật trạng thái staff trong UI (real-time update) - DEPRECATED: Sử dụng reloadStaffList thay thế
+        function updateStaffStatus(staffId, isLocked) {
+            const staffRow = document.querySelector(`.staff-row[data-staff-id="${staffId}"]`);
+            if (!staffRow) {
+                console.warn(`Staff row not found for ID: ${staffId}`);
+                return;
+            }
+
+            const staffName = staffRow.getAttribute('data-staff-name');
+            const statusBadge = staffRow.querySelector('.staff-status .status-badge');
+            const actionsContainer = staffRow.querySelector('.staff-actions');
+            
+            // Tìm các section container - Tìm section chứa activeStaffCount hoặc lockedStaffCount
+            const activeStaffCountEl = document.getElementById('activeStaffCount');
+            const lockedStaffCountEl = document.getElementById('lockedStaffCount');
+            const activeSection = activeStaffCountEl ? activeStaffCountEl.closest('.staff-section') : null;
+            const lockedSection = lockedStaffCountEl ? lockedStaffCountEl.closest('.staff-section') : null;
+            
+            if (isLocked) {
+                // Chuyển sang trạng thái "Đã khóa"
+                staffRow.classList.add('locked-staff');
+                
+                // Update status badge
+                if (statusBadge) {
+                    statusBadge.className = 'status-badge status-locked';
+                    statusBadge.innerHTML = '<i class="bi bi-lock-fill me-1"></i>Đã khóa';
+                }
+                
+                // Update buttons: thay lock button bằng unlock button
+                const lockBtn = actionsContainer.querySelector('.lock-btn');
+                if (lockBtn) {
+                    lockBtn.className = 'action-btn unlock-btn';
+                    lockBtn.title = 'Mở khóa';
+                    lockBtn.innerHTML = '<i class="bi bi-unlock"></i>';
+                    lockBtn.onclick = function() { unlockStaff(staffId, staffName); };
+                }
+                
+                // Animation fade out trước
+                staffRow.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                staffRow.style.opacity = '0';
+                staffRow.style.transform = 'translateX(-30px)';
+                
+                setTimeout(() => {
+                    // Tìm hoặc tạo locked section
+                    let targetSection = lockedSection;
+                    if (!targetSection) {
+                        // Tạo locked section nếu chưa có
+                        const staffListContainer = document.querySelector('.staff-list') || document.querySelector('.staff-content');
+                        if (staffListContainer) {
+                            targetSection = document.createElement('div');
+                            targetSection.className = 'staff-section';
+                            targetSection.innerHTML = `
+                                <h6 class="section-title">
+                                    <i class="bi bi-person-x"></i>
+                                    <span>Nhân viên bị khóa <strong id="lockedStaffCount">(0)</strong></span>
+                                </h6>
+                            `;
+                            // Insert sau active section hoặc append vào cuối
+                            const activeSectionElement = activeSection;
+                            if (activeSectionElement && activeSectionElement.nextSibling) {
+                                activeSectionElement.parentNode.insertBefore(targetSection, activeSectionElement.nextSibling);
+                            } else if (activeSectionElement) {
+                                activeSectionElement.parentNode.appendChild(targetSection);
+                            } else {
+                                staffListContainer.appendChild(targetSection);
+                            }
+                            // Update lại reference
+                            lockedSection = targetSection;
+                        }
+                    }
+                    
+                    if (targetSection) {
+                        // Di chuyển DOM element
+                        const sectionTitle = targetSection.querySelector('.section-title');
+                        const existingLockedRows = targetSection.querySelectorAll('.staff-row.locked-staff');
+                        
+                        if (existingLockedRows.length > 0) {
+                            // Append sau staff-row cuối cùng
+                            const lastRow = existingLockedRows[existingLockedRows.length - 1];
+                            if (lastRow.nextSibling) {
+                                lastRow.parentNode.insertBefore(staffRow, lastRow.nextSibling);
+                            } else {
+                                lastRow.parentNode.appendChild(staffRow);
+                            }
+                        } else if (sectionTitle) {
+                            // Append sau section-title
+                            if (sectionTitle.nextSibling) {
+                                sectionTitle.parentNode.insertBefore(staffRow, sectionTitle.nextSibling);
+                            } else {
+                                sectionTitle.parentNode.appendChild(staffRow);
+                            }
+                        } else {
+                            targetSection.appendChild(staffRow);
+                        }
+                        
+                        // Hiển thị section
+                        targetSection.style.display = '';
+                        
+                        // Animation fade in
+                        setTimeout(() => {
+                            staffRow.style.opacity = '1';
+                            staffRow.style.transform = 'translateX(0)';
+                        }, 50);
+                    } else {
+                        // Fallback: chỉ update class và status
+                        staffRow.style.opacity = '1';
+                        staffRow.style.transform = 'translateX(0)';
+                    }
+                }, 200);
+                
+                // Update section count (active)
+                updateSectionCount('activeStaffCount', -1);
+                // Update section count (locked)
+                updateSectionCount('lockedStaffCount', 1);
+                
+            } else {
+                // Chuyển sang trạng thái "Hoạt động"
+                staffRow.classList.remove('locked-staff');
+                
+                // Update status badge
+                if (statusBadge) {
+                    statusBadge.className = 'status-badge status-active';
+                    statusBadge.innerHTML = '<i class="bi bi-check-circle me-1"></i>Hoạt động';
+                }
+                
+                // Update buttons: thay unlock button bằng lock button
+                const unlockBtn = actionsContainer.querySelector('.unlock-btn');
+                if (unlockBtn) {
+                    unlockBtn.className = 'action-btn lock-btn';
+                    unlockBtn.title = 'Khóa tài khoản';
+                    unlockBtn.innerHTML = '<i class="bi bi-lock"></i>';
+                    unlockBtn.onclick = function() { lockStaff(staffId, staffName); };
+                }
+                
+                // Di chuyển staff row sang active section với animation
+                if (activeSection) {
+                    // Animation fade out trước
+                    staffRow.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                    staffRow.style.opacity = '0';
+                    staffRow.style.transform = 'translateX(-30px)';
+                    
+                    setTimeout(() => {
+                        // Di chuyển DOM element
+                        const sectionTitle = activeSection.querySelector('.section-title');
+                        const firstActiveRow = activeSection.querySelector('.staff-row:not(.locked-staff)');
+                        
+                        if (firstActiveRow && firstActiveRow.parentNode) {
+                            // Insert trước staff-row đầu tiên
+                            firstActiveRow.parentNode.insertBefore(staffRow, firstActiveRow);
+                        } else if (sectionTitle) {
+                            // Append sau section-title
+                            if (sectionTitle.nextSibling) {
+                                sectionTitle.parentNode.insertBefore(staffRow, sectionTitle.nextSibling);
+                            } else {
+                                sectionTitle.parentNode.appendChild(staffRow);
+                            }
+                        } else {
+                            activeSection.appendChild(staffRow);
+                        }
+                        
+                        // Animation fade in
+                        setTimeout(() => {
+                            staffRow.style.opacity = '1';
+                            staffRow.style.transform = 'translateX(0)';
+                        }, 50);
+                    }, 200);
+                }
+                
+                // Update section count (active)
+                updateSectionCount('activeStaffCount', 1);
+                // Update section count (locked)
+                updateSectionCount('lockedStaffCount', -1);
+                
+                // Ẩn locked section nếu không còn staff nào
+                if (lockedSection && !lockedSection.querySelector('.staff-row.locked-staff')) {
+                    lockedSection.style.display = 'none';
+                }
+            }
+            
+            // Xóa transition sau animation để tránh conflict
+            setTimeout(() => {
+                staffRow.style.transition = '';
+            }, 600);
+        }
+
+        // 🔢 Cập nhật số lượng staff trong section
+        function updateSectionCount(elementId, delta) {
+            const countElement = document.getElementById(elementId);
+            if (countElement) {
+                const currentText = countElement.textContent;
+                const match = currentText.match(/\((\d+)\)/);
+                if (match) {
+                    const currentCount = parseInt(match[1]);
+                    const newCount = Math.max(0, currentCount + delta);
+                    countElement.textContent = `(${newCount})`;
+                }
+            }
+        }
+
+        // 🔒 Hiển thị modal xác nhận khóa
         function lockStaff(staffId, staffName) {
-            if (confirm(`Bạn có chắc chắn muốn khóa tài khoản của nhân viên "${staffName}"?`)) {
+            document.getElementById('confirmLockStaffId').value = staffId;
+            document.getElementById('confirmLockStaffName').textContent = staffName;
+            
+            // Reset button state
+            const confirmBtn = document.querySelector('#confirmLockModal .btn-amber');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="bi bi-lock-fill me-2"></i>Khóa tài khoản';
+            
+            const modal = new bootstrap.Modal(document.getElementById('confirmLockModal'));
+            modal.show();
+        }
+
+        // 🔒 Xác nhận khóa tài khoản
+        function confirmLockStaff(event) {
+            // Ngăn reload trang
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            const staffId = document.getElementById('confirmLockStaffId').value;
+            const staffName = document.getElementById('confirmLockStaffName').textContent;
+            
+            // Disable button to prevent double click
+            const confirmBtn = document.querySelector('#confirmLockModal .btn-amber');
+            confirmBtn.disabled = true;
+            const originalText = confirmBtn.innerHTML;
+            confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+            
                 // Get AntiForgeryToken
                 const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
-                console.log('Locking staff:', staffId, 'Token:', antiForgeryToken);
                 
                 fetch(`/Provider/StaffManagement/${staffId}/lock`, {
                     method: 'POST',
@@ -282,45 +920,93 @@
                         'RequestVerificationToken': antiForgeryToken || ''
                     }
                 })
-                .then(response => {
-                    console.log('Lock response status:', response.status);
-                    console.log('Lock response headers:', response.headers);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    
-                    const contentType = response.headers.get('content-type');
-                    if (!contentType || !contentType.includes('application/json')) {
-                        return response.text().then(text => {
-                            console.error('Non-JSON response:', text);
-                            throw new Error('Server trả về dữ liệu không phải JSON');
-                        });
-                    }
-                    
-                    return response.json();
+            .then(async response => {
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    throw new Error('Server trả về dữ liệu không phải JSON');
+                }
+                
+                // Kiểm tra cả HTTP status code và data.error/data.success
+                // Nếu HTTP status không OK (400, 404, 500, etc) HOẶC có data.error HOẶC data.success === false
+                // => Đây là lỗi, không thể khóa staff
+                if (!response.ok || data.error || data.success === false) {
+                    const errorMsg = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+                    console.error('❌ Lock staff error:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: data.error,
+                        message: data.message,
+                        success: data.success
+                    });
+                    throw new Error(errorMsg);
+                }
+                
+                console.log('✅ Lock staff success:', data);
+                return data;
                 })
                 .then(data => {
-                    console.log('Lock response data:', data);
-                    if (data.success) {
-                        alert(data.message);
-                        location.reload();
-                    } else {
-                        alert('Lỗi: ' + (data.error || 'Không xác định'));
-                    }
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('confirmLockModal'));
+                modal.hide();
+                
+                // Show success toast
+                showToast('success', 'Thành công', data.message || 'Đã khóa tài khoản nhân viên thành công!');
+                
+                // Reload staff list bằng AJAX
+                reloadStaffList();
                 })
                 .catch(error => {
                     console.error('Lock error:', error);
-                    alert('Có lỗi xảy ra: ' + error.message);
+                
+                // Re-enable button
+                const confirmBtn = document.querySelector('#confirmLockModal .btn-amber');
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<i class="bi bi-lock-fill me-2"></i>Khóa tài khoản';
+                
+                // Show error toast
+                showToast('error', 'Lỗi', error.message);
                 });
-            }
+            
+            return false; // Ngăn reload trang
         }
 
+        // 🔓 Hiển thị modal xác nhận mở khóa
         function unlockStaff(staffId, staffName) {
-            if (confirm(`Bạn có chắc chắn muốn mở khóa tài khoản của nhân viên "${staffName}"?`)) {
+            document.getElementById('confirmUnlockStaffId').value = staffId;
+            document.getElementById('confirmUnlockStaffName').textContent = staffName;
+            
+            // Reset button state
+            const confirmBtn = document.querySelector('#confirmUnlockModal .btn-success');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="bi bi-unlock-fill me-2"></i>Mở khóa tài khoản';
+            
+            const modal = new bootstrap.Modal(document.getElementById('confirmUnlockModal'));
+            modal.show();
+        }
+
+        // 🔓 Xác nhận mở khóa tài khoản
+        function confirmUnlockStaff(event) {
+            // Ngăn reload trang
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            const staffId = document.getElementById('confirmUnlockStaffId').value;
+            
+            // Disable button to prevent double click
+            const confirmBtn = document.querySelector('#confirmUnlockModal .btn-success');
+            confirmBtn.disabled = true;
+            const originalText = confirmBtn.innerHTML;
+            confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+            
                 // Get AntiForgeryToken
                 const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
-                console.log('Unlocking staff:', staffId, 'Token:', antiForgeryToken);
                 
                 fetch(`/Provider/StaffManagement/${staffId}/unlock`, {
                     method: 'POST',
@@ -329,38 +1015,59 @@
                         'RequestVerificationToken': antiForgeryToken || ''
                     }
                 })
-                .then(response => {
-                    console.log('Unlock response status:', response.status);
-                    console.log('Unlock response headers:', response.headers);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    
-                    const contentType = response.headers.get('content-type');
-                    if (!contentType || !contentType.includes('application/json')) {
-                        return response.text().then(text => {
-                            console.error('Non-JSON response:', text);
-                            throw new Error('Server trả về dữ liệu không phải JSON');
-                        });
-                    }
-                    
-                    return response.json();
+            .then(async response => {
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
+                    throw new Error('Server trả về dữ liệu không phải JSON');
+                }
+                
+                // Kiểm tra cả HTTP status code và data.error/data.success
+                // Nếu HTTP status không OK (400, 404, 500, etc) HOẶC có data.error HOẶC data.success === false
+                // => Đây là lỗi, không thể mở khóa staff
+                if (!response.ok || data.error || data.success === false) {
+                    const errorMsg = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+                    console.error('❌ Unlock staff error:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: data.error,
+                        message: data.message,
+                        success: data.success
+                    });
+                    throw new Error(errorMsg);
+                }
+                
+                console.log('✅ Unlock staff success:', data);
+                return data;
                 })
                 .then(data => {
-                    console.log('Unlock response data:', data);
-                    if (data.success) {
-                        alert(data.message);
-                        location.reload();
-                    } else {
-                        alert('Lỗi: ' + (data.error || 'Không xác định'));
-                    }
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('confirmUnlockModal'));
+                modal.hide();
+                
+                // Show success toast
+                showToast('success', 'Thành công', data.message || 'Đã mở khóa tài khoản nhân viên thành công!');
+                
+                // Reload staff list bằng AJAX
+                reloadStaffList();
                 })
                 .catch(error => {
                     console.error('Unlock error:', error);
-                    alert('Có lỗi xảy ra: ' + error.message);
+                
+                // Re-enable button
+                const confirmBtn = document.querySelector('#confirmUnlockModal .btn-success');
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<i class="bi bi-unlock-fill me-2"></i>Mở khóa tài khoản';
+                
+                // Show error toast
+                showToast('error', 'Lỗi', error.message);
                 });
-            }
+            
+            return false; // Ngăn reload trang
         }
 
         // 🔑 Cập nhật mật khẩu cho Staff
@@ -370,34 +1077,92 @@
             document.getElementById('updatePasswordStaffName').textContent = staffName;
             
             // Clear form
-            document.getElementById('newPassword').value = '';
-            document.getElementById('confirmPassword').value = '';
+            const newPasswordInput = document.getElementById('newPassword');
+            const confirmPasswordInput = document.getElementById('confirmPassword');
+            const newPasswordError = document.getElementById('newPasswordError');
+            const confirmPasswordError = document.getElementById('confirmPasswordError');
+            
+            newPasswordInput.value = '';
+            confirmPasswordInput.value = '';
+            
+            // Clear validation errors
+            newPasswordInput.classList.remove('is-invalid');
+            confirmPasswordInput.classList.remove('is-invalid');
+            if (newPasswordError) {
+                newPasswordError.style.display = 'none';
+                newPasswordError.textContent = '';
+            }
+            if (confirmPasswordError) {
+                confirmPasswordError.style.display = 'none';
+                confirmPasswordError.textContent = '';
+            }
             
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('updatePasswordModal'));
             modal.show();
         }
 
-        function updateStaffPassword() {
+        // 🔑 Cập nhật mật khẩu cho Staff
+        function updateStaffPassword(event) {
+            // Ngăn reload trang
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
             const staffId = document.getElementById('updatePasswordStaffId').value;
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             
+            // Clear previous errors
+            const newPasswordInput = document.getElementById('newPassword');
+            const confirmPasswordInput = document.getElementById('confirmPassword');
+            const newPasswordError = document.getElementById('newPasswordError');
+            const confirmPasswordError = document.getElementById('confirmPasswordError');
+            
+            newPasswordInput.classList.remove('is-invalid');
+            confirmPasswordInput.classList.remove('is-invalid');
+            newPasswordError.style.display = 'none';
+            confirmPasswordError.style.display = 'none';
+            newPasswordError.textContent = '';
+            confirmPasswordError.textContent = '';
+            
+            let isValid = true;
+            
             // Validation
-            if (!newPassword || !confirmPassword) {
-                alert('Vui lòng nhập đầy đủ thông tin');
-                return;
+            if (!newPassword || newPassword.trim() === '') {
+                newPasswordInput.classList.add('is-invalid');
+                newPasswordError.textContent = 'Vui lòng nhập mật khẩu mới';
+                newPasswordError.style.display = 'block';
+                isValid = false;
+            } else if (newPassword.length < 6) {
+                newPasswordInput.classList.add('is-invalid');
+                newPasswordError.textContent = 'Mật khẩu phải có ít nhất 6 ký tự';
+                newPasswordError.style.display = 'block';
+                isValid = false;
             }
             
-            if (newPassword !== confirmPassword) {
-                alert('Mật khẩu xác nhận không khớp');
-                return;
+            if (!confirmPassword || confirmPassword.trim() === '') {
+                confirmPasswordInput.classList.add('is-invalid');
+                confirmPasswordError.textContent = 'Vui lòng xác nhận mật khẩu';
+                confirmPasswordError.style.display = 'block';
+                isValid = false;
+            } else if (newPassword !== confirmPassword) {
+                confirmPasswordInput.classList.add('is-invalid');
+                confirmPasswordError.textContent = 'Mật khẩu xác nhận không khớp';
+                confirmPasswordError.style.display = 'block';
+                isValid = false;
             }
             
-            if (newPassword.length < 6) {
-                alert('Mật khẩu phải có ít nhất 6 ký tự');
-                return;
+            if (!isValid) {
+                return false;
             }
+            
+            // Disable button to prevent double click
+            const submitBtn = document.querySelector('#updatePasswordModal .btn-amber');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
             
             // Get AntiForgeryToken
             const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
@@ -416,34 +1181,48 @@
                 },
                 body: JSON.stringify(formData)
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
+            .then(async response => {
                 const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    return response.text().then(text => {
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    const text = await response.text();
                         throw new Error('Server trả về dữ liệu không phải JSON');
-                    });
                 }
                 
-                return response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || data.error || `HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return data;
             })
             .then(data => {
-                if (data.success) {
-                    alert(data.message);
                     // Close modal
                     const modal = bootstrap.Modal.getInstance(document.getElementById('updatePasswordModal'));
                     modal.hide();
-                } else {
-                    alert('Lỗi: ' + (data.error || 'Không xác định'));
-                }
+                
+                // Clear form
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+                
+                // Show success toast
+                showToast('success', 'Thành công', data.message || 'Đã cập nhật mật khẩu thành công!');
             })
             .catch(error => {
                 console.error('Update password error:', error);
-                alert('Có lỗi xảy ra: ' + error.message);
+                
+                // Re-enable button
+                const submitBtn = document.querySelector('#updatePasswordModal .btn-amber');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-check-lg me-2"></i>Cập nhật mật khẩu';
+                
+                // Show error toast
+                showToast('error', 'Lỗi', error.message);
             });
+            
+            return false; // Ngăn reload trang
         }
     </script>
 }

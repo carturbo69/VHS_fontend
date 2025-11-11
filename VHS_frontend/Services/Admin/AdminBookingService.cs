@@ -40,9 +40,9 @@ namespace VHS_frontend.Services.Admin
             
             var queryParams = new List<string>();
             if (startDate.HasValue)
-                queryParams.Add($"startDate={startDate.Value:yyyy-MM-dd}");
+                queryParams.Add($"startDate={Uri.EscapeDataString(startDate.Value.ToString("o"))}");
             if (endDate.HasValue)
-                queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
+                queryParams.Add($"endDate={Uri.EscapeDataString(endDate.Value.ToString("o"))}");
             
             var query = queryParams.Any() ? "?" + string.Join("&", queryParams) : "";
             

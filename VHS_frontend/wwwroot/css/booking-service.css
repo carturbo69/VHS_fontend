@@ -2274,12 +2274,39 @@ img {
 #addressModal .modal-card > div:last-child > div:first-child {
     display: flex;
     flex-direction: column;
-    gap: var(--s-2);
+    gap: 0 !important; /* Không có gap giữa các phần tử con */
     overflow-y: auto;
-    padding-right: var(--s-2); /* Tạo không gian cho scrollbar */
+    padding: 0 !important; /* Không có padding */
+    margin: 0 !important; /* Không có margin */
     flex: 1; /* Chiếm hết không gian còn lại */
     min-height: 0; /* Cho phép flex shrink */
     /* Không set max-height mặc định, chỉ set khi có > 4 items */
+}
+
+/* Đảm bảo addressListContainer không có khoảng trống */
+#addressListContainer,
+#addressListContainer.addr-list,
+.addr-list#addressListContainer {
+    gap: 0 !important; /* Không có gap - sát nhau hoàn toàn */
+    row-gap: 0 !important;
+    column-gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: grid !important;
+}
+
+/* Override inline style margin-top của div wrapper */
+#addressModal .modal-card > div:last-child > div[style*="margin-top"] {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* Đảm bảo div chứa addr-list không có khoảng trống */
+#addressModal .modal-card > div:last-child > div:has(#addressListContainer),
+#addressModal .modal-card > div:last-child > div:has(.addr-list) {
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
 }
 
 /* Khi có > 4 items, bật scroll với max-height - tăng để hiển thị nhiều hơn */
@@ -2349,7 +2376,18 @@ img {
 }
 
 #addressModal .modal-card > div:last-child > div:first-child {
-    margin-bottom: var(--s-4);
+    margin-bottom: 0 !important; /* Không có margin-bottom */
+}
+
+/* Loại bỏ margin-top của div chứa addr-list nếu có */
+#addressModal .modal-card > div:last-child > div[style*="margin-top"] {
+    margin-top: 0 !important;
+}
+
+/* Đảm bảo div chứa addr-list không tạo khoảng trống */
+#addressModal .modal-card > div:last-child > div:has(.addr-list) {
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 /* Large modal for Terms of Service */
@@ -2665,13 +2703,57 @@ img {
 
 /* ---------- Address list ---------- */
 .addr-list {
-    display: grid;
-    gap: var(--s-2); /* Giảm gap */
-    margin: var(--s-3) 0; /* Giảm margin */
-    padding-right: var(--s-2);
+    display: grid !important;
+    gap: 0 !important; /* Không có gap - các item sát nhau hoàn toàn */
+    margin: 0 !important; /* Không có margin để loại bỏ khoảng trống */
+    padding: 0 !important; /* Không có padding */
+    row-gap: 0 !important; /* Không có gap dọc - sát nhau hoàn toàn */
+    column-gap: 0 !important; /* Không có gap ngang */
     flex: 1; /* Cho phép co giãn */
     min-height: 0; /* Để có thể scroll */
     overflow-y: auto; /* Scroll khi nội dung dài */
+}
+
+/* Đảm bảo các addr-item không có margin và sát nhau hoàn toàn */
+.addr-list > .addr-item {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+    /* margin-top sẽ được set riêng cho từng item */
+}
+
+/* Loại bỏ border-radius giữa các item để chúng sát nhau hoàn toàn */
+.addr-list > .addr-item:not(:first-child):not(:last-child) {
+    border-radius: 0 !important;
+    border-top: none !important; /* Loại bỏ border trên */
+    margin-top: -1.5px !important; /* Negative margin để kéo sát item trước */
+    margin-bottom: 0 !important;
+}
+
+/* Item đầu tiên: chỉ có border-radius ở trên */
+.addr-list > .addr-item:first-child:not(:only-child) {
+    border-top-left-radius: var(--radius-in) !important;
+    border-top-right-radius: var(--radius-in) !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-bottom: 1.5px solid var(--border, #e2e8f0) !important; /* Giữ border dưới làm separator */
+    margin-bottom: 0 !important;
+}
+
+/* Item cuối cùng: chỉ có border-radius ở dưới */
+.addr-list > .addr-item:last-child:not(:only-child) {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-left-radius: var(--radius-in) !important;
+    border-bottom-right-radius: var(--radius-in) !important;
+    border-top: none !important; /* Loại bỏ border trên để sát item trước */
+    margin-top: -1.5px !important; /* Negative margin để kéo sát item trước */
+}
+
+/* Nếu chỉ có 1 item, giữ border-radius ở tất cả các góc */
+.addr-list > .addr-item:only-child {
+    border-radius: var(--radius-in) !important;
+    border: 1.5px solid var(--border, #e2e8f0) !important; /* Giữ tất cả border */
 }
 
 .addr-list::-webkit-scrollbar {
@@ -2690,21 +2772,42 @@ img {
 
 .addr-item {
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: var(--s-2); /* Giảm gap */
-    padding: var(--s-2) var(--s-3); /* Giảm padding dọc */
-    border: 1px solid var(--border);
-    border-radius: var(--radius-in);
+    grid-template-columns: auto minmax(0, 1fr) auto; /* Cho phép cột giữa co lại nhưng không vỡ */
+    gap: 6px !important; /* Gap nhỏ hơn giữa các cột bên trong */
+    padding: 8px 10px !important; /* Padding nhỏ hơn - giảm từ 10px 12px xuống 8px 10px */
+    border: 1.5px solid var(--border, #e2e8f0) !important; /* Border rõ ràng */
+    border-radius: 0 !important; /* Mặc định không có border-radius */
     background-color: var(--background);
     transition: border-color .2s ease, background-color .2s ease, transform .2s ease;
-    font-size: 0.875rem; /* Nhỏ hơn */
+    font-size: 0.875rem;
+    box-shadow: none !important; /* Loại bỏ box-shadow để tránh tạo khoảng trống */
+    min-height: auto; /* Tự động điều chỉnh theo nội dung */
+    height: fit-content; /* Chiều cao vừa với nội dung */
+    max-height: none;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden; /* Ngăn nội dung vỡ khung */
+    word-wrap: break-word; /* Cho phép xuống dòng nếu cần */
+    align-items: start; /* Căn trên để tránh stretch */
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+    margin-top: 0 !important; /* Sẽ được override bởi rule cụ thể cho item không phải đầu tiên */
+}
+
+/* Border cho các item sát nhau - loại bỏ border trên của item không phải đầu tiên và dùng negative margin */
+.addr-list > .addr-item:not(:first-child) {
+    border-top: none !important; /* Loại bỏ border trên để sát nhau */
+    margin-top: -1.5px !important; /* Negative margin để kéo sát border-bottom của item trước */
 }
 
     .addr-item:hover {
         border-color: var(--accent);
         background-color: var(--muted);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px color-mix(in oklab, var(--primary) 10%, transparent);
+        transform: none !important; /* Không transform để tránh tạo khoảng trống */
+        box-shadow: none !important; /* Không có shadow khi hover */
+        z-index: 1; /* Đảm bảo item hover hiển thị trên item khác */
+        position: relative; /* Để z-index hoạt động */
     }
 
     .addr-item input[type="radio"] {
@@ -2714,16 +2817,41 @@ img {
     }
     
     .addr-item button.btn.small {
-        padding: var(--s-1) var(--s-2);
+        padding: 3px 4px !important; /* Padding nhỏ hơn */
         font-size: 0.875rem;
-        min-width: auto;
-        height: auto;
+        min-width: 28px !important; /* Kích thước button nhỏ hơn */
+        max-width: 28px !important;
+        width: 28px !important;
+        height: 24px !important; /* Chiều cao nhỏ hơn */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0; /* Không cho button co lại */
     }
     
-    .addr-item > div:first-of-type {
-        font-size: 0.875rem; /* Tăng một chút */
-        line-height: 1.6;
+    .addr-item > div:last-child {
+        display: flex;
+        flex-direction: column;
+        gap: 3px !important; /* Gap nhỏ hơn giữa các button */
+        align-items: center;
+        justify-content: flex-start;
+        flex-shrink: 0; /* Không cho container button co lại */
+        padding: 0 !important; /* Không có padding */
+        margin: 0 !important; /* Không có margin */
+    }
+    
+    /* Div chứa địa chỉ (div thứ 2 trong grid) */
+    .addr-item > div:nth-child(2) {
+        font-size: 0.875rem;
+        line-height: 1.4; /* Giảm line-height để khung nhỏ hơn */
         color: var(--foreground);
+        min-width: 0 !important; /* Cho phép co lại, override inline style */
+        max-width: 100%; /* Không vượt quá container */
+        overflow: hidden; /* Ngăn vỡ khung */
+        word-break: break-word; /* Xuống dòng nếu cần */
+        flex: 1 1 auto !important; /* Cho phép co lại nhưng không quá nhỏ */
+        padding: 0 !important; /* Không có padding */
+        margin: 0 !important; /* Không có margin */
     }
     
     .addr-item strong {
@@ -2733,15 +2861,32 @@ img {
     }
     
     .addr-item .muted {
-        font-size: 0.8125rem; /* Tăng một chút */
-        margin-top: 4px;
+        font-size: 0.8125rem;
+        margin-top: 1px !important; /* Giảm margin xuống còn 1px */
         color: var(--muted-foreground);
+        line-height: 1.3; /* Giảm line-height */
+        padding: 0 !important;
+    }
+    
+    .addr-item strong {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .addr-item > div:nth-child(2) > div {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .addr-item > div:nth-child(2) > div:first-child {
+        margin-bottom: 0 !important;
     }
     
     /* Dark mode cho address items */
     .dark .addr-item {
         background-color: var(--background);
-        border-color: var(--border);
+        border: 1.5px solid var(--border, #475569) !important; /* Đảm bảo border hiển thị trong dark mode với fallback */
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important; /* Shadow đậm hơn cho dark mode */
     }
     
     .dark .addr-item:hover {
@@ -2760,6 +2905,27 @@ img {
     .dark .addr-item .muted {
         color: #94a3b8;
     }
+
+/* Đảm bảo border hiển thị rõ khi chỉ có 1 item hoặc bất kỳ item nào */
+.addr-list .addr-item:only-child,
+.addr-list .addr-item:first-child:last-child {
+    border: 1.5px solid var(--border, #e2e8f0) !important;
+    box-shadow: none !important; /* Không có shadow để tránh khoảng trống */
+}
+
+/* Các item khác - loại bỏ border trên */
+.addr-list .addr-item:not(:only-child):not(:first-child) {
+    border-top: none !important;
+    box-shadow: none !important;
+}
+
+/* Đảm bảo border rõ ràng trong dark mode */
+.dark .addr-list .addr-item:only-child,
+.dark .addr-list .addr-item:first-child:last-child,
+.dark .addr-list .addr-item {
+    border: 1.5px solid var(--border, #475569) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
 
 /* Footer của modal địa chỉ */
 .address-modal-footer {

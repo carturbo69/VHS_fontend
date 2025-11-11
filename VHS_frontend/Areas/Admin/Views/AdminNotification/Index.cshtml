@@ -46,6 +46,48 @@
             _ => type
         };
     }
+
+    // Helper function to convert DateTime to Vietnam timezone (UTC+7)
+    // Note: Database đã lưu theo giờ Việt Nam (Unspecified), nên không cần convert nữa
+    DateTime? ToVietnamTime(DateTime? dateTime)
+    {
+        if (dateTime == null) return null;
+        
+        try
+        {
+            // Database đã lưu theo giờ Việt Nam (Unspecified kind)
+            // Nếu là Unspecified hoặc Local -> đã là giờ Việt Nam rồi, không cần convert
+            if (dateTime.Value.Kind == DateTimeKind.Unspecified || dateTime.Value.Kind == DateTimeKind.Local)
+            {
+                return dateTime.Value;
+            }
+            
+            // Chỉ convert nếu thực sự là UTC
+            if (dateTime.Value.Kind == DateTimeKind.Utc)
+            {
+                TimeZoneInfo vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+                return TimeZoneInfo.ConvertTimeFromUtc(dateTime.Value, vietnamTimeZone);
+            }
+            
+            return dateTime.Value;
+        }
+        catch
+        {
+            // Fallback: nếu là UTC thì cộng 7 giờ, còn lại giữ nguyên
+            if (dateTime.Value.Kind == DateTimeKind.Utc)
+            {
+                return dateTime.Value.AddHours(7);
+            }
+            return dateTime.Value;
+        }
+    }
+
+    // Helper function to format DateTime to Vietnamese format
+    string FormatVietnamTime(DateTime? dateTime)
+    {
+        var vietnamTime = ToVietnamTime(dateTime);
+        return vietnamTime?.ToString("dd/MM/yyyy HH:mm") ?? "N/A";
+    }
 }
 
 @section Styles {
@@ -241,7 +283,7 @@
                                         </td>
                                         <td class="content-text" title="@notification.Content">@notification.Content</td>
                                         <td class="time-cell">
-                                            <div class="date-line">@(notification.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
+                                            <div class="date-line">@FormatVietnamTime(notification.CreatedAt)</div>
                                         </td>
                                         <td>
                                             @if (notification.IsRead != true)
@@ -327,7 +369,7 @@
                                         </td>
                                         <td class="content-text" title="@notification.Content">@notification.Content</td>
                                         <td class="time-cell">
-                                            <div class="date-line">@(notification.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "N/A")</div>
+                                            <div class="date-line">@FormatVietnamTime(notification.CreatedAt)</div>
                                         </td>
                                         <td>
                                             @if (notification.IsRead != true)
@@ -784,7 +826,126 @@
                     }
                 });
             }
+            
+            // Lắng nghe event từ dropdown khi đánh dấu đã đọc
+            setupNotificationSync();
         });
+        
+        // ===== Sync với dropdown khi đánh dấu đã đọc =====
+        function setupNotificationSync() {
+            console.log('[NotificationSync] Setting up sync listeners');
+            
+            // Lắng nghe custom event từ layout
+            window.addEventListener('notificationMarkedRead', function(event) {
+                console.log('[NotificationSync] Received custom event:', event.detail);
+                const { action, data } = event.detail;
+                handleNotificationMarkedRead(action, data);
+            });
+            
+            // Lắng nghe BroadcastChannel để sync giữa các tabs
+            try {
+                const channel = new BroadcastChannel('admin_notification_sync');
+                channel.addEventListener('message', function(event) {
+                    console.log('[NotificationSync] Received BroadcastChannel message:', event.data);
+                    const { action, data } = event.data;
+                    handleNotificationMarkedRead(action, data);
+                });
+                console.log('[NotificationSync] BroadcastChannel listener set up');
+            } catch (e) {
+                console.log('[NotificationSync] BroadcastChannel not supported');
+            }
+            
+            // Lắng nghe localStorage event (fallback)
+            window.addEventListener('storage', function(event) {
+                if (event.key === 'admin_notification_update') {
+                    console.log('[NotificationSync] Received storage event');
+                    try {
+                        const update = JSON.parse(event.newValue);
+                        if (update) {
+                            handleNotificationMarkedRead(update.action, update.data);
+                        }
+                    } catch (e) {
+                        console.error('[NotificationSync] Error parsing notification update:', e);
+                    }
+                }
+            });
+        }
+        
+        // Xử lý khi notification được đánh dấu đã đọc từ dropdown
+        async function handleNotificationMarkedRead(action, data) {
+            console.log('[NotificationSync] Received:', action, data);
+            
+            if (action === 'markRead' && data.id) {
+                // Cập nhật UI cho notification cụ thể (sử dụng data-id vì là table row)
+                const notificationRow = document.querySelector(`tr[data-id="${data.id}"]`);
+                if (notificationRow) {
+                    console.log('[NotificationSync] Found row, updating UI');
+                    
+                    // Cập nhật trạng thái trong cột "Trạng thái"
+                    const statusCell = notificationRow.querySelector('td:nth-child(4)');
+                    if (statusCell) {
+                        statusCell.innerHTML = '<span class="state ok">Đã đọc</span>';
+                    }
+                    
+                    // Ẩn nút "Đánh dấu đã đọc" nếu có
+                    const markReadBtn = notificationRow.querySelector('.btn-mark-read');
+                    if (markReadBtn) {
+                        markReadBtn.style.transition = 'opacity 0.3s ease';
+                        markReadBtn.style.opacity = '0';
+                        setTimeout(() => markReadBtn.remove(), 300);
+                    }
+                    
+                    // Thêm class để đánh dấu đã đọc (nếu có styling)
+                    notificationRow.classList.remove('unread');
+                    notificationRow.classList.add('read');
+                } else {
+                    console.log('[NotificationSync] Row not found, will reload filter');
+                }
+                
+                // Cập nhật số lượng unread trong tab badge
+                updateUnreadCountInHeader();
+                
+                // Reload filter sau một chút để đồng bộ dữ liệu (nhưng không làm mất UI update)
+                setTimeout(async () => {
+                    await applyFilter();
+                }, 500);
+            } else if (action === 'markAllRead') {
+                console.log('[NotificationSync] Marking all as read');
+                
+                // Cập nhật tất cả notifications thành "Đã đọc"
+                const unreadRows = document.querySelectorAll('tr.notification-row');
+                unreadRows.forEach(row => {
+                    // Cập nhật trạng thái trong cột "Trạng thái"
+                    const statusCell = row.querySelector('td:nth-child(4)');
+                    if (statusCell) {
+                        const stateSpan = statusCell.querySelector('.state');
+                        if (stateSpan && stateSpan.classList.contains('warn')) {
+                            statusCell.innerHTML = '<span class="state ok">Đã đọc</span>';
+                        }
+                    }
+                    
+                    // Ẩn nút "Đánh dấu đã đọc" nếu có
+                    const markReadBtn = row.querySelector('.btn-mark-read');
+                    if (markReadBtn) {
+                        markReadBtn.style.transition = 'opacity 0.3s ease';
+                        markReadBtn.style.opacity = '0';
+                        setTimeout(() => markReadBtn.remove(), 300);
+                    }
+                    
+                    // Thêm class để đánh dấu đã đọc
+                    row.classList.remove('unread');
+                    row.classList.add('read');
+                });
+                
+                // Cập nhật số lượng unread trong tab badge
+                updateUnreadCountInHeader();
+                
+                // Reload filter sau một chút để đồng bộ dữ liệu
+                setTimeout(async () => {
+                    await applyFilter();
+                }, 500);
+            }
+        }
 
         // ===== Save tab when user clicks on tab =====
         document.getElementById('inbox-tab')?.addEventListener('click', function() {
@@ -853,7 +1014,22 @@
                     document.getElementById('detailReceiverName').textContent = notification.receiverName || notification.receiverEmail || 'N/A';
                     document.getElementById('detailReceiverRole').innerHTML = `<span class="badge bg-secondary">${getRoleInVietnamese(notification.receiverRole)}</span>`;
                     document.getElementById('detailNotificationType').innerHTML = `<span class="badge bg-info">${getNotificationTypeInVietnamese(notification.notificationType)}</span>`;
-                    document.getElementById('detailCreatedAt').textContent = notification.createdAt ? new Date(notification.createdAt).toLocaleString('vi-VN') : 'N/A';
+                    // Display time (database đã lưu theo giờ Việt Nam rồi)
+                    if (notification.createdAt) {
+                        const date = new Date(notification.createdAt);
+                        // Database đã lưu theo giờ Việt Nam, chỉ cần format
+                        const formattedDate = date.toLocaleString('vi-VN', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        });
+                        document.getElementById('detailCreatedAt').textContent = formattedDate;
+                    } else {
+                        document.getElementById('detailCreatedAt').textContent = 'N/A';
+                    }
                     document.getElementById('detailContent').textContent = notification.content || 'N/A';
                     
                     // Show status
@@ -1665,5 +1841,187 @@
                 }, 100);
             }
         }
+
+        // ===== SignalR Real-time Notifications =====
+        let notificationConnection = null;
+
+        async function initNotificationSignalR() {
+            try {
+                // Load SignalR if not already loaded
+                if (typeof signalR === 'undefined') {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+
+                // Get backend URL from meta tag or default
+                const metaBackendUrl = document.querySelector('meta[name="backend-url"]')?.getAttribute('content');
+                const backendUrl = metaBackendUrl || 'http://localhost:5154';
+                const hubUrl = `${backendUrl}/hubs/notification`;
+
+                // Create connection
+                notificationConnection = new signalR.HubConnectionBuilder()
+                    .withUrl(hubUrl, {
+                        accessTokenFactory: () => {
+                            // Get token from session or cookie if available
+                            return '';
+                        },
+                        skipNegotiation: false,
+                        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling
+                    })
+                    .withAutomaticReconnect({
+                        nextRetryDelayInMilliseconds: retryContext => {
+                            if (retryContext.elapsedMilliseconds < 60000) {
+                                return 2000; // Retry after 2 seconds
+                            } else {
+                                return 10000; // Retry after 10 seconds
+                            }
+                        }
+                    })
+                    .configureLogging(signalR.LogLevel.Warning)
+                    .build();
+
+                // Handle connection events
+                notificationConnection.onreconnecting(() => {
+                    console.log('[NotificationHub] Reconnecting...');
+                });
+
+                notificationConnection.onreconnected(() => {
+                    console.log('[NotificationHub] Reconnected');
+                    // Join admin group after reconnection
+                    if (notificationConnection.state === signalR.HubConnectionState.Connected) {
+                        notificationConnection.invoke('JoinAdminGroup').catch(err => {
+                            console.error('[NotificationHub] Error joining admin group:', err);
+                        });
+                    }
+                });
+
+                notificationConnection.onclose(() => {
+                    console.log('[NotificationHub] Connection closed');
+                });
+
+                // Listen for new notifications
+                notificationConnection.on('ReceiveNotification', (notification) => {
+                    console.log('[NotificationHub] Received notification:', notification);
+                    handleNewNotification(notification);
+                });
+
+                // Start connection
+                await notificationConnection.start();
+                console.log('[NotificationHub] Connected successfully');
+
+                // Join admin group
+                await notificationConnection.invoke('JoinAdminGroup');
+                console.log('[NotificationHub] Joined admin group');
+
+            } catch (error) {
+                console.error('[NotificationHub] Error initializing SignalR:', error);
+            }
+        }
+
+        function handleNewNotification(notification) {
+            if (!notification) return;
+
+            // Show toast notification first
+            showNotificationToast(notification);
+
+            // Update notification dropdown if exists
+            updateNotificationDropdown(notification);
+
+            // Update unread count in header
+            updateUnreadCountInHeader();
+
+            // Reload notifications list if on inbox tab (after a short delay to show toast)
+            const currentTab = document.querySelector('.tab-content .tab-pane.active')?.id;
+            if (currentTab === 'inbox') {
+                setTimeout(() => {
+                    // Reload the page to refresh notifications
+                    window.location.reload();
+                }, 3000); // Wait 3 seconds to show toast first
+            }
+        }
+
+        function updateUnreadCountInHeader() {
+            // Update the unread count badge in the header
+            fetch('/Admin/AdminNotification/GetUnreadCount')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.querySelector('.badge-notify');
+                    if (badge && data.count > 0) {
+                        badge.textContent = `${data.count} chưa đọc`;
+                        badge.style.display = 'inline-block';
+                    } else if (badge) {
+                        badge.style.display = 'none';
+                    }
+                })
+                .catch(err => console.error('Error updating unread count:', err));
+        }
+
+        function showNotificationToast(notification) {
+            // Create toast notification
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            toast.innerHTML = `
+                <div class="toast-content">
+                    <div class="toast-icon">
+                        <i class="bi bi-bell-fill"></i>
+                    </div>
+                    <div class="toast-body">
+                        <div class="toast-title">Thông báo mới</div>
+                        <div class="toast-message">${escapeHtml(notification.content || notification.Content || '')}</div>
+                    </div>
+                    <button class="toast-close" onclick="this.parentElement.remove()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function updateNotificationDropdown(notification) {
+            // Try to update the notification dropdown in the header
+            const dropdown = document.querySelector('.notif-menu');
+            if (dropdown) {
+                // Reload dropdown content
+                fetch('/Admin/AdminNotification/GetNotificationsPartial')
+                    .then(response => response.text())
+                    .then(html => {
+                        dropdown.innerHTML = html;
+                    })
+                    .catch(err => console.error('Error updating notification dropdown:', err));
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize SignalR when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initNotificationSignalR();
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (notificationConnection) {
+                notificationConnection.stop();
+            }
+        });
     </script>
 }

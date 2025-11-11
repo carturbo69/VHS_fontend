@@ -30,6 +30,9 @@
         public Guid? StaffId { get; set; }
         public string? StaffName { get; set; }
         public string? StaffImage { get; set; }
+        // Optional contact fields (may be null if backend doesn't supply)
+        public string? StaffPhone { get; set; }
+        public string? StaffAddress { get; set; }
 
         // ===== Service =====
         public ServiceInBookingDTO Service { get; set; } = new();
@@ -54,6 +57,8 @@
         public string? BankName { get; set; }
         public string? AccountHolderName { get; set; }
         public string? BankAccountNumber { get; set; }
+        public string? RefundStatus { get; set; } // Status của refund request: "Pending", "Approved", "Rejected"
+        public string? ResolutionNote { get; set; } // Ghi chú từ admin khi approve/reject
 
         // ===== Tiến trình / Tracking =====
         public List<TrackingEventDTO> Timeline { get; set; } = new();

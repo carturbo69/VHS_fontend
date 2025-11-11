@@ -1,54 +1,69 @@
 @model List<VHS_frontend.Areas.Admin.Models.Payment.ProviderWithdrawalDTO>
 
-<div class="withdrawals-content">
-    <div class="section-header">
-        <h2>Đã xử lý rút tiền</h2>
-        <p>Danh sách các yêu cầu rút tiền đã được xử lý (đã phê duyệt hoặc từ chối)</p>
+<div>
+    <div class="card-x mb-4">
+        <div class="card-header">
+            <span><i class="bi bi-clock-history me-2"></i>Đã xử lý rút tiền</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-0">Danh sách các yêu cầu rút tiền đã được xử lý (đã phê duyệt hoặc từ chối)</p>
+        </div>
     </div>
 
     @if (Model != null && Model.Any())
     {
-        <div class="withdrawals-list">
+        <div>
             @foreach (var withdrawal in Model)
             {
-                <div class="withdrawal-card">
-                    <div class="withdrawal-header">
+                <div class="withdrawal-card withdrawal-card-collapsible">
+                    <div class="withdrawal-header withdrawal-header-toggle" onclick="toggleWithdrawalCard(this)">
                         <div class="withdrawal-id">
-                            <span class="badge">#@withdrawal.WithdrawalId.ToString().Substring(0, 8)</span>
+                            <div class="withdrawal-id-icon"><i class="bi bi-bank"></i></div>
+                            <div class="withdrawal-id-content">
+                                <span class="withdrawal-id-label">Mã yêu cầu</span>
+                                <span class="badge withdrawal-id-badge">#@withdrawal.WithdrawalId.ToString().Substring(0, 8)</span>
+                            </div>
                         </div>
-                        <div class="withdrawal-status">
-                            @{
-                                var statusText = withdrawal.Status == "Completed" ? "Đã phê duyệt" : 
-                                                 withdrawal.Status == "Rejected" ? "Đã từ chối" : 
-                                                 withdrawal.Status;
-                                var statusClass = withdrawal.Status == "Completed" ? "status-completed" : 
-                                                  withdrawal.Status == "Rejected" ? "status-canceled" : 
-                                                  "status-pending";
-                                var statusIcon = withdrawal.Status == "Completed" ? "bi-check-circle" : 
-                                                 withdrawal.Status == "Rejected" ? "bi-x-circle" : 
-                                                 "bi-clock";
-                            }
-                            <span class="status-badge @statusClass">
-                                <i class="bi @statusIcon"></i>
-                                @statusText
-                            </span>
+                        <div class="withdrawal-header-right">
+                            <div class="withdrawal-status">
+                                @{
+                                    var statusText = withdrawal.Status == "Completed" ? "Đã phê duyệt" : 
+                                                     withdrawal.Status == "Rejected" ? "Đã từ chối" : 
+                                                     withdrawal.Status;
+                                    var statusClass = withdrawal.Status == "Completed" ? "status-completed" : 
+                                                      withdrawal.Status == "Rejected" ? "status-canceled" : 
+                                                      "status-pending";
+                                    var statusIcon = withdrawal.Status == "Completed" ? "bi-check-circle" : 
+                                                     withdrawal.Status == "Rejected" ? "bi-x-circle" : 
+                                                     "bi-clock";
+                                }
+                                <span class="status-badge @statusClass">
+                                    <i class="bi @statusIcon"></i>
+                                    @statusText
+                                </span>
+                            </div>
+                            <div class="withdrawal-amount-preview">
+                                <span class="amount-preview-label">Số tiền</span>
+                                <span class="amount-preview-value">@withdrawal.Amount.ToString("N0") VNĐ</span>
+                            </div>
+                            <i class="bi bi-chevron-down withdrawal-chevron"></i>
                         </div>
                     </div>
 
-                    <div class="withdrawal-content">
+                    <div class="withdrawal-content withdrawal-content-collapsible collapsed">
                         <div class="withdrawal-info-row">
                             <div class="info-item">
-                                <i class="bi bi-building"></i>
-                                <div>
-                                    <strong>Nhà cung cấp:</strong>
-                                    <div>@withdrawal.ProviderName</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-building"></i></div>
+                                <div class="info-content">
+                                    <strong>Nhà cung cấp</strong>
+                                    <div class="info-value">@withdrawal.ProviderName</div>
                                     <small>@withdrawal.ProviderEmail</small>
                                 </div>
                             </div>
-                            <div class="info-item">
-                                <i class="bi bi-cash-stack"></i>
-                                <div>
-                                    <strong>Số tiền:</strong>
+                            <div class="info-item info-item-amount">
+                                <div class="info-icon-wrapper"><i class="bi bi-cash-stack"></i></div>
+                                <div class="info-content">
+                                    <strong>Số tiền</strong>
                                     <div class="amount @(withdrawal.Status == "Completed" ? "highlight" : "")">
                                         @withdrawal.Amount.ToString("N0") VNĐ
                                     </div>
@@ -58,36 +73,36 @@
 
                         <div class="withdrawal-info-row">
                             <div class="info-item">
-                                <i class="bi bi-bank"></i>
-                                <div>
-                                    <strong>Ngân hàng:</strong>
-                                    <div>@withdrawal.BankName</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-bank"></i></div>
+                                <div class="info-content">
+                                    <strong>Ngân hàng</strong>
+                                    <div class="info-value">@withdrawal.BankName</div>
                                 </div>
                             </div>
                             <div class="info-item">
-                                <i class="bi bi-credit-card"></i>
-                                <div>
-                                    <strong>Số tài khoản:</strong>
-                                    <div>@withdrawal.BankAccount</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-credit-card"></i></div>
+                                <div class="info-content">
+                                    <strong>Số tài khoản</strong>
+                                    <div class="info-value">@withdrawal.BankAccount</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="withdrawal-info-row">
                             <div class="info-item">
-                                <i class="bi bi-calendar3"></i>
-                                <div>
-                                    <strong>Ngày yêu cầu:</strong>
-                                    <div>@withdrawal.RequestDate.ToString("dd/MM/yyyy HH:mm")</div>
+                                <div class="info-icon-wrapper"><i class="bi bi-calendar3"></i></div>
+                                <div class="info-content">
+                                    <strong>Ngày yêu cầu</strong>
+                                    <div class="info-value">@withdrawal.RequestDate.ToString("dd/MM/yyyy HH:mm")</div>
                                 </div>
                             </div>
                             @if (withdrawal.ProcessedDate.HasValue)
                             {
                                 <div class="info-item">
-                                    <i class="bi bi-clock"></i>
-                                    <div>
-                                        <strong>Ngày xử lý:</strong>
-                                        <div>@withdrawal.ProcessedDate.Value.ToString("dd/MM/yyyy HH:mm")</div>
+                                    <div class="info-icon-wrapper"><i class="bi bi-clock"></i></div>
+                                    <div class="info-content">
+                                        <strong>Ngày xử lý</strong>
+                                        <div class="info-value">@withdrawal.ProcessedDate.Value.ToString("dd/MM/yyyy HH:mm")</div>
                                     </div>
                                 </div>
                             }
@@ -95,19 +110,23 @@
 
                         @if (!string.IsNullOrEmpty(withdrawal.Note))
                         {
-                            <div class="withdrawal-note">
-                                <i class="bi bi-sticky"></i>
-                                <strong>Ghi chú từ nhà cung cấp:</strong>
-                                <p>@withdrawal.Note</p>
+                            <div class="cancel-info">
+                                <div class="cancel-info-header">
+                                    <div class="cancel-info-header-icon"><i class="bi bi-sticky"></i></div>
+                                    <strong>Ghi chú từ nhà cung cấp</strong>
+                                </div>
+                                <div class="cancel-info-content">@withdrawal.Note</div>
                             </div>
                         }
 
                         @if (!string.IsNullOrEmpty(withdrawal.AdminNote))
                         {
-                            <div class="withdrawal-note mt-2 p-2 bg-light rounded">
-                                <i class="bi bi-info-circle"></i>
-                                <strong>Ghi chú từ admin:</strong>
-                                <p>@withdrawal.AdminNote</p>
+                            <div class="cancel-info mt-2">
+                                <div class="cancel-info-header">
+                                    <div class="cancel-info-header-icon"><i class="bi bi-info-circle"></i></div>
+                                    <strong>Ghi chú từ admin</strong>
+                                </div>
+                                <div class="cancel-info-content">@withdrawal.AdminNote</div>
                             </div>
                         }
                     </div>
@@ -117,12 +136,12 @@
     }
     else
     {
-        <div class="empty-state">
-            <div class="empty-icon">
-                <i class="bi bi-clock-history"></i>
+        <div class="card-x">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-clock-history" style="font-size: 3rem; opacity: 0.3;"></i>
+                <h3 class="mt-3 mb-0">Chưa có yêu cầu rút tiền nào đã được xử lý</h3>
+                <p class="mt-2 mb-0">Danh sách các yêu cầu rút tiền đã được phê duyệt hoặc từ chối sẽ hiển thị ở đây.</p>
             </div>
-            <h3>Chưa có yêu cầu rút tiền nào đã được xử lý</h3>
-            <p>Danh sách các yêu cầu rút tiền đã được phê duyệt hoặc từ chối sẽ hiển thị ở đây.</p>
         </div>
     }
 </div>

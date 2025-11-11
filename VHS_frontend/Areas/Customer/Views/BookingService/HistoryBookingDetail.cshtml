@@ -210,7 +210,9 @@
             }
             else if (IsWorking || IsConfirmed)
             {
-                <button class="btn btn-outline-secondary">Liên hệ nhân viên</button>
+                <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#staffInfoModal">
+                    <i class="bi bi-person-vcard me-1"></i> Liên hệ nhân viên
+                </button>
             }
             else if (IsCancelled)
             {
@@ -231,6 +233,51 @@
         </div>
     </div>
 
+    @* Modal: Thông tin nhân viên *@
+    @{
+        var modalStaffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? "—" : Model!.StaffName!;
+        var modalStaffImg = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
+        var modalStaffPhone = !string.IsNullOrWhiteSpace(Model?.StaffPhone) ? Model!.StaffPhone! : (string.IsNullOrWhiteSpace(ViewBag.StaffPhone as string) ? "—" : (string)ViewBag.StaffPhone);
+        var modalStaffAddress = !string.IsNullOrWhiteSpace(Model?.StaffAddress) ? Model!.StaffAddress! : (string.IsNullOrWhiteSpace(ViewBag.StaffAddress as string) ? "—" : (string)ViewBag.StaffAddress);
+    }
+    <div class="modal fade" id="staffInfoModal" tabindex="-1" aria-labelledby="staffInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 560px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 id="staffInfoModalLabel" class="modal-title" style="font-size: 1.125rem; font-weight: 700;">Thông tin nhân viên</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex gap-3 align-items-start">
+                        <img src="@modalStaffImg"
+                             alt="Ảnh nhân viên"
+                             width="140" height="140"
+                             style="object-fit:cover;border-radius:50%;border:1px solid #eee; cursor: zoom-in;"
+                             loading="lazy"
+                             decoding="async"
+                             onerror="this.onerror=null;this.src='@fallbackImg';"
+                             class="zoomable"
+                             data-full="@modalStaffImg" />
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold mb-1" style="font-size: 1.05rem;">@modalStaffName</div>
+                            <div class="text-muted mb-2" style="font-size: .95rem;">
+                                <i class="bi bi-geo-alt"></i>
+                                <span class="ms-1">@modalStaffAddress</span>
+                            </div>
+                            <div class="text-muted" style="font-size: .95rem;">
+                                <i class="bi bi-telephone"></i>
+                                <a href="tel:@modalStaffPhone" class="ms-1 text-decoration-none">@modalStaffPhone</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Steps: chỉ hiện cho 4 trạng thái chính -->
     @if (IsFourStates)
     {
@@ -247,6 +294,8 @@
             @{
                 var stepStaffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
                 var stepStaffImg = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
+                var stepStaffPhone = ViewBag.StaffPhone as string;
+                var stepStaffAddress = ViewBag.StaffAddress as string;
             }
 
             <div class="step @StepClass("Confirmed")">
@@ -258,7 +307,7 @@
 
                     @if (!string.IsNullOrWhiteSpace(stepStaffName))
                     {
-                        <span class="d-inline-flex align-items-center gap-2">
+                        <span class="d-inline-flex align-items-center gap-2 flex-wrap">
                             <span><span class="label">Nhân viên:</span> @stepStaffName</span>
                             <img src="@stepStaffImg"
                                  alt="Ảnh @stepStaffName"
@@ -267,6 +316,7 @@
                                  loading="lazy"
                                  decoding="async"
                                  onerror="this.onerror=null;this.src='@fallbackImg';" />
+                            
                         </span>
                     }
                     else
@@ -699,6 +749,21 @@
                 }
             });
             imgModalEl.addEventListener('hidden.bs.modal', function () { imgEl.src = ''; imgEl.alt = ''; });
+            // Close when clicking outside content or on body area
+            imgModalEl.addEventListener('click', function (e) {
+              const content = imgModalEl.querySelector('.modal-content');
+              if (!content) return;
+              if (!content.contains(e.target)) {
+                const inst = bootstrap.Modal.getInstance(imgModalEl) || new bootstrap.Modal(imgModalEl);
+                inst.hide();
+              }
+            });
+            // Also allow closing when clicking image area (zoom out)
+            imgModalEl.querySelector('.modal-body')?.addEventListener('click', function(){
+              const inst = bootstrap.Modal.getInstance(imgModalEl) || new bootstrap.Modal(imgModalEl);
+              inst.hide();
+            });
+
         });
 
           // ===== Uploader ảnh (bản chắc chắn) =====
@@ -855,16 +920,16 @@
 }
 
 <!-- Modal xem ảnh fullscreen -->
-<div class="modal fade" id="imgPreviewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-fullscreen modal-dialog-centered">
-        <div class="modal-content bg-black">
-            <div class="modal-body p-0">
-                <img class="modal-img" src="" alt="">
-            </div>
-            <div class="position-absolute top-0 end-0 p-2">
-                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal" aria-label="Close">
-                    <i class="bi bi-x-lg"></i>
-                </button>
+<div class="modal fade" id="imgPreviewModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false" data-bs-keyboard="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 1200px;">
+        <div class="modal-content" style="background: transparent; border: none; box-shadow: none;">
+            <div class="modal-body p-0 d-flex justify-content-center align-items-center" style="cursor: zoom-out;">
+                <div class="position-relative d-inline-block">
+                    <img class="modal-img" src="" alt="" style="max-width: 98vw; max-height: 92vh; border-radius: 10px; background: #fff; object-fit: contain;" />
+                    <button type="button" class="btn btn-light position-absolute" data-bs-dismiss="modal" aria-label="Close" style="top: 6px; right: 6px; padding: 2px 6px; line-height: 1; border-radius: 6px;">
+                        <i class="bi bi-x-lg" style="font-size: .8rem;"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>

@@ -19,6 +19,8 @@ namespace VHS_frontend.Areas.Admin.Models.Payment
         public string? BankAccount { get; set; }
         public string? BankName { get; set; }
         public string? AccountHolderName { get; set; }
+        public string? RefundStatus { get; set; } // Status của refund request: "Approved" hoặc "Rejected"
+        public string? ResolutionNote { get; set; } // Ghi chú từ admin khi approve/reject
     }
 }
 

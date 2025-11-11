@@ -12,116 +12,171 @@
         if (relativePath.StartsWith("http://") || relativePath.StartsWith("https://")) return relativePath;
         return backendUrl + relativePath;
     }
+    
+    // Helper function để chuyển ComplaintType sang tiếng Việt
+    string GetComplaintTypeVi(string? type)
+    {
+        return type switch
+        {
+            "ServiceQuality" => "Chất lượng dịch vụ",
+            "ProviderBehavior" => "Hành vi nhà cung cấp",
+            "PriceIssue" => "Vấn đề giá",
+            "Delay" => "Trễ hẹn",
+            "Other" => "Khác",
+            _ => type ?? "Khác"
+        };
+    }
+    
+    // Helper function để chuyển BookingStatus sang tiếng Việt
+    string GetBookingStatusVi(string? status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ xử lý",
+            "Confirmed" => "Đã xác nhận",
+            "InProgress" => "Đang thực hiện",
+            "Completed" => "Đã hoàn thành",
+            "Cancelled" => "Đã hủy",
+            "Rejected" => "Đã từ chối",
+            _ => status ?? "Không xác định"
+        };
+    }
 }
 
 @section Styles {
+    <link rel="stylesheet" href="~/css/admin-service-management.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin-complaint.css" asp-append-version="true" />
 }
 
-<div class="complaint-details-container">
+<div class="admin-service-management">
     <!-- Header -->
-    <div class="page-header">
-        <div class="header-content">
-            <div class="header-title">
-                <div class="title-with-icon">
-                    <a href="@Url.Action("Index")" class="back-btn">
-                        <i class="bi bi-arrow-left"></i>
-                    </a>
-                    <div class="title-content">
-                        <h1>Chi tiết Khiếu nại</h1>
-                        <p>Xem và xử lý khiếu nại</p>
+    <div class="admin-service-management__header">
+        <h3><i class="bi bi-info-circle-fill"></i>Chi tiết Khiếu nại</h3>
+        <a href="@Url.Action("Index")" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Quay lại
+        </a>
+    </div>
+
+    <!-- Complaint Info -->
+    <div class="row g-3 mb-4">
+        <!-- Main Complaint Info -->
+        <div class="col-lg-8">
+            <div class="card-x">
+                <div class="card-header">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span><i class="bi bi-info-circle me-2"></i>Thông tin Khiếu nại</span>
+                        @switch(Model.Status)
+                        {
+                            case "Pending":
+                                <span class="status-badge status-pending">
+                                    <i class="bi bi-hourglass-split"></i><span> Chờ xử lý</span>
+                                </span>
+                                break;
+                            case "InReview":
+                                <span class="status-badge status-processing">
+                                    <i class="bi bi-search"></i><span> Đang xem xét</span>
+                                </span>
+                                break;
+                            case "Resolved":
+                                <span class="status-badge status-completed">
+                                    <i class="bi bi-check-circle"></i><span> Đã giải quyết</span>
+                                </span>
+                                break;
+                            case "Rejected":
+                                <span class="status-badge status-canceled">
+                                    <i class="bi bi-x-circle"></i><span> Đã từ chối</span>
+                                </span>
+                                break;
+                            default:
+                                <span class="badge bg-secondary">@(Model.Status ?? "Không xác định")</span>
+                                break;
+                        }
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="complaint-detail-info">
+                        <div class="info-row">
+                            <div class="info-label">ID Khiếu nại</div>
+                            <div class="info-value"><code>@Model.ComplaintId</code></div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">Tiêu đề</div>
+                            <div class="info-value-title">@Model.Title</div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-label">Loại khiếu nại</div>
+                            <div class="info-value">
+                                <span class="badge badge-type">@GetComplaintTypeVi(Model.ComplaintType)</span>
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.Description))
+                        {
+                            <div class="info-row info-row-description">
+                                <div class="info-label">Mô tả</div>
+                                <div class="info-value-description">@Model.Description</div>
+                            </div>
+                        }
+                        <div class="info-row-group">
+                            <div class="info-row">
+                                <div class="info-label">Ngày tạo</div>
+                                <div class="info-value">
+                                    <i class="bi bi-calendar3 me-1"></i>
+                                    @(Model.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "Không có")
+                                </div>
+                            </div>
+                            @if (Model.UpdatedAt.HasValue)
+                            {
+                                <div class="info-row">
+                                    <div class="info-label">Ngày cập nhật</div>
+                                    <div class="info-value">
+                                        <i class="bi bi-clock-history me-1"></i>
+                                        @Model.UpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                                    </div>
+                                </div>
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Complaint Info -->
-    <div class="complaint-details-section">
-        <div class="details-grid">
-            <!-- Main Complaint Info -->
-            <div class="details-card main-card">
-                <div class="card-header">
-                    <h3><i class="bi bi-info-circle"></i> Thông tin Khiếu nại</h3>
-                    <span class="status-badge status-@Model.Status.ToLower()">
-                        @switch(Model.Status)
-                        {
-                            case "Pending":
-                                <i class="bi bi-hourglass-split"></i><span> Chờ xử lý</span>
-                                break;
-                            case "InReview":
-                                <i class="bi bi-search"></i><span> Đang xem xét</span>
-                                break;
-                            case "Resolved":
-                                <i class="bi bi-check-circle"></i><span> Đã giải quyết</span>
-                                break;
-                            case "Rejected":
-                                <i class="bi bi-x-circle"></i><span> Đã từ chối</span>
-                                break;
-                            default:
-                                @Model.Status
-                                break;
-                        }
-                    </span>
-                </div>
-                <div class="card-body">
-                    <div class="info-row">
-                        <span class="info-label">ID Khiếu nại:</span>
-                        <span class="info-value">@Model.ComplaintId</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Tiêu đề:</span>
-                        <span class="info-value">@Model.Title</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Loại:</span>
-                        <span class="info-value">@Model.ComplaintType</span>
-                    </div>
-                    @if (!string.IsNullOrEmpty(Model.Description))
-                    {
-                        <div class="info-row full-width">
-                            <span class="info-label">Mô tả:</span>
-                            <p class="info-description">@Model.Description</p>
-                        </div>
-                    }
-                    <div class="info-row">
-                        <span class="info-label">Ngày tạo:</span>
-                        <span class="info-value">@(Model.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</span>
-                    </div>
-                    @if (Model.UpdatedAt.HasValue)
-                    {
-                        <div class="info-row">
-                            <span class="info-label">Ngày cập nhật:</span>
-                            <span class="info-value">@Model.UpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
-                        </div>
-                    }
-                </div>
-            </div>
-
+        <!-- Sidebar Info -->
+        <div class="col-lg-4">
             <!-- Customer Info -->
-            <div class="details-card">
+            <div class="card-x mb-3">
                 <div class="card-header">
-                    <h3><i class="bi bi-person-circle"></i> Khách hàng</h3>
+                    <span><i class="bi bi-person-circle me-2"></i>Khách hàng</span>
                 </div>
                 <div class="card-body">
-                    <div class="info-row">
-                        <span class="info-label">Họ tên:</span>
-                        <span class="info-value">@Model.CustomerName</span>
+                    <div class="sidebar-info-item">
+                        <div class="sidebar-label">Tài khoản</div>
+                        <div class="sidebar-value">
+                            <i class="bi bi-person me-2"></i>
+                            @(!string.IsNullOrWhiteSpace(Model.CustomerName) ? Model.CustomerName : (!string.IsNullOrWhiteSpace(Model.CustomerEmail) ? Model.CustomerEmail.Split('@')[0] : "Không xác định"))
+                        </div>
                     </div>
-                    <div class="info-row">
-                        <span class="info-label">Email:</span>
-                        <span class="info-value">@Model.CustomerEmail</span>
+                    <div class="sidebar-info-item">
+                        <div class="sidebar-label">Email</div>
+                        <div class="sidebar-value">
+                            <i class="bi bi-envelope me-2"></i>
+                            @Model.CustomerEmail
+                        </div>
                     </div>
                     @if (!string.IsNullOrEmpty(Model.CustomerPhone))
                     {
-                        <div class="info-row">
-                            <span class="info-label">Điện thoại:</span>
-                            <span class="info-value">@Model.CustomerPhone</span>
+                        <div class="sidebar-info-item">
+                            <div class="sidebar-label">Điện thoại</div>
+                            <div class="sidebar-value">
+                                <i class="bi bi-telephone me-2"></i>
+                                @Model.CustomerPhone
+                            </div>
                         </div>
                     }
-                    <div class="info-row">
-                        <span class="info-label">ID Khách hàng:</span>
-                        <span class="info-value small">@Model.UserId</span>
+                    <div class="sidebar-info-item">
+                        <div class="sidebar-label">ID Khách hàng</div>
+                        <div class="sidebar-value">
+                            <code>@Model.UserId</code>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -129,27 +184,36 @@
             <!-- Provider Info -->
             @if (Model.ProviderId.HasValue)
             {
-                <div class="details-card">
+                <div class="card-x mb-3">
                     <div class="card-header">
-                        <h3><i class="bi bi-briefcase"></i> Nhà cung cấp</h3>
+                        <span><i class="bi bi-briefcase me-2"></i>Nhà cung cấp</span>
                     </div>
                     <div class="card-body">
-                        <div class="info-row">
-                            <span class="info-label">Tên:</span>
-                            <span class="info-value">@Model.ProviderName</span>
+                        <div class="sidebar-info-item">
+                            <div class="sidebar-label">Tên</div>
+                            <div class="sidebar-value">
+                                <i class="bi bi-building me-2"></i>
+                                @Model.ProviderName
+                            </div>
                         </div>
                         @if (!string.IsNullOrEmpty(Model.ProviderEmail))
                         {
-                            <div class="info-row">
-                                <span class="info-label">Email:</span>
-                                <span class="info-value">@Model.ProviderEmail</span>
+                            <div class="sidebar-info-item">
+                                <div class="sidebar-label">Email</div>
+                                <div class="sidebar-value">
+                                    <i class="bi bi-envelope me-2"></i>
+                                    @Model.ProviderEmail
+                                </div>
                             </div>
                         }
                         @if (!string.IsNullOrEmpty(Model.ProviderPhone))
                         {
-                            <div class="info-row">
-                                <span class="info-label">Điện thoại:</span>
-                                <span class="info-value">@Model.ProviderPhone</span>
+                            <div class="sidebar-info-item">
+                                <div class="sidebar-label">Điện thoại</div>
+                                <div class="sidebar-value">
+                                    <i class="bi bi-telephone me-2"></i>
+                                    @Model.ProviderPhone
+                                </div>
                             </div>
                         }
                     </div>
@@ -157,101 +221,122 @@
             }
 
             <!-- Booking Info -->
-            <div class="details-card">
+            <div class="card-x">
                 <div class="card-header">
-                    <h3><i class="bi bi-calendar-check"></i> Thông tin Đặt dịch vụ</h3>
+                    <span><i class="bi bi-calendar-check me-2"></i>Thông tin Đặt dịch vụ</span>
                 </div>
                 <div class="card-body">
-                    <div class="info-row">
-                        <span class="info-label">ID Booking:</span>
-                        <span class="info-value small">@Model.BookingId</span>
+                    <div class="sidebar-info-item">
+                        <div class="sidebar-label">Mã đặt dịch vụ</div>
+                        <div class="sidebar-value">
+                            <code>@Model.BookingId</code>
+                        </div>
                     </div>
                     @if (!string.IsNullOrEmpty(Model.ServiceName))
                     {
-                        <div class="info-row">
-                            <span class="info-label">Dịch vụ:</span>
-                            <span class="info-value">@Model.ServiceName</span>
+                        <div class="sidebar-info-item">
+                            <div class="sidebar-label">Dịch vụ</div>
+                            <div class="sidebar-value">
+                                <i class="bi bi-gear me-2"></i>
+                                @Model.ServiceName
+                            </div>
                         </div>
                     }
                     @if (Model.BookingDate.HasValue)
                     {
-                        <div class="info-row">
-                            <span class="info-label">Ngày đặt:</span>
-                            <span class="info-value">@Model.BookingDate.Value.ToString("dd/MM/yyyy")</span>
+                        <div class="sidebar-info-item">
+                            <div class="sidebar-label">Ngày đặt</div>
+                            <div class="sidebar-value">
+                                <i class="bi bi-calendar3 me-2"></i>
+                                @Model.BookingDate.Value.ToString("dd/MM/yyyy")
+                            </div>
                         </div>
                     }
                     @if (!string.IsNullOrEmpty(Model.BookingStatus))
                     {
-                        <div class="info-row">
-                            <span class="info-label">Trạng thái:</span>
-                            <span class="info-value">@Model.BookingStatus</span>
+                        <div class="sidebar-info-item">
+                            <div class="sidebar-label">Trạng thái đặt dịch vụ</div>
+                            <div class="sidebar-value">
+                                <span class="badge badge-status">@GetBookingStatusVi(Model.BookingStatus)</span>
+                            </div>
                         </div>
                     }
                     @if (!string.IsNullOrEmpty(Model.ServiceLocation))
                     {
-                        <div class="info-row">
-                            <span class="info-label">Địa chỉ:</span>
-                            <span class="info-value">@Model.ServiceLocation</span>
+                        <div class="sidebar-info-item">
+                            <div class="sidebar-label">Địa chỉ</div>
+                            <div class="sidebar-value">
+                                <i class="bi bi-geo-alt me-2"></i>
+                                @Model.ServiceLocation
+                            </div>
                         </div>
                     }
                 </div>
             </div>
         </div>
-
-        <!-- Attachments -->
-        @if (Model.AttachmentUrls != null && Model.AttachmentUrls.Any())
-        {
-            <div class="details-card attachments-card">
-                <div class="card-header">
-                    <h3><i class="bi bi-paperclip"></i> Tệp đính kèm (@Model.AttachmentUrls.Length)</h3>
-                </div>
-                <div class="card-body">
-                    <div class="attachments-grid">
-                        @foreach (var attachment in Model.AttachmentUrls)
-                        {
-                            var fullImageUrl = GetFullImageUrl(attachment);
-                            <div class="attachment-item">
-                                <img src="@fullImageUrl" alt="Attachment" 
-                                     onerror="this.onerror=null;this.src='/images/placeholder.png';" />
-                                <a href="@fullImageUrl" target="_blank" rel="noopener" class="attachment-link">
-                                    <i class="bi bi-box-arrow-up-right"></i>
-                                    Mở
-                                </a>
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
-        }
-
-        <!-- Resolution Info -->
-        @if (!string.IsNullOrEmpty(Model.ResolutionNote))
-        {
-            <div class="details-card resolution-card">
-                <div class="card-header">
-                    <h3><i class="bi bi-check2-circle"></i> Ghi chú xử lý</h3>
-                </div>
-                <div class="card-body">
-                    <p class="resolution-note">@Model.ResolutionNote</p>
-                </div>
-            </div>
-        }
     </div>
+
+    <!-- Attachments -->
+    @if (Model.AttachmentUrls != null && Model.AttachmentUrls.Any())
+    {
+        <div class="card-x mb-4">
+            <div class="card-header">
+                <span><i class="bi bi-paperclip me-2"></i>Tệp đính kèm (@Model.AttachmentUrls.Length)</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    @foreach (var attachment in Model.AttachmentUrls)
+                    {
+                        var fullImageUrl = GetFullImageUrl(attachment);
+                        <div class="col-md-4 col-lg-3">
+                            <div class="attachment-item">
+                                <div class="attachment-image-wrapper">
+                                    <img src="@fullImageUrl" alt="Tệp đính kèm" class="attachment-image"
+                                         onerror="this.onerror=null;this.src='/images/placeholder.png';" />
+                                    <div class="attachment-overlay">
+                                        <a href="@fullImageUrl" target="_blank" rel="noopener" class="btn btn-sm btn-light">
+                                            <i class="bi bi-box-arrow-up-right me-1"></i>Mở
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Resolution Info -->
+    @if (!string.IsNullOrEmpty(Model.ResolutionNote))
+    {
+        <div class="card-x mb-4">
+            <div class="card-header bg-success bg-opacity-10">
+                <span><i class="bi bi-check2-circle me-2"></i>Ghi chú xử lý</span>
+            </div>
+            <div class="card-body">
+                <div class="resolution-note-content">
+                    <i class="bi bi-chat-quote me-2"></i>
+                    <p class="mb-0">@Model.ResolutionNote</p>
+                </div>
+            </div>
+        </div>
+    }
 
     <!-- Handle Complaint Form -->
     @if (Model.Status == "Pending" || Model.Status == "InReview")
     {
-        <div class="handle-complaint-section">
-            <div class="handle-card">
-                <div class="card-header">
-                    <h3><i class="bi bi-gear"></i> Xử lý Khiếu nại</h3>
-                </div>
-                <div class="card-body">
-                    <form method="post" asp-action="HandleComplaint" class="handle-form">
-                        <input type="hidden" name="id" value="@Model.ComplaintId" />
-                        
-                        <div class="form-group">
-                            <label for="Status">Trạng thái <span class="required">*</span></label>
+        <div class="card-x">
+            <div class="card-header">
+                <span><i class="bi bi-gear me-2"></i>Xử lý Khiếu nại</span>
+            </div>
+            <div class="card-body">
+                <form method="post" asp-action="HandleComplaint" class="handle-form">
+                    <input type="hidden" name="id" value="@Model.ComplaintId" />
+                    
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="Status" class="form-label">Trạng thái <span class="text-danger">*</span></label>
                             <select name="Status" id="Status" class="form-select" required>
                                 <option value="">-- Chọn trạng thái --</option>
                                 <option value="InReview">Đang xem xét</option>
@@ -259,28 +344,27 @@
                                 <option value="Rejected">Đã từ chối</option>
                             </select>
                         </div>
+                    </div>
 
-                        <div class="form-group">
-                            <label for="ResolutionNote">Ghi chú xử lý <span class="required">*</span></label>
-                            <textarea name="ResolutionNote" id="ResolutionNote" 
-                                      class="form-textarea" 
-                                      rows="5" 
-                                      placeholder="Nhập ghi chú về cách xử lý khiếu nại..."
-                                      required></textarea>
-                        </div>
+                    <div class="mb-4">
+                        <label for="ResolutionNote" class="form-label">Ghi chú xử lý <span class="text-danger">*</span></label>
+                        <textarea name="ResolutionNote" id="ResolutionNote" 
+                                  class="form-control" 
+                                  rows="6" 
+                                  placeholder="Nhập ghi chú về cách xử lý khiếu nại..."
+                                  required></textarea>
+                        <small class="form-text text-muted mt-2">Vui lòng mô tả chi tiết cách xử lý khiếu nại này.</small>
+                    </div>
 
-                        <div class="form-actions">
-                            <button type="submit" class="btn-submit">
-                                <i class="bi bi-check-circle"></i>
-                                Xác nhận
-                            </button>
-                            <a href="@Url.Action("Index")" class="btn-cancel">
-                                <i class="bi bi-x-circle"></i>
-                                Hủy
-                            </a>
-                        </div>
-                    </form>
-                </div>
+                    <div class="d-flex gap-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-circle me-2"></i>Xác nhận xử lý
+                        </button>
+                        <a href="@Url.Action("Index")" class="btn btn-secondary btn-lg">
+                            <i class="bi bi-x-circle me-2"></i>Hủy
+                        </a>
+                    </div>
+                </form>
             </div>
         </div>
     }
@@ -299,32 +383,37 @@
         }
 
         // Form validation
-        document.querySelector('.handle-form').addEventListener('submit', function(e) {
-            const status = document.getElementById('Status').value;
-            const note = document.getElementById('ResolutionNote').value.trim();
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('.handle-form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const status = document.getElementById('Status').value;
+                    const note = document.getElementById('ResolutionNote').value.trim();
 
-            if (!status || !note) {
-                e.preventDefault();
-                alert('Vui lòng điền đầy đủ thông tin!');
-                return false;
-            }
+                    if (!status || !note) {
+                        e.preventDefault();
+                        alert('Vui lòng điền đầy đủ thông tin!');
+                        return false;
+                    }
 
-            // Confirm action based on status
-            let confirmMsg = '';
-            switch(status) {
-                case 'Resolved':
-                    confirmMsg = 'Bạn có chắc muốn đánh dấu khiếu nại này là ĐÃ GIẢI QUYẾT?';
-                    break;
-                case 'Rejected':
-                    confirmMsg = 'Bạn có chắc muốn TỪ CHỐI khiếu nại này?';
-                    break;
-                default:
-                    confirmMsg = 'Bạn có chắc muốn xử lý khiếu nại này?';
-            }
+                    // Confirm action based on status
+                    let confirmMsg = '';
+                    switch(status) {
+                        case 'Resolved':
+                            confirmMsg = 'Bạn có chắc muốn đánh dấu khiếu nại này là ĐÃ GIẢI QUYẾT?';
+                            break;
+                        case 'Rejected':
+                            confirmMsg = 'Bạn có chắc muốn TỪ CHỐI khiếu nại này?';
+                            break;
+                        default:
+                            confirmMsg = 'Bạn có chắc muốn xử lý khiếu nại này?';
+                    }
 
-            if (!confirm(confirmMsg)) {
-                e.preventDefault();
-                return false;
+                    if (!confirm(confirmMsg)) {
+                        e.preventDefault();
+                        return false;
+                    }
+                });
             }
         });
     </script>

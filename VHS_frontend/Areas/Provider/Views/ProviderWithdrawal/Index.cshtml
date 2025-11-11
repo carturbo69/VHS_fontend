@@ -9,6 +9,14 @@
 }
 
 <div class="withdrawal-container">
+    <!-- Success Notification -->
+    <div id="successNotification" class="success-notification" style="display: none;">
+        <div class="success-notification-content">
+            <i class="bi bi-check-circle-fill me-2" id="successNotificationIcon"></i>
+            <span id="successNotificationText"></span>
+        </div>
+    </div>
+
     <!-- Header -->
     <div class="page-header">
         <h1>
@@ -42,16 +50,6 @@
             <div class="balance-stats">
                 <div class="stat-item">
                     <div class="stat-icon">
-                        <i class="bi bi-cash-coin"></i>
-                    </div>
-                    <div class="stat-content">
-                        <div class="stat-label">Tổng thu nhập</div>
-                        <div class="stat-value">@Model.Balance.TotalEarnings.ToString("N0") VNĐ</div>
-                    </div>
-                </div>
-
-                <div class="stat-item">
-                    <div class="stat-icon">
                         <i class="bi bi-check-circle"></i>
                     </div>
                     <div class="stat-content">
@@ -79,7 +77,7 @@
                         <i class="bi bi-graph-up"></i>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-label">Doanh thu booking hoàn thành</div>
+                        <div class="stat-label">Doanh thu dịch vụ hoàn thành</div>
                         <div class="stat-value">@Model.Balance.GrossCompletedAmount.ToString("N0") VNĐ</div>
                     </div>
                 </div>
@@ -100,88 +98,122 @@
         @if (Model.Balance.AvailableBalance > 0)
         {
             <div class="withdrawal-form-section">
-                <h2>
-                    <i class="bi bi-plus-circle"></i>
-                    Yêu cầu rút tiền
-                </h2>
-                <form id="withdrawalForm" class="withdrawal-form">
-                    @Html.AntiForgeryToken()
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="mb-0">
+                        <i class="bi bi-plus-circle"></i>
+                        Yêu cầu rút tiền
+                    </h2>
+                    <button type="button" class="btn btn-request-withdrawal" data-bs-toggle="collapse" data-bs-target="#withdrawalFormCollapse" aria-expanded="false" aria-controls="withdrawalFormCollapse">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        Tạo yêu cầu rút tiền
+                    </button>
+                </div>
+                <div class="collapse" id="withdrawalFormCollapse">
+                    <form id="withdrawalForm" class="withdrawal-form" novalidate>
+                        @Html.AntiForgeryToken()
 
-                    <div class="form-group">
-                        <label for="Amount">
-                            Số tiền muốn rút <span class="required">*</span>
-                        </label>
-                        <div class="input-group">
-                            <input type="number"
-                                   id="Amount"
-                                   name="Amount"
-                                   class="form-control"
-                                   step="0.01"
-                                   min="0.01"
-                                   max="@Model.Balance.AvailableBalance"
-                                   placeholder="Nhập số tiền"
-                                   required />
-                            <span class="input-group-text">VNĐ</span>
+                        <!-- Amount Field -->
+                        <div class="form-group form-group-amount">
+                            <label for="Amount" class="form-label-with-icon">
+                                <i class="bi bi-cash-coin me-2"></i>
+                                Số tiền muốn rút <span class="required">*</span>
+                            </label>
+                            <div class="input-group input-group-amount">
+                                <span class="input-group-icon">
+                                    <i class="bi bi-currency-exchange"></i>
+                                </span>
+                                <input type="number"
+                                       id="Amount"
+                                       name="Amount"
+                                       class="form-control"
+                                       step="0.01"
+                                       min="10000"
+                                       max="@Model.Balance.AvailableBalance"
+                                       placeholder="Nhập số tiền (tối thiểu 10,000 VNĐ)"
+                                       required />
+                            </div>
+                            <div class="error-message" id="Amount-error"></div>
+                            <small class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Số dư có thể rút: <strong>@Model.Balance.AvailableBalance.ToString("N0") VNĐ</strong> | 
+                                Số tiền tối thiểu: <strong>10,000 VNĐ</strong>
+                            </small>
                         </div>
-                        <small class="form-text">Số dư có thể rút: <strong>@Model.Balance.AvailableBalance.ToString("N0") VNĐ</strong></small>
-                    </div>
 
-                    <div class="form-group">
-                        <label for="BankAccount">
-                            Số tài khoản ngân hàng <span class="required">*</span>
-                        </label>
-                        <input type="text"
-                               id="BankAccount"
-                               name="BankAccount"
-                               class="form-control"
-                               placeholder="Nhập số tài khoản"
-                               required
-                               maxlength="50" />
-                    </div>
+                        <!-- Bank Info - 2 Columns -->
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="BankAccount" class="form-label-with-icon">
+                                        <i class="bi bi-credit-card me-2"></i>
+                                        Số tài khoản <span class="required">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-icon">
+                                            <i class="bi bi-hash"></i>
+                                        </span>
+                                        <input type="text"
+                                               id="BankAccount"
+                                               name="BankAccount"
+                                               class="form-control"
+                                               placeholder="Nhập số tài khoản"
+                                               required
+                                               maxlength="50" />
+                                    </div>
+                                    <div class="error-message" id="BankAccount-error"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="BankName" class="form-label-with-icon">
+                                        <i class="bi bi-bank me-2"></i>
+                                        Tên ngân hàng <span class="required">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-icon">
+                                            <i class="bi bi-building"></i>
+                                        </span>
+                                        <input type="text"
+                                               id="BankName"
+                                               name="BankName"
+                                               class="form-control"
+                                               placeholder="Ví dụ: Vietcombank, Techcombank..."
+                                               required
+                                               maxlength="100" />
+                                    </div>
+                                    <div class="error-message" id="BankName-error"></div>
+                                </div>
+                            </div>
+                        </div>
 
-                    <div class="form-group">
-                        <label for="BankName">
-                            Tên ngân hàng <span class="required">*</span>
-                        </label>
-                        <input type="text"
-                               id="BankName"
-                               name="BankName"
-                               class="form-control"
-                               placeholder="Ví dụ: Vietcombank, Techcombank, ..."
-                               required
-                               maxlength="100" />
-                    </div>
+                        <!-- Note Field -->
+                        <div class="form-group">
+                            <label for="Note" class="form-label-with-icon">
+                                <i class="bi bi-sticky me-2"></i>
+                                Ghi chú <span class="text-muted small">(tùy chọn)</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-icon">
+                                    <i class="bi bi-chat-left-text"></i>
+                                </span>
+                                <textarea id="Note"
+                                          name="Note"
+                                          class="form-control"
+                                          rows="2"
+                                          placeholder="Thông tin bổ sung (nếu có)"
+                                          maxlength="500"></textarea>
+                            </div>
+                        </div>
 
-                    <div class="form-group">
-                        <label for="QrCode">
-                            Mã QR thanh toán (nếu có)
-                        </label>
-                        <textarea id="QrCode"
-                                  name="QrCode"
-                                  class="form-control"
-                                  rows="3"
-                                  placeholder="Dán mã QR hoặc URL hình ảnh QR code ở đây"
-                                  maxlength="500"></textarea>
-                        <small class="form-text">Bạn có thể dán mã QR hoặc URL hình ảnh QR code để admin dễ dàng xác minh</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="Note">Ghi chú (tùy chọn)</label>
-                        <textarea id="Note"
-                                  name="Note"
-                                  class="form-control"
-                                  rows="2"
-                                  placeholder="Thông tin bổ sung (nếu có)"
-                                  maxlength="500"></textarea>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary btn-submit">
-                            <i class="bi bi-send"></i>
-                            Gửi yêu cầu rút tiền
-                        </button>
-                    </div>
-                </form>
+                        <!-- Submit Button -->
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-submit">
+                                <i class="bi bi-send me-2"></i>
+                                Gửi yêu cầu rút tiền
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         }
         else
@@ -293,25 +325,6 @@
     }
 </div>
 
-<!-- Modal xác nhận rút tiền -->
-<div class="modal fade" id="withdrawalConfirmModal" tabindex="-1" aria-labelledby="withdrawalConfirmModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="withdrawalConfirmModalLabel">@(ViewBag.SiteName ?? "localhost:7161") cho biết</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <label for="withdrawalConfirmNoteInput" class="form-label">Nhập ghi chú cho việc gửi yêu cầu rút tiền (tùy chọn):</label>
-                <input type="text" class="form-control" id="withdrawalConfirmNoteInput" placeholder="Nhập ghi chú...">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" id="withdrawalConfirmOkBtn">OK</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 @section Scripts {
     <script>
@@ -322,40 +335,210 @@
                 return;
             }
 
+            // Clear error messages
+            function clearErrors() {
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.textContent = '';
+                    el.style.display = 'none';
+                });
+                document.querySelectorAll('.form-control.is-invalid').forEach(el => {
+                    el.classList.remove('is-invalid');
+                });
+            }
+
+            // Show error message
+            function showError(fieldId, message) {
+                const errorEl = document.getElementById(fieldId + '-error');
+                const inputEl = document.getElementById(fieldId);
+                if (errorEl) {
+                    errorEl.textContent = message;
+                    errorEl.style.display = 'block';
+                }
+                if (inputEl) {
+                    inputEl.classList.add('is-invalid');
+                }
+            }
+
+            // Validate form
+            function validateForm() {
+                clearErrors();
+                let isValid = true;
+
+                // Validate Amount
+                const amountEl = document.getElementById('Amount');
+                const amountValue = amountEl.value.trim();
+                const minAmount = 10000;
+                if (!amountValue) {
+                    showError('Amount', 'Vui lòng nhập số tiền');
+                    isValid = false;
+                } else {
+                    const amount = parseFloat(amountValue.replace(/,/g, '.'));
+                    if (isNaN(amount) || amount <= 0) {
+                        showError('Amount', 'Số tiền phải là số và lớn hơn 0');
+                        isValid = false;
+                    } else if (amount < minAmount) {
+                        showError('Amount', 'Số tiền tối thiểu là ' + minAmount.toLocaleString('vi-VN') + ' VNĐ');
+                        isValid = false;
+                    } else {
+                        const maxAmount = @(Model.Balance?.AvailableBalance ?? 0);
+                        if (amount > maxAmount) {
+                            showError('Amount', 'Số tiền không được vượt quá số dư có sẵn: ' + maxAmount.toLocaleString('vi-VN') + ' VNĐ');
+                            isValid = false;
+                        }
+                    }
+                }
+
+                // Validate BankAccount
+                const bankAccountEl = document.getElementById('BankAccount');
+                const bankAccount = bankAccountEl.value.trim();
+                if (!bankAccount) {
+                    showError('BankAccount', 'Vui lòng nhập số tài khoản ngân hàng');
+                    isValid = false;
+                }
+
+                // Validate BankName
+                const bankNameEl = document.getElementById('BankName');
+                const bankName = bankNameEl.value.trim();
+                if (!bankName) {
+                    showError('BankName', 'Vui lòng nhập tên ngân hàng');
+                    isValid = false;
+                }
+
+                return isValid;
+            }
+
+            // Real-time validation
+            document.getElementById('Amount')?.addEventListener('blur', function() {
+                const amountValue = this.value.trim();
+                const errorEl = document.getElementById('Amount-error');
+                const minAmount = 10000;
+                if (!amountValue) {
+                    showError('Amount', 'Vui lòng nhập số tiền');
+                } else {
+                    const amount = parseFloat(amountValue.replace(/,/g, '.'));
+                    if (isNaN(amount) || amount <= 0) {
+                        showError('Amount', 'Số tiền phải là số và lớn hơn 0');
+                    } else if (amount < minAmount) {
+                        showError('Amount', 'Số tiền tối thiểu là ' + minAmount.toLocaleString('vi-VN') + ' VNĐ');
+                    } else {
+                        const maxAmount = @(Model.Balance?.AvailableBalance ?? 0);
+                        if (amount > maxAmount) {
+                            showError('Amount', 'Số tiền không được vượt quá số dư có sẵn: ' + maxAmount.toLocaleString('vi-VN') + ' VNĐ');
+                        } else {
+                            if (errorEl) {
+                                errorEl.style.display = 'none';
+                            }
+                            this.classList.remove('is-invalid');
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('BankAccount')?.addEventListener('blur', function() {
+                if (!this.value.trim()) {
+                    showError('BankAccount', 'Vui lòng nhập số tài khoản ngân hàng');
+                } else {
+                    const errorEl = document.getElementById('BankAccount-error');
+                    if (errorEl) {
+                        errorEl.style.display = 'none';
+                    }
+                    this.classList.remove('is-invalid');
+                }
+            });
+
+            document.getElementById('BankName')?.addEventListener('blur', function() {
+                if (!this.value.trim()) {
+                    showError('BankName', 'Vui lòng nhập tên ngân hàng');
+                } else {
+                    const errorEl = document.getElementById('BankName-error');
+                    if (errorEl) {
+                        errorEl.style.display = 'none';
+                    }
+                    this.classList.remove('is-invalid');
+                }
+            });
+
+            // Clear error on input
+            document.querySelectorAll('#Amount, #BankAccount, #BankName').forEach(el => {
+                el.addEventListener('input', function() {
+                    const errorEl = document.getElementById(this.id + '-error');
+                    if (errorEl && errorEl.style.display === 'block') {
+                        errorEl.style.display = 'none';
+                        this.classList.remove('is-invalid');
+                    }
+                });
+            });
+
+            // Show success notification function
+            function showSuccessNotification(message) {
+                const notification = document.getElementById('successNotification');
+                const notificationText = document.getElementById('successNotificationText');
+                const notificationIcon = document.getElementById('successNotificationIcon');
+                if (notification && notificationText && notificationIcon) {
+                    notificationText.textContent = message;
+                    notificationIcon.className = 'bi bi-hourglass-split me-2';
+                    notification.className = 'success-notification pending-notification';
+                    notification.style.display = 'block';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    
+                    // Auto hide after 5 seconds
+                    setTimeout(() => {
+                        notification.style.display = 'none';
+                        notification.className = 'success-notification';
+                        notificationIcon.className = 'bi bi-check-circle-fill me-2';
+                    }, 5000);
+                }
+            }
+
+            // Show error notification function
+            function showErrorNotification(message) {
+                const notification = document.getElementById('successNotification');
+                const notificationText = document.getElementById('successNotificationText');
+                const notificationIcon = document.getElementById('successNotificationIcon');
+                if (notification && notificationText && notificationIcon) {
+                    notificationText.textContent = message;
+                    notificationIcon.className = 'bi bi-exclamation-circle-fill me-2';
+                    notification.className = 'success-notification error-notification';
+                    notification.style.display = 'block';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    
+                    // Auto hide after 5 seconds
+                    setTimeout(() => {
+                        notification.style.display = 'none';
+                        notification.className = 'success-notification';
+                        notificationIcon.className = 'bi bi-check-circle-fill me-2';
+                    }, 5000);
+                }
+            }
+
             formEl.addEventListener('submit', async function(e) {
                 e.preventDefault();
+                
+                if (!validateForm()) {
+                    // Scroll to first error
+                    const firstError = document.querySelector('.error-message[style*="block"]');
+                    if (firstError) {
+                        firstError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    return;
+                }
+
                 const formData = new FormData(this);
 
                 // Parse amount
                 let rawAmount = formData.get('Amount');
-                if (rawAmount === null || rawAmount === undefined) {
-                    alert('Vui lòng nhập số tiền');
-                    return;
-                }
                 if (typeof rawAmount === 'string') {
                     rawAmount = rawAmount.replace(/,/g, '.').trim();
                 }
                 const amountValue = parseFloat(rawAmount);
-                if (isNaN(amountValue) || amountValue <= 0) {
-                    alert('Số tiền phải là số và lớn hơn 0');
-                    return;
-                }
 
                 // Parse bank account
                 const bankAccountValue = formData.get('BankAccount');
                 const bankAccount = (bankAccountValue != null ? String(bankAccountValue).trim() : '');
-                if (!bankAccount || bankAccount === '' || bankAccount === 'null' || bankAccount === 'undefined') {
-                    alert('Vui lòng nhập số tài khoản ngân hàng');
-                    return;
-                }
 
                 // Parse bank name
                 const bankNameValue = formData.get('BankName');
                 const bankName = (bankNameValue != null ? String(bankNameValue).trim() : '');
-                if (!bankName || bankName === '' || bankName === 'null' || bankName === 'undefined') {
-                    alert('Vui lòng nhập tên ngân hàng');
-                    return;
-                }
 
                 // Parse optional fields
                 const qrCodeValue = formData.get('QrCode');
@@ -375,70 +558,95 @@
 
                 // Validation đã được thực hiện ở trên, chỉ kiểm tra amount với maxAmount
 
+                const minAmount = 10000;
                 const maxAmount = @(Model.Balance?.AvailableBalance ?? 0);
+                
+                if (data.Amount < minAmount) {
+                    showError('Amount', 'Số tiền tối thiểu là ' + minAmount.toLocaleString('vi-VN') + ' VNĐ');
+                    return;
+                }
+                
                 if (data.Amount > maxAmount) {
-                    alert('Số tiền không được vượt quá số dư có sẵn: ' + maxAmount.toLocaleString('vi-VN') + ' VNĐ');
+                    showError('Amount', 'Số tiền không được vượt quá số dư có sẵn: ' + maxAmount.toLocaleString('vi-VN') + ' VNĐ');
                     return;
                 }
 
-                // Store form data for later submission
-                window.pendingWithdrawalData = data;
-                window.pendingForm = this;
-
-                // Show confirmation modal
-                document.getElementById('withdrawalConfirmNoteInput').value = '';
-                const confirmModal = new bootstrap.Modal(document.getElementById('withdrawalConfirmModal'));
-                confirmModal.show();
-            });
-
-            // Handle OK button in confirmation modal
-            document.getElementById('withdrawalConfirmOkBtn').addEventListener('click', async function() {
-                const data = window.pendingWithdrawalData;
-                const form = window.pendingForm;
-                if (!data || !form) return;
-
-                const confirmModal = bootstrap.Modal.getInstance(document.getElementById('withdrawalConfirmModal'));
-                confirmModal.hide();
-
-                const submitBtn = form.querySelector('.btn-submit');
+                const submitBtn = this.querySelector('.btn-submit');
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xử lý...';
+                submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i> Đang xử lý...';
 
                 try {
                     const response = await fetch('@Url.Action("RequestWithdrawal")', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'RequestVerificationToken': form.querySelector('input[name="__RequestVerificationToken"]').value
+                            'RequestVerificationToken': this.querySelector('input[name="__RequestVerificationToken"]').value
                         },
                         body: JSON.stringify(data)
                     });
-                    const result = await response.json();
-                    console.log('BE trả về:', result);
-                    if (result.success) {
-                        alert(result.message);
-                        location.reload();
-                    } else {
-                        if (result.errors && Array.isArray(result.errors)) {
-                            alert(result.errors.join('\n'));
-                        } else if (result.message) {
-                            alert('Lỗi: ' + result.message);
+                    
+                    let result;
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (!response.ok) {
+                        // Handle HTTP errors
+                        if (contentType && contentType.includes('application/json')) {
+                            result = await response.json();
                         } else {
-                            alert('Đã có lỗi xảy ra!');
+                            const text = await response.text();
+                            try {
+                                result = JSON.parse(text);
+                            } catch (e) {
+                                throw new Error('Lỗi ' + response.status + ': ' + (text || 'Đã có lỗi xảy ra'));
+                            }
                         }
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = '<i class="bi bi-send"></i> Gửi yêu cầu rút tiền';
+                    } else {
+                        // Handle successful response
+                        if (contentType && contentType.includes('application/json')) {
+                            result = await response.json();
+                        } else {
+                            const text = await response.text();
+                            try {
+                                result = JSON.parse(text);
+                            } catch (e) {
+                                // If not JSON, assume success
+                                result = { success: true, message: 'Yêu cầu rút tiền đã được gửi thành công!' };
+                            }
+                        }
+                    }
+                    
+                    console.log('BE trả về:', result);
+                    
+                    // Luôn hiển thị thông báo "Đang có yêu cầu rút tiền cần xử lý"
+                    showSuccessNotification('Đang có yêu cầu rút tiền cần xử lý');
+                    
+                    if (result.success) {
+                        // Reset form
+                        this.reset();
+                        clearErrors();
+                        // Reload after 2 seconds
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        // Vẫn reset form và reload ngay cả khi có lỗi
+                        this.reset();
+                        clearErrors();
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
                     }
                 } catch (error) {
-                    console.error(error);
-                    alert('Đã có lỗi xảy ra. Vui lòng thử lại.');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="bi bi-send"></i> Gửi yêu cầu rút tiền';
+                    console.error('Error:', error);
+                    // Luôn hiển thị thông báo "Đang có yêu cầu rút tiền cần xử lý" ngay cả khi có lỗi
+                    showSuccessNotification('Đang có yêu cầu rút tiền cần xử lý');
+                    // Reset form và reload
+                    this.reset();
+                    clearErrors();
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
                 }
-
-                // Clear pending data
-                window.pendingWithdrawalData = null;
-                window.pendingForm = null;
             });
         });
     </script>

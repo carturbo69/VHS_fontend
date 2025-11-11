@@ -2,7 +2,13 @@
 @{
     ViewData["Title"] = "Chi tiết dịch vụ";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
-    
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-service-management.css" asp-append-version="true" />
+}
+
+@{
     // Xác định có pending update không
     var isPendingUpdate = Model.Status == "PendingUpdate" && !string.IsNullOrEmpty(Model.PendingTitle);
     
@@ -82,16 +88,21 @@
     }
 }
 
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3><i class="bi bi-info-circle me-2"></i>Chi tiết dịch vụ</h3>
+<div class="admin-service-management">
+    <!-- Header -->
+    <div class="admin-service-management__header">
+        <h3><i class="bi bi-info-circle-fill"></i>Chi tiết dịch vụ</h3>
         @if (!string.IsNullOrWhiteSpace(ViewBag.ReturnUrl as string))
         {
-            <a href="@ViewBag.ReturnUrl" class="btn btn-secondary">Quay lại</a>
+            <a href="@ViewBag.ReturnUrl" class="btn btn-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Quay lại
+            </a>
         }
         else
         {
-            <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+            <a asp-action="Index" class="btn btn-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Quay lại
+            </a>
         }
     </div>
 
@@ -100,10 +111,10 @@
             @if (isPendingUpdate && !string.IsNullOrEmpty(Model.PendingImages))
             {
                 <!-- Hiển thị ảnh với so sánh khi có pending update -->
-                <div class="card">
+                <div class="card-x">
                     <div class="card-header">
                         <span class="badge bg-info me-2">Mới (chờ duyệt)</span>
-                        Ảnh đại diện
+                        <i class="bi bi-image me-2"></i>Ảnh đại diện
                     </div>
                     <div class="card-body text-center">
                         @if (!string.IsNullOrEmpty(pendingAvatar))
@@ -147,10 +158,10 @@
                         }
                     </div>
                 </div>
-                <div class="card mt-3">
+                <div class="card-x mt-3">
                     <div class="card-header">
                         <span class="badge bg-info me-2">Mới (chờ duyệt)</span>
-                        Ảnh mô tả
+                        <i class="bi bi-images me-2"></i>Ảnh mô tả
                     </div>
                     <div class="card-body">
                         @if (pendingDescImgs.Any())
@@ -217,8 +228,10 @@
             else
             {
                 <!-- Hiển thị ảnh bình thường khi không có pending update -->
-                <div class="card">
-                    <div class="card-header">Ảnh đại diện</div>
+                <div class="card-x">
+                    <div class="card-header">
+                        <i class="bi bi-image me-2"></i>Ảnh đại diện
+                    </div>
                     <div class="card-body text-center">
                         @if (!string.IsNullOrEmpty(avatar))
                         {
@@ -230,8 +243,10 @@
                         }
                     </div>
                 </div>
-                <div class="card mt-3">
-                    <div class="card-header">Ảnh mô tả</div>
+                <div class="card-x mt-3">
+                    <div class="card-header">
+                        <i class="bi bi-images me-2"></i>Ảnh mô tả
+                    </div>
                     <div class="card-body">
                         @if (descImgs.Any())
                         {
@@ -255,209 +270,317 @@
         <div class="col-lg-8">
             @if (isPendingUpdate)
             {
-                <div class="alert alert-info mb-3">
-                    <i class="bi bi-info-circle me-2"></i>
-                    <strong>Dịch vụ đang chờ duyệt chỉnh sửa</strong>
-                    @if (Model.PendingUpdatedAt.HasValue)
-                    {
-                        <br />
-                        <small>Cập nhật lúc: @Model.PendingUpdatedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
-                    }
+                <div class="alert alert-info mb-4">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                        <div>
+                            <strong>Dịch vụ đang chờ duyệt chỉnh sửa</strong>
+                            @if (Model.PendingUpdatedAt.HasValue)
+                            {
+                                <div class="small mt-1">Cập nhật lúc: @Model.PendingUpdatedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                            }
+                        </div>
+                    </div>
                 </div>
             }
             
-            <div class="card">
-                <div class="card-header">
-                    @if (isPendingUpdate)
-                    {
-                        <span class="badge bg-info me-2">Nội dung mới (chờ duyệt)</span>
-                    }
-                    Thông tin
-                </div>
-                <div class="card-body">
-                    <h4 class="mb-1">
-                        @displayTitle
-                        @if (isPendingUpdate && !string.IsNullOrEmpty(Model.CurrentTitle) && Model.CurrentTitle != displayTitle)
-                        {
-                            <br />
-                            <small class="text-muted">
-                                <del>@Model.CurrentTitle</del>
-                            </small>
-                        }
-                    </h4>
-                    <div class="text-muted mb-3">Danh mục: @Model.CategoryName</div>
-                    <p>
-                        @displayDescription
-                        @if (isPendingUpdate && !string.IsNullOrEmpty(Model.CurrentDescription) && Model.CurrentDescription != displayDescription)
-                        {
-                            <br />
-                            <small class="text-muted">
-                                <del>@Model.CurrentDescription</del>
-                            </small>
-                        }
-                    </p>
-                    <hr />
-                    <div class="row">
-                        <div class="col-md-4">
-                            <strong>Giá:</strong>
-                            <span class="@(isPendingUpdate && Model.CurrentPrice.HasValue && Model.CurrentPrice.Value != displayPrice ? "text-success fw-bold" : "")">
-                                @displayPrice.ToString("N0") VNĐ
-                            </span>
-                            @if (isPendingUpdate && Model.CurrentPrice.HasValue && Model.CurrentPrice.Value != displayPrice)
-                            {
-                                <br />
-                                <small class="text-muted">
-                                    <del>@Model.CurrentPrice.Value.ToString("N0") VNĐ</del>
-                                </small>
-                            }
-                        </div>
-                        <div class="col-md-4">
-                            <strong>Đơn vị:</strong>
-                            <span class="@(isPendingUpdate && !string.IsNullOrEmpty(Model.CurrentUnitType) && Model.CurrentUnitType != displayUnitType ? "text-success fw-bold" : "")">
-                                @GetUnitTypeVietnamese(displayUnitType)
-                            </span>
-                            @if (isPendingUpdate && !string.IsNullOrEmpty(Model.CurrentUnitType) && Model.CurrentUnitType != displayUnitType)
-                            {
-                                <br />
-                                <small class="text-muted">
-                                    <del>@GetUnitTypeVietnamese(Model.CurrentUnitType)</del>
-                                </small>
-                            }
-                        </div>
-                        <div class="col-md-4">
-                            <strong>Cơ bản:</strong>
-                            <span class="@(isPendingUpdate && Model.CurrentBaseUnit.HasValue && Model.CurrentBaseUnit.Value != displayBaseUnit ? "text-success fw-bold" : "")">
-                                @displayBaseUnit
-                            </span>
-                            @if (isPendingUpdate && Model.CurrentBaseUnit.HasValue && Model.CurrentBaseUnit.Value != displayBaseUnit)
-                            {
-                                <br />
-                                <small class="text-muted">
-                                    <del>@Model.CurrentBaseUnit.Value</del>
-                                </small>
-                            }
-                        </div>
-                    </div>
-                    <hr />
-                    <div class="mb-3">
-                        <strong>Thẻ:</strong>
-                        @if (displayTagsList.Any())
-                        {
-                            // Hiển thị tags mới (pending hoặc current)
-                            foreach (var tagName in displayTagsList)
-                            {
-                                <span class="badge bg-info text-dark me-1">@tagName</span>
-                            }
-                            
-                            // Chỉ hiển thị tags cũ nếu có pending update và tags thực sự khác nhau
-                            @if (isPendingUpdate && Model.CurrentTags != null && Model.CurrentTags.Any())
-                            {
-                                var currentTagNames = Model.CurrentTags.Select(t => t.Name).OrderBy(x => x).ToList();
-                                var displayTagNames = displayTagsList.OrderBy(x => x).ToList();
+            @if (isPendingUpdate)
+            {
+                <!-- Comparison View: Vertical Stack -->
+                <div class="row g-4">
+                    <!-- New Content (Pending) -->
+                    <div class="col-12">
+                        <div class="card-x border-success border-2 mb-4">
+                            <div class="card-header bg-success bg-opacity-10">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="fw-bold text-success">
+                                        <i class="bi bi-check-circle-fill me-2"></i>Nội dung mới (Chờ duyệt)
+                                    </span>
+                                    <span class="badge bg-success">Mới</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <h4 class="mb-1 fw-bold">@displayTitle</h4>
+                                <div class="mb-1">
+                                    <span class="badge bg-secondary">@Model.CategoryName</span>
+                                </div>
+                                <p class="text-muted mb-2 text-start">@displayDescription</p>
                                 
-                                // So sánh danh sách tags (không phân biệt thứ tự)
-                                var hasChanges = !currentTagNames.SequenceEqual(displayTagNames);
+                                <div class="row g-2 mb-2">
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-1"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
+                                            <div class="fs-5 fw-bold text-success">@displayPrice.ToString("N0") VNĐ</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-1"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
+                                            <div class="fw-semibold">@GetUnitTypeVietnamese(displayUnitType)</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-1"><i class="bi bi-hash me-1"></i>Cơ bản</small>
+                                            <div class="fw-semibold">@displayBaseUnit</div>
+                                        </div>
+                                    </div>
+                                </div>
                                 
-                                if (hasChanges)
+                                @if (displayTagsList.Any())
                                 {
-                                    <br />
-                                    <small class="text-muted d-block mt-2">
-                                        <i class="bi bi-arrow-down me-1"></i>
-                                        <strong>Trước đây:</strong>
-                                        @foreach (var t in Model.CurrentTags)
-                                        {
-                                            <del class="me-1">
-                                                <span class="badge bg-secondary">@t.Name</span>
-                                            </del>
-                                        }
-                                    </small>
-                                }
-                            }
-                        }
-                        else
-                        {
-                            <span class="text-muted">Không có</span>
-                            // Nếu không có tags mới nhưng có tags cũ, hiển thị tags cũ
-                            @if (isPendingUpdate && Model.CurrentTags != null && Model.CurrentTags.Any())
-                            {
-                                <br />
-                                <small class="text-muted">
-                                    <del>
-                                        @foreach (var t in Model.CurrentTags)
-                                        {
-                                            <span class="badge bg-secondary me-1">@t.Name</span>
-                                        }
-                                    </del>
-                                </small>
-                            }
-                        }
-                    </div>
-                    <div>
-                        <strong>Tùy chọn:</strong>
-                        @if (displayOptions != null && displayOptions.Any())
-                        {
-                            <ul class="mt-2">
-                                @foreach (var o in displayOptions)
-                                {
-                                    <li>
-                                        <strong>@o.OptionName</strong>
-                                        <span class="text-muted"> — @o.Description</span>
-                                        <span class="ms-2">@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
-                                    </li>
-                                }
-                            </ul>
-                            @if (isPendingUpdate && Model.CurrentOptions != null && Model.CurrentOptions.Any())
-                            {
-                                var currentOptionIds = Model.CurrentOptions.Select(o => o.OptionId).OrderBy(x => x).ToList();
-                                var pendingOptionIds = displayOptions.Select(o => o.OptionId).OrderBy(x => x).ToList();
-                                if (!currentOptionIds.SequenceEqual(pendingOptionIds))
-                                {
-                                    <div class="mt-2">
-                                        <small class="text-muted">
-                                            <del>
-                                                <ul class="mb-0">
-                                                    @foreach (var o in Model.CurrentOptions)
-                                                    {
-                                                        <li>
-                                                            <strong>@o.OptionName</strong>
-                                                            <span class="text-muted"> — @o.Description</span>
-                                                            <span class="ms-2">@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
-                                                        </li>
-                                                    }
-                                                </ul>
-                                            </del>
-                                        </small>
+                                    <div class="mb-1 text-start">
+                                        <small class="text-muted d-block mb-1"><strong>Thẻ:</strong></small>
+                                        <div>
+                                            @foreach (var tagName in displayTagsList)
+                                            {
+                                                <span class="badge bg-info me-1 mb-1">@tagName</span>
+                                            }
+                                        </div>
                                     </div>
                                 }
-                            }
-                        }
-                        else
+                                
+                                @if (displayOptions != null && displayOptions.Any())
+                                {
+                                    <div class="mt-1 text-start">
+                                        <small class="text-muted d-block mb-1"><strong>Tùy chọn:</strong></small>
+                                        <div class="list-group list-group-flush bg-transparent">
+                                            @foreach (var o in displayOptions)
+                                            {
+                                                <div class="list-group-item px-0 border-0 border-bottom bg-transparent py-1">
+                                                    <div class="d-flex justify-content-between align-items-start">
+                                                        <div>
+                                                            <strong>@o.OptionName</strong>
+                                                            <div class="text-muted small">@o.Description</div>
+                                                        </div>
+                                                        <span class="text-success fw-bold">@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Content -->
+                    <div class="col-12">
+                        <div class="card-x border-secondary border-2 opacity-75">
+                            <div class="card-header bg-secondary bg-opacity-10">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="fw-bold text-muted">
+                                        <i class="bi bi-clock-history me-2"></i>Nội dung hiện tại
+                                    </span>
+                                    <span class="badge bg-secondary">Cũ</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="mb-1 text-muted">
+                                    <del>@(string.IsNullOrEmpty(Model.CurrentTitle) ? Model.Title : Model.CurrentTitle)</del>
+                                </h5>
+                                <div class="mb-1">
+                                    <span class="badge bg-secondary">@Model.CategoryName</span>
+                                </div>
+                                <p class="text-muted mb-2 text-start">
+                                    <del>@(string.IsNullOrEmpty(Model.CurrentDescription) ? Model.Description : Model.CurrentDescription)</del>
+                                </p>
+                                
+                                <div class="row g-2 mb-2">
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-1"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
+                                            <div class="fs-5 fw-bold text-muted">
+                                                <del>@((Model.CurrentPrice ?? Model.Price).ToString("N0")) VNĐ</del>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-1"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
+                                            <div class="fw-semibold text-muted">
+                                                <del>@GetUnitTypeVietnamese(string.IsNullOrEmpty(Model.CurrentUnitType) ? Model.UnitType : Model.CurrentUnitType)</del>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-1"><i class="bi bi-hash me-1"></i>Cơ bản</small>
+                                            <div class="fw-semibold text-muted">
+                                                <del>@((Model.CurrentBaseUnit ?? Model.BaseUnit).ToString())</del>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                @if (Model.CurrentTags != null && Model.CurrentTags.Any())
+                                {
+                                    <div class="mb-1 text-start">
+                                        <small class="text-muted d-block mb-1"><strong>Thẻ:</strong></small>
+                                        <div>
+                                            @foreach (var tag in Model.CurrentTags)
+                                            {
+                                                <span class="badge bg-secondary me-1 mb-1"><del>@tag.Name</del></span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else if (Model.Tags != null && Model.Tags.Any())
+                                {
+                                    <div class="mb-1 text-start">
+                                        <small class="text-muted d-block mb-1"><strong>Thẻ:</strong></small>
+                                        <div>
+                                            @foreach (var tag in Model.Tags)
+                                            {
+                                                <span class="badge bg-secondary me-1 mb-1"><del>@tag.Name</del></span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                
+                                @if (Model.CurrentOptions != null && Model.CurrentOptions.Any())
+                                {
+                                    <div class="mt-1 text-start">
+                                        <small class="text-muted d-block mb-1"><strong>Tùy chọn:</strong></small>
+                                        <div class="list-group list-group-flush bg-transparent">
+                                            @foreach (var o in Model.CurrentOptions)
+                                            {
+                                                <div class="list-group-item px-0 border-0 border-bottom bg-transparent py-1">
+                                                    <del class="text-muted">
+                                                        <div class="d-flex justify-content-between align-items-start">
+                                                            <div>
+                                                                <strong>@o.OptionName</strong>
+                                                                <div class="text-muted small">@o.Description</div>
+                                                            </div>
+                                                            <span>@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
+                                                        </div>
+                                                    </del>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else if (Model.Options != null && Model.Options.Any())
+                                {
+                                    <div class="mt-1 text-start">
+                                        <small class="text-muted d-block mb-1"><strong>Tùy chọn:</strong></small>
+                                        <div class="list-group list-group-flush bg-transparent">
+                                            @foreach (var o in Model.Options)
+                                            {
+                                                <div class="list-group-item px-0 border-0 border-bottom bg-transparent py-1">
+                                                    <del class="text-muted">
+                                                        <div class="d-flex justify-content-between align-items-start">
+                                                            <div>
+                                                                <strong>@o.OptionName</strong>
+                                                                <div class="text-muted small">@o.Description</div>
+                                                            </div>
+                                                            <span>@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
+                                                        </div>
+                                                    </del>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Normal View: Single Column -->
+                <div class="card-x">
+                    <div class="card-header">
+                        <i class="bi bi-info-circle me-2"></i>Thông tin dịch vụ
+                    </div>
+                    <div class="card-body">
+                        <h3 class="mb-1 fw-bold">@displayTitle</h3>
+                        <div class="mb-1">
+                            <span class="badge bg-secondary">@Model.CategoryName</span>
+                        </div>
+                        <p class="text-muted mb-2 text-start">@displayDescription</p>
+                        
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-4">
+                                <div class="p-2 bg-light rounded text-center">
+                                    <small class="text-muted d-block mb-1"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
+                                    <div class="fs-5 fw-bold text-success">@displayPrice.ToString("N0") VNĐ</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-2 bg-light rounded text-center">
+                                    <small class="text-muted d-block mb-1"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
+                                    <div class="fw-semibold">@GetUnitTypeVietnamese(displayUnitType)</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-2 bg-light rounded text-center">
+                                    <small class="text-muted d-block mb-1"><i class="bi bi-hash me-1"></i>Cơ bản</small>
+                                    <div class="fw-semibold">@displayBaseUnit</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        @if (displayTagsList.Any())
                         {
-                            <span class="text-muted">Không có</span>
+                            <div class="mb-1 text-start">
+                                <small class="text-muted d-block mb-1"><strong>Thẻ:</strong></small>
+                                <div>
+                                    @foreach (var tagName in displayTagsList)
+                                    {
+                                        <span class="badge bg-info me-1 mb-1">@tagName</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        
+                        @if (displayOptions != null && displayOptions.Any())
+                        {
+                            <div class="mt-1 text-start">
+                                <small class="text-muted d-block mb-1"><strong>Tùy chọn:</strong></small>
+                                <div class="list-group list-group-flush bg-transparent">
+                                    @foreach (var o in displayOptions)
+                                    {
+                                        <div class="list-group-item px-0 border-0 border-bottom bg-transparent py-1">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <strong>@o.OptionName</strong>
+                                                    <div class="text-muted small">@o.Description</div>
+                                                </div>
+                                                <span class="text-success fw-bold">@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
                         }
                     </div>
                 </div>
-                @if (isPendingUpdate || Model.Status == "Pending")
-                {
-                    <div class="card-footer bg-light">
-                        <div class="d-flex justify-content-end gap-2">
+            }
+            
+            @if (isPendingUpdate || Model.Status == "Pending")
+            {
+                <div class="card-x mt-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-end gap-3">
                             @{
                                 var returnUrlForActions = ViewBag.ReturnUrl as string ?? Url.Action("Index", "AdminServiceApproval");
                             }
-                            <form asp-action="Approve" method="post" class="d-inline">
+                            <form asp-action="Approve" method="post" class="d-inline m-0">
                                 <input type="hidden" name="id" value="@Model.ServiceId" />
                                 <input type="hidden" name="returnUrl" value="@returnUrlForActions" />
-                                <button type="submit" class="btn btn-approval btn-approval-approve">
-                                    <i class="bi bi-check2 me-1"></i>@(isPendingUpdate ? "Duyệt chỉnh sửa" : "Duyệt")
+                                <button type="submit" class="btn btn-approval btn-approval-approve btn-lg">
+                                    <i class="bi bi-check2 me-2"></i>@(isPendingUpdate ? "Duyệt chỉnh sửa" : "Duyệt dịch vụ")
                                 </button>
                             </form>
-                            <button class="btn btn-approval btn-approval-reject" data-bs-toggle="modal" data-bs-target="#rejectModal" data-id="@Model.ServiceId" data-status="@Model.Status">
-                                <i class="bi bi-x-lg me-1"></i>Từ chối
+                            <button class="btn btn-approval btn-approval-reject btn-lg" data-bs-toggle="modal" data-bs-target="#rejectModal" data-id="@Model.ServiceId" data-status="@Model.Status">
+                                <i class="bi bi-x-lg me-2"></i>Từ chối
                             </button>
                         </div>
                     </div>
-                }
-            </div>
+                </div>
+            }
         </div>
     </div>
 </div>
@@ -467,7 +590,9 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="rejectModalLabel">Lý do từ chối</h5>
+                <h5 class="modal-title" id="rejectModalLabel">
+                    <i class="bi bi-x-circle me-2"></i>Lý do từ chối
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form asp-action="Reject" method="post">
@@ -477,11 +602,16 @@
                         var returnUrlForReject = ViewBag.ReturnUrl as string ?? Url.Action("Index", "AdminServiceApproval");
                     }
                     <input type="hidden" name="returnUrl" value="@returnUrlForReject" />
-                    <textarea class="form-control" name="reason" rows="4" placeholder="Nhập lý do (tuỳ chọn)"></textarea>
+                    <label class="form-label">Lý do từ chối (tuỳ chọn)</label>
+                    <textarea class="form-control" name="reason" rows="4" placeholder="Nhập lý do từ chối dịch vụ này..."></textarea>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-danger">Xác nhận từ chối</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x me-1"></i>Hủy
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-check-lg me-1"></i>Xác nhận từ chối
+                    </button>
                 </div>
             </form>
         </div>

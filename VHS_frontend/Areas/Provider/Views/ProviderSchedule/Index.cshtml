@@ -11,171 +11,209 @@
 
 <div class="schedule-container">
     <!-- Header -->
-    <div class="schedule-header">
-        <div>
-            <h3><i class="bi bi-calendar3"></i> Quản lý lịch làm việc</h3>
-            <p style="margin: 5px 0 0 0; opacity: 0.9;">Theo dõi và quản lý lịch làm việc của bạn</p>
-        </div>
-        <div>
-            <button type="button" class="btn btn-light btn-create" data-bs-toggle="modal" data-bs-target="#createWeeklyModal">
-                <i class="bi bi-plus-circle"></i> Tạo lịch tuần
-            </button>
-            <button type="button" class="btn btn-light btn-create" data-bs-toggle="modal" data-bs-target="#createDailyModal" style="margin-left: 10px;">
-                <i class="bi bi-calendar-plus"></i> Thêm ngày
-            </button>
-            <button type="button" class="btn btn-light btn-create" data-bs-toggle="modal" data-bs-target="#createTimeOffModal" style="margin-left: 10px; background: rgba(220,53,69,0.2);">
-                <i class="bi bi-calendar-x"></i> Tạo ngày nghỉ
-            </button>
+    <div class="schedule-header-card">
+        <div class="schedule-header-content">
+            <div class="schedule-header-info">
+                <h2 class="schedule-title">
+                    <i class="bi bi-calendar3 me-2"></i> Quản lý lịch làm việc
+                </h2>
+                <p class="schedule-subtitle">
+                    <i class="bi bi-info-circle me-2"></i> Theo dõi và quản lý lịch làm việc của bạn
+                </p>
+            </div>
+            <div class="schedule-header-actions">
+                <button type="button" class="btn btn-schedule-action btn-schedule-weekly" data-bs-toggle="modal" data-bs-target="#createWeeklyModal">
+                    <i class="bi bi-plus-circle me-2"></i> Tạo lịch tuần
+                </button>
+                <button type="button" class="btn btn-schedule-action btn-schedule-daily" data-bs-toggle="modal" data-bs-target="#createDailyModal">
+                    <i class="bi bi-calendar-plus me-2"></i> Thêm ngày
+                </button>
+                <button type="button" class="btn btn-schedule-action btn-schedule-timeoff" data-bs-toggle="modal" data-bs-target="#createTimeOffModal">
+                    <i class="bi bi-calendar-x me-2"></i> Tạo ngày nghỉ
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- Quick Stats -->
-    <div class="quick-stats">
-        <div class="stat-box">
-            <div class="icon text-success">
-                <i class="bi bi-clock-history"></i>
+    <div class="schedule-stats">
+        <div class="schedule-stat-card stat-card-hours">
+            <div class="stat-card-body">
+                <div class="stat-icon-wrapper">
+                    <i class="bi bi-clock-history stat-icon"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">@(Model?.TotalWeeklyHours.ToString("0.0") ?? "0.0")h</div>
+                    <div class="stat-label">Tổng giờ/tuần</div>
+                </div>
             </div>
-            <div class="value">@(Model?.TotalWeeklyHours.ToString("0.0") ?? "0.0")h</div>
-            <div class="label">Tổng giờ/tuần</div>
         </div>
-        <div class="stat-box">
-            <div class="icon text-primary">
-                <i class="bi bi-calendar-check"></i>
+        <div class="schedule-stat-card stat-card-days">
+            <div class="stat-card-body">
+                <div class="stat-icon-wrapper">
+                    <i class="bi bi-calendar-check stat-icon"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">@(Model?.Schedules?.Count() ?? 0)</div>
+                    <div class="stat-label">Ngày làm việc</div>
+                </div>
             </div>
-            <div class="value">@(Model?.Schedules?.Count() ?? 0)</div>
-            <div class="label">Ngày làm việc</div>
         </div>
-        <div class="stat-box">
-            <div class="icon @((Model?.IsAvailableToday ?? false) ? "text-success" : "text-muted")">
-                <i class="bi bi-circle-fill"></i>
+        <div class="schedule-stat-card stat-card-status @((Model?.IsAvailableToday ?? false) ? "stat-card-active" : "stat-card-inactive")">
+            <div class="stat-card-body">
+                <div class="stat-icon-wrapper">
+                    <i class="bi bi-circle-fill stat-icon"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">@((Model?.IsAvailableToday ?? false) ? "Hoạt động" : "Nghỉ")</div>
+                    <div class="stat-label">Hôm nay</div>
+                </div>
             </div>
-            <div class="value">@((Model?.IsAvailableToday ?? false) ? "Hoạt động" : "Nghỉ")</div>
-            <div class="label">Hôm nay</div>
         </div>
-        <div class="stat-box">
-            <div class="icon text-danger">
-                <i class="bi bi-calendar-x"></i>
+        <div class="schedule-stat-card stat-card-timeoff">
+            <div class="stat-card-body">
+                <div class="stat-icon-wrapper">
+                    <i class="bi bi-calendar-x stat-icon"></i>
+                </div>
+                <div class="stat-content">
+                    <div class="stat-value">@(Model?.UpcomingTimeOffs?.Count() ?? 0)</div>
+                    <div class="stat-label">Ngày nghỉ sắp tới</div>
+                </div>
             </div>
-            <div class="value">@(Model?.UpcomingTimeOffs?.Count() ?? 0)</div>
-            <div class="label">Ngày nghỉ sắp tới</div>
         </div>
     </div>
 
     <!-- Calendar View -->
-    <div class="calendar-wrapper">
-        <div class="calendar-header">
-            <h5><i class="bi bi-calendar3"></i> Lịch tháng</h5>
-            <div>
-                <button class="calendar-nav-btn" onclick="previousMonth()">
+    <div class="calendar-card">
+        <div class="calendar-card-header">
+            <h5 class="calendar-title">
+                <i class="bi bi-calendar3 me-2"></i> Lịch tháng
+            </h5>
+            <div class="calendar-nav">
+                <button class="btn-calendar-nav" onclick="previousMonth()">
                     <i class="bi bi-chevron-left"></i>
                 </button>
-                <span id="currentMonthDisplay" style="margin: 0 15px; font-weight: 600;"></span>
-                <button class="calendar-nav-btn" onclick="nextMonth()">
+                <span id="currentMonthDisplay" class="calendar-month-display"></span>
+                <button class="btn-calendar-nav" onclick="nextMonth()">
                     <i class="bi bi-chevron-right"></i>
                 </button>
             </div>
         </div>
         
-        <div id="calendarMonth" class="calendar-grid"></div>
+        <div class="calendar-card-body">
+            <div id="calendarMonth" class="calendar-grid"></div>
+        </div>
         
-        <div class="legend">
+        <div class="calendar-legend">
             <div class="legend-item">
-                <div class="legend-color available"></div>
+                <div class="legend-color legend-available"></div>
                 <span>Có lịch làm việc</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color timeoff"></div>
+                <div class="legend-color legend-timeoff"></div>
                 <span>Ngày nghỉ</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color noschedule"></div>
+                <div class="legend-color legend-noschedule"></div>
                 <span>Không có lịch</span>
             </div>
         </div>
     </div>
 
     <!-- Weekly Schedule Table -->
-    <div class="schedule-table">
-        <h5 style="margin-bottom: 20px;"><i class="bi bi-calendar-week"></i> Lịch làm việc trong tuần</h5>
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Thứ</th>
-                        <th>Giờ bắt đầu</th>
-                        <th>Giờ kết thúc</th>
-                        <th>Thời gian</th>
-                        <th>Giới hạn đơn</th>
-                        <th>Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (Model?.Schedules != null && Model.Schedules.Any())
-                    {
-                        @foreach (var schedule in Model.Schedules)
+    <div class="schedule-table-card">
+        <div class="schedule-table-header">
+            <h5 class="schedule-table-title">
+                <i class="bi bi-calendar-week me-2"></i> Lịch làm việc trong tuần
+            </h5>
+        </div>
+        <div class="schedule-table-body">
+            <div class="table-responsive">
+                <table class="table schedule-table">
+                    <thead>
+                        <tr>
+                            <th>Thứ</th>
+                            <th>Giờ bắt đầu</th>
+                            <th>Giờ kết thúc</th>
+                            <th>Thời gian</th>
+                            <th>Giới hạn đơn</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model?.Schedules != null && Model.Schedules.Any())
+                        {
+                            @foreach (var schedule in Model.Schedules)
+                            {
+                                <tr>
+                                    <td><strong class="schedule-day-name">@schedule.DayName</strong></td>
+                                    <td><span class="schedule-time">@schedule.StartTime.ToString("HH:mm")</span></td>
+                                    <td><span class="schedule-time">@schedule.EndTime.ToString("HH:mm")</span></td>
+                                    <td><span class="schedule-duration">@schedule.WorkDuration.ToString("0.0") giờ</span></td>
+                                    <td><span class="schedule-limit">@(schedule.BookingLimit?.ToString() ?? "Không giới hạn")</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-schedule-edit" title="Sửa" onclick="openEditScheduleModal('@schedule.ScheduleId', '@schedule.DayName', '@schedule.StartTime.ToString("HH:mm")', '@schedule.EndTime.ToString("HH:mm")', @(schedule.BookingLimit?.ToString() ?? "null"))">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-schedule-delete" title="Xóa" onclick="deleteSchedule('@schedule.ScheduleId', '@schedule.DayName', '@schedule.StartTime.ToString("HH:mm")', '@schedule.EndTime.ToString("HH:mm")')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
                         {
                             <tr>
-                                <td><strong style="color: var(--fg);">@schedule.DayName</strong></td>
-                                <td><span class="text-muted">@schedule.StartTime.ToString("HH:mm")</span></td>
-                                <td><span class="text-muted">@schedule.EndTime.ToString("HH:mm")</span></td>
-                                <td><span class="text-muted">@schedule.WorkDuration.ToString("0.0") giờ</span></td>
-                                <td><span class="text-muted">@(schedule.BookingLimit?.ToString() ?? "Không giới hạn")</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary" title="Sửa" onclick="openEditScheduleModal('@schedule.ScheduleId', '@schedule.DayName', '@schedule.StartTime.ToString("HH:mm")', '@schedule.EndTime.ToString("HH:mm")', @(schedule.BookingLimit?.ToString() ?? "null"))">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" title="Xóa" onclick="deleteSchedule('@schedule.ScheduleId', '@schedule.DayName', '@schedule.StartTime.ToString("HH:mm")', '@schedule.EndTime.ToString("HH:mm")')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                <td colspan="6" class="schedule-table-empty">
+                                    <i class="bi bi-calendar-x"></i>
+                                    <div>Chưa có lịch làm việc nào</div>
                                 </td>
                             </tr>
                         }
-                    }
-                    else
-                    {
-                        <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
-                                <i class="bi bi-calendar-x" style="font-size: 48px; opacity: 0.3;"></i>
-                                <div style="margin-top: 10px;">Chưa có lịch làm việc nào</div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <!-- Upcoming Time-Offs -->
     @if (Model?.UpcomingTimeOffs != null && Model.UpcomingTimeOffs.Any())
     {
-        <div class="schedule-table" style="margin-top: 30px;">
-            <h5 style="margin-bottom: 20px;"><i class="bi bi-calendar-x"></i> Ngày nghỉ sắp tới</h5>
-            <div class="table-responsive">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Ngày</th>
-                            <th>Thứ</th>
-                            <th>Lý do</th>
-                            <th>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var timeOff in Model.UpcomingTimeOffs)
-                        {
+        <div class="schedule-table-card timeoff-table-card">
+            <div class="schedule-table-header">
+                <h5 class="schedule-table-title">
+                    <i class="bi bi-calendar-x me-2"></i> Ngày nghỉ sắp tới
+                </h5>
+            </div>
+            <div class="schedule-table-body">
+                <div class="table-responsive">
+                    <table class="table schedule-table">
+                        <thead>
                             <tr>
-                                <td><strong style="color: var(--fg);">@timeOff.Date.ToString("dd/MM/yyyy")</strong></td>
-                                <td><span style="color: var(--fg);">@timeOff.DayName</span></td>
-                                <td><span style="color: var(--fg);">@(string.IsNullOrEmpty(timeOff.Reason) ? "Nghỉ" : timeOff.Reason)</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-danger" title="Xóa" onclick="deleteTimeOff('@timeOff.TimeOffId', '@timeOff.Date.ToString("dd/MM/yyyy")', '@(string.IsNullOrEmpty(timeOff.Reason) ? "" : timeOff.Reason)')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </td>
+                                <th>Ngày</th>
+                                <th>Thứ</th>
+                                <th>Lý do</th>
+                                <th>Thao tác</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach (var timeOff in Model.UpcomingTimeOffs)
+                            {
+                                <tr>
+                                    <td><strong class="timeoff-date">@timeOff.Date.ToString("dd/MM/yyyy")</strong></td>
+                                    <td><span class="timeoff-day">@timeOff.DayName</span></td>
+                                    <td><span class="timeoff-reason">@(string.IsNullOrEmpty(timeOff.Reason) ? "Nghỉ" : timeOff.Reason)</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-schedule-delete" title="Xóa" onclick="deleteTimeOff('@timeOff.TimeOffId', '@timeOff.Date.ToString("dd/MM/yyyy")', '@(string.IsNullOrEmpty(timeOff.Reason) ? "" : timeOff.Reason)')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     }
@@ -388,85 +426,111 @@
 
 <!-- Modals Section -->
 <div class="modal fade" id="createWeeklyModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-calendar-week"></i> Tạo lịch theo tuần</h5>
+    <div class="modal-dialog modal-dialog-centered schedule-modal-dialog">
+        <div class="modal-content schedule-modal">
+            <div class="modal-header schedule-modal-header schedule-modal-header-warning" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; color: #fff !important;">
+                <h5 class="modal-title" style="color: #fff !important;">
+                    <i class="bi bi-calendar-week me-2"></i> Tạo lịch theo tuần
+                </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="weeklyForm">
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Chọn các ngày trong tuần</label>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="day0" value="0">
-                                    <label class="form-check-label" for="day0"><i class="bi bi-calendar-week"></i> Chủ nhật</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="day1" value="1">
-                                    <label class="form-check-label" for="day1"><i class="bi bi-calendar-check"></i> Thứ 2</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="day2" value="2">
-                                    <label class="form-check-label" for="day2"><i class="bi bi-calendar-check"></i> Thứ 3</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="day3" value="3">
-                                    <label class="form-check-label" for="day3"><i class="bi bi-calendar-check"></i> Thứ 4</label>
-                                </div>
+            <form id="weeklyForm" novalidate>
+                <div class="modal-body schedule-modal-body">
+                    <div class="schedule-form-group">
+                        <label class="schedule-form-label">
+                            <i class="bi bi-calendar3 me-2"></i> Chọn các ngày trong tuần
+                        </label>
+                        <div class="schedule-days-grid">
+                            <div class="schedule-day-checkbox">
+                                <input class="form-check-input schedule-checkbox" type="checkbox" id="day0" value="0">
+                                <label class="schedule-day-label" for="day0">
+                                    <i class="bi bi-calendar-week"></i> Chủ nhật
+                                </label>
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="day4" value="4">
-                                    <label class="form-check-label" for="day4"><i class="bi bi-calendar-check"></i> Thứ 5</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="day5" value="5">
-                                    <label class="form-check-label" for="day5"><i class="bi bi-calendar-check"></i> Thứ 6</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="day6" value="6">
-                                    <label class="form-check-label" for="day6"><i class="bi bi-calendar-check"></i> Thứ 7</label>
-                                </div>
+                            <div class="schedule-day-checkbox">
+                                <input class="form-check-input schedule-checkbox" type="checkbox" id="day1" value="1">
+                                <label class="schedule-day-label" for="day1">
+                                    <i class="bi bi-calendar-check"></i> Thứ 2
+                                </label>
+                            </div>
+                            <div class="schedule-day-checkbox">
+                                <input class="form-check-input schedule-checkbox" type="checkbox" id="day2" value="2">
+                                <label class="schedule-day-label" for="day2">
+                                    <i class="bi bi-calendar-check"></i> Thứ 3
+                                </label>
+                            </div>
+                            <div class="schedule-day-checkbox">
+                                <input class="form-check-input schedule-checkbox" type="checkbox" id="day3" value="3">
+                                <label class="schedule-day-label" for="day3">
+                                    <i class="bi bi-calendar-check"></i> Thứ 4
+                                </label>
+                            </div>
+                            <div class="schedule-day-checkbox">
+                                <input class="form-check-input schedule-checkbox" type="checkbox" id="day4" value="4">
+                                <label class="schedule-day-label" for="day4">
+                                    <i class="bi bi-calendar-check"></i> Thứ 5
+                                </label>
+                            </div>
+                            <div class="schedule-day-checkbox">
+                                <input class="form-check-input schedule-checkbox" type="checkbox" id="day5" value="5">
+                                <label class="schedule-day-label" for="day5">
+                                    <i class="bi bi-calendar-check"></i> Thứ 6
+                                </label>
+                            </div>
+                            <div class="schedule-day-checkbox">
+                                <input class="form-check-input schedule-checkbox" type="checkbox" id="day6" value="6">
+                                <label class="schedule-day-label" for="day6">
+                                    <i class="bi bi-calendar-check"></i> Thứ 7
+                                </label>
                             </div>
                         </div>
-                        <div class="mt-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllDays()">
-                                <i class="bi bi-check-all"></i> Chọn tất cả
+                        <div class="error-message" id="days-error"></div>
+                        <div class="schedule-days-actions">
+                            <button type="button" class="btn btn-schedule-select-all" onclick="selectAllDays()" style="border-color: #f59e0b !important; color: #f59e0b !important; background: rgba(245, 158, 11, 0.1) !important;">
+                                <i class="bi bi-check-all me-1"></i> Chọn tất cả
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAllDays()">
-                                <i class="bi bi-x-circle"></i> Bỏ chọn tất cả
+                            <button type="button" class="btn btn-schedule-clear-all" onclick="clearAllDays()" style="border-color: #fbbf24 !important; color: #f59e0b !important; background: rgba(251, 191, 36, 0.1) !important;">
+                                <i class="bi bi-x-circle me-1"></i> Bỏ chọn tất cả
                             </button>
                         </div>
                     </div>
                     
-                    <div class="row">
+                    <div class="row g-3">
                         <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Giờ bắt đầu</label>
-                                <input type="time" class="form-control" id="weeklyStartTime" required>
+                            <div class="schedule-form-group">
+                                <label class="schedule-form-label">
+                                    <i class="bi bi-clock me-2"></i> Giờ bắt đầu
+                                </label>
+                                <input type="time" class="form-control schedule-form-control" id="weeklyStartTime" required>
+                                <div class="error-message" id="weeklyStartTime-error"></div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Giờ kết thúc</label>
-                                <input type="time" class="form-control" id="weeklyEndTime" required>
+                            <div class="schedule-form-group">
+                                <label class="schedule-form-label">
+                                    <i class="bi bi-clock-fill me-2"></i> Giờ kết thúc
+                                </label>
+                                <input type="time" class="form-control schedule-form-control" id="weeklyEndTime" required>
+                                <div class="error-message" id="weeklyEndTime-error"></div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Giới hạn đơn mỗi ngày (tùy chọn)</label>
-                        <input type="number" class="form-control" id="weeklyBookingLimit" min="1" max="100" placeholder="Không giới hạn">
-                        <small class="text-muted">Để trống nếu không muốn giới hạn</small>
+                    <div class="schedule-form-group">
+                        <label class="schedule-form-label">
+                            <i class="bi bi-list-check me-2"></i> Giới hạn đơn mỗi ngày (tùy chọn)
+                        </label>
+                        <input type="number" class="form-control schedule-form-control" id="weeklyBookingLimit" min="1" max="100" placeholder="Không giới hạn">
+                        <small class="schedule-form-text">Để trống nếu không muốn giới hạn</small>
+                        <div class="error-message" id="weeklyBookingLimit-error"></div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Tạo lịch
+                <div class="modal-footer schedule-modal-footer">
+                    <button type="button" class="btn btn-schedule-cancel" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i> Hủy
+                    </button>
+                    <button type="submit" class="btn btn-schedule-submit btn-schedule-submit-warning" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; color: #fff !important; border: none !important;">
+                        <i class="bi bi-check-circle me-2"></i> Tạo lịch
                     </button>
                 </div>
             </form>
@@ -475,17 +539,21 @@
 </div>
 
 <div class="modal fade" id="createDailyModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="bi bi-calendar-plus"></i> Thêm ngày làm việc</h5>
+    <div class="modal-dialog modal-dialog-centered schedule-modal-dialog">
+        <div class="modal-content schedule-modal">
+            <div class="modal-header schedule-modal-header schedule-modal-header-success">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-plus me-2"></i> Thêm ngày làm việc
+                </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="dailyForm">
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Thứ trong tuần</label>
-                        <select class="form-select" id="dailyDayOfWeek" required>
+            <form id="dailyForm" novalidate>
+                <div class="modal-body schedule-modal-body">
+                    <div class="schedule-form-group">
+                        <label class="schedule-form-label">
+                            <i class="bi bi-calendar3 me-2"></i> Thứ trong tuần
+                        </label>
+                        <select class="form-select schedule-form-control" id="dailyDayOfWeek" required>
                             <option value="">-- Chọn thứ --</option>
                             <option value="0">Chủ nhật</option>
                             <option value="1">Thứ 2</option>
@@ -495,32 +563,44 @@
                             <option value="5">Thứ 6</option>
                             <option value="6">Thứ 7</option>
                         </select>
+                        <div class="error-message" id="dailyDayOfWeek-error"></div>
                     </div>
                     
-                    <div class="row">
+                    <div class="row g-3">
                         <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Giờ bắt đầu</label>
-                                <input type="time" class="form-control" id="dailyStartTime" required>
+                            <div class="schedule-form-group">
+                                <label class="schedule-form-label">
+                                    <i class="bi bi-clock me-2"></i> Giờ bắt đầu
+                                </label>
+                                <input type="time" class="form-control schedule-form-control" id="dailyStartTime" required>
+                                <div class="error-message" id="dailyStartTime-error"></div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Giờ kết thúc</label>
-                                <input type="time" class="form-control" id="dailyEndTime" required>
+                            <div class="schedule-form-group">
+                                <label class="schedule-form-label">
+                                    <i class="bi bi-clock-fill me-2"></i> Giờ kết thúc
+                                </label>
+                                <input type="time" class="form-control schedule-form-control" id="dailyEndTime" required>
+                                <div class="error-message" id="dailyEndTime-error"></div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Giới hạn đơn</label>
-                        <input type="number" class="form-control" id="dailyBookingLimit" min="1" max="100" placeholder="Không giới hạn">
+                    <div class="schedule-form-group">
+                        <label class="schedule-form-label">
+                            <i class="bi bi-list-check me-2"></i> Giới hạn đơn
+                        </label>
+                        <input type="number" class="form-control schedule-form-control" id="dailyBookingLimit" min="1" max="100" placeholder="Không giới hạn">
+                        <div class="error-message" id="dailyBookingLimit-error"></div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-plus-circle"></i> Thêm
+                <div class="modal-footer schedule-modal-footer">
+                    <button type="button" class="btn btn-schedule-cancel" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i> Hủy
+                    </button>
+                    <button type="submit" class="btn btn-schedule-submit btn-schedule-submit-success">
+                        <i class="bi bi-plus-circle me-2"></i> Thêm
                     </button>
                 </div>
             </form>
@@ -530,28 +610,38 @@
 
 <!-- Create Time Off Modal -->
 <div class="modal fade" id="createTimeOffModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="bi bi-calendar-x"></i> Tạo ngày nghỉ</h5>
+    <div class="modal-dialog modal-dialog-centered schedule-modal-dialog">
+        <div class="modal-content schedule-modal">
+            <div class="modal-header schedule-modal-header schedule-modal-header-danger">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-x me-2"></i> Tạo ngày nghỉ
+                </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="timeOffForm">
-                <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Ngày nghỉ</label>
-                        <input type="date" class="form-control" id="timeOffDate" required>
+            <form id="timeOffForm" novalidate>
+                <div class="modal-body schedule-modal-body">
+                    <div class="schedule-form-group">
+                        <label class="schedule-form-label">
+                            <i class="bi bi-calendar-date me-2"></i> Ngày nghỉ
+                        </label>
+                        <input type="date" class="form-control schedule-form-control" id="timeOffDate" required>
+                        <div class="error-message" id="timeOffDate-error"></div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Lý do nghỉ (tùy chọn)</label>
-                        <textarea class="form-control" id="timeOffReason" rows="3" placeholder="Ví dụ: Nghỉ lễ, Nghỉ phép..."></textarea>
+                    <div class="schedule-form-group">
+                        <label class="schedule-form-label">
+                            <i class="bi bi-file-text me-2"></i> Lý do nghỉ (tùy chọn)
+                        </label>
+                        <textarea class="form-control schedule-form-control" id="timeOffReason" rows="3" placeholder="Ví dụ: Nghỉ lễ, Nghỉ phép..."></textarea>
+                        <div class="error-message" id="timeOffReason-error"></div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-calendar-x"></i> Tạo ngày nghỉ
+                <div class="modal-footer schedule-modal-footer">
+                    <button type="button" class="btn btn-schedule-cancel" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i> Hủy
+                    </button>
+                    <button type="submit" class="btn btn-schedule-submit btn-schedule-submit-danger">
+                        <i class="bi bi-calendar-x me-2"></i> Tạo ngày nghỉ
                     </button>
                 </div>
             </form>
@@ -559,27 +649,29 @@
     </div>
 </div>
 
-<!-- Toast Container -->
-<div class="toast-container-custom" id="toastContainer"></div>
+<!-- Toast Container - Centered -->
+<div class="toast-container-center" id="toastContainer"></div>
 
 <!-- Confirmation Modal -->
 <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title" id="confirmModalTitle">Xác nhận</h5>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content schedule-modal">
+            <div class="modal-header schedule-modal-header schedule-modal-header-warning">
+                <h5 class="modal-title" id="confirmModalTitle">
+                    <i class="bi bi-exclamation-triangle me-2"></i> Xác nhận
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p id="confirmModalMessage"></p>
-                <div id="confirmModalDetails"></div>
+            <div class="modal-body schedule-modal-body">
+                <p id="confirmModalMessage" class="schedule-confirm-message"></p>
+                <div id="confirmModalDetails" class="schedule-confirm-details"></div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x-circle"></i> Hủy
+            <div class="modal-footer schedule-modal-footer">
+                <button type="button" class="btn btn-schedule-cancel" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i> Hủy
                 </button>
-                <button type="button" class="btn btn-danger" id="confirmModalButton">
-                    <i class="bi bi-check-circle"></i> Xác nhận
+                <button type="button" class="btn btn-schedule-submit btn-schedule-submit-danger" id="confirmModalButton">
+                    <i class="bi bi-check-circle me-2"></i> Xác nhận
                 </button>
             </div>
         </div>
@@ -588,16 +680,18 @@
 
 <!-- Edit Schedule Modal -->
 <div class="modal fade" id="editScheduleModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Chỉnh sửa lịch làm việc</h5>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content schedule-modal">
+            <div class="modal-header schedule-modal-header schedule-modal-header-warning">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square me-2"></i> Chỉnh sửa lịch làm việc
+                </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editScheduleForm">
+            <form id="editScheduleForm" novalidate>
                 <input type="hidden" id="editScheduleId">
-                <div class="modal-body p-4">
-                    <div class="alert alert-info d-flex align-items-center mb-3">
+                <div class="modal-body schedule-modal-body">
+                    <div class="schedule-alert schedule-alert-info">
                         <i class="bi bi-info-circle me-2"></i>
                         <div>
                             <strong id="editScheduleDayName"></strong>
@@ -605,33 +699,42 @@
                         </div>
                     </div>
                     
-                    <div class="row">
+                    <div class="row g-3">
                         <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Giờ bắt đầu</label>
-                                <input type="time" class="form-control" id="editStartTime" required>
+                            <div class="schedule-form-group">
+                                <label class="schedule-form-label">
+                                    <i class="bi bi-clock me-2"></i> Giờ bắt đầu
+                                </label>
+                                <input type="time" class="form-control schedule-form-control" id="editStartTime" required>
+                                <div class="error-message" id="editStartTime-error"></div>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Giờ kết thúc</label>
-                                <input type="time" class="form-control" id="editEndTime" required>
+                            <div class="schedule-form-group">
+                                <label class="schedule-form-label">
+                                    <i class="bi bi-clock-fill me-2"></i> Giờ kết thúc
+                                </label>
+                                <input type="time" class="form-control schedule-form-control" id="editEndTime" required>
+                                <div class="error-message" id="editEndTime-error"></div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Giới hạn đơn mỗi ngày</label>
-                        <input type="number" class="form-control" id="editBookingLimit" min="1" max="100" placeholder="Không giới hạn">
-                        <small class="text-muted">Để trống nếu không muốn giới hạn</small>
+                    <div class="schedule-form-group">
+                        <label class="schedule-form-label">
+                            <i class="bi bi-list-check me-2"></i> Giới hạn đơn mỗi ngày
+                        </label>
+                        <input type="number" class="form-control schedule-form-control" id="editBookingLimit" min="1" max="100" placeholder="Không giới hạn">
+                        <small class="schedule-form-text">Để trống nếu không muốn giới hạn</small>
+                        <div class="error-message" id="editBookingLimit-error"></div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle"></i> Hủy
+                <div class="modal-footer schedule-modal-footer">
+                    <button type="button" class="btn btn-schedule-cancel" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i> Hủy
                     </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Lưu thay đổi
+                    <button type="submit" class="btn btn-schedule-submit btn-schedule-submit-warning">
+                        <i class="bi bi-check-circle me-2"></i> Lưu thay đổi
                     </button>
                 </div>
             </form>

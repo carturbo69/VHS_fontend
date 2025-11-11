@@ -1,0 +1,172 @@
+@model IEnumerable<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>
+@using VHS_frontend.Helpers
+@inject IConfiguration Configuration
+
+@if (Model == null || !Model.Any())
+{
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="bi bi-people"></i>
+        </div>
+        <h4>Chưa có nhân viên nào</h4>
+        <p>Hãy thêm nhân viên đầu tiên để bắt đầu quản lý đội ngũ của bạn</p>
+        <a href="@Url.Action("Create", "StaffManagement")" class="btn btn-primary">
+            <i class="bi bi-person-plus me-2"></i>
+            Thêm nhân viên mới
+        </a>
+    </div>
+}
+else
+{
+    <div class="staff-list">
+        @{
+            var activeStaff = Model.Where(s => !s.IsLocked).ToList();
+            var lockedStaff = Model.Where(s => s.IsLocked).ToList();
+        }
+        
+        @* Hiển thị nhân viên hoạt động trước *@
+        @if (activeStaff.Any())
+        {
+            <div class="staff-section">
+                <h6 class="section-title">
+                    <i class="bi bi-person-check"></i>
+                    <span>Nhân viên hoạt động <strong id="activeStaffCount">(@activeStaff.Count)</strong></span>
+                </h6>
+                @foreach (var staff in activeStaff)
+                {
+                    <div class="staff-row" data-staff-id="@staff.StaffId" data-staff-name="@staff.StaffName">
+                        <div class="staff-avatar">
+                            @if (!string.IsNullOrEmpty(staff.FaceImage))
+                            {
+                                <img src="@ImageHelper.GetImageUrl(staff.FaceImage, Configuration)" 
+                                     alt="@staff.StaffName" 
+                                     class="avatar-img" 
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                <div class="avatar-placeholder" style="display: none;">
+                                    <i class="bi bi-person"></i>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="avatar-placeholder">
+                                    <i class="bi bi-person"></i>
+                                </div>
+                            }
+                        </div>
+                        
+                        <div class="staff-info">
+                            <h5 class="staff-name">@staff.StaffName</h5>
+                            <p class="staff-citizen-id">CCCD: @staff.CitizenID</p>
+                        </div>
+                        
+                        <div class="staff-status">
+                            <span class="status-badge status-active">
+                                <i class="bi bi-check-circle me-1"></i>
+                                Hoạt động
+                            </span>
+                        </div>
+                        
+                        <div class="staff-actions">
+                            <a href="@Url.Action("Details", "StaffManagement", new { id = staff.StaffId })" 
+                               class="action-btn view-btn" title="Xem lịch làm việc">
+                                <i class="bi bi-calendar-week"></i>
+                            </a>
+                            
+                            <a href="@Url.Action("Edit", "StaffManagement", new { id = staff.StaffId })" 
+                               class="action-btn edit-btn" title="Chỉnh sửa">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            
+                            <button type="button" 
+                                    class="action-btn password-btn" 
+                                    title="Cập nhật mật khẩu"
+                                    onclick="showUpdatePasswordModal('@staff.StaffId', '@staff.StaffName')">
+                                <i class="bi bi-key"></i>
+                            </button>
+                            
+                            <button type="button" 
+                                    class="action-btn lock-btn" 
+                                    title="Khóa tài khoản"
+                                    onclick="lockStaff('@staff.StaffId', '@staff.StaffName')">
+                                <i class="bi bi-lock"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        
+        @* Hiển thị nhân viên bị khóa sau *@
+        @if (lockedStaff.Any())
+        {
+            <div class="staff-section">
+                <h6 class="section-title">
+                    <i class="bi bi-person-x"></i>
+                    <span>Nhân viên bị khóa <strong id="lockedStaffCount">(@lockedStaff.Count)</strong></span>
+                </h6>
+                @foreach (var staff in lockedStaff)
+                {
+                    <div class="staff-row locked-staff" data-staff-id="@staff.StaffId" data-staff-name="@staff.StaffName">
+                        <div class="staff-avatar">
+                            @if (!string.IsNullOrEmpty(staff.FaceImage))
+                            {
+                                <img src="@ImageHelper.GetImageUrl(staff.FaceImage, Configuration)" 
+                                     alt="@staff.StaffName" 
+                                     class="avatar-img" 
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                <div class="avatar-placeholder" style="display: none;">
+                                    <i class="bi bi-person"></i>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="avatar-placeholder">
+                                    <i class="bi bi-person"></i>
+                                </div>
+                            }
+                        </div>
+                        
+                        <div class="staff-info">
+                            <h5 class="staff-name">@staff.StaffName</h5>
+                            <p class="staff-citizen-id">CCCD: @staff.CitizenID</p>
+                        </div>
+                        
+                        <div class="staff-status">
+                            <span class="status-badge status-locked">
+                                <i class="bi bi-lock-fill me-1"></i>
+                                Đã khóa
+                            </span>
+                        </div>
+                        
+                        <div class="staff-actions">
+                            <a href="@Url.Action("Details", "StaffManagement", new { id = staff.StaffId })" 
+                               class="action-btn view-btn" title="Xem lịch làm việc">
+                                <i class="bi bi-calendar-week"></i>
+                            </a>
+                            
+                            <a href="@Url.Action("Edit", "StaffManagement", new { id = staff.StaffId })" 
+                               class="action-btn edit-btn" title="Chỉnh sửa">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            
+                            <button type="button" 
+                                    class="action-btn password-btn" 
+                                    title="Cập nhật mật khẩu"
+                                    onclick="showUpdatePasswordModal('@staff.StaffId', '@staff.StaffName')">
+                                <i class="bi bi-key"></i>
+                            </button>
+                            
+                            <button type="button" 
+                                    class="action-btn unlock-btn" 
+                                    title="Mở khóa"
+                                    onclick="unlockStaff('@staff.StaffId', '@staff.StaffName')">
+                                <i class="bi bi-unlock"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+

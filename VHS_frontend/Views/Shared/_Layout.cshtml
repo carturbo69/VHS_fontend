@@ -20,6 +20,39 @@
     <link rel="stylesheet" href="~/css/notification.css" asp-append-version="true" />
     <!-- <link rel="stylesheet" href="~/css/service-shop.css" asp-append-version="true" /> -->
     <link rel="stylesheet" href="~/css/header.css" asp-append-version="true" /> <!-- MUST BE LAST to override everything -->
+    
+    <!-- CRITICAL FIX: Force white color for notification item-time in dark mode - Load after all CSS -->
+    <style>
+        /* ULTIMATE FIX: Force white cho item-time trong dark mode - Priority cao nhất */
+        .dark .item-time,
+        .dark .item-time.notification-time-bright,
+        .dark #notificationDropdown .item-time,
+        .dark .notification-dropdown .item-time,
+        .dark .notification-items .item-time,
+        .dark .notification-item .item-time,
+        .dark .item-content .item-time,
+        .dark .notification-item .item-content .item-time,
+        .dark #notificationDropdown .notification-item .item-time,
+        .dark .notification-dropdown .notification-item .item-time,
+        .dark #notificationDropdown .item-content .item-time,
+        .dark .notification-dropdown .item-content .item-time,
+        .dark #notificationDropdown .notification-item .item-content .item-time,
+        .dark .notification-dropdown .notification-item .item-content .item-time,
+        .dark body #notificationDropdown .item-time,
+        .dark body .notification-dropdown .item-time,
+        .dark html body #notificationDropdown .item-time,
+        .dark html body .notification-dropdown .item-time {
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 13px !important;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 4px rgba(255, 255, 255, 0.3) !important;
+            opacity: 1 !important;
+            filter: none !important;
+            letter-spacing: 0.3px !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+        }
+    </style>
 
 
     @* THÊM DÒNG NÀY để các view bơm CSS riêng *@
@@ -105,8 +138,14 @@
             // Hover để hiển thị dropdown
             btn.addEventListener('mouseenter', () => {
                 clearTimeout(hoverTimeout);
-                // Chỉ render menu nếu chưa render hoặc đã có thay đổi
-                if (!menuRendered) {
+                // Check if we have latest HTML from real-time update
+                const latestHtml = menu.getAttribute('data-latest-html');
+                if (latestHtml) {
+                    // Use cached HTML from real-time update
+                    menu.innerHTML = latestHtml;
+                    menu.removeAttribute('data-latest-html');
+                    menuRendered = true;
+                } else if (!menuRendered) {
                     renderNotificationMenu();
                     menuRendered = true;
                 }
@@ -335,12 +374,49 @@
                         body: formData
                     }).then(() => {
                         menuRendered = false; // Reset để render lại menu lần sau
+                        
+                        // Thông báo cho trang notification nếu đang mở
+                        notifyCustomerNotificationPage('markRead', { id: notificationId });
                     }).catch(error => {
                         console.error('Error marking notification as read:', error);
                     });
                 }
             } catch (error) {
                 console.error('Error in markAsReadFromDropdown:', error);
+            }
+        }
+        
+        // Function để thông báo cho trang notification khi có thay đổi
+        function notifyCustomerNotificationPage(action, data) {
+            console.log('[CustomerLayout] Notifying notification page:', action, data);
+            
+            // Nếu đang ở trang notification, trigger custom event để trang notification lắng nghe
+            if (window.location.pathname.includes('/Customer/Notification')) {
+                console.log('[CustomerLayout] Same page, dispatching custom event');
+                window.dispatchEvent(new CustomEvent('notificationMarkedRead', {
+                    detail: { action: action, data: data }
+                }));
+            }
+            
+            // Sử dụng BroadcastChannel để sync giữa các tabs/windows
+            try {
+                const channel = new BroadcastChannel('customer_notification_sync');
+                channel.postMessage({
+                    action: action,
+                    data: data,
+                    timestamp: Date.now()
+                });
+                console.log('[CustomerLayout] Sent via BroadcastChannel');
+                channel.close();
+            } catch (e) {
+                console.log('[CustomerLayout] BroadcastChannel not supported, using localStorage fallback');
+                // Fallback: sử dụng localStorage event
+                localStorage.setItem('customer_notification_update', JSON.stringify({
+                    action: action,
+                    data: data,
+                    timestamp: Date.now()
+                }));
+                localStorage.removeItem('customer_notification_update');
             }
         }
 
@@ -363,6 +439,197 @@
         console.log('✅ Notification script loaded at:', new Date().toISOString());
     </script>
 
+    <!-- SignalR Real-time Notifications for Customer -->
+    <script>
+        (function() {
+          let notificationConnection = null;
+
+          async function initNotificationSignalR() {
+            try {
+              // Load SignalR if not already loaded (may be loaded by chatbox)
+              if (typeof signalR === 'undefined') {
+                await new Promise((resolve, reject) => {
+                  const script = document.createElement('script');
+                  script.src = 'https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js';
+                  script.onload = resolve;
+                  script.onerror = reject;
+                  document.head.appendChild(script);
+                });
+              }
+
+              // Get backend URL from meta tag or default
+              const metaBackendUrl = document.querySelector('meta[name="backend-url"]')?.getAttribute('content');
+              const backendUrl = metaBackendUrl || 'http://localhost:5154';
+              const hubUrl = `${backendUrl}/hubs/notification`;
+
+              // Create connection
+              notificationConnection = new signalR.HubConnectionBuilder()
+                .withUrl(hubUrl, {
+                  skipNegotiation: false,
+                  transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling
+                })
+                .withAutomaticReconnect({
+                  nextRetryDelayInMilliseconds: retryContext => {
+                    if (retryContext.elapsedMilliseconds < 60000) {
+                      return 2000;
+                    } else {
+                      return 10000;
+                    }
+                  }
+                })
+                .configureLogging(signalR.LogLevel.Warning)
+                .build();
+
+              // Handle connection events
+              notificationConnection.onreconnecting(() => {
+                console.log('[NotificationHub] Reconnecting...');
+              });
+
+              notificationConnection.onreconnected(() => {
+                console.log('[NotificationHub] Reconnected');
+              });
+
+              notificationConnection.onclose(() => {
+                console.log('[NotificationHub] Connection closed');
+              });
+
+              // Listen for new notifications
+              notificationConnection.on('ReceiveNotification', (notification) => {
+                console.log('[NotificationHub] Received notification for Customer:', notification);
+                handleNewNotification(notification);
+              });
+
+              // Start connection
+              await notificationConnection.start();
+              console.log('[NotificationHub] Connected successfully for Customer');
+
+            } catch (error) {
+              console.error('[NotificationHub] Error initializing SignalR for Customer:', error);
+            }
+          }
+
+          function handleNewNotification(notification) {
+            if (!notification) return;
+
+            // Add notification to local array if it exists
+            if (typeof notifications !== 'undefined' && Array.isArray(notifications)) {
+              notifications.unshift({
+                notificationId: notification.notificationId || notification.NotificationId,
+                content: notification.content || notification.Content,
+                notificationType: notification.notificationType || notification.NotificationType,
+                createdAt: notification.createdAt || notification.CreatedAt,
+                isRead: false
+              });
+
+              // Update badge
+              const badge = document.getElementById('notificationBadge');
+              if (badge) {
+                const unreadCount = notifications.filter(n => !n.isRead).length;
+                if (unreadCount > 0) {
+                  badge.textContent = unreadCount;
+                  badge.style.display = 'inline-flex';
+                } else {
+                  badge.style.display = 'none';
+                }
+              }
+
+              // Re-render menu if it's open
+              if (typeof menuRendered !== 'undefined' && menuRendered && typeof renderNotificationMenu === 'function') {
+                renderNotificationMenu();
+              }
+            }
+
+            // Always reload from server to sync and update dropdown
+            // Method 1: Use loadNotifications if available (updates array and re-renders)
+            if (typeof loadNotifications === 'function') {
+              loadNotifications().then(() => {
+                // Re-render menu after loading if it's open
+                if (typeof menuRendered !== 'undefined' && menuRendered && typeof renderNotificationMenu === 'function') {
+                  renderNotificationMenu();
+                }
+              });
+            }
+            
+            // Method 2: Also reload partial view HTML directly for immediate update
+            const notificationMenu = document.getElementById('notificationMenu');
+            if (notificationMenu) {
+              fetch('/Customer/Notification/GetNotificationsPartial')
+                .then(response => response.text())
+                .then(html => {
+                  // Update dropdown if it's visible
+                  if (notificationMenu.style.display === 'block' || notificationMenu.offsetParent !== null) {
+                    notificationMenu.innerHTML = html;
+                    menuRendered = true; // Mark as rendered
+                  }
+                  // Always store the latest HTML for when dropdown is opened
+                  notificationMenu.setAttribute('data-latest-html', html);
+                })
+                .catch(err => console.error('Error updating Customer notification dropdown:', err));
+            }
+
+            // Show toast notification
+            showNotificationToast(notification);
+          }
+
+          function showNotificationToast(notification) {
+            // Create toast notification
+            const toast = document.createElement('div');
+            toast.className = 'notification-toast';
+            toast.style.cssText = 'position: fixed; top: 20px; right: 20px; min-width: 320px; max-width: 420px; background: white; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); z-index: 10000; opacity: 0; transform: translateX(400px); transition: all 0.3s ease;';
+            toast.innerHTML = `
+              <div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px; position: relative;">
+                <div style="flex-shrink: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #10b981 0%, #34d399 100%); border-radius: 10px; color: white; font-size: 1.2rem;">
+                  <i class="bi bi-bell-fill"></i>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 700; font-size: 0.95rem; color: #111827; margin-bottom: 4px;">Thông báo mới</div>
+                  <div style="font-size: 0.875rem; color: #6b7280; line-height: 1.5; word-wrap: break-word;">${escapeHtml(notification.content || notification.Content || '')}</div>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" style="position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: #6b7280; cursor: pointer; border-radius: 6px;">
+                  <i class="bi bi-x"></i>
+                </button>
+              </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+              toast.style.opacity = '1';
+              toast.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+              toast.style.opacity = '0';
+              toast.style.transform = 'translateX(400px)';
+              setTimeout(() => toast.remove(), 300);
+            }, 3000);
+          }
+
+          function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+          }
+
+          // Initialize SignalR when page loads
+          document.addEventListener('DOMContentLoaded', () => {
+            // Wait a bit for notification system to initialize
+            setTimeout(() => {
+              initNotificationSignalR();
+            }, 1000);
+          });
+
+          // Cleanup on page unload
+          window.addEventListener('beforeunload', () => {
+            if (notificationConnection) {
+              notificationConnection.stop();
+            }
+          });
+        })();
+    </script>
+
     @RenderSection("Scripts", required: false)
     
     <!-- Chatbox AI -->
@@ -371,9 +638,60 @@
     <!-- SignalR Client Library -->
     <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
     <script src="~/js/chatbox.js" type="text/javascript"></script>
+    
+    <!-- ULTIMATE FIX: Inject CSS cho notification item-time - Load cuối cùng -->
+    <style id="notification-time-ultimate-fix" data-priority="99999">
+        /* ULTIMATE FIX: Force white cho item-time trong dark mode - Priority cao nhất */
+        .dark .item-time,
+        .dark .item-time.notification-time-bright,
+        .dark #notificationDropdown .item-time,
+        .dark .notification-dropdown .item-time,
+        .dark .notification-items .item-time,
+        .dark .notification-item .item-time,
+        .dark .item-content .item-time,
+        .dark .notification-item .item-content .item-time,
+        .dark #notificationDropdown .notification-item .item-time,
+        .dark .notification-dropdown .notification-item .item-time,
+        .dark #notificationDropdown .item-content .item-time,
+        .dark .notification-dropdown .item-content .item-time,
+        .dark #notificationDropdown .notification-item .item-content .item-time,
+        .dark .notification-dropdown .notification-item .item-content .item-time,
+        .dark body #notificationDropdown .item-time,
+        .dark body .notification-dropdown .item-time,
+        .dark html body #notificationDropdown .item-time,
+        .dark html body .notification-dropdown .item-time,
+        .dark html.dark body #notificationDropdown .item-time,
+        .dark html.dark body .notification-dropdown .item-time {
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 13px !important;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 4px rgba(255, 255, 255, 0.3) !important;
+            opacity: 1 !important;
+            filter: none !important;
+            letter-spacing: 0.3px !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+        }
+    </style>
+    
     <script>
         console.log('=== Layout script section loaded ===');
         console.log('DOM state:', document.readyState);
+        
+        // Force apply style ngay khi script load
+        (function() {
+            function applyTimeStyle() {
+                const items = document.querySelectorAll('.item-time, #notificationDropdown .item-time, .notification-dropdown .item-time');
+                items.forEach(function(el) {
+                    el.style.setProperty('color', '#ffffff', 'important');
+                    el.style.setProperty('font-weight', '700', 'important');
+                });
+            }
+            
+            applyTimeStyle();
+            setTimeout(applyTimeStyle, 100);
+            setTimeout(applyTimeStyle, 500);
+        })();
     </script>
 </body>
 </html>

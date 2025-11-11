@@ -43,11 +43,11 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <p><strong>Họ tên:</strong> @Model.CustomerName</p>
+                            <p><strong>Họ tên:</strong> @Model.RecipientName</p>
                             <p><strong>Email:</strong> @Model.CustomerEmail</p>
                         </div>
                         <div class="col-md-6">
-                            <p><strong>Số điện thoại:</strong> @Model.CustomerPhone</p>
+                            <p><strong>Số điện thoại:</strong> @Model.RecipientPhone</p>
                         </div>
                     </div>
                 </div>
@@ -63,10 +63,15 @@
                 </div>
                 <div class="card-body">
                     <div class="d-flex">
-                        @if (!string.IsNullOrEmpty(Model.ServiceImages))
+                       @if (!string.IsNullOrEmpty(Model.ServiceImages))
                         {
-                            var firstImage = Model.ServiceImages.Split(',').FirstOrDefault();
-                            <img src="@firstImage" alt="@Model.ServiceName" class="service-image me-3" />
+                            string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
+                            var firstImage = Model.ServiceImages.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                            var firstUrl = ToUrl(firstImage);
+                            if (!string.IsNullOrEmpty(firstUrl))
+                            {
+                                <img src="@firstUrl" alt="@Model.ServiceName" class="service-image me-3" />
+                            }
                         }
                         <div class="flex-grow-1">
                             <h5>@Model.ServiceName</h5>
@@ -83,10 +88,7 @@
                                             <li class="mb-2">
                                                 <i class="bi bi-check-circle text-success"></i>
                                                 @option.OptionName
-                                                @if (!string.IsNullOrEmpty(option.Description))
-                                                {
-                                                    <span class="text-muted">(@option.Description)</span>
-                                                }
+                                               
                                                 - <strong>@option.Price.ToString("N0") VND</strong>
                                             </li>
                                         }
@@ -108,7 +110,52 @@
                 </div>
                 <div class="card-body">
                     <p><strong>Thời gian thực hiện:</strong> @Model.BookingTime.ToString("dd/MM/yyyy HH:mm")</p>
-                    <p><strong>Địa chỉ:</strong> @Model.Address</p>
+                    
+                    @* ✅ Hiển thị địa chỉ chi tiết từ UserAddresses *@
+                    @if (!string.IsNullOrEmpty(Model.ProvinceName) || !string.IsNullOrEmpty(Model.DistrictName) || !string.IsNullOrEmpty(Model.WardName) || !string.IsNullOrEmpty(Model.StreetAddress))
+                    {
+                        <div class="address-details">
+                            <p><strong>Địa chỉ:</strong></p>
+                            <div class="address-info">
+                                @if (!string.IsNullOrEmpty(Model.RecipientName))
+                                {
+                                    <p><strong>Người nhận:</strong> @Model.RecipientName</p>
+                                }
+                                @if (!string.IsNullOrEmpty(Model.RecipientPhone))
+                                {
+                                    <p><strong>Số điện thoại:</strong> @Model.RecipientPhone</p>
+                                }
+                                @if (!string.IsNullOrEmpty(Model.StreetAddress))
+                                {
+                                    <p><strong>Địa chỉ:</strong> @Model.StreetAddress</p>
+                                }
+                                @if (!string.IsNullOrEmpty(Model.WardName) || !string.IsNullOrEmpty(Model.DistrictName) || !string.IsNullOrEmpty(Model.ProvinceName))
+                                {
+                                    <p>
+                                        @if (!string.IsNullOrEmpty(Model.WardName))
+                                        {
+                                            <strong>Phường/Xã:</strong> @Model.WardName
+                                        }
+                                        @if (!string.IsNullOrEmpty(Model.DistrictName))
+                                        {
+                                            <br />
+                                            <strong>Quận/Huyện:</strong> @Model.DistrictName
+                                        }
+                                        @if (!string.IsNullOrEmpty(Model.ProvinceName))
+                                        {
+                                            <br />
+                                            <strong>Tỉnh/Thành phố:</strong> @Model.ProvinceName
+                                        }
+                                    </p>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p><strong>Địa chỉ:</strong> @Model.Address</p>
+                    }
+                    
                     @if (!string.IsNullOrEmpty(Model.VoucherCode))
                     {
                         <p>
@@ -298,7 +345,7 @@
 </div>
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/booking-management.css" asp-append-version="true" />
 }
 
 @functions {

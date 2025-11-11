@@ -10,6 +10,7 @@ namespace VHS_frontend.Areas.Admin.Models.Feedback
         public string CustomerEmail { get; set; } = string.Empty;
         public Guid? ServiceId { get; set; }
         public string ServiceName { get; set; } = string.Empty;
+        public string? ServiceImage { get; set; }
         public Guid? ProviderId { get; set; }
         public string ProviderName { get; set; } = string.Empty;
         public int Rating { get; set; }

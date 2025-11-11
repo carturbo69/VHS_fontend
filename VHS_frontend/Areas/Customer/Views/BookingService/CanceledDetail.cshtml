@@ -206,25 +206,62 @@
                 <div class="kb-payment-status-wrapper">
                     <span class="kb-payment-status-label">Xử lí:</span>
                     @{
-                        var paymentStatus = Model?.PaymentStatus ?? "";
-                        var isPaid = paidAmount > 0 || paymentStatus.Equals("Paid", StringComparison.OrdinalIgnoreCase) || 
-                                     paymentStatus.Equals("Đã thanh toán", StringComparison.OrdinalIgnoreCase);
+                        var paymentStatusTop = Model?.PaymentStatus ?? "";
+                        var refundStatusTop = Model?.RefundStatus ?? "";
+                        var isPaidTop = paidAmount > 0 || paymentStatusTop.Equals("Paid", StringComparison.OrdinalIgnoreCase) || 
+                                        paymentStatusTop.Equals("Đã thanh toán", StringComparison.OrdinalIgnoreCase);
+                        
+                        string displayStatusTop = "";
+                        string statusClassTop = "";
+                        string statusIconTop = "";
+                        bool showIconTop = false;
+                        
+                        if (!string.IsNullOrWhiteSpace(refundStatusTop))
+                        {
+                            if (refundStatusTop.Equals("Approved", StringComparison.OrdinalIgnoreCase))
+                            {
+                                displayStatusTop = "Đã duyệt hoàn tiền";
+                                statusClassTop = "kb-payment-status-refunded";
+                                statusIconTop = "bi-check-circle-fill";
+                                showIconTop = true;
+                            }
+                            else if (refundStatusTop.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
+                            {
+                                displayStatusTop = "Đã từ chối hoàn tiền";
+                                statusClassTop = "kb-payment-status-rejected";
+                                statusIconTop = "bi-x-circle-fill";
+                                showIconTop = true;
+                            }
+                            else if (refundStatusTop.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+                            {
+                                displayStatusTop = "Đang chờ xử lý";
+                                statusClassTop = "kb-payment-status-pending";
+                                statusIconTop = "bi-clock-fill";
+                                showIconTop = true;
+                            }
+                        }
+                        else if (isPaidTop)
+                        {
+                            displayStatusTop = "Đã thanh toán";
+                            statusClassTop = "kb-payment-status-paid";
+                            statusIconTop = "bi-check-circle";
+                            showIconTop = true;
+                        }
+                        else
+                        {
+                            displayStatusTop = "Chưa thanh toán";
+                            statusClassTop = "kb-payment-status-pending";
+                            statusIconTop = "";
+                            showIconTop = false;
+                        }
                     }
-                    @if (isPaid)
-                    {
-                        <div class="kb-payment-status kb-payment-status-paid">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="kb-icon-small">
-                                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
-                            </svg>
-                            <span>Đã thanh toán</span>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="kb-payment-status kb-payment-status-pending">
-                            <span>Chưa thanh toán</span>
-                        </div>
-                    }
+                    <div class="kb-payment-status @statusClassTop">
+                        @if (showIconTop)
+                        {
+                            <i class="bi @statusIconTop"></i>
+                        }
+                        <span>@displayStatusTop</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -280,6 +317,58 @@
                     }
                 </div>
             </div>
+
+            <!-- Trạng thái hoàn tiền -->
+            @if (!string.IsNullOrWhiteSpace(Model?.RefundStatus))
+            {
+                <div class="kb-refund-status-section" style="margin-top: 20px;">
+                    <div class="kb-cancel-reason-label">TRẠNG THÁI HOÀN TIỀN</div>
+                    <div style="margin-top: 8px;">
+                        @{
+                            var refundStatus = Model.RefundStatus;
+                            var statusText = "";
+                            var statusClass = "";
+                            var statusIcon = "";
+                            
+                            if (refundStatus.Equals("Approved", StringComparison.OrdinalIgnoreCase))
+                            {
+                                statusText = "Đã duyệt hoàn tiền";
+                                statusClass = "kb-refund-status-approved";
+                                statusIcon = "bi-check-circle-fill";
+                            }
+                            else if (refundStatus.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
+                            {
+                                statusText = "Đã từ chối hoàn tiền";
+                                statusClass = "kb-refund-status-rejected";
+                                statusIcon = "bi-x-circle-fill";
+                            }
+                            else if (refundStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+                            {
+                                statusText = "Đang chờ xử lý";
+                                statusClass = "kb-refund-status-pending";
+                                statusIcon = "bi-clock-fill";
+                            }
+                            else
+                            {
+                                statusText = refundStatus;
+                                statusClass = "kb-refund-status-pending";
+                                statusIcon = "bi-info-circle-fill";
+                            }
+                        }
+                        <div class="kb-refund-status-badge @statusClass">
+                            <i class="bi @statusIcon"></i>
+                            <span>@statusText</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(Model?.ResolutionNote))
+                        {
+                            <div class="kb-resolution-note" style="margin-top: 12px; padding: 12px; background-color: var(--muted, #f5f5f5); border-radius: 6px; border-left: 3px solid var(--primary, #007bff);">
+                                <div style="font-weight: 600; margin-bottom: 6px; color: var(--foreground, #333);">Ghi chú từ quản trị viên:</div>
+                                <div style="color: var(--foreground, #555); white-space: pre-wrap;">@Model.ResolutionNote</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
             
             <!-- Thông tin ngân hàng hoàn tiền -->
             @if (!string.IsNullOrWhiteSpace(Model?.BankAccountNumber))

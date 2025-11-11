@@ -1725,7 +1725,14 @@
           // Kiểm tra Leaflet đã load chưa
           if (typeof L === 'undefined') {
             console.error('Leaflet chưa được load. Kiểm tra xem script Leaflet đã được include chưa.');
-            alert('Leaflet Maps chưa sẵn sàng. Vui lòng refresh trang.');
+            // Hiển thị lỗi trong form error nếu có
+            const errorEl = document.getElementById('upsertFormError');
+            if (errorEl) {
+              errorEl.textContent = '⚠️ Leaflet Maps chưa sẵn sàng. Vui lòng refresh trang.';
+              errorEl.style.display = 'block';
+              errorEl.style.visibility = 'visible';
+              errorEl.style.opacity = '1';
+            }
             return;
           }
           
@@ -1825,7 +1832,14 @@
             } catch (error) {
               console.error('❌ Error initializing map:', error);
               console.error('Error stack:', error.stack);
-              alert('Không thể khởi tạo bản đồ. Vui lòng mở Console (F12) để xem chi tiết lỗi.');
+              // Hiển thị lỗi trong form error nếu có
+              const errorEl = document.getElementById('upsertFormError');
+              if (errorEl) {
+                errorEl.textContent = '⚠️ Không thể khởi tạo bản đồ. Vui lòng thử lại.';
+                errorEl.style.display = 'block';
+                errorEl.style.visibility = 'visible';
+                errorEl.style.opacity = '1';
+              }
             }
           } else {
             console.log('Map already exists, updating position...');
@@ -2000,23 +2014,79 @@
                   btn.style.pointerEvents = '';
                   btn.innerHTML = originalText;
                   
-                  // Kiểm tra và hiển thị thông báo
+                  // Kiểm tra và hiển thị thông báo lỗi nếu cần (không dùng alert)
+                  const errorEl = document.getElementById('upsertFormError');
                   if (!ward && !province) {
-                    alert('Không thể tự động điền đầy đủ. Vui lòng kiểm tra console (F12) để xem dữ liệu từ API.\n\nRaw response: ' + JSON.stringify(data, null, 2));
+                    console.warn('Không thể tự động điền đầy đủ địa chỉ. Raw response:', data);
+                    if (errorEl) {
+                      errorEl.textContent = '⚠️ Không thể tự động điền đầy đủ địa chỉ. Vui lòng nhập thủ công.';
+                      errorEl.style.display = 'block';
+                      errorEl.style.visibility = 'visible';
+                      errorEl.style.opacity = '1';
+                      setTimeout(() => {
+                        errorEl.style.display = 'none';
+                        errorEl.style.visibility = 'hidden';
+                        errorEl.style.opacity = '0';
+                      }, 5000);
+                    }
                   } else if (!province) {
-                    alert('Đã lấy địa chỉ nhưng không tìm thấy Tỉnh/Thành. Vui lòng nhập thủ công.\n\nVui lòng kiểm tra console (F12) để xem chi tiết.');
+                    console.warn('Đã lấy địa chỉ nhưng không tìm thấy Tỉnh/Thành.');
+                    if (errorEl) {
+                      errorEl.textContent = '⚠️ Đã lấy địa chỉ nhưng không tìm thấy Tỉnh/Thành. Vui lòng nhập thủ công.';
+                      errorEl.style.display = 'block';
+                      errorEl.style.visibility = 'visible';
+                      errorEl.style.opacity = '1';
+                      setTimeout(() => {
+                        errorEl.style.display = 'none';
+                        errorEl.style.visibility = 'hidden';
+                        errorEl.style.opacity = '0';
+                      }, 5000);
+                    }
                   } else {
-                    alert('Đã lấy địa chỉ thành công!');
+                    // Thành công - không hiển thị alert, chỉ log
+                    console.log('Đã lấy địa chỉ thành công:', { streetAddress, ward, province });
+                    // Ẩn lỗi nếu có
+                    if (errorEl) {
+                      errorEl.style.display = 'none';
+                      errorEl.style.visibility = 'hidden';
+                      errorEl.style.opacity = '0';
+                    }
                   }
                 } else {
-                  alert('Không tìm thấy địa chỉ tại vị trí này. Vui lòng thử lại hoặc chọn vị trí khác.');
+                  console.warn('Không tìm thấy địa chỉ tại vị trí này.');
+                  const errorEl = document.getElementById('upsertFormError');
+                  if (errorEl) {
+                    errorEl.textContent = '⚠️ Không tìm thấy địa chỉ tại vị trí này. Vui lòng thử lại hoặc chọn vị trí khác.';
+                    errorEl.style.display = 'block';
+                    errorEl.style.visibility = 'visible';
+                    errorEl.style.opacity = '1';
+                    setTimeout(() => {
+                      errorEl.style.display = 'none';
+                      errorEl.style.visibility = 'hidden';
+                      errorEl.style.opacity = '0';
+                    }, 5000);
+                  }
                   btn.disabled = false;
-                  btn.textContent = '🔍 Lấy địa chỉ từ vị trí đã chọn';
+                  btn.classList.remove('loading');
+                  btn.style.pointerEvents = '';
+                  btn.innerHTML = originalText;
                 }
               })
               .catch(error => {
                 console.error('Geocoding error:', error);
-                alert('Không thể lấy địa chỉ từ vị trí đã chọn. Lỗi: ' + error.message);
+                // Hiển thị lỗi trong form error
+                const errorEl = document.getElementById('upsertFormError');
+                if (errorEl) {
+                  errorEl.textContent = '⚠️ Không thể lấy địa chỉ từ vị trí đã chọn. Vui lòng thử lại.';
+                  errorEl.style.display = 'block';
+                  errorEl.style.visibility = 'visible';
+                  errorEl.style.opacity = '1';
+                  setTimeout(() => {
+                    errorEl.style.display = 'none';
+                    errorEl.style.visibility = 'hidden';
+                    errorEl.style.opacity = '0';
+                  }, 5000);
+                }
                 btn.disabled = false;
                 btn.classList.remove('loading');
                 btn.style.pointerEvents = '';

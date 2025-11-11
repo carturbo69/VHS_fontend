@@ -71,6 +71,66 @@ namespace VHS_frontend.Areas.Provider.Controllers
             };
 
             Console.WriteLine($"[DEBUG] Calling API with ProviderId: {providerId}, Status: {status ?? "NULL"}");
+            
+            // ✨ LẤY TẤT CẢ ĐƠN HÀNG ACTIVE (không filter) để đếm Pending và Confirmed
+            var allBookingsFilter = new BookingFilterDTO
+            {
+                ProviderId = providerId,
+                Status = null,  // Lấy tất cả active
+                FromDate = null,
+                ToDate = null,
+                SearchTerm = null,
+                PageNumber = 1,
+                PageSize = 1000  // Lấy nhiều để đếm đúng
+            };
+            var allBookingsData = await _bookingService.GetBookingListAsync(allBookingsFilter);
+            var allBookings = allBookingsData?.Items ?? new List<BookingListItemDTO>();
+            
+            // ✨ ĐẾM PENDING VÀ CONFIRMED từ danh sách active
+            ViewBag.MonthPending = allBookings.Count(b => 
+                b.Status?.Equals("Pending", StringComparison.OrdinalIgnoreCase) == true ||
+                b.Status?.Contains("chờ", StringComparison.OrdinalIgnoreCase) == true ||
+                b.Status?.Contains("Dang ch", StringComparison.OrdinalIgnoreCase) == true);
+            
+            ViewBag.MonthConfirmed = allBookings.Count(b => 
+                b.Status?.Equals("Confirmed", StringComparison.OrdinalIgnoreCase) == true ||
+                b.Status?.Contains("xác nhận", StringComparison.OrdinalIgnoreCase) == true);
+            
+            // ✨ ĐẾM COMPLETED VÀ CANCELED - gọi API riêng vì có thể có IsDeleted=true
+            var thisMonthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+            var thisMonthEnd = thisMonthStart.AddMonths(1);
+            
+            // Đếm Completed (history status - lấy cả IsDeleted=true)
+            var completedFilter = new BookingFilterDTO
+            {
+                ProviderId = providerId,
+                Status = "Completed",
+                FromDate = thisMonthStart,
+                ToDate = thisMonthEnd,
+                SearchTerm = null,
+                PageNumber = 1,
+                PageSize = 1000
+            };
+            var completedData = await _bookingService.GetBookingListAsync(completedFilter);
+            ViewBag.MonthCompleted = completedData?.TotalCount ?? 0;
+            
+            // Đếm Canceled (history status - lấy cả IsDeleted=true)
+            var canceledFilter = new BookingFilterDTO
+            {
+                ProviderId = providerId,
+                Status = "Canceled",
+                FromDate = thisMonthStart,
+                ToDate = thisMonthEnd,
+                SearchTerm = null,
+                PageNumber = 1,
+                PageSize = 1000
+            };
+            var canceledData = await _bookingService.GetBookingListAsync(canceledFilter);
+            ViewBag.MonthCanceled = canceledData?.TotalCount ?? 0;
+            
+            Console.WriteLine($"[DEBUG] Statistics - Pending: {ViewBag.MonthPending}, Confirmed: {ViewBag.MonthConfirmed}, Completed: {ViewBag.MonthCompleted}, Canceled: {ViewBag.MonthCanceled}");
+
+            // ✨ LẤY DANH SÁCH ĐƠN HÀNG - với filter từ user
             var result = await _bookingService.GetBookingListAsync(filter);
             Console.WriteLine($"[DEBUG] API returned {result?.Items?.Count ?? 0} bookings, Total: {result?.TotalCount ?? 0}");
 
@@ -84,62 +144,42 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     PageSize = 10
                 };
             }
-
-            // ✨ THỐNG KÊ THÁNG NÀY - Lấy từng loại riêng biệt
-            var thisMonthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-            var thisMonthEnd = thisMonthStart.AddMonths(1);
             
-            // Đếm Pending
-            var pendingFilter = new BookingFilterDTO
+            // ✨ NẾU KHÔNG CÓ FILTER STATUS, THÊM ĐƠN CANCELED VÀO DANH SÁCH (nếu có)
+            // Vì đơn Canceled có thể có IsDeleted=true nên không hiện trong danh sách chính
+            if (string.IsNullOrEmpty(status))
             {
-                ProviderId = providerId,
-                Status = "Pending",
-                FromDate = thisMonthStart,
-                ToDate = thisMonthEnd,
-                PageNumber = 1,
-                PageSize = 1
-            };
-            var pendingData = await _bookingService.GetBookingListAsync(pendingFilter);
-            ViewBag.MonthPending = pendingData?.TotalCount ?? 0;
-            
-            // Đếm Confirmed
-            var confirmedFilter = new BookingFilterDTO
-            {
-                ProviderId = providerId,
-                Status = "Confirmed",
-                FromDate = thisMonthStart,
-                ToDate = thisMonthEnd,
-                PageNumber = 1,
-                PageSize = 1
-            };
-            var confirmedData = await _bookingService.GetBookingListAsync(confirmedFilter);
-            ViewBag.MonthConfirmed = confirmedData?.TotalCount ?? 0;
-            
-            // Đếm Completed
-            var completedFilter = new BookingFilterDTO
-            {
-                ProviderId = providerId,
-                Status = "Completed",
-                FromDate = thisMonthStart,
-                ToDate = thisMonthEnd,
-                PageNumber = 1,
-                PageSize = 1
-            };
-            var completedData = await _bookingService.GetBookingListAsync(completedFilter);
-            ViewBag.MonthCompleted = completedData?.TotalCount ?? 0;
-            
-            // Đếm Canceled
-            var canceledFilter = new BookingFilterDTO
-            {
-                ProviderId = providerId,
-                Status = "Canceled",
-                FromDate = thisMonthStart,
-                ToDate = thisMonthEnd,
-                PageNumber = 1,
-                PageSize = 1
-            };
-            var canceledData = await _bookingService.GetBookingListAsync(canceledFilter);
-            ViewBag.MonthCanceled = canceledData?.TotalCount ?? 0;
+                // Lấy thêm đơn Canceled trong tháng này để hiển thị
+                var canceledForListFilter = new BookingFilterDTO
+                {
+                    ProviderId = providerId,
+                    Status = "Canceled",
+                    FromDate = thisMonthStart,
+                    ToDate = thisMonthEnd,
+                    SearchTerm = null,
+                    PageNumber = 1,
+                    PageSize = 10  // Lấy một số đơn Canceled gần đây
+                };
+                var canceledForList = await _bookingService.GetBookingListAsync(canceledForListFilter);
+                
+                if (canceledForList?.Items != null && canceledForList.Items.Any())
+                {
+                    // Merge vào danh sách, tránh trùng lặp
+                    var existingIds = result.Items.Select(b => b.BookingId).ToHashSet();
+                    var newCanceledItems = canceledForList.Items
+                        .Where(b => !existingIds.Contains(b.BookingId))
+                        .ToList();
+                    
+                    if (newCanceledItems.Any())
+                    {
+                        result.Items.AddRange(newCanceledItems);
+                        result.TotalCount = result.Items.Count;
+                        // Sắp xếp lại theo CreatedAt DESC
+                        result.Items = result.Items.OrderByDescending(b => b.CreatedAt).ToList();
+                        Console.WriteLine($"[DEBUG] Added {newCanceledItems.Count} canceled bookings to list");
+                    }
+                }
+            }
 
             // Pass filter data to view
             ViewBag.CurrentStatus = status;

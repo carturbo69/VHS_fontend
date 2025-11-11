@@ -23,6 +23,9 @@ namespace VHS_frontend.Areas.Admin.Models.Dashboard
         public double ProvidersProgress { get; set; }
         
         public int ActiveVouchers { get; set; }
+
+        // Services
+        public int TotalServices { get; set; }
         
         public double ConversionRate { get; set; }
         public double ConversionChange { get; set; }
@@ -42,6 +45,8 @@ namespace VHS_frontend.Areas.Admin.Models.Dashboard
         
         public List<decimal> MonthlyRevenueData { get; set; } = new List<decimal>();
         public List<string> MonthlyRevenueLabels { get; set; } = new List<string>();
+        public int SelectedMonths { get; set; } = 6;
+        public int SelectedYear { get; set; } = DateTime.Now.Year;
         
         public List<int> WeeklyOrdersData { get; set; } = new List<int>();
         public List<string> WeeklyOrdersLabels { get; set; } = new List<string>();

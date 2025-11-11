@@ -1,41 +1,68 @@
 @model VHS_frontend.Areas.Provider.Models.Profile.ProviderProfileUpdateDTO
+@inject IConfiguration Configuration
 @{
     ViewData["Title"] = "Chỉnh sửa Profile";
     Layout = "~/Areas/Provider/Views/_ProviderLayout.cshtml";
+}
+@using VHS_frontend.Helpers
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/provider-profile-edit.css" asp-append-version="true" />
 }
 
 <div class="provider-profile">
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-lg-10 col-xl-8">
-                <div class="edit-form">
-                    <div class="profile-header">
-                        <h3 class="card-title">
-                            <i class="bi bi-pencil-square me-2"></i>
-                            Chỉnh sửa Profile Provider
-                        </h3>
+            <div class="col-lg-10 col-xl-9">
+                <!-- Header Section -->
+                <div class="profile-edit-header">
+                    <div class="header-icon">
+                        <i class="bi bi-pencil-square"></i>
                     </div>
+                    <div class="header-content">
+                        <h1 class="header-title">Chỉnh sửa Profile Provider</h1>
+                        <p class="header-subtitle">Cập nhật thông tin và ảnh đại diện của bạn</p>
+                    </div>
+                    </div>
+
                     @if (TempData["Error"] != null)
                     {
                         <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
                             @TempData["Error"]
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+                @if (TempData["Success"] != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="bi bi-check-circle me-2"></i>
+                        @TempData["Success"]
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     }
 
+                <!-- Edit Form Card -->
+                <div class="edit-form-card">
                     <form asp-action="Edit" method="post" enctype="multipart/form-data">
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label asp-for="ProviderName" class="form-label">Tên nhà cung cấp <span class="text-danger">*</span></label>
-                                    <input asp-for="ProviderName" class="form-control" />
+                                <div class="mb-4">
+                                    <label asp-for="ProviderName" class="form-label">
+                                        <i class="bi bi-building"></i>
+                                        Tên nhà cung cấp <span class="text-danger">*</span>
+                                    </label>
+                                    <input asp-for="ProviderName" class="form-control" placeholder="Nhập tên nhà cung cấp" />
                                     <span asp-validation-for="ProviderName" class="text-danger"></span>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label asp-for="PhoneNumber" class="form-label">Số điện thoại <span class="text-danger">*</span></label>
-                                    <input asp-for="PhoneNumber" class="form-control" />
+                                <div class="mb-4">
+                                    <label asp-for="PhoneNumber" class="form-label">
+                                        <i class="bi bi-telephone"></i>
+                                        Số điện thoại <span class="text-danger">*</span>
+                                    </label>
+                                    <input asp-for="PhoneNumber" class="form-control" placeholder="Nhập số điện thoại (ví dụ: 0912345678 hoặc +84912345678)" maxlength="15" />
                                     <span asp-validation-for="PhoneNumber" class="text-danger"></span>
                                 </div>
                             </div>
@@ -43,9 +70,12 @@
 
                         <div class="row">
                             <div class="col-12">
-                                <div class="mb-3">
-                                    <label asp-for="Description" class="form-label">Mô tả</label>
-                                    <textarea asp-for="Description" class="form-control" rows="4"></textarea>
+                                <div class="mb-4">
+                                    <label asp-for="Description" class="form-label">
+                                        <i class="bi bi-file-text"></i>
+                                        Mô tả dịch vụ <span class="text-danger">*</span>
+                                    </label>
+                                    <textarea asp-for="Description" class="form-control" rows="5" placeholder="Nhập mô tả về dịch vụ của bạn..."></textarea>
                                     <span asp-validation-for="Description" class="text-danger"></span>
                                 </div>
                             </div>
@@ -53,40 +83,69 @@
 
                         <div class="row">
                             <div class="col-12">
-                                <div class="mb-3">
-                                    <label asp-for="ImageFile" class="form-label">Hình ảnh</label>
-                                    <input asp-for="ImageFile" class="form-control" type="file" accept="image/*" />
-                                    <span asp-validation-for="ImageFile" class="text-danger"></span>
-                                    <div class="form-text">Chọn file hình ảnh từ máy tính (JPG, PNG, GIF - tối đa 5MB)</div>
-
-                                    <!-- Hidden field để lưu URL hình ảnh hiện tại -->
-                                    <input asp-for="Images" type="hidden" />
-
-                                    <!-- Hiển thị hình ảnh hiện tại nếu có -->
-                                    @if (!string.IsNullOrEmpty(Model.Images))
-                                    {
-                                        <div class="mt-2">
-                                            <label class="form-label"><strong>Hình ảnh hiện tại:</strong></label>
-                                            <div>
-                                                <img src="@Model.Images" alt="Current Image" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />
+                                <div class="mb-4">
+                                    <label for="ImageFile" class="form-label">
+                                        <i class="bi bi-image"></i>
+                                        Ảnh đại diện
+                                    </label>
+                                    
+                                    <div class="avatar-upload-section">
+                                        <!-- Avatar Upload UI -->
+                                        @{
+                                            var currentImageUrl = !string.IsNullOrEmpty(Model.Images) 
+                                                ? ImageHelper.GetImageUrl(Model.Images, Configuration) 
+                                                : string.Empty;
+                                        }
+                                        
+                                        @if (string.IsNullOrEmpty(currentImageUrl))
+                                        {
+                                            <!-- Placeholder khi chưa có ảnh -->
+                                            <button type="button" id="avatarPlaceholder" class="avatar-tile" aria-label="Chọn ảnh từ tệp">
+                                                <div class="tile-icon">📷</div>
+                                                <div class="tile-text">Chọn từ tệp</div>
+                                            </button>
+                                        }
+                                        
+                                        <div id="avatarPreviewWrap" class="avatar-wrap @(string.IsNullOrEmpty(currentImageUrl) ? "d-none" : "")">
+                                            <div class="avatar-img-wrap">
+                                                <img id="imgPreview" class="avatar-img" alt="Ảnh đại diện" 
+                                                     src="@(string.IsNullOrEmpty(currentImageUrl) ? "/images/placeholder-avatar.png" : currentImageUrl)" 
+                                                     onerror="this.src='/images/placeholder-avatar.png'" />
+                                                <button type="button" id="avatarOverlay" class="avatar-overlay" title="Xóa ảnh">
+                                                    <span class="overlay-x">×</span>
+                                                </button>
+                                            </div>
+                                            
+                                            <div class="file-row">
+                                                <input type="file" asp-for="ImageFile" id="ImageFile" name="ImageFile" accept="image/*" class="file-input" />
+                                                <div class="file-actions">
+                                                    <span id="fileName" class="file-name">@(string.IsNullOrEmpty(currentImageUrl) ? "Chưa chọn tệp" : "Ảnh hiện tại")</span>
+                                                    <label for="ImageFile" class="btn ghost">Chọn tệp khác</label>
+                                                </div>
+                                            </div>
                                             </div>
                                         </div>
-                                    }
+                                    
+                                    <!-- Hidden field để lưu URL hình ảnh hiện tại -->
+                                    <input asp-for="Images" type="hidden" id="Images" value="@Model.Images" />
+                                    
+                                    <span asp-validation-for="ImageFile" class="text-danger"></span>
+                                    <div class="field-error text-danger small d-none mt-1" id="imageError"></div>
+                                    <div class="form-text">Chọn file hình ảnh từ máy tính (JPG, PNG, GIF - tối đa 5MB)</div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-12 text-center">
-                                <button type="submit" class="btn btn-primary me-3">
-                                    <i class="bi bi-check-circle me-2"></i>
-                                    Cập nhật Profile
+                        <!-- Action Buttons -->
+                        <div class="form-actions">
+                            <button type="submit" class="btn-submit">
+                                <i class="bi bi-check-circle"></i>
+                                <span>Cập nhật Profile</span>
                                 </button>
-                                <a href="@Url.Action("Index", "ProviderProfile")" class="btn btn-secondary">
-                                    <i class="bi bi-arrow-left me-2"></i>
-                                    Quay lại
-                                </a>
-                            </div>
+                            <a href="@Url.Action("Index", "ProviderProfile")" class="btn-cancel">
+                                <i class="bi bi-arrow-left"></i>
+                                <span>Quay lại</span>
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -101,46 +160,264 @@
     }
 
     <script>
-        // File upload preview
-        document.addEventListener('DOMContentLoaded', function() {
-            const fileInput = document.querySelector('input[type="file"]');
-            const imagePreview = document.querySelector('.image-preview');
+        (function() {
+            // ===== Avatar Upload =====
+            const fileInput = document.getElementById("ImageFile");
+            const placeholder = document.getElementById("avatarPlaceholder");
+            const previewWrap = document.getElementById("avatarPreviewWrap");
+            const img = document.getElementById("imgPreview");
+            const fileNameEl = document.getElementById("fileName");
+            const overlayBtn = document.getElementById("avatarOverlay");
+            const imagesInput = document.getElementById("Images");
+            const imageError = document.getElementById("imageError");
 
-            if (fileInput) {
-                fileInput.addEventListener('change', function(e) {
-                    const file = e.target.files[0];
-                    if (file) {
-                        // Kiểm tra loại file
-                        if (!file.type.startsWith('image/')) {
-                            alert('Vui lòng chọn file hình ảnh');
-                            fileInput.value = '';
+            // Click placeholder để chọn file
+            if (placeholder) {
+                placeholder.addEventListener("click", () => fileInput?.click());
+            }
+
+            // Xử lý khi chọn file
+            fileInput?.addEventListener("change", function(e) {
+                const f = e.target.files?.[0];
+                if (!f) return;
+
+                // Validate file
+                if (!f.type.startsWith("image/")) {
+                    showImageError("Ảnh đại diện không hợp lệ. Vui lòng chọn file hình ảnh.");
+                    fileInput.value = "";
                             return;
                         }
 
                         // Kiểm tra kích thước file (5MB)
-                        if (file.size > 5 * 1024 * 1024) {
-                            alert('File không được vượt quá 5MB');
-                            fileInput.value = '';
+                if (f.size > 5 * 1024 * 1024) {
+                    showImageError("File không được vượt quá 5MB.");
+                    fileInput.value = "";
                             return;
                         }
 
                         // Hiển thị preview
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            if (!imagePreview) {
-                                // Tạo div preview nếu chưa có
-                                const previewDiv = document.createElement('div');
-                                previewDiv.className = 'image-preview';
-                                previewDiv.innerHTML = '<img src="' + e.target.result + '" alt="Preview" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />';
-                                fileInput.parentNode.appendChild(previewDiv);
+                const objectUrl = URL.createObjectURL(f);
+                img.src = objectUrl;
+                if (fileNameEl) fileNameEl.textContent = f.name;
+                
+                // Ẩn placeholder, hiện preview
+                if (placeholder) placeholder.classList.add("d-none");
+                if (previewWrap) previewWrap.classList.remove("d-none");
+                
+                // Xóa error state
+                clearImageError();
+                if (placeholder) placeholder.classList.remove('is-invalid');
+            });
+
+            // Xóa ảnh đã chọn
+            if (overlayBtn) {
+                overlayBtn.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    if (fileInput) fileInput.value = "";
+                    
+                    // Reset về ảnh cũ nếu có
+                    const currentImageUrl = imagesInput?.value || "";
+                    if (currentImageUrl && img) {
+                        img.src = currentImageUrl;
+                        if (previewWrap) previewWrap.classList.remove("d-none");
+                        if (placeholder) placeholder.classList.add("d-none");
+                        if (fileNameEl) fileNameEl.textContent = "Ảnh hiện tại";
                             } else {
-                                imagePreview.innerHTML = '<img src="' + e.target.result + '" alt="Preview" class="img-thumbnail" style="max-width: 200px; max-height: 200px;" />';
-                            }
-                        };
-                        reader.readAsDataURL(file);
+                        if (previewWrap) previewWrap.classList.add("d-none");
+                        if (placeholder) placeholder.classList.remove("d-none");
+                        if (fileNameEl) fileNameEl.textContent = "Chưa chọn tệp";
+                        img.src = '/images/placeholder-avatar.png';
+                    }
+                    
+                    clearImageError();
+                });
+            }
+
+            // Helper functions
+            function showImageError(message) {
+                if (imageError) {
+                    imageError.textContent = message;
+                    imageError.classList.remove('d-none');
+                }
+            }
+
+            function clearImageError() {
+                if (imageError) {
+                    imageError.textContent = "";
+                    imageError.classList.add('d-none');
+                }
+            }
+
+            // Clear error khi chọn file lại
+            fileInput?.addEventListener('change', clearImageError);
+
+            // ===== Form Validation =====
+            const form = document.querySelector('form[method="post"]');
+            const providerNameInput = document.getElementById('ProviderName');
+            const phoneNumberInput = document.getElementById('PhoneNumber');
+            const descriptionInput = document.getElementById('Description');
+
+            // Helper function để hiển thị lỗi
+            function showFieldError(input, message) {
+                if (!input) return;
+                
+                // Xóa class valid nếu có
+                input.classList.remove('is-valid');
+                input.classList.add('is-invalid');
+                
+                // Tìm hoặc tạo error element
+                let errorSpan = input.parentElement.querySelector('.text-danger');
+                if (!errorSpan) {
+                    errorSpan = document.createElement('span');
+                    errorSpan.className = 'text-danger';
+                    errorSpan.setAttribute('asp-validation-for', input.name);
+                    input.parentElement.appendChild(errorSpan);
+                }
+                errorSpan.textContent = message;
+            }
+
+            // Helper function để xóa lỗi
+            function clearFieldError(input) {
+                if (!input) return;
+                input.classList.remove('is-invalid');
+                const errorSpan = input.parentElement.querySelector('.text-danger');
+                if (errorSpan && errorSpan.getAttribute('asp-validation-for')) {
+                    errorSpan.textContent = '';
+                }
+            }
+
+            // Validate ProviderName
+            function validateProviderName(value) {
+                const trimmed = value?.trim() || '';
+                if (trimmed === '') {
+                    showFieldError(providerNameInput, 'Tên nhà cung cấp không được để trống');
+                    return false;
+                }
+                if (trimmed.length > 100) {
+                    showFieldError(providerNameInput, 'Tên nhà cung cấp không được vượt quá 100 ký tự');
+                    return false;
+                }
+                clearFieldError(providerNameInput);
+                providerNameInput.classList.add('is-valid');
+                return true;
+            }
+
+            // Validate PhoneNumber
+            function validatePhoneNumber(value) {
+                const trimmed = value?.trim() || '';
+                if (trimmed === '') {
+                    showFieldError(phoneNumberInput, 'Số điện thoại không được để trống');
+                    return false;
+                }
+                
+                // Format: 
+                // - 0xxxxxxxxx (10 số) - ví dụ: 0912345678
+                // - 0xxxxxxxxxx (11 số) - ví dụ: 01234567890
+                // - +84xxxxxxxxx (12 ký tự) - ví dụ: +84912345678
+                // - +84xxxxxxxxxx (13 ký tự) - ví dụ: +841234567890
+                const phoneRegex = /^(0[0-9]{9,10}|\+84[0-9]{9,10})$/;
+                if (!phoneRegex.test(trimmed)) {
+                    showFieldError(phoneNumberInput, 'Số điện thoại không đúng định dạng. Vui lòng nhập số điện thoại 10-11 chữ số (bắt đầu bằng 0 hoặc +84)');
+                    return false;
+                }
+                
+                if (trimmed.length > 15) {
+                    showFieldError(phoneNumberInput, 'Số điện thoại không được vượt quá 15 ký tự');
+                    return false;
+                }
+                
+                clearFieldError(phoneNumberInput);
+                phoneNumberInput.classList.add('is-valid');
+                return true;
+            }
+
+            // Validate Description
+            function validateDescription(value) {
+                const trimmed = value?.trim() || '';
+                if (trimmed === '') {
+                    showFieldError(descriptionInput, 'Mô tả không được để trống');
+                    return false;
+                }
+                if (trimmed.length > 500) {
+                    showFieldError(descriptionInput, 'Mô tả không được vượt quá 500 ký tự');
+                    return false;
+                }
+                clearFieldError(descriptionInput);
+                descriptionInput.classList.add('is-valid');
+                return true;
+            }
+
+            // Real-time validation cho ProviderName
+            if (providerNameInput) {
+                providerNameInput.addEventListener('blur', function() {
+                    validateProviderName(this.value);
+                });
+                providerNameInput.addEventListener('input', function() {
+                    if (this.classList.contains('is-invalid')) {
+                        validateProviderName(this.value);
                     }
                 });
             }
-        });
+
+            // Real-time validation cho PhoneNumber
+            if (phoneNumberInput) {
+                phoneNumberInput.addEventListener('blur', function() {
+                    validatePhoneNumber(this.value);
+                });
+                phoneNumberInput.addEventListener('input', function() {
+                    // Chỉ cho phép số, dấu + và khoảng trắng (sẽ xóa khoảng trắng)
+                    this.value = this.value.replace(/[^\d+]/g, '');
+                    if (this.classList.contains('is-invalid')) {
+                        validatePhoneNumber(this.value);
+                    }
+                });
+            }
+
+            // Real-time validation cho Description
+            if (descriptionInput) {
+                descriptionInput.addEventListener('blur', function() {
+                    validateDescription(this.value);
+                });
+                descriptionInput.addEventListener('input', function() {
+                    if (this.classList.contains('is-invalid')) {
+                        validateDescription(this.value);
+                    }
+                });
+            }
+
+            // Form submit validation
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    let isValid = true;
+
+                    // Validate tất cả các trường
+                    if (!validateProviderName(providerNameInput?.value)) {
+                        isValid = false;
+                    }
+                    if (!validatePhoneNumber(phoneNumberInput?.value)) {
+                        isValid = false;
+                    }
+                    if (!validateDescription(descriptionInput?.value)) {
+                        isValid = false;
+                    }
+
+                    if (!isValid) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Scroll đến trường đầu tiên có lỗi
+                        const firstError = form.querySelector('.is-invalid');
+                        if (firstError) {
+                            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            firstError.focus();
+                        }
+                        
+                        return false;
+                    }
+                });
+            }
+        })();
     </script>
 }

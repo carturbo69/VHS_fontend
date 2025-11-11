@@ -9,8 +9,11 @@
 }
 
 <div class="service-management-container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3>
+    <!-- Header Card -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">
             <i class="bi bi-briefcase me-2"></i>
             Quản lý Dịch vụ
         </h3>
@@ -18,6 +21,8 @@
             <i class="bi bi-plus-circle me-1"></i>
             Tạo dịch vụ mới
         </a>
+            </div>
+        </div>
     </div>
 
     @if (TempData["Success"] != null)
@@ -27,19 +32,70 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
-    @if (TempData["Error"] != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            @TempData["Error"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    }
+    @* Removed Error alert display - Error messages are handled by redirects *@
 
-    <div class="card shadow-sm">
-        <div class="card-header">
-            <h5 class="mb-0">Danh sách Dịch vụ</h5>
-        </div>
+    <!-- Filter Section -->
+    <div class="filter-card card shadow-sm mb-4">
         <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">
+                        <i class="bi bi-search me-1"></i>Tìm kiếm
+                    </label>
+                    <input type="text" id="searchInput" class="form-control" placeholder="Tìm theo tên dịch vụ...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">
+                        <i class="bi bi-tags me-1"></i>Danh mục
+                    </label>
+                    <select id="categoryFilter" class="form-select">
+                        <option value="">Tất cả</option>
+                        @if (Model != null && Model.Any())
+                        {
+                            var categories = Model.Select(s => s.CategoryName).Distinct().OrderBy(c => c);
+                            @foreach (var category in categories)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">
+                        <i class="bi bi-info-circle me-1"></i>Trạng thái
+                    </label>
+                    <select id="statusFilter" class="form-select">
+                        <option value="">Tất cả</option>
+                        <option value="Active">Hoạt động</option>
+                        <option value="Inactive">Tạm dừng</option>
+                        <option value="Pending">Chờ duyệt</option>
+                        <option value="PendingUpdate">Chờ duyệt chỉnh sửa</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">
+                        <i class="bi bi-sort-down me-1"></i>Sắp xếp
+                    </label>
+                    <select id="sortFilter" class="form-select">
+                        <option value="name-asc">Tên A-Z</option>
+                        <option value="name-desc">Tên Z-A</option>
+                        <option value="price-asc">Giá tăng dần</option>
+                        <option value="price-desc">Giá giảm dần</option>
+                        <option value="date-desc">Mới nhất</option>
+                        <option value="date-asc">Cũ nhất</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" id="resetFilter" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>
+                        Đặt lại
+                    </button>
+                </div>
+            </div>
+        </div>
+        </div>
+
+    <!-- Service Table (No Card Wrapper) -->
             @if (Model != null && Model.Any())
             {
                 <div class="table-responsive">
@@ -97,13 +153,11 @@
                                     </td>
                                     <td>
                                         <strong>@service.Title</strong>
-                                        <br />
-                                        <small class="text-muted service-description">@service.Description</small>
                                     </td>
                                     <td>
                                         <span class="badge bg-secondary">@service.CategoryName</span>
                                     </td>
-                                    <td>@service.Price.ToString("N0") VNĐ</td>
+                                    <td class="price-cell">@service.Price.ToString("N0") VNĐ</td>
                                     <td>@service.UnitType (@service.BaseUnit)</td>
                                     <td>
                                         @if (service.Tags.Any())
@@ -157,7 +211,7 @@
                                         <div class="actions-stack" role="group">
                                             <a asp-action="Edit" asp-route-id="@service.ServiceId" class="btn btn-action btn-action--lg btn-edit" title="Chỉnh sửa" data-bs-toggle="tooltip" data-bs-placement="top">
                                                 <i class="bi bi-pencil-square"></i>
-                                                <span class="label d-none d-xl-inline">Chỉnh sửa</span>
+                                                <span class="label d-none d-xl-inline">Sửa</span>
                                             </a>
                                             @if (service.Status == "Active")
                                             {
@@ -167,7 +221,7 @@
                                                     <input type="hidden" name="targetStatus" value="Inactive" />
                                                     <button type="submit" class="btn btn-action btn-action--lg btn-toggle-pause" title="Tạm dừng">
                                                         <i class="bi bi-pause-circle"></i>
-                                                        <span class="label d-none d-xl-inline">Tạm dừng</span>
+                                                        <span class="label d-none d-xl-inline">Dừng</span>
                                                     </button>
                                                 </form>
                                             }
@@ -203,8 +257,6 @@
                     </a>
                 </div>
             }
-        </div>
-    </div>
 </div>
 
 <!-- Delete Confirmation Modal -->
@@ -238,8 +290,114 @@
             tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
+
+            // Filter functionality
+            const searchInput = document.getElementById('searchInput');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const sortFilter = document.getElementById('sortFilter');
+            const resetFilter = document.getElementById('resetFilter');
+            const tableRows = document.querySelectorAll('tbody tr');
+
+            if (!searchInput || !categoryFilter || !statusFilter || !sortFilter || !resetFilter) {
+                return; // Exit if filter elements don't exist
+            }
+
+            function filterTable() {
+                if (tableRows.length === 0) return; // No rows to filter
+                const searchTerm = searchInput.value.toLowerCase().trim();
+                const categoryValue = categoryFilter.value.toLowerCase();
+                const statusValue = statusFilter.value.toLowerCase();
+                const sortValue = sortFilter.value;
+
+                let visibleRows = Array.from(tableRows).filter(row => {
+                    const title = row.querySelector('td:nth-child(2) strong')?.textContent.toLowerCase() || '';
+                    const category = row.querySelector('td:nth-child(3) .badge')?.textContent.toLowerCase() || '';
+                    const status = row.querySelector('td:nth-child(8) .badge')?.textContent.toLowerCase() || '';
+                    
+                    // Map Vietnamese status to English
+                    let statusMatch = '';
+                    if (status.includes('hoạt động')) statusMatch = 'active';
+                    else if (status.includes('tạm dừng')) statusMatch = 'inactive';
+                    else if (status.includes('chờ duyệt chỉnh sửa')) statusMatch = 'pendingupdate';
+                    else if (status.includes('chờ duyệt')) statusMatch = 'pending';
+
+                    const matchesSearch = !searchTerm || title.includes(searchTerm);
+                    const matchesCategory = !categoryValue || category.includes(categoryValue);
+                    const matchesStatus = !statusValue || statusMatch === statusValue;
+
+                    return matchesSearch && matchesCategory && matchesStatus;
+                });
+
+                // Hide all rows first
+                tableRows.forEach(row => {
+                    row.style.display = 'none';
+                });
+
+                // Sort rows
+                if (sortValue) {
+                    visibleRows.sort((a, b) => {
+                        switch (sortValue) {
+                            case 'name-asc':
+                                const nameA = a.querySelector('td:nth-child(2) strong')?.textContent || '';
+                                const nameB = b.querySelector('td:nth-child(2) strong')?.textContent || '';
+                                return nameA.localeCompare(nameB, 'vi');
+                            case 'name-desc':
+                                const nameA2 = a.querySelector('td:nth-child(2) strong')?.textContent || '';
+                                const nameB2 = b.querySelector('td:nth-child(2) strong')?.textContent || '';
+                                return nameB2.localeCompare(nameA2, 'vi');
+                            case 'price-asc':
+                                const priceA = parseInt(a.querySelector('td:nth-child(4)')?.textContent.replace(/[^\d]/g, '') || '0');
+                                const priceB = parseInt(b.querySelector('td:nth-child(4)')?.textContent.replace(/[^\d]/g, '') || '0');
+                                return priceA - priceB;
+                            case 'price-desc':
+                                const priceA2 = parseInt(a.querySelector('td:nth-child(4)')?.textContent.replace(/[^\d]/g, '') || '0');
+                                const priceB2 = parseInt(b.querySelector('td:nth-child(4)')?.textContent.replace(/[^\d]/g, '') || '0');
+                                return priceB2 - priceA2;
+                            default:
+                                return 0;
+                        }
+                    });
+                }
+
+                // Show filtered and sorted rows
+                const tbody = document.querySelector('tbody');
+                visibleRows.forEach(row => {
+                    row.style.display = '';
+                    tbody.appendChild(row);
+                });
+
+                // Show message if no results
+                const noResultsMsg = document.getElementById('noResultsMessage');
+                if (visibleRows.length === 0) {
+                    if (!noResultsMsg) {
+                        const msg = document.createElement('tr');
+                        msg.id = 'noResultsMessage';
+                        msg.innerHTML = '<td colspan="9" class="text-center py-4"><i class="bi bi-search text-muted me-2"></i>Không tìm thấy dịch vụ nào phù hợp</td>';
+                        tbody.appendChild(msg);
+                    }
+                } else if (noResultsMsg) {
+                    noResultsMsg.remove();
+                }
+            }
+
+            // Event listeners
+            searchInput.addEventListener('input', filterTable);
+            categoryFilter.addEventListener('change', filterTable);
+            statusFilter.addEventListener('change', filterTable);
+            sortFilter.addEventListener('change', filterTable);
+
+            resetFilter.addEventListener('click', function() {
+                searchInput.value = '';
+                categoryFilter.value = '';
+                statusFilter.value = '';
+                sortFilter.value = 'name-asc';
+                filterTable();
+            });
         });
+
         var deleteModal = document.getElementById('deleteModal');
+        if (deleteModal) {
         deleteModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
             var serviceId = button.getAttribute('data-service-id');
@@ -251,6 +409,7 @@
             modalServiceName.textContent = serviceName;
             deleteForm.action = '@Url.Action("Delete", "ServiceManagement", new { area = "Provider" })?id=' + serviceId;
         });
+        }
     </script>
 }
 
