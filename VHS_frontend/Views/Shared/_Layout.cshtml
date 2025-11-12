@@ -1,4 +1,9 @@
-﻿<!DOCTYPE html>
+﻿@using Microsoft.Extensions.Configuration
+@using Microsoft.AspNetCore.Http
+@inject IConfiguration Configuration
+<!-- Thêm Này Vào đề nữa đẩy lên cloud khỏi sửa đường dẫn -->
+
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8" />
@@ -75,6 +80,14 @@
     {
         @await Html.PartialAsync("_Footer")
     }
+
+    @* LẤY ACCOUNTID ĐỂ DÙNG CHO CHAT HUB *@
+    @{
+        var accIdClaim = User.FindFirst("AccountID")?.Value;
+        var accIdSession = Context.Session.GetString("AccountID");
+        var accId = !string.IsNullOrWhiteSpace(accIdClaim) ? accIdClaim : accIdSession;
+    }
+
 
     <script>
         // Theme toggle
@@ -439,6 +452,108 @@
         console.log('✅ Notification script loaded at:', new Date().toISOString());
     </script>
 
+
+    <!-- CHAT UNREAD BADGE + SIGNALR CHAT HUB (THÊM MỚI) -->
+    <script>
+        // URL ChatHub lấy từ cấu hình backend (Apis:Backend) + /chathub
+        const chatHubUrl = '@(Configuration["Apis:Backend"]?.TrimEnd('/') ?? "")/chathub';
+        const currentAccountId = '@accId';
+
+        // ================== CHAT UNREAD BADGE ==================
+        async function loadChatUnreadCount() {
+            const badge = document.getElementById("chatUnreadBadge");
+            if (!badge) {
+                console.warn("⚠️ Không tìm thấy #chatUnreadBadge trong DOM");
+                return;
+            }
+
+            console.log("🔄 loadChatUnreadCount() gọi từ JS");
+
+            try {
+                const resp = await fetch("/Customer/ChatCustomer/UnreadTotal", {
+                    method: "GET",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                });
+
+                if (!resp.ok) {
+                    console.warn("⚠️ loadChatUnreadCount response not OK:", resp.status);
+                    badge.style.display = "none";
+                    badge.textContent = "";
+                    return;
+                }
+
+                const data = await resp.json();
+                const total = (data && typeof data.total === "number") ? data.total : 0;
+
+                console.log("✅ loadChatUnreadCount OK, total =", total);
+
+                if (total > 0) {
+                    badge.style.display = "inline-block";
+                    badge.textContent = total;
+                } else {
+                    badge.style.display = "none";
+                    badge.textContent = "";
+                }
+            } catch (err) {
+                console.error("❌ Error loading chat unread count:", err);
+                const badge2 = document.getElementById("chatUnreadBadge");
+                if (badge2) {
+                    badge2.style.display = "none";
+                    badge2.textContent = "";
+                }
+            }
+        }
+
+        // ================== SIGNALR CHAT HUB ==================
+        document.addEventListener("DOMContentLoaded", async () => {
+            console.log("📬 Chat unread + ChatHub system initialized");
+
+            // Load badge chat lần đầu khi trang mở
+            await loadChatUnreadCount();
+
+            try {
+                if (window.__chatHub) {
+                    await window.__chatHub.start(chatHubUrl, currentAccountId);
+                    console.log("✅ Chat hub started via __chatHub");
+
+                    // Server bắn tổng số chưa đọc
+                    window.__chatHub.on("totalUnread:update", payload => {
+                        const total = (payload && typeof payload.total === "number") ? payload.total : 0;
+                        const badge = document.getElementById("chatUnreadBadge");
+                        if (!badge) return;
+
+                        if (total > 0) {
+                            badge.style.display = "inline-block";
+                            badge.textContent = total;
+                        } else {
+                            badge.style.display = "none";
+                            badge.textContent = "";
+                        }
+
+                        console.log("🔔 totalUnread:update từ SignalR =", total);
+                    });
+
+                    // Khi danh sách hội thoại thay đổi → reload lại tổng chưa đọc từ API
+                    window.__chatHub.on("conversationList:update", async item => {
+                        console.log("📥 conversationList:update (sẽ gọi loadChatUnreadCount)", item);
+                        await loadChatUnreadCount();
+                    });
+                } else {
+                    console.error("❌ window.__chatHub chưa được load");
+                }
+            } catch (err) {
+                console.error("❌ Không kết nối được chatHub:", err);
+            }
+
+            // Fallback: mỗi 30s gọi lại (phòng trường hợp SignalR rớt)
+            setInterval(async () => {
+                await loadChatUnreadCount();
+            }, 30000);
+        });
+    </script>
+
     <!-- SignalR Real-time Notifications for Customer -->
     <script>
         (function() {
@@ -637,6 +752,7 @@
     @await Html.PartialAsync("_Chatbox")
     <!-- SignalR Client Library -->
     <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+    <script src="~/js/chat-hub-signalr.js" asp-append-version="true"></script>
     <script src="~/js/chatbox.js" type="text/javascript"></script>
     
     <!-- ULTIMATE FIX: Inject CSS cho notification item-time - Load cuối cùng -->

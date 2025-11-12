@@ -1,4 +1,8 @@
-﻿<!DOCTYPE html>
+﻿@using Microsoft.Extensions.Configuration
+@using Microsoft.AspNetCore.Http
+@inject IConfiguration Configuration
+
+<!DOCTYPE html>
 <html lang="vi" class="preload">
  <!-- Thêm .preload để chặn transition khi khởi động -->
 <head>
@@ -182,6 +186,18 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- COPY 1: Thêm SignalR + wrapper ChatHub + biến Razor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+    <script src="~/js/chat-hub-signalr.js" asp-append-version="true"></script>
+
+    @{
+        var accIdClaim = User.FindFirst("AccountID")?.Value;
+        var accIdSession = Context.Session.GetString("AccountID");
+        var accId = !string.IsNullOrWhiteSpace(accIdClaim) ? accIdClaim : accIdSession;
+        var chatHubUrl = (Configuration["Apis:Backend"]?.TrimEnd('/') ?? "") + "/chathub";
+    }
+
 
     <script>
         // =========================
@@ -775,6 +791,96 @@
               notificationConnection.stop();
             }
           });
+        })();
+    </script>
+
+    <script>
+        (function () {
+            const hubUrl = '@chatHubUrl';
+            const currentAccountId = '@accId';
+
+            // Hàm apply badge dùng chung cho realtime
+            function applyAdminChatBadge(total) {
+                const badge = document.querySelector('[data-chat-count]');
+                if (!badge) {
+                    console.warn('[Admin ChatHub] Không tìm thấy badge chat');
+                    return;
+                }
+
+                const num = Number(total ?? 0);
+                badge.textContent = num;
+
+                if (num > 0) {
+                    badge.style.display = 'inline-flex';
+                    badge.classList.remove('is-empty');
+                } else {
+                    badge.style.display = 'none';
+                    badge.classList.add('is-empty');
+                }
+            }
+
+            async function initAdminChatHub() {
+                if (!currentAccountId) {
+                    console.warn('[Admin ChatHub] Không có AccountId -> không khởi tạo SignalR');
+                    return;
+                }
+
+                if (!window.signalR) {
+                    console.error('[Admin ChatHub] signalR chưa load');
+                    return;
+                }
+
+                if (!window.__chatHub) {
+                    console.error('[Admin ChatHub] __chatHub wrapper chưa load (file ~/js/chat-hub-signalr.js)');
+                    return;
+                }
+
+                // Tránh khởi tạo 2 lần
+                if (window.__adminChatHubInitialized) return;
+                window.__adminChatHubInitialized = true;
+
+                try {
+                    // Kết nối tới /chathub và register accountId
+                    await window.__chatHub.start(hubUrl, currentAccountId);
+                    console.log('[Admin ChatHub] ✅ Connected & Registered');
+
+                    const conn = (window.__chatHub.getConnection && window.__chatHub.getConnection()) || null;
+
+                    const handleTotalUnread = payload => {
+                        const total = (payload && typeof payload.total === 'number')
+                            ? payload.total
+                            : (typeof payload === 'number' ? payload : 0);
+
+                        console.log('[Admin ChatHub] totalUnread:update =', total);
+                        applyAdminChatBadge(total);
+                    };
+
+                    const handleConversationListUpdate = async item => {
+                        console.log('[Admin ChatHub] conversationList:update', item);
+                        // Gọi lại API cũ để sync chính xác
+                        if (typeof updateAdminChatUnreadCount === 'function') {
+                            await updateAdminChatUnreadCount();
+                        }
+                    };
+
+                    if (conn) {
+                        conn.on('totalUnread:update', handleTotalUnread);
+                        conn.on('conversationList:update', handleConversationListUpdate);
+                    } else {
+                        // Fallback: vẫn dùng wrapper nếu không lấy được conn
+                        window.__chatHub.on('totalUnread:update', handleTotalUnread);
+                        window.__chatHub.on('conversationList:update', handleConversationListUpdate);
+                    }
+                } catch (e) {
+                    console.error('[Admin ChatHub] Lỗi khởi tạo SignalR:', e);
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                // Polling cũ của bạn vẫn chạy (updateAdminChatUnreadCount + setInterval)
+                // Bây giờ thêm realtime qua SignalR
+                initAdminChatHub();
+            });
         })();
     </script>
 
