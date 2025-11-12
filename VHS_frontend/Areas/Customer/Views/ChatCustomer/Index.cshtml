@@ -78,6 +78,62 @@
     // Overload nếu model dùng DateTimeOffset
     private static string HHmmVN(DateTimeOffset dto) => HHmmVN(dto.UtcDateTime);
 
+    // Hàm format thời gian thông minh cho chat (đồng bộ giữa message list và conversation list)
+    private static string FormatChatTime(DateTime utc)
+    {
+        var fixedUtc = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        var vn = TimeZoneInfo.ConvertTimeFromUtc(fixedUtc, GetVnTz());
+        var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, GetVnTz());
+        
+        // Cùng ngày: chỉ hiển thị giờ
+        if (vn.Date == now.Date)
+        {
+            return vn.ToString("HH:mm");
+        }
+        
+        // Hôm qua
+        if (vn.Date == now.Date.AddDays(-1))
+        {
+            return "Hôm qua " + vn.ToString("HH:mm");
+        }
+        
+        // Trong 7 ngày gần đây: hiển thị thứ và giờ
+        if ((now.Date - vn.Date).TotalDays <= 7)
+        {
+            var dayOfWeek = vn.DayOfWeek switch
+            {
+                DayOfWeek.Monday => "Thứ 2",
+                DayOfWeek.Tuesday => "Thứ 3",
+                DayOfWeek.Wednesday => "Thứ 4",
+                DayOfWeek.Thursday => "Thứ 5",
+                DayOfWeek.Friday => "Thứ 6",
+                DayOfWeek.Saturday => "Thứ 7",
+                DayOfWeek.Sunday => "CN",
+                _ => ""
+            };
+            return dayOfWeek + " " + vn.ToString("HH:mm");
+        }
+        
+        // Trong cùng năm: hiển thị ngày/tháng và giờ
+        if (vn.Year == now.Year)
+        {
+            return vn.ToString("dd/MM HH:mm");
+        }
+        
+        // Khác năm: hiển thị đầy đủ
+        return vn.ToString("dd/MM/yyyy HH:mm");
+    }
+
+    // Overload cho DateTimeOffset
+    private static string FormatChatTime(DateTimeOffset dto) => FormatChatTime(dto.UtcDateTime);
+    
+    // Overload cho DateTime? (nullable)
+    private static string FormatChatTime(DateTime? utc)
+    {
+        if (!utc.HasValue) return "";
+        return FormatChatTime(utc.Value);
+    }
+
     // Helper hiển thị trạng thái
     public static Microsoft.AspNetCore.Html.IHtmlContent RenderStatus(MessageStatus status)
     {
@@ -191,7 +247,7 @@
                                 <div class="d-flex">
                                     <div class="fw-semibold text-ellipsis-1">@c.Title</div>
                                     <div class="ms-auto small text-muted conv-time">
-                                        @(c.LastMessageAt.HasValue? HHmmVN(c.LastMessageAt.Value) : "")
+                                        @(c.LastMessageAt.HasValue ? FormatChatTime(c.LastMessageAt.Value) : "")
                                     </div>
                                 </div>
                                 <div class="small text-muted text-ellipsis-1 conv-snippet">@c.LastMessageSnippet</div>
@@ -333,7 +389,7 @@
                                                     style="cursor: pointer !important; pointer-events: auto !important; z-index: 10 !important; position: relative !important;">
                                                 <i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span>
                                             </button>
-                                            <span class="text-muted">@HHmmVN(m.CreatedAt)</span>
+                                            <span class="text-muted">@FormatChatTime(m.CreatedAt)</span>
 
                                             @if (isMe)
                                             {
@@ -1276,6 +1332,95 @@
     <script>
         // ===== Helpers chung cho Chat Customer (giống style Provider) =====
 
+        // Hàm format thời gian thông minh cho chat (đồng bộ với C# FormatChatTime)
+        function __customerFormatChatTime(dateStr) {
+            if (!dateStr) return '';
+
+            const sourceDate = __customerParseIso(dateStr);
+            if (!sourceDate) return '';
+
+            const TZ = 'Asia/Ho_Chi_Minh';
+
+            const formatDateKey = (date) => {
+                const formatted = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: TZ,
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).format(date); // yyyy-mm-dd
+                const [year, month, day] = formatted.split('-').map(Number);
+                return {
+                    key: formatted,
+                    year,
+                    month,
+                    day,
+                    utcMidnightMs: Date.UTC(year, month - 1, day)
+                };
+            };
+
+            const msgDateInfo = formatDateKey(sourceDate);
+            const todayDate = new Date();
+            const todayInfo = formatDateKey(todayDate);
+            const yesterdayInfo = formatDateKey(new Date(todayDate.getTime() - 86400000));
+
+            const timeFormatter = new Intl.DateTimeFormat('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZone: TZ
+            });
+            const hhmm = timeFormatter.format(sourceDate);
+
+            // Cùng ngày: chỉ hiển thị giờ
+            if (msgDateInfo.key === todayInfo.key) {
+                return hhmm;
+            }
+
+            // Hôm qua
+            if (msgDateInfo.key === yesterdayInfo.key) {
+                return 'Hôm qua ' + hhmm;
+            }
+
+            // Khoảng cách ngày theo múi giờ VN
+            const diffDays = Math.round((todayInfo.utcMidnightMs - msgDateInfo.utcMidnightMs) / 86400000);
+            if (diffDays > 0 && diffDays <= 7) {
+                const weekdayKey = new Intl.DateTimeFormat('en-US', {
+                    weekday: 'short',
+                    timeZone: TZ
+                }).format(sourceDate);
+                const dayMap = {
+                    Sun: 'CN',
+                    Mon: 'Thứ 2',
+                    Tue: 'Thứ 3',
+                    Wed: 'Thứ 4',
+                    Thu: 'Thứ 5',
+                    Fri: 'Thứ 6',
+                    Sat: 'Thứ 7'
+                };
+                const dayLabel = dayMap[weekdayKey] || weekdayKey;
+                return dayLabel + ' ' + hhmm;
+            }
+
+            // Trong cùng năm: hiển thị ngày/tháng + giờ
+            if (msgDateInfo.year === todayInfo.year) {
+                const dateFormatterWithinYear = new Intl.DateTimeFormat('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    timeZone: TZ
+                });
+                return dateFormatterWithinYear.format(sourceDate) + ' ' + hhmm;
+            }
+
+            // Khác năm: hiển thị đầy đủ
+            const fullFormatter = new Intl.DateTimeFormat('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                timeZone: TZ
+            });
+            return fullFormatter.format(sourceDate) + ' ' + hhmm;
+        }
+
         // Lấy convId đang mở (lowercase để so sánh)
         function __customerChatGetCurrentConvId() {
             const main = document.querySelector('main.chat-col[data-selected-conv]');
@@ -1592,14 +1737,8 @@
                 const meta = document.createElement('div');
                 meta.className = 'msg-meta text-end small mt-1 d-flex align-items-center justify-content-end gap-2';
 
-                const fmtVN = new Intl.DateTimeFormat('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                    timeZone: 'Asia/Ho_Chi_Minh'
-                });
-                const d = new Date(createdAt);
-                const hhmm = isNaN(d) ? '' : fmtVN.format(d);
+                // Format thời gian đồng bộ với C# FormatChatTime
+                const formattedTime = __customerFormatChatTime(createdAt);
 
                 meta.innerHTML =
                     '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted reply-btn"'
@@ -1612,7 +1751,7 @@
                         + ' z-index: 10 !important; position: relative !important;">'
                         + '<i class="bi bi-reply"></i> <span class="d-none d-md-inline">Reply</span>'
                     + '</button>'
-                    + '<span class="text-muted">' + hhmm + '</span>'
+                    + '<span class="text-muted">' + formattedTime + '</span>'
                     + (isMine ? __customerStatusHtml(status) : '');
 
                 bubble.appendChild(meta);
@@ -1653,14 +1792,8 @@
                 const timeEl = row.querySelector('.conv-time');
                 const lastAt = item.lastMessageAt ?? item.LastMessageAt;
                 if (timeEl && lastAt) {
-                    const d2 = new Date(lastAt);
-                    const fmtVN2 = new Intl.DateTimeFormat('vi-VN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false,
-                        timeZone: 'Asia/Ho_Chi_Minh'
-                    });
-                    timeEl.textContent = isNaN(d2) ? '' : fmtVN2.format(d2);
+                    // Format thời gian đồng bộ với C# FormatChatTime
+                    timeEl.textContent = __customerFormatChatTime(lastAt);
                 }
 
                 let badge = row.querySelector('.conv-unread');
@@ -1699,13 +1832,8 @@
                     ? payload.total
                     : (typeof payload === 'number' ? payload : 0);
 
-                if (total > 0) {
-                    badge.style.display = 'inline-block';
-                    badge.textContent = total;
-                } else {
-                    badge.style.display = 'none';
-                    badge.textContent = '';
-                }
+                badge.style.display = 'inline-block';
+                badge.textContent = total.toString();
             });
 
             // Re-markRead sau reconnect

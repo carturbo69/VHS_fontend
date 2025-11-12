@@ -56,7 +56,7 @@
                     <a asp-controller="Account" asp-action="Login" class="link">Đăng nhập</a>
                 </p>
 
-                <form asp-controller="Account" asp-action="Register" method="post" class="form" novalidate>
+                <form asp-controller="Account" asp-action="Register" method="post" class="form" novalidate data-reset-on-reload="true">
                     @Html.AntiForgeryToken()
 
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -362,6 +362,286 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
+        // Hàm xóa account chưa kích hoạt - định nghĩa sớm để dùng ở nhiều nơi
+        async function deleteUnactivatedAccount(email) {
+          // Nếu không có email, lấy từ sessionStorage
+          let emailToDelete = email;
+          if (!emailToDelete || !emailToDelete.trim()) {
+            emailToDelete = sessionStorage.getItem('pendingActivationEmail');
+          }
+          
+          if (!emailToDelete || !emailToDelete.trim()) {
+            console.warn('[Delete Account] No email provided and not found in sessionStorage');
+            return;
+          }
+          
+          emailToDelete = emailToDelete.trim();
+          console.log('[Delete Account] Attempting to delete account for email:', emailToDelete);
+          
+          try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+            const url = '@Url.Action("DeleteUnactivatedAccount", "Account")';
+            
+            console.log('[Delete Account] Calling API:', url);
+            
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': token
+              },
+              body: JSON.stringify({ email: emailToDelete })
+            });
+            
+            console.log('[Delete Account] Response status:', response.status);
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('[Delete Account] API error:', response.status, errorText);
+              return;
+            }
+            
+            const result = await response.json();
+            if (result?.success) {
+              console.log('[Delete Account] ✅ Account deleted successfully:', emailToDelete);
+              // Xóa email khỏi sessionStorage sau khi xóa thành công
+              sessionStorage.removeItem('pendingActivationEmail');
+            } else {
+              console.warn('[Delete Account] ⚠️ Failed to delete:', result?.message || 'Unknown error');
+            }
+          } catch (error) {
+            console.error('[Delete Account] ❌ Exception:', error);
+          }
+        }
+
+        (function () {
+            function navigationIsReload() {
+                if (typeof performance === 'undefined') return false;
+                if (typeof performance.getEntriesByType === 'function') {
+                    const entries = performance.getEntriesByType('navigation');
+                    if (entries && entries.length > 0) {
+                        return entries[0].type === 'reload';
+                    }
+                }
+                if (performance.navigation) {
+                    return performance.navigation.type === 1;
+                }
+                return false;
+            }
+
+            function resetOtpModalState() {
+                const otpModal = document.getElementById('otpModal');
+                if (otpModal) {
+                    // Lấy email từ sessionStorage (đã lưu khi mở modal)
+                    const emailFromStorage = sessionStorage.getItem('pendingActivationEmail');
+                    
+                    if (emailFromStorage && emailFromStorage.trim()) {
+                      console.log('[Reset OTP Modal] Found email in sessionStorage:', emailFromStorage);
+                      deleteUnactivatedAccount(emailFromStorage);
+                    } else {
+                      // Fallback: lấy từ nhiều nguồn
+                      let emailToDelete = null;
+                      
+                      // Ưu tiên lấy từ hiddenOtpEmail (từ server, không bị reset)
+                      const hiddenEmail = document.getElementById('hiddenOtpEmail')?.value;
+                      if (hiddenEmail && hiddenEmail.trim()) {
+                        emailToDelete = hiddenEmail.trim();
+                      } else {
+                        // Fallback: lấy từ otpEmail input
+                        const otpEmail = document.getElementById('otpEmail')?.value;
+                        if (otpEmail && otpEmail.trim()) {
+                          emailToDelete = otpEmail.trim();
+                        } else {
+                          // Fallback cuối: lấy từ otpEmailDisplay
+                          const otpEmailDisplay = document.getElementById('otpEmailDisplay')?.textContent;
+                          if (otpEmailDisplay && otpEmailDisplay.trim()) {
+                            emailToDelete = otpEmailDisplay.trim();
+                          }
+                        }
+                      }
+                      
+                      if (emailToDelete) {
+                        console.log('[Reset OTP Modal] Deleting account for email (from fallback):', emailToDelete);
+                        deleteUnactivatedAccount(emailToDelete);
+                      }
+                    }
+                    
+                    otpModal.classList.remove('show');
+                    otpModal.setAttribute('hidden', '');
+                }
+
+                const otpDigits = document.querySelectorAll('#otpModal .otp-digit');
+                otpDigits.forEach(input => {
+                    input.value = '';
+                    input.classList.remove('filled');
+                    input.disabled = false;
+                    input.style.opacity = '';
+                    input.style.cursor = '';
+                });
+
+                const otpCode = document.getElementById('otpCode');
+                if (otpCode) otpCode.value = '';
+
+                const otpEmailEl = document.getElementById('otpEmail');
+                if (otpEmailEl) otpEmailEl.value = '';
+
+                const otpError = document.getElementById('otpError');
+                if (otpError) {
+                    otpError.textContent = '';
+                    otpError.style.display = 'none';
+                }
+
+                const otpSuccess = document.getElementById('otpSuccess');
+                if (otpSuccess) {
+                    otpSuccess.innerHTML = '';
+                    otpSuccess.style.display = 'none';
+                }
+
+                const otpInputsWrap = document.getElementById('otpInputs');
+                if (otpInputsWrap) otpInputsWrap.style.display = '';
+
+                const btnActivate = document.getElementById('btnActivate');
+                if (btnActivate) {
+                    btnActivate.disabled = true;
+                    btnActivate.style.opacity = '0.6';
+                    btnActivate.classList.remove('btn-primary');
+                    btnActivate.style.display = '';
+                }
+
+                const btnResend = document.getElementById('btnResendOTP');
+                if (btnResend) {
+                    btnResend.disabled = true;
+                    btnResend.style.opacity = '0.5';
+                    btnResend.style.display = '';
+                }
+
+                const otpTimer = document.getElementById('otpTimer');
+                if (otpTimer) {
+                    otpTimer.innerHTML = 'Mã OTP còn hiệu lực trong: <span id="otpCountdown" style="color: #1abc9c;">02:00</span>';
+                }
+
+                sessionStorage.removeItem('otpModalShown');
+                document.body.style.overflow = '';
+            }
+
+            function clearValidationMessages(form) {
+                const summary = form.querySelector('.validation-summary');
+                if (summary) {
+                    summary.innerHTML = '';
+                    summary.style.display = 'none';
+                    summary.classList.remove('validation-summary-errors');
+                }
+
+                form.querySelectorAll('[data-valmsg-for], .field-error').forEach(msg => {
+                    msg.textContent = '';
+                    if (msg.style) msg.style.display = 'none';
+                    msg.classList.remove('field-validation-error', 'text-danger');
+                });
+            }
+
+            function resetForms() {
+                const forms = document.querySelectorAll('form[data-reset-on-reload="true"]');
+                if (!forms.length) return;
+
+                forms.forEach(form => {
+                    form.reset();
+
+                    form.querySelectorAll('input, textarea, select').forEach(field => {
+                        if (field.type === 'hidden' || field.getAttribute('data-preserve') === 'true') {
+                            return;
+                        }
+
+                        if (field.type === 'checkbox' || field.type === 'radio') {
+                            field.checked = field.defaultChecked;
+                        } else {
+                            field.value = '';
+                        }
+
+                        field.classList.remove('is-invalid', 'is-valid');
+                    });
+
+                    clearValidationMessages(form);
+                });
+
+                const authCard = document.querySelector('.auth-card');
+                if (authCard) authCard.classList.remove('has-error');
+
+                // Chỉ reset OTP modal nếu không có TempData ShowOTPModal
+                // (Nếu có TempData, modal cần được hiển thị)
+                const hasOtpModalToShow = document.getElementById('hiddenOtpEmail') !== null;
+                if (!hasOtpModalToShow) {
+                    resetOtpModalState();
+                }
+            }
+
+            function handleResetIfNeeded() {
+                // Kiểm tra xem có lỗi validation từ POST không
+                const hasValidationErrors = document.querySelector('.validation-summary-errors')?.textContent.trim().length > 0 ||
+                                           Array.from(document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess)')).some(el => el.textContent.trim().length > 0);
+                
+                // Kiểm tra xem có cần hiển thị OTP modal không
+                const hasOtpModalToShow = document.getElementById('hiddenOtpEmail') !== null;
+                
+                // Nếu không có lỗi validation và không có OTP modal cần hiển thị, clear form
+                // (Nếu có OTP modal, giữ lại form để user có thể nhập OTP)
+                if (!hasValidationErrors && !hasOtpModalToShow) {
+                    resetForms();
+                } else if (!hasValidationErrors && hasOtpModalToShow) {
+                    // Chỉ clear form fields, không reset OTP modal
+                    const forms = document.querySelectorAll('form[data-reset-on-reload="true"]');
+                    forms.forEach(form => {
+                        form.reset();
+                        form.querySelectorAll('input, textarea, select').forEach(field => {
+                            if (field.type === 'hidden' || field.getAttribute('data-preserve') === 'true' || field.id === 'hiddenOtpEmail') {
+                                return;
+                            }
+                            if (field.type === 'checkbox' || field.type === 'radio') {
+                                field.checked = field.defaultChecked;
+                            } else {
+                                field.value = '';
+                            }
+                            field.classList.remove('is-invalid', 'is-valid');
+                        });
+                        clearValidationMessages(form);
+                    });
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', handleResetIfNeeded);
+            window.addEventListener('pageshow', function (event) {
+                // Clear form khi back/forward hoặc reload từ cache
+                if (event.persisted || event.type === 'pageshow') {
+                    const hasValidationErrors = document.querySelector('.validation-summary-errors')?.textContent.trim().length > 0 ||
+                                               Array.from(document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess)')).some(el => el.textContent.trim().length > 0);
+                    
+                    const hasOtpModalToShow = document.getElementById('hiddenOtpEmail') !== null;
+                    
+                    // Chỉ reset nếu không có lỗi validation và không có OTP modal cần hiển thị
+                    if (!hasValidationErrors && !hasOtpModalToShow) {
+                        resetForms();
+                    } else if (!hasValidationErrors && hasOtpModalToShow) {
+                        // Chỉ clear form fields, không reset OTP modal
+                        const forms = document.querySelectorAll('form[data-reset-on-reload="true"]');
+                        forms.forEach(form => {
+                            form.reset();
+                            form.querySelectorAll('input, textarea, select').forEach(field => {
+                                if (field.type === 'hidden' || field.getAttribute('data-preserve') === 'true' || field.id === 'hiddenOtpEmail') {
+                                    return;
+                                }
+                                if (field.type === 'checkbox' || field.type === 'radio') {
+                                    field.checked = field.defaultChecked;
+                                } else {
+                                    field.value = '';
+                                }
+                                field.classList.remove('is-invalid', 'is-valid');
+                            });
+                            clearValidationMessages(form);
+                        });
+                    }
+                }
+            });
+        })();
+
         // Smooth page transition khi chuyển trang
         (function() {
             // Thêm fade out khi click vào link đăng ký/đăng nhập
@@ -433,8 +713,10 @@
                 }
               });
               
-              // Nếu là GET request (reload), chỉ xóa validation messages, giữ nguyên dữ liệu form
-              // Không reset form để người dùng có thể tiếp tục điền form sau khi reload
+              // Nếu là GET request (reload), clear form và validation messages
+              if (!isPostRequest) {
+                resetForms();
+              }
             } else {
               // Có lỗi từ POST request - giữ lại và thêm animation
               if (hasSummaryErrors) {
@@ -521,6 +803,10 @@
                 if (otpEmailDisplay) {
                   otpEmailDisplay.textContent = pendingEmail;
                 }
+                
+                // Lưu email vào sessionStorage để dùng khi xóa account
+                sessionStorage.setItem('pendingActivationEmail', pendingEmail);
+                console.log('[OTP Modal] Email saved to sessionStorage:', pendingEmail);
                 
                 // Mở modal bằng cách thủ công (không phụ thuộc vào hàm openModal)
                 otpModal.removeAttribute('hidden');
@@ -785,6 +1071,9 @@
               // Ẩn error message nếu có
               errorEl.style.display = 'none';
               
+              // Xóa email khỏi sessionStorage vì đã kích hoạt thành công
+              sessionStorage.removeItem('pendingActivationEmail');
+              
               // Hiển thị success message trong modal với style rõ ràng
               successEl.innerHTML = '<div style="display: flex; align-items: center; gap: 8px; color: #16a085; font-weight: 600;"><svg style="width: 20px; height: 20px; fill: #16a085;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Tài khoản đã được kích hoạt thành công!</div>';
               successEl.style.display = 'block';
@@ -811,9 +1100,64 @@
                 window.location.href = '@Url.Action("Login", "Account")?activated=true';
               }, 800);
             } else {
-              // Hiển thị lỗi
-              errorEl.textContent = result.message || 'OTP không hợp lệ hoặc đã hết hạn.';
+              const parseMaybeJson = (value) => {
+                if (!value || typeof value !== 'string') return null;
+                try {
+                  const parsed = JSON.parse(value);
+                  return parsed && typeof parsed === 'object' ? parsed : null;
+                } catch (_) {
+                  return null;
+                }
+              };
+
+              const extractMessage = (payload) => {
+                if (!payload) return null;
+
+                if (typeof payload === 'string') {
+                  const parsed = parseMaybeJson(payload);
+                  if (parsed) return extractMessage(parsed) ?? null;
+                  return payload;
+                }
+
+                if (typeof payload === 'object') {
+                  const rawMessage = payload.message ?? payload.Message ?? null;
+                  if (typeof rawMessage === 'string') {
+                    const nested = parseMaybeJson(rawMessage);
+                    return nested ? extractMessage(nested) ?? null : rawMessage;
+                  }
+
+                  if (rawMessage) {
+                    return extractMessage(rawMessage);
+                  }
+                }
+
+                return null;
+              };
+
+              const message = extractMessage(result) || 'OTP không hợp lệ hoặc đã hết hạn.';
+
+              errorEl.textContent = message;
               errorEl.style.display = 'block';
+              
+              // Xóa account chưa kích hoạt khi OTP sai
+              // Lấy email từ nhiều nguồn để đảm bảo
+              let emailToDelete = email;
+              if (!emailToDelete || !emailToDelete.trim()) {
+                const hiddenEmail = document.getElementById('hiddenOtpEmail')?.value;
+                if (hiddenEmail && hiddenEmail.trim()) {
+                  emailToDelete = hiddenEmail.trim();
+                } else {
+                  const otpEmailDisplay = document.getElementById('otpEmailDisplay')?.textContent;
+                  if (otpEmailDisplay && otpEmailDisplay.trim()) {
+                    emailToDelete = otpEmailDisplay.trim();
+                  }
+                }
+              }
+              
+              if (emailToDelete && emailToDelete.trim()) {
+                console.log('[OTP Wrong] Deleting account for email:', emailToDelete);
+                deleteUnactivatedAccount(emailToDelete);
+              }
               
               // Clear OTP inputs
               document.querySelectorAll('.otp-digit').forEach(input => {
@@ -886,6 +1230,29 @@
               // Enable resend button
               btnResend.disabled = false;
               btnResend.style.opacity = '1';
+              
+              // Xóa account chưa kích hoạt khi OTP hết hạn
+              const emailFromStorage = sessionStorage.getItem('pendingActivationEmail');
+              if (emailFromStorage && emailFromStorage.trim()) {
+                console.log('[OTP Expired] Deleting account for email from sessionStorage:', emailFromStorage);
+                deleteUnactivatedAccount(emailFromStorage);
+              } else {
+                // Fallback
+                let emailToDelete = null;
+                const hiddenEmail = document.getElementById('hiddenOtpEmail')?.value;
+                if (hiddenEmail && hiddenEmail.trim()) {
+                  emailToDelete = hiddenEmail.trim();
+                } else {
+                  const otpEmail = document.getElementById('otpEmail')?.value;
+                  if (otpEmail && otpEmail.trim()) {
+                    emailToDelete = otpEmail.trim();
+                  }
+                }
+                if (emailToDelete) {
+                  console.log('[OTP Expired] Deleting account for email (from fallback):', emailToDelete);
+                  deleteUnactivatedAccount(emailToDelete);
+                }
+              }
             }
           }, 1000);
         }
@@ -1019,10 +1386,51 @@
           const el = document.getElementById(id);
           if (!el) return;
           
-          // Nếu đóng OTP modal, clear timer
-          if (id === 'otpModal' && otpTimerInterval) {
-            clearInterval(otpTimerInterval);
-            otpTimerInterval = null;
+          // Nếu đóng OTP modal, xóa account chưa kích hoạt và clear timer
+          if (id === 'otpModal') {
+            // Lấy email từ sessionStorage (đã lưu khi mở modal)
+            const emailFromStorage = sessionStorage.getItem('pendingActivationEmail');
+            
+            if (emailFromStorage && emailFromStorage.trim()) {
+              console.log('[Close Modal] Found email in sessionStorage:', emailFromStorage);
+              deleteUnactivatedAccount(emailFromStorage);
+            } else {
+              // Fallback: lấy từ nhiều nguồn
+              let emailToDelete = null;
+              
+              // Ưu tiên lấy từ hiddenOtpEmail (từ server, không bị reset)
+              const hiddenEmail = document.getElementById('hiddenOtpEmail')?.value;
+              if (hiddenEmail && hiddenEmail.trim()) {
+                emailToDelete = hiddenEmail.trim();
+              } else {
+                // Fallback: lấy từ otpEmail input
+                const otpEmail = document.getElementById('otpEmail')?.value;
+                if (otpEmail && otpEmail.trim()) {
+                  emailToDelete = otpEmail.trim();
+                } else {
+                  // Fallback cuối: lấy từ otpEmailDisplay
+                  const otpEmailDisplay = document.getElementById('otpEmailDisplay')?.textContent;
+                  if (otpEmailDisplay && otpEmailDisplay.trim()) {
+                    emailToDelete = otpEmailDisplay.trim();
+                  }
+                }
+              }
+              
+              if (emailToDelete) {
+                console.log('[Close Modal] Deleting account for email (from fallback):', emailToDelete);
+                deleteUnactivatedAccount(emailToDelete);
+              } else {
+                console.warn('[Close Modal] No email found to delete account');
+              }
+            }
+            
+            if (otpTimerInterval) {
+              clearInterval(otpTimerInterval);
+              otpTimerInterval = null;
+            }
+            
+            // Xóa session storage
+            sessionStorage.removeItem('otpModalShown');
           }
           
           try { el.classList.remove('show'); } catch(_){}

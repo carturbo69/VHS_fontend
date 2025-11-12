@@ -189,6 +189,8 @@
                         </div>
                         <!-- Hidden inputs for removed images -->
                         <div id="removedImagesContainer"></div>
+                        <!-- Hidden input to store current images (for keeping old images when no new images are uploaded) -->
+                        <input type="hidden" id="currentImagesData" value="@currentImageUrl" />
                         <div class="file-input-wrapper">
                             <input name="Images" type="file" id="imageInputEdit" class="form-control mt-3" accept="image/*" multiple />
                         </div>
@@ -739,6 +741,51 @@
                     removeOptionFromList(optionId, optionName);
                 });
             });
+
+            // Handle form submit to ensure old images are preserved when no new images are uploaded
+            const editForm = document.getElementById('editServiceForm');
+            if (editForm) {
+                editForm.addEventListener('submit', function(e) {
+                    const imageInput = document.getElementById('imageInputEdit');
+                    const currentImagesData = document.getElementById('currentImagesData');
+                    const removedImagesContainer = document.getElementById('removedImagesContainer');
+                    
+                    // Get current images list
+                    const currentImagesStr = currentImagesData ? currentImagesData.value : '';
+                    const currentImages = currentImagesStr 
+                        ? currentImagesStr.split(',').map(img => img.trim()).filter(img => img.length > 0)
+                        : [];
+                    
+                    // Get removed images list
+                    const removedInputs = removedImagesContainer ? removedImagesContainer.querySelectorAll('input[name="RemoveImages"]') : [];
+                    const removedImages = Array.from(removedInputs).map(input => input.value.trim()).filter(img => img.length > 0);
+                    
+                    // Calculate remaining images (current - removed)
+                    const remainingImages = currentImages.filter(img => !removedImages.includes(img));
+                    
+                    // Check if there are new images being uploaded
+                    const hasNewImages = imageInput && imageInput.files && imageInput.files.length > 0;
+                    
+                    // If no new images are uploaded, send the remaining images as KeepImages
+                    // This ensures backend knows which old images to preserve
+                    if (!hasNewImages && remainingImages.length > 0) {
+                        // Remove any existing KeepImages inputs
+                        const existingKeepImages = document.querySelectorAll('input[name="KeepImages"]');
+                        existingKeepImages.forEach(input => input.remove());
+                        
+                        // Add hidden inputs for images to keep
+                        remainingImages.forEach(imgPath => {
+                            if (imgPath && imgPath.trim().length > 0) {
+                                const hiddenInput = document.createElement('input');
+                                hiddenInput.type = 'hidden';
+                                hiddenInput.name = 'KeepImages';
+                                hiddenInput.value = imgPath.trim();
+                                removedImagesContainer.appendChild(hiddenInput);
+                            }
+                        });
+                    }
+                });
+            }
         });
     </script>
     

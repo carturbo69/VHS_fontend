@@ -131,7 +131,8 @@ namespace VHS_frontend.Controllers
             TempData["ShowOTPModal"] = true;
             TempData["RegisterMessage"] = result.Message ?? "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP.";
 
-            return View(model); // Giữ lại view để hiển thị modal OTP
+            // PRG Pattern: Redirect để tránh thông báo "Resubmit the form?" khi reload
+            return RedirectToAction(nameof(Register));
         }
 
         [HttpPost]
@@ -144,7 +145,24 @@ namespace VHS_frontend.Controllers
                 TempData.Remove("ShowOTPModal"); // Xóa TempData để tránh hiển thị lại khi reload
                 return Json(new { success = true, message = result.Message });
             }
-            return Json(new { success = false, message = result?.Message ?? "Kích hoạt thất bại." });
+            
+            // Nếu OTP sai, xóa account chưa kích hoạt
+            await _authService.DeleteUnactivatedAccountAsync(dto.Email);
+            
+            return Json(new { success = false, message = result?.Message ?? "OTP không hợp lệ hoặc tài khoản không tồn tại." });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteUnactivatedAccount([FromBody] ResendOTPDTO dto)
+        {
+            var result = await _authService.DeleteUnactivatedAccountAsync(dto.Email);
+            if (result?.Success == true)
+            {
+                HttpContext.Session.Remove("PendingActivationEmail");
+                TempData.Remove("ShowOTPModal");
+                return Json(new { success = true, message = result.Message ?? "Tài khoản đã được xóa." });
+            }
+            return Json(new { success = false, message = result?.Message ?? "Không thể xóa tài khoản." });
         }
 
         [HttpPost]

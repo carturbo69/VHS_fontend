@@ -155,6 +155,16 @@ namespace VHS_frontend.Services.Provider
                 }
             }
 
+            // Add KeepImages - danh sách ảnh cũ cần giữ lại khi không có ảnh mới
+            if (dto.KeepImages != null && dto.KeepImages.Count > 0)
+            {
+                foreach (var path in dto.KeepImages)
+                {
+                    if (string.IsNullOrWhiteSpace(path)) continue;
+                    formContent.Add(new StringContent(path), "KeepImages");
+                }
+            }
+
             // Add TagIds
             foreach (var tagId in dto.TagIds)
             {
