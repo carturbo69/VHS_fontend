@@ -178,13 +178,13 @@
                                         @if (!string.IsNullOrEmpty(booking.PaymentStatus))
                                         {
                                             <br />
-                                            <span class="badge payment-badge payment-@(booking.PaymentStatus.ToLower())" style="color: #000000 !important; font-weight: 800 !important;">
+                                            <span class="badge payment-badge payment-@(booking.PaymentStatus.ToLower().Replace(" ", "-"))" style="color: #000000 !important; font-weight: 800 !important;">
                                                 @GetPaymentStatusText(booking.PaymentStatus)
                                             </span>
                                         }
                                     </td>
                                     <td>
-                                        <span class="badge status-badge status-@booking.Status.ToLower()" style="color: #000000 !important; font-weight: 800 !important;">
+                                        <span class="badge status-badge status-@(booking.Status.ToLower().Replace(" ", "-"))" style="color: #000000 !important; font-weight: 800 !important;">
                                             @GetStatusText(booking.Status)
                                         </span>
                                     </td>
@@ -323,32 +323,116 @@
         .dark .order-table tbody td .payment-badge {
             color: #ffffff !important;
         }
+        
+        /* Allow status and payment badges to wrap text */
+        .order-table tbody td {
+            white-space: normal !important;
+            word-wrap: break-word;
+        }
+        
+        .order-table .badge.status-badge,
+        .order-table .badge.payment-badge {
+            white-space: normal !important;
+            word-wrap: break-word;
+            display: inline-block;
+            max-width: 100%;
+            line-height: 1.4;
+            text-align: center;
+        }
+        
+        /* Ensure table cells can wrap */
+        .order-table td {
+            vertical-align: middle;
+        }
+        
+        /* Service Completed Status Badge - Màu xanh dương nhạt để phân biệt với Completed */
+        .order-management-container .order-table tbody td .badge.status-badge.status-service-completed,
+        .order-management-container .order-table tbody td .status-badge.status-service-completed,
+        .order-management-container .order-table .badge.status-badge.status-service-completed,
+        .order-management-container .order-table .status-badge.status-service-completed,
+        .order-table tbody td .badge.status-badge.status-service-completed,
+        .order-table tbody td .status-badge.status-service-completed,
+        .order-table .badge.status-badge.status-service-completed,
+        .order-table .status-badge.status-service-completed {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%) !important;
+            color: #000000 !important;
+            border: 1px solid #6366f1 !important;
+            font-weight: 800 !important;
+        }
+        
+        /* Dark mode for Service Completed */
+        .dark .order-management-container .order-table tbody td .badge.status-badge.status-service-completed,
+        .dark .order-management-container .order-table tbody td .status-badge.status-service-completed,
+        .dark .order-management-container .order-table .badge.status-badge.status-service-completed,
+        .dark .order-management-container .order-table .status-badge.status-service-completed,
+        .dark .order-table tbody td .badge.status-badge.status-service-completed,
+        .dark .order-table tbody td .status-badge.status-service-completed,
+        .dark .order-table .badge.status-badge.status-service-completed,
+        .dark .order-table .status-badge.status-service-completed {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(79, 70, 229, 0.25) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(99, 102, 241, 0.6) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3) !important;
+        }
+        
+        /* Payment Rejected Badge */
+        .order-table .payment-badge.payment-rejected,
+        .order-table tbody td .payment-badge.payment-rejected {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%) !important;
+            color: #000000 !important;
+            border: 1px solid #ef4444 !important;
+            font-weight: 800 !important;
+        }
+        
+        .dark .order-table .payment-badge.payment-rejected,
+        .dark .order-table tbody td .payment-badge.payment-rejected {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.25) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(239, 68, 68, 0.6) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3) !important;
+        }
     </style>
 }
 
 @functions {
     string GetStatusText(string status)
     {
-        var statusLower = status?.ToLower() ?? "";
+        if (string.IsNullOrWhiteSpace(status))
+            return "Chưa xác định";
+            
+        var statusLower = status.Trim().ToLower();
         return statusLower switch
         {
-            "pending" => "Chờ xử lý",
+            "pending" => "Đang chờ xử lý",
             "confirmed" => "Đã xác nhận",
             "completed" => "Hoàn thành",
+            "service completed" or "service-completed" => "Xác nhận hoàn thành",
             "canceled" or "cancelled" => "Đã hủy",
-            _ => status ?? "Chưa xác định"
+            "inprogress" or "in progress" or "in-progress" => "Đang xử lý",
+            "processing" => "Đang xử lý",
+            "rejected" => "Đã từ chối",
+            "refunded" => "Đã hoàn tiền",
+            _ => status // Giữ nguyên nếu không khớp, nhưng nên được xử lý ở backend
         };
     }
 
     string GetPaymentStatusText(string paymentStatus)
     {
-        var statusLower = paymentStatus?.ToLower() ?? "";
+        if (string.IsNullOrWhiteSpace(paymentStatus))
+            return "Chưa xác định";
+            
+        var statusLower = paymentStatus.Trim().ToLower();
         return statusLower switch
         {
             "paid" => "Đã thanh toán",
             "unpaid" => "Chưa thanh toán",
             "pending" => "Chờ thanh toán",
-            _ => paymentStatus ?? "Chưa xác định"
+            "refunded" => "Đã hoàn tiền",
+            "waiting for payment" or "waiting-for-payment" => "Chờ thanh toán",
+            "rejected" => "Đã từ chối",
+            _ => paymentStatus // Giữ nguyên nếu không khớp
         };
     }
 }

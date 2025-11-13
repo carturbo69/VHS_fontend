@@ -247,12 +247,21 @@
                 </div>
                 <div class="card-body">
                     <div class="text-center mb-3">
-                        <span class="status-badge-lg status-@Model.Status.ToLower()">
+                        <span class="status-badge-lg status-@(Model.Status.ToLower().Replace(" ", "-"))">
                             @GetStatusText(Model.Status)
                         </span>
                     </div>
 
-                    @if (Model.Status == "Confirmed")
+                    @{
+                        var statusNorm = (Model.Status ?? string.Empty).Trim();
+                        bool isConfirmed = string.Equals(statusNorm, "Confirmed", StringComparison.OrdinalIgnoreCase);
+                        bool isCompleted = string.Equals(statusNorm, "Completed", StringComparison.OrdinalIgnoreCase);
+                        bool isServiceCompleted = string.Equals(statusNorm, "Service Completed", StringComparison.OrdinalIgnoreCase) || 
+                                                 string.Equals(statusNorm, "Service-Completed", StringComparison.OrdinalIgnoreCase);
+                        bool isCanceled = string.Equals(statusNorm, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+                                          string.Equals(statusNorm, "Cancelled", StringComparison.OrdinalIgnoreCase);
+                    }
+                    @if (isConfirmed)
                     {
                         <div class="alert alert-info">
                             <i class="bi bi-info-circle"></i>
@@ -262,7 +271,7 @@
                             </p>
                         </div>
                     }
-                    else if (Model.Status == "Completed")
+                    else if (isCompleted || isServiceCompleted)
                     {
                         <div class="alert alert-success">
                             <i class="bi bi-check-circle-fill"></i>
@@ -272,7 +281,7 @@
                             </p>
                         </div>
                     }
-                    else if (Model.Status == "Canceled")
+                    else if (isCanceled)
                     {
                         <div class="alert alert-danger">
                             <h5 class="alert-heading">
@@ -326,8 +335,28 @@
                         </div>
                         <div class="d-flex justify-content-between">
                             <span>Trạng thái:</span>
-                            <span class="badge bg-@(Model.PaymentStatus == "Paid" ? "success" : "warning")">
-                                @(Model.PaymentStatus ?? "Chưa thanh toán")
+                            @{
+                                var paymentStatusClass = "unpaid";
+                                var paymentStatusLower = Model.PaymentStatus?.ToLower() ?? "";
+                                if (paymentStatusLower.Contains("paid") || paymentStatusLower.Contains("đã"))
+                                {
+                                    paymentStatusClass = "paid";
+                                }
+                                else if (paymentStatusLower.Contains("rejected") || paymentStatusLower.Contains("từ chối"))
+                                {
+                                    paymentStatusClass = "rejected";
+                                }
+                                else if (paymentStatusLower.Contains("refunded") || paymentStatusLower.Contains("hoàn tiền"))
+                                {
+                                    paymentStatusClass = "refunded";
+                                }
+                                else if (paymentStatusLower.Contains("unpaid") || paymentStatusLower.Contains("chưa") || paymentStatusLower.Contains("pending"))
+                                {
+                                    paymentStatusClass = "unpaid";
+                                }
+                            }
+                            <span class="badge payment-status-badge payment-@(paymentStatusClass.Replace(" ", "-"))">
+                                @GetPaymentStatusText(Model.PaymentStatus)
                             </span>
                         </div>
                         @if (Model.PaymentDate.HasValue)
@@ -346,20 +375,168 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/booking-management.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
+    <style>
+        /* Status Pending Badge - Vàng (Chờ xử lý) */
+        .status-badge-lg.status-pending {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid #b45309 !important;
+            font-weight: 800 !important;
+            box-shadow: 0 1px 3px rgba(245, 158, 11, 0.3) !important;
+        }
+        
+        .dark .status-badge-lg.status-pending {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.5) 0%, rgba(217, 119, 6, 0.45) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(245, 158, 11, 1) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 6px rgba(245, 158, 11, 0.5) !important;
+        }
+        
+        /* Service Completed Status Badge - Xanh dương nhạt (Xác nhận hoàn thành) */
+        .status-badge-lg.status-service-completed {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%) !important;
+            color: #000000 !important;
+            border: 2px solid #6366f1 !important;
+            font-weight: 800 !important;
+            box-shadow: 0 1px 3px rgba(99, 102, 241, 0.3) !important;
+        }
+        
+        /* Dark mode for Service Completed */
+        .dark .status-badge-lg.status-service-completed {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(79, 70, 229, 0.25) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(99, 102, 241, 0.6) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3) !important;
+        }
+        
+        /* Payment Paid Badge - Xanh lá (Đã thanh toán) */
+        .payment-status-badge.payment-paid {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid #047857 !important;
+            font-weight: 800 !important;
+            box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3) !important;
+        }
+        
+        .dark .payment-status-badge.payment-paid {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.5) 0%, rgba(5, 150, 105, 0.45) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(16, 185, 129, 1) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.5) !important;
+        }
+        
+        /* Payment Unpaid Badge - Đỏ (Chưa thanh toán) */
+        .payment-status-badge.payment-unpaid {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid #b91c1c !important;
+            font-weight: 800 !important;
+            box-shadow: 0 1px 3px rgba(239, 68, 68, 0.3) !important;
+        }
+        
+        .dark .payment-status-badge.payment-unpaid {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.5) 0%, rgba(220, 38, 38, 0.45) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(239, 68, 68, 1) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5) !important;
+        }
+        
+        /* Payment Pending Badge - Vàng (Chờ thanh toán) */
+        .payment-status-badge.payment-pending {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid #b45309 !important;
+            font-weight: 800 !important;
+            box-shadow: 0 1px 3px rgba(245, 158, 11, 0.3) !important;
+        }
+        
+        .dark .payment-status-badge.payment-pending {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.5) 0%, rgba(217, 119, 6, 0.45) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(245, 158, 11, 1) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 6px rgba(245, 158, 11, 0.5) !important;
+        }
+        
+        /* Payment Rejected Badge - Đỏ đậm (Đã từ chối) */
+        .payment-status-badge.payment-rejected {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid #991b1b !important;
+            font-weight: 800 !important;
+            box-shadow: 0 1px 3px rgba(220, 38, 38, 0.3) !important;
+        }
+        
+        .dark .payment-status-badge.payment-rejected {
+            background: linear-gradient(135deg, rgba(220, 38, 38, 0.5) 0%, rgba(185, 28, 28, 0.45) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(220, 38, 38, 1) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 6px rgba(220, 38, 38, 0.5) !important;
+        }
+        
+        /* Payment Refunded Badge - Cam (Đã hoàn tiền) */
+        .payment-status-badge.payment-refunded {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid #92400e !important;
+            font-weight: 800 !important;
+            box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3) !important;
+        }
+        
+        .dark .payment-status-badge.payment-refunded {
+            background: linear-gradient(135deg, rgba(217, 119, 6, 0.5) 0%, rgba(180, 83, 9, 0.45) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(217, 119, 6, 1) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 6px rgba(217, 119, 6, 0.5) !important;
+        }
+    </style>
 }
 
 @functions {
     string GetStatusText(string status)
     {
-        return status switch
+        if (string.IsNullOrWhiteSpace(status))
+            return "Chưa xác định";
+            
+        var statusLower = status.Trim().ToLower();
+        return statusLower switch
         {
-            "Pending" => "Chờ xử lý",
-            "PendingPayment" => "Chờ xử lý",
-            "Processing" => "Chờ xử lý",
-            "Confirmed" => "Đã xác nhận",
-            "Completed" => "Hoàn thành",
-            "Canceled" => "Đã hủy",
+            "pending" => "Đang chờ xử lý",
+            "pendingpayment" => "Đang chờ xử lý",
+            "confirmed" => "Đã xác nhận",
+            "completed" => "Hoàn thành",
+            "service completed" or "service-completed" => "Xác nhận hoàn thành",
+            "canceled" or "cancelled" => "Đã hủy",
+            "inprogress" or "in progress" or "in-progress" => "Đang xử lý",
+            "processing" => "Đang xử lý",
+            "rejected" => "Đã từ chối",
+            "refunded" => "Đã hoàn tiền",
             _ => status
+        };
+    }
+
+    string GetPaymentStatusText(string? paymentStatus)
+    {
+        if (string.IsNullOrEmpty(paymentStatus))
+            return "Chưa xác định";
+
+        var statusLower = paymentStatus.ToLower().Trim();
+        return statusLower switch
+        {
+            "paid" => "Đã thanh toán",
+            "unpaid" => "Chưa thanh toán",
+            "pending" => "Chờ thanh toán",
+            "refunded" => "Đã hoàn tiền",
+            "waiting for payment" or "waiting-for-payment" => "Chờ thanh toán",
+            "rejected" => "Đã từ chối",
+            _ => paymentStatus
         };
     }
 }
