@@ -373,7 +373,7 @@
                         </label>
 
                         <!-- MoMo -->
-                        <label class="pm @(Model.SelectedPaymentCode?.ToUpperInvariant() == "MOMO" ? "active" : "")">
+                       @*label class="pm @(Model.SelectedPaymentCode?.ToUpperInvariant() == "MOMO" ? "active" : "")">
                             <input type="radio"
                                    form="@placeOrderFormId"
                                    name="SelectedPaymentCode"
@@ -383,6 +383,7 @@
                                    style="display:none" />
                             MoMo (Ví điện tử)
                         </label>
+
 
                         <!-- (tuỳ chọn) COD hoặc Bank Transfer nếu bạn vẫn muốn giữ -->
                         @* 
@@ -2613,6 +2614,22 @@
             if(res.ok){
               const html = await res.text();
               body.innerHTML = html;
+              // Dịch nội dung vừa load nếu đang ở chế độ dịch
+              // Sử dụng nhiều cách để đảm bảo dịch được: requestAnimationFrame + setTimeout
+              if (window.VHSTranslate && window.VHSTranslate.isTranslated && window.VHSTranslate.isTranslated()) {
+                // Dịch ngay lập tức
+                if (window.VHSTranslate.translateElement) {
+                  window.VHSTranslate.translateElement(body);
+                }
+                // Dịch lại sau khi DOM đã render xong (đảm bảo)
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    if (window.VHSTranslate && window.VHSTranslate.translateElement) {
+                      window.VHSTranslate.translateElement(body);
+                    }
+                  }, 50);
+                });
+              }
             } else {
               body.innerHTML = '<div style="color:#c00">Không tải được điều khoản từ máy chủ.</div>';
             }

@@ -34,7 +34,16 @@ namespace VHS_frontend.Models.ServiceDTOs
         // Options trực tiếp của service
         public List<ReadServiceOptionDTOs> ServiceOptions { get; set; } = new();
 
+        // Tags của service
+        public List<ServiceTagDTO> Tags { get; set; } = new();
+
         // Packages của service (mỗi package có danh sách option)
         //public List<ServicePackageDTO> Packages { get; set; } = new();
+    }
+
+    public class ServiceTagDTO
+    {
+        public Guid TagId { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 }

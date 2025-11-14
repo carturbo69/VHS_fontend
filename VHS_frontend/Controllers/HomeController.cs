@@ -93,5 +93,17 @@ namespace VHS_frontend.Controllers
         }
 
         //public IActionResult Contact() => View();
+
+        public IActionResult Policy()
+        {
+            ViewData["Title"] = "Chính sách bảo mật";
+            return View();
+        }
+
+        public IActionResult Terms()
+        {
+            ViewData["Title"] = "Điều khoản sử dụng";
+            return View();
+        }
     }
 }
