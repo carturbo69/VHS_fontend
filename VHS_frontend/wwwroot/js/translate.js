@@ -195,8 +195,19 @@
         }
     }
     
-    // Tạo nút dịch
+    // Tạo nút dịch (hoặc kết nối với nút có sẵn trong settings menu)
     function createTranslateButton() {
+        // Kiểm tra xem có nút translate trong settings menu không (Customer layout)
+        const translateToggleBtn = document.getElementById('translateToggleBtn');
+        if (translateToggleBtn) {
+            // Nếu có nút trong settings menu, kết nối event listener
+            translateToggleBtn.addEventListener('click', toggleTranslate);
+            // Cập nhật trạng thái nút
+            updateButtonState();
+            return;
+        }
+        
+        // Nếu không có settings menu, tạo nút riêng (Provider/Admin layout)
         // Kiểm tra xem nút đã tồn tại chưa
         if (document.getElementById('translateBtn')) {
             return;
@@ -256,7 +267,7 @@
                 navActions.insertBefore(translateBtn, navActions.firstChild);
             }
         } else if (topbarRight) {
-            // Provider layout - chèn vào topbar.right, trước nút theme
+            // Provider/Admin layout - chèn vào topbar.right, trước nút theme
             if (themeBtn && themeBtn.parentNode === topbarRight) {
                 topbarRight.insertBefore(translateBtn, themeBtn);
             } else {
@@ -276,6 +287,17 @@
     
     // Cập nhật trạng thái nút
     function updateButtonState() {
+        // Cập nhật nút trong settings menu (Customer layout)
+        const translateToggleBtn = document.getElementById('translateToggleBtn');
+        if (translateToggleBtn) {
+            const textSpan = translateToggleBtn.querySelector('.settings-text');
+            if (textSpan) {
+                textSpan.textContent = isTranslated ? 'Tiếng Việt' : 'Tiếng Anh';
+            }
+            translateToggleBtn.setAttribute('aria-label', isTranslated ? 'Chuyển về tiếng Việt' : 'Dịch sang tiếng Anh');
+        }
+        
+        // Cập nhật nút riêng (Provider/Admin layout)
         const btn = document.getElementById('translateBtn');
         if (!btn) return;
         
