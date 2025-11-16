@@ -45,25 +45,87 @@
 }
 
 @functions {
+    private static TimeZoneInfo GetVnTz()
+    {
+        try
+        {
+            var tzId = Environment.OSVersion.Platform == PlatformID.Win32NT
+                ? "SE Asia Standard Time"
+                : "Asia/Ho_Chi_Minh";
+            return TimeZoneInfo.FindSystemTimeZoneById(tzId);
+        }
+        catch
+        {
+            // fallback +07:00 nếu máy chủ không có TZ
+            return TimeZoneInfo.CreateCustomTimeZone("VN_Fallback", TimeSpan.FromHours(7), "VN", "VN");
+        }
+    }
+
     public static DateTime ToVnLocal(DateTime utc)
     {
         // nếu utc không phải UTC, coi như UTC để tránh lệch
         var dtUtc = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
-        try
-        {
-            // Windows
-            var tz = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-            return TimeZoneInfo.ConvertTimeFromUtc(dtUtc, tz);
-        }
-        catch
-        {
-            // Linux/macOS
-            var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
-            return TimeZoneInfo.ConvertTimeFromUtc(dtUtc, tz);
-        }
+        return TimeZoneInfo.ConvertTimeFromUtc(dtUtc, GetVnTz());
     }
+    
     public static string ToVnHHmm(DateTime? utc)
         => utc.HasValue ? ToVnLocal(utc.Value).ToString("HH:mm") : "";
+
+    // Hàm format thời gian thông minh cho chat (đồng bộ giữa message list và conversation list)
+    private static string FormatChatTime(DateTime utc)
+    {
+        var fixedUtc = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        var vn = TimeZoneInfo.ConvertTimeFromUtc(fixedUtc, GetVnTz());
+        var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, GetVnTz());
+        
+        // Cùng ngày: chỉ hiển thị giờ
+        if (vn.Date == now.Date)
+        {
+            return vn.ToString("HH:mm");
+        }
+        
+        // Hôm qua
+        if (vn.Date == now.Date.AddDays(-1))
+        {
+            return "Hôm qua " + vn.ToString("HH:mm");
+        }
+        
+        // Trong 7 ngày gần đây: hiển thị thứ và giờ
+        if ((now.Date - vn.Date).TotalDays <= 7)
+        {
+            var dayOfWeek = vn.DayOfWeek switch
+            {
+                DayOfWeek.Monday => "Thứ 2",
+                DayOfWeek.Tuesday => "Thứ 3",
+                DayOfWeek.Wednesday => "Thứ 4",
+                DayOfWeek.Thursday => "Thứ 5",
+                DayOfWeek.Friday => "Thứ 6",
+                DayOfWeek.Saturday => "Thứ 7",
+                DayOfWeek.Sunday => "CN",
+                _ => ""
+            };
+            return dayOfWeek + " " + vn.ToString("HH:mm");
+        }
+        
+        // Trong cùng năm: hiển thị ngày/tháng và giờ
+        if (vn.Year == now.Year)
+        {
+            return vn.ToString("dd/MM HH:mm");
+        }
+        
+        // Khác năm: hiển thị đầy đủ
+        return vn.ToString("dd/MM/yyyy HH:mm");
+    }
+
+    // Overload cho DateTimeOffset
+    private static string FormatChatTime(DateTimeOffset dto) => FormatChatTime(dto.UtcDateTime);
+    
+    // Overload cho DateTime? (nullable)
+    private static string FormatChatTime(DateTime? utc)
+    {
+        if (!utc.HasValue) return "";
+        return FormatChatTime(utc.Value);
+    }
 
     // Helper hiển thị trạng thái
     public static Microsoft.AspNetCore.Html.IHtmlContent RenderStatus(MessageStatus status)
@@ -155,19 +217,20 @@
                              onerror="this.onerror=null;this.src='@fallbackImg';" />
 
                         <div class="flex-grow-1">
-                            <div class="d-flex">
+                            <div class="d-flex justify-content-between align-items-start">
                                 <div class="conv-header">
                                     <div class="conv-title">@c.Title</div>
-                                    <div class="conv-time">@ToVnHHmm(c.LastMessageAt)</div>
+                                </div>
+                                <div class="d-flex flex-column align-items-end gap-1 ms-2">
+                                    <div class="conv-time">@(c.LastMessageAt.HasValue ? FormatChatTime(c.LastMessageAt.Value) : "")</div>
+                                    @if (c.UnreadCount > 0)
+                                    {
+                                        <span class="badge rounded-pill bg-danger conv-unread">@c.UnreadCount</span>
+                                    }
                                 </div>
                             </div>
                             <div class="small text-muted text-ellipsis-1 conv-snippet">@c.LastMessageSnippet</div>
                         </div>
-
-                        @if (c.UnreadCount > 0)
-                        {
-                            <span class="badge rounded-pill bg-danger ms-2 conv-unread">@c.UnreadCount</span>
-                        }
                     </a>
                 }
             </div>
@@ -274,7 +337,7 @@
                                         <button type="button" class="reply-btn" title="Trả lời">
                                             <i class="bi bi-reply"></i> <span class="reply-text">Reply</span>
                                         </button>
-                                        <span class="msg-time">@ToVnHHmm(m.CreatedAt)</span>
+                                        <span class="msg-time">@FormatChatTime(m.CreatedAt)</span>
 
                                         @if (isMe)
                                         {
@@ -1008,9 +1071,114 @@
             .catch(err => console.error('[provider-chat] ❌ MarkRead lỗi', err));
         }
 
-        // Helper parse / status / reply-ref
+        // Helper parse ISO date string
         function __providerParseIso(s) {
-            return s ? new Date(s) : null;
+            if (!s) return null;
+
+            s = String(s).trim();
+            if (!s) return null;
+
+            // Có phần time hay không
+            const hasTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s);
+            // Có timezone (Z hoặc +07:00 / -05:00) hay chưa
+            const hasZone = /Z$|[+\-]\d{2}:?\d{2}$/.test(s);
+
+            // Nếu có time mà không có timezone -> coi là UTC
+            if (hasTime && !hasZone) {
+                s = s + 'Z';
+            }
+
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        // Hàm format thời gian thông minh cho chat (đồng bộ với C# FormatChatTime)
+        function __providerFormatChatTime(dateStr) {
+            if (!dateStr) return '';
+
+            const sourceDate = __providerParseIso(dateStr);
+            if (!sourceDate) return '';
+
+            const TZ = 'Asia/Ho_Chi_Minh';
+
+            const formatDateKey = (date) => {
+                const formatted = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: TZ,
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).format(date); // yyyy-mm-dd
+                const [year, month, day] = formatted.split('-').map(Number);
+                return {
+                    key: formatted,
+                    year,
+                    month,
+                    day,
+                    utcMidnightMs: Date.UTC(year, month - 1, day)
+                };
+            };
+
+            const msgDateInfo = formatDateKey(sourceDate);
+            const todayDate = new Date();
+            const todayInfo = formatDateKey(todayDate);
+            const yesterdayInfo = formatDateKey(new Date(todayDate.getTime() - 86400000));
+
+            const timeFormatter = new Intl.DateTimeFormat('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZone: TZ
+            });
+            const hhmm = timeFormatter.format(sourceDate);
+
+            // Cùng ngày: chỉ hiển thị giờ
+            if (msgDateInfo.key === todayInfo.key) {
+                return hhmm;
+            }
+
+            // Hôm qua
+            if (msgDateInfo.key === yesterdayInfo.key) {
+                return 'Hôm qua ' + hhmm;
+            }
+
+            // Khoảng cách ngày theo múi giờ VN
+            const diffDays = Math.round((todayInfo.utcMidnightMs - msgDateInfo.utcMidnightMs) / 86400000);
+            if (diffDays > 0 && diffDays <= 7) {
+                const weekdayKey = new Intl.DateTimeFormat('en-US', {
+                    weekday: 'short',
+                    timeZone: TZ
+                }).format(sourceDate);
+                const dayMap = {
+                    Sun: 'CN',
+                    Mon: 'Thứ 2',
+                    Tue: 'Thứ 3',
+                    Wed: 'Thứ 4',
+                    Thu: 'Thứ 5',
+                    Fri: 'Thứ 6',
+                    Sat: 'Thứ 7'
+                };
+                const dayLabel = dayMap[weekdayKey] || weekdayKey;
+                return dayLabel + ' ' + hhmm;
+            }
+
+            // Trong cùng năm: hiển thị ngày/tháng + giờ
+            if (msgDateInfo.year === todayInfo.year) {
+                const dateFormatterWithinYear = new Intl.DateTimeFormat('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    timeZone: TZ
+                });
+                return dateFormatterWithinYear.format(sourceDate) + ' ' + hhmm;
+            }
+
+            // Khác năm: hiển thị đầy đủ
+            const fullFormatter = new Intl.DateTimeFormat('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                timeZone: TZ
+            });
+            return fullFormatter.format(sourceDate) + ' ' + hhmm;
         }
 
         function __providerStatusHtml(status) {
@@ -1214,21 +1382,14 @@
                     const meta = document.createElement('div');
                     meta.className = 'msg-meta';
 
-                    const fmtVN = new Intl.DateTimeFormat('vi-VN', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false,
-                        timeZone: 'Asia/Ho_Chi_Minh'
-                    });
-
-                    const d = new Date(createdAt);
-                    const hhmm = isNaN(d) ? '' : fmtVN.format(d);
+                    // Format thời gian đồng bộ với C# FormatChatTime
+                    const formattedTime = __providerFormatChatTime(createdAt);
 
                     meta.innerHTML =
                         '<button type="button" class="reply-btn" title="Trả lời">' +
                             '<i class="bi bi-reply"></i> <span class="reply-text">Reply</span>' +
                         '</button>' +
-                        '<span class="msg-time">' + hhmm + '</span>' +
+                        '<span class="msg-time">' + formattedTime + '</span>' +
                         (isMine ? __providerStatusHtml(status) : '');
 
                     bubble.appendChild(meta);
@@ -1268,17 +1429,12 @@
                     const timeEl = row.querySelector('.conv-time');
                     const lastAt = item.lastMessageAt ?? item.LastMessageAt;
                     if (timeEl && lastAt) {
-                        const d2 = new Date(lastAt);
-                        const fmtVN2 = new Intl.DateTimeFormat('vi-VN', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false,
-                            timeZone: 'Asia/Ho_Chi_Minh'
-                        });
-                        timeEl.textContent = isNaN(d2) ? '' : fmtVN2.format(d2);
+                        // Format thời gian đồng bộ với C# FormatChatTime
+                        timeEl.textContent = __providerFormatChatTime(lastAt);
                     }
 
-                    // Badge unread (class conv-unread trong markup)
+                    // Badge unread - tìm container chứa thời gian (flex-column)
+                    const timeContainer = timeEl ? timeEl.parentElement : null;
                     let badge = row.querySelector('.conv-unread');
                     const currentConvId = __providerChatGetCurrentConvId();
                     let unread = item.unreadCount ?? item.UnreadCount ?? 0;
@@ -1287,10 +1443,10 @@
                         unread = 0; // đang mở thì không hiển thị unread
                     }
 
-                    if (!badge && unread > 0) {
+                    if (!badge && unread > 0 && timeContainer) {
                         badge = document.createElement('span');
-                        badge.className = 'badge rounded-pill bg-danger ms-2 conv-unread';
-                        row.appendChild(badge);
+                        badge.className = 'badge rounded-pill bg-danger conv-unread';
+                        timeContainer.appendChild(badge);
                     }
 
                     if (badge) {
@@ -1339,3 +1495,4 @@
     </script>
 
 }
+

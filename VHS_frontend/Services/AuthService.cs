@@ -311,5 +311,55 @@ namespace VHS_frontend.Services
                 return null;
             }
         }
+
+        /// <summary>
+        /// Xóa account chưa kích hoạt khi OTP không được xác thực
+        /// </summary>
+        public async Task<RegisterRespondDTO?> DeleteUnactivatedAccountAsync(string email, CancellationToken ct = default)
+        {
+            try
+            {
+                var dto = new { Email = email };
+                var res = await _httpClient.PostAsJsonAsync("/api/auth/delete-unactivated-account", dto, ct);
+                
+                var responseText = await res.Content.ReadAsStringAsync(ct);
+                
+                if (!res.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        var errorObj = JsonSerializer.Deserialize<JsonElement>(responseText);
+                        var message = errorObj.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : responseText;
+                        return new RegisterRespondDTO { Success = false, Message = message ?? responseText };
+                    }
+                    catch
+                    {
+                        return new RegisterRespondDTO { Success = false, Message = responseText };
+                    }
+                }
+
+                try
+                {
+                    var result = JsonSerializer.Deserialize<JsonElement>(responseText);
+                    var success = result.TryGetProperty("success", out var successProp) && successProp.GetBoolean();
+                    var message = result.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "Tài khoản đã được xóa.";
+                    
+                    return new RegisterRespondDTO 
+                    { 
+                        Success = success, 
+                        Message = message ?? "Tài khoản đã được xóa." 
+                    };
+                }
+                catch
+                {
+                    return new RegisterRespondDTO { Success = true, Message = "Tài khoản đã được xóa." };
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DeleteUnactivatedAccountAsync] Error: {ex.Message}");
+                return new RegisterRespondDTO { Success = false, Message = $"Lỗi khi xóa tài khoản: {ex.Message}" };
+            }
+        }
     }
 }

@@ -218,7 +218,9 @@
                                         @if (!string.IsNullOrEmpty(booking.PaymentStatus))
                                         {
                                             <br />
-                                            <small class="badge bg-info">@GetPaymentStatusText(booking.PaymentStatus)</small>
+                                            <span class="badge payment-badge payment-@(booking.PaymentStatus.ToLower().Replace(" ", "-"))" style="color: #000000 !important; font-weight: 800 !important;">
+                                                @GetPaymentStatusText(booking.PaymentStatus)
+                                            </span>
                                         }
                                     </td>
                                     <td>
@@ -237,30 +239,9 @@
                                         }
                                     </td>
                                     <td>
-                                        @{
-                                            // 🐛 DEBUG: In ra Status thực tế
-                                            var statusDebug = booking.Status ?? "NULL";
-                                            Console.WriteLine($"[History View] BookingId={booking.BookingId}, Status='{statusDebug}'");
-                                        }
-                                        @if (booking.Status == "Completed")
-                                        {
-                                            <span class="badge bg-success">
-                                                <i class="bi bi-check-circle"></i> Hoàn thành
-                                            </span>
-                                        }
-                                        else if (booking.Status == "Canceled")
-                                        {
-                                            <span class="badge bg-danger">
-                                                <i class="bi bi-x-circle"></i> Đã hủy
-                                            </span>
-                                        }
-                                        else
-                                        {
-                                            <!-- 🐛 DEBUG: Hiển thị Status không match -->
-                                            <span class="badge bg-warning text-dark">
-                                                <i class="bi bi-question-circle"></i> @booking.Status
-                                            </span>
-                                        }
+                                        <span class="badge status-badge status-@(booking.Status.ToLower().Replace(" ", "-"))" style="color: #000000 !important; font-weight: 800 !important;">
+                                            @GetStatusText(booking.Status)
+                                        </span>
                                     </td>
                                     <td class="text-center">
                                         <a href="@Url.Action("Details", "Order", new { id = booking.BookingId })" 
@@ -288,26 +269,157 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
+    <style>
+        /* Force status badge text color to black in light mode */
+        .order-management-container .badge.status-badge.status-pending,
+        .order-management-container .badge.status-badge.status-confirmed,
+        .order-management-container .badge.status-badge.status-completed,
+        .order-management-container .badge.status-badge.status-canceled,
+        .order-management-container .badge.status-badge.status-cancelled,
+        .order-management-container table .badge.status-badge {
+            color: #000000 !important;
+        }
+        
+        /* Force payment badge text color to black in light mode */
+        .order-management-container .payment-badge.payment-paid,
+        .order-management-container .payment-badge.payment-unpaid,
+        .order-management-container .payment-badge.payment-pending,
+        .order-management-container table .payment-badge {
+            color: #000000 !important;
+        }
+        
+        /* Force status badge text color to white in dark mode */
+        .dark .order-management-container .badge.status-badge.status-pending,
+        .dark .order-management-container .badge.status-badge.status-confirmed,
+        .dark .order-management-container .badge.status-badge.status-completed,
+        .dark .order-management-container .badge.status-badge.status-canceled,
+        .dark .order-management-container .badge.status-badge.status-cancelled,
+        .dark .order-management-container table .badge.status-badge {
+            color: #ffffff !important;
+        }
+        
+        /* Force payment badge text color to white in dark mode */
+        .dark .order-management-container .payment-badge.payment-paid,
+        .dark .order-management-container .payment-badge.payment-unpaid,
+        .dark .order-management-container .payment-badge.payment-pending,
+        .dark .order-management-container table .payment-badge {
+            color: #ffffff !important;
+        }
+        
+        /* Allow status and payment badges to wrap text */
+        .order-management-container table tbody td {
+            white-space: normal !important;
+            word-wrap: break-word;
+        }
+        
+        .order-management-container .badge.status-badge,
+        .order-management-container .badge.payment-badge {
+            white-space: normal !important;
+            word-wrap: break-word;
+            display: inline-block;
+            max-width: 100%;
+            line-height: 1.4;
+            text-align: center;
+        }
+        
+        /* Ensure table cells can wrap */
+        .order-management-container table td {
+            vertical-align: middle;
+        }
+        
+        /* Service Completed Status Badge - Màu xanh dương nhạt để phân biệt với Completed */
+        .order-management-container .badge.status-badge.status-service-completed {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%) !important;
+            color: #000000 !important;
+            border: 1px solid #6366f1 !important;
+            font-weight: 800 !important;
+        }
+        
+        /* Dark mode for Service Completed */
+        .dark .order-management-container .badge.status-badge.status-service-completed {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(79, 70, 229, 0.25) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(99, 102, 241, 0.6) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3) !important;
+        }
+        
+        /* Payment Rejected Badge */
+        .order-management-container .payment-badge.payment-rejected {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%) !important;
+            color: #000000 !important;
+            border: 1px solid #ef4444 !important;
+            font-weight: 800 !important;
+        }
+        
+        .dark .order-management-container .payment-badge.payment-rejected {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3) 0%, rgba(220, 38, 38, 0.25) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(239, 68, 68, 0.6) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3) !important;
+        }
+        
+        /* Payment Refunded Badge */
+        .order-management-container .payment-badge.payment-refunded {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+            color: #000000 !important;
+            border: 1px solid #f59e0b !important;
+            font-weight: 800 !important;
+        }
+        
+        .dark .order-management-container .payment-badge.payment-refunded {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.3) 0%, rgba(245, 158, 11, 0.25) 100%) !important;
+            color: #ffffff !important;
+            border: 2px solid rgba(251, 191, 36, 0.6) !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 4px rgba(251, 191, 36, 0.3) !important;
+        }
+    </style>
 }
 
 @functions {
+    string GetStatusText(string status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return "Chưa xác định";
+            
+        var statusLower = status.Trim().ToLower();
+        return statusLower switch
+        {
+            "pending" => "Đang chờ xử lý",
+            "pendingpayment" => "Đang chờ xử lý",
+            "confirmed" => "Đã xác nhận",
+            "completed" => "Hoàn thành",
+            "service completed" or "service-completed" => "Xác nhận hoàn thành",
+            "canceled" or "cancelled" => "Đã hủy",
+            "inprogress" or "in progress" or "in-progress" => "Đang xử lý",
+            "processing" => "Đang xử lý",
+            "rejected" => "Đã từ chối",
+            "refunded" => "Đã hoàn tiền",
+            _ => status
+        };
+    }
+
     string GetPaymentStatusText(string paymentStatus)
     {
         if (string.IsNullOrEmpty(paymentStatus))
-            return "Chưa thanh toán";
+            return "Chưa xác định";
 
         var statusLower = paymentStatus.ToLower().Trim();
         return statusLower switch
         {
             "paid" => "Đã thanh toán",
             "unpaid" => "Chưa thanh toán",
-            "pending" => "Đang chờ",
+            "pending" => "Chờ thanh toán",
             "refunded" => "Đã hoàn tiền",
+            "waiting for payment" or "waiting-for-payment" => "Chờ thanh toán",
+            "rejected" => "Đã từ chối",
             "cancelled" => "Đã hủy",
             "canceled" => "Đã hủy",
             "đã thanh toán" => "Đã thanh toán",
             "chưa thanh toán" => "Chưa thanh toán",
-            "đang chờ" => "Đang chờ",
+            "đang chờ" => "Chờ thanh toán",
             "đã hoàn tiền" => "Đã hoàn tiền",
             "đã hủy" => "Đã hủy",
             _ => paymentStatus
@@ -334,10 +446,6 @@
             document.querySelector('input[name="fromDate"]').value = fromDateStr;
             document.querySelector('input[name="toDate"]').value = toDateStr;
             
-            // Log để debug
-            const monthName = targetDate.toLocaleString('vi-VN', { month: 'long', year: 'numeric' });
-            console.log(`[Filter by Month] ${monthName}: ${fromDateStr} → ${toDateStr}`);
-            
             // Submit form
             document.getElementById('filterForm').submit();
         }
@@ -346,15 +454,7 @@
         function clearDateFilter() {
             document.querySelector('input[name="fromDate"]').value = '';
             document.querySelector('input[name="toDate"]').value = '';
-            console.log('[Clear Date Filter] Cleared fromDate and toDate');
             document.getElementById('filterForm').submit();
         }
-        
-        // Log status của bookings để debug
-        console.log('[History View] Loaded');
-        document.querySelectorAll('.badge').forEach((badge, index) => {
-            const status = badge.textContent.trim();
-            console.log(`[History View] BookingId=${index}, Status='${status}'`);
-        });
     </script>
 }
