@@ -62,8 +62,10 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
     {
         public Guid OptionId { get; set; }
         public string OptionName { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public decimal Price { get; set; }
+        public Guid? TagId { get; set; }
+        public string Type { get; set; } = string.Empty; // enum: checkbox, radio, text, optional, etc.
+        public Guid? Family { get; set; } // For radio buttons: if one is selected, others are hidden
+        public string? Value { get; set; } // Stores the value if any
     }
 
     public class BookingCheckerDTO

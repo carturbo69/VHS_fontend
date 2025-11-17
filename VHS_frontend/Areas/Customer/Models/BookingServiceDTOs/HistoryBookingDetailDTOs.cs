@@ -133,7 +133,7 @@
             public List<OptionDTO> Options { get; set; } = new();
             public bool IncludeOptionPriceToLineTotal { get; set; } = false;
 
-            public decimal OptionsTotal => Options?.Sum(o => o.Price) ?? 0m;
+            public decimal OptionsTotal => 0m; // Options no longer have Price
             public decimal LineTotal => (UnitPrice * Quantity) + (IncludeOptionPriceToLineTotal ? OptionsTotal : 0m);
         }
 

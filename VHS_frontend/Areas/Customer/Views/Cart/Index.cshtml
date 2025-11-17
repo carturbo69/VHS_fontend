@@ -70,7 +70,7 @@
         decimal LineTotalOf(ReadCartItemDTOs it)
         {
             var basePrice = it?.ServicePrice ?? 0m;
-            var optTotal = it?.Options?.Sum(o => o?.Price ?? 0m) ?? 0m;
+            var optTotal = 0m; // Options no longer have Price
             return basePrice + optTotal;
         }
 
@@ -81,8 +81,8 @@
             var parts = options.Select(o =>
             {
                 var name = o?.OptionName ?? "";
-                var unit = o?.UnitType;
-                return string.IsNullOrWhiteSpace(unit) ? name : $"{name} ({unit})";
+                var type = o?.Type;
+                return string.IsNullOrWhiteSpace(type) ? name : $"{name} ({type})";
             })
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .ToList();
@@ -250,15 +250,15 @@
                                                                        value="@a.OptionId" 
                                                                        data-cart-item-id="@it.CartItemId" />
                                                                 <div class="opt-name">
-                                                                    <div>@a.OptionName@(string.IsNullOrWhiteSpace(a.UnitType) ? "" : $" ({a.UnitType})")</div>
-                                                                    @if (!string.IsNullOrWhiteSpace(a.Description))
+                                                                    <div>@a.OptionName@(!string.IsNullOrWhiteSpace(a.Type) ? $" ({a.Type})" : "")</div>
+                                                                    @if (!string.IsNullOrWhiteSpace(a.Value))
                                                                     {
-                                                                        <div class="muted text-sm">@a.Description</div>
+                                                                        <div class="muted text-sm">Giá trị: @a.Value</div>
                                                                     }
                                                                 </div>
 
                                                                 <div class="opt-controls">
-                                                                    <span class="opt-price">+ @a.Price.ToString("n0")₫</span>
+                                                                    @* Options no longer have Price *@
                                                                 </div>
                                                             </div>
                                                         }
@@ -297,15 +297,14 @@
                                                                     <input type="checkbox" name="optionIds" value="@s.OptionId" />
                                                                     <span>
                                                                         <strong>@s.OptionName</strong>
-                                                                        @(string.IsNullOrWhiteSpace(s.UnitType) ? "" : $"({s.UnitType})")
                                                                     </span>
-                                                                    @if (!string.IsNullOrWhiteSpace(s.Description))
+                                                                    @if (!string.IsNullOrWhiteSpace(s.Value))
                                                                     {
-                                                                        <div class="muted small">@s.Description</div>
+                                                                        <div class="muted small">Giá trị: @s.Value</div>
                                                                     }
                                                                 </div>
                                                                 <div class="opt-controls">
-                                                                    <span class="opt-price">+ @s.Price.ToString("n0")₫</span>
+                                                                    @* Options no longer have Price *@
                                                                 </div>
                                                             </label>
                                                         }

@@ -104,6 +104,16 @@ namespace VHS_frontend.Services.Provider
                 formContent.Add(new StringContent(optionId.ToString()), "OptionIds");
             }
 
+            // Add OptionValues (Dictionary<Guid, string>)
+            if (dto.OptionValues != null && dto.OptionValues.Any())
+            {
+                foreach (var kvp in dto.OptionValues)
+                {
+                    // Format: OptionValues[key] = value
+                    formContent.Add(new StringContent(kvp.Value ?? ""), $"OptionValues[{kvp.Key}]");
+                }
+            }
+
             var response = await _httpClient.PostAsync("/api/ServiceProvider", formContent, ct);
             return await response.Content.ReadFromJsonAsync<ApiResponse<ServiceProviderReadDTO>>(_json, ct);
         }
@@ -177,6 +187,16 @@ namespace VHS_frontend.Services.Provider
                 formContent.Add(new StringContent(optionId.ToString()), "OptionIds");
             }
 
+            // Add OptionValues (Dictionary<Guid, string>)
+            if (dto.OptionValues != null && dto.OptionValues.Any())
+            {
+                foreach (var kvp in dto.OptionValues)
+                {
+                    // Format: OptionValues[key] = value
+                    formContent.Add(new StringContent(kvp.Value ?? ""), $"OptionValues[{kvp.Key}]");
+                }
+            }
+
             var response = await _httpClient.PutAsync($"/api/ServiceProvider/{serviceId}", formContent, ct);
             return await response.Content.ReadFromJsonAsync<ApiResponse<string>>(_json, ct);
         }
@@ -210,11 +230,16 @@ namespace VHS_frontend.Services.Provider
             return result?.Data;
         }
 
-        // Lấy danh sách Tags theo CategoryId
-        public async Task<List<TagDTO>?> GetTagsByCategoryAsync(string categoryId, string? token = null, CancellationToken ct = default)
+        // Lấy danh sách Tags theo CategoryId (chỉ trả về tags còn lại trong certificate của provider)
+        public async Task<List<TagDTO>?> GetTagsByCategoryAsync(string categoryId, string? providerId = null, string? token = null, CancellationToken ct = default)
         {
             SetAuthHeader(token);
-            var response = await _httpClient.GetAsync($"/api/ServiceProvider/tags/category/{categoryId}", ct);
+            var url = $"/api/ServiceProvider/tags/category/{categoryId}";
+            if (!string.IsNullOrWhiteSpace(providerId))
+            {
+                url += $"?providerId={providerId}";
+            }
+            var response = await _httpClient.GetAsync(url, ct);
             
             if (!response.IsSuccessStatusCode) return null;
 

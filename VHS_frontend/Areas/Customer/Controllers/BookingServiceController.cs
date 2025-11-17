@@ -142,7 +142,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             // ====== Helpers ======
             static decimal LineTotalOf(ReadCartItemDTOs it)
-                => (it?.ServicePrice ?? 0m) + (it?.Options?.Sum(o => o?.Price ?? 0m) ?? 0m);
+                => it?.ServicePrice ?? 0m; // Options no longer have Price
 
             // Kiểm tra JWToken trước - nếu có token thì có thể session đang load
             var hasJwt = !string.IsNullOrWhiteSpace(jwt);
@@ -222,8 +222,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 {
                     OptionId   = o.OptionId,
                     OptionName = o.OptionName,
-                    Price      = o.Price,
-                    UnitType   = o.UnitType
+                    TagId      = o.TagId,
+                    Type       = o.Type,
+                    Family     = o.Family,
+                    Value      = o.Value
                 }).ToList()
             }
         };
@@ -893,7 +895,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 }
 
                 // Tính toán giá tiền (giống ListHistoryBooking)
-                var optionTotal = bookingDetail.Options?.Sum(op => op.Price) ?? 0m;
+                var optionTotal = 0m; // Options no longer have Price
                 var servicePrice = bookingDetail.Service?.UnitPrice ?? 0m;
                 var subTotal = servicePrice + optionTotal;
                 
@@ -1406,9 +1408,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         {
                             OptionId = o.OptionId,
                             Name = o.OptionName ?? "",
-                            Unit = o.UnitType,
-                            Description = o.Description,
-                            Price = o.Price
+                            TagId = o.TagId,
+                            Type = o.Type ?? "",
+                            Family = o.Family,
+                            Value = o.Value
                         }).ToList()
                     });
                 }

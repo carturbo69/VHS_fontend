@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Admin.Models.Category;
 using VHS_frontend.Areas.Admin.Models.Tag;
+using VHS_frontend.Areas.Admin.Models.Option;
 using VHS_frontend.Services.Admin;
 
 namespace VHS_frontend.Areas.Admin.Controllers
@@ -10,13 +11,15 @@ namespace VHS_frontend.Areas.Admin.Controllers
     public class CategoryController : Controller
     {
         private readonly CategoryAdminService _svc;
-        private readonly TagAdminService _tagSvc;     // + field
+        private readonly TagAdminService _tagSvc;
+        private readonly OptionAdminService _optionSvc;
         private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
-        public CategoryController(CategoryAdminService svc, TagAdminService tagSvc) // + inject
+        public CategoryController(CategoryAdminService svc, TagAdminService tagSvc, OptionAdminService optionSvc)
         {
             _svc = svc;
             _tagSvc = tagSvc;
+            _optionSvc = optionSvc;
         }
 
         [HttpGet]
@@ -108,6 +111,41 @@ namespace VHS_frontend.Areas.Admin.Controllers
         public async Task<IActionResult> RestoreTag(Guid id, CancellationToken ct)
         {
             var res = await _tagSvc.RestoreAsync(id, ct);
+            var text = await res.Content.ReadAsStringAsync(ct);
+            return StatusCode((int)res.StatusCode, text);
+        }
+
+        // ===== OPTION proxies cho Tag =====
+        [HttpGet]
+        public async Task<IActionResult> GetOptions(Guid tagId, CancellationToken ct = default)
+        {
+            var list = await _optionSvc.GetByTagAsync(tagId, ct) ?? new();
+            return Json(list, _json);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateOption([FromBody] OptionCreateDTO dto, CancellationToken ct)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.OptionName) || string.IsNullOrWhiteSpace(dto.Type))
+                return BadRequest("OptionName & Type are required.");
+
+            var res = await _optionSvc.CreateAsync(dto, ct);
+            var text = await res.Content.ReadAsStringAsync(ct);
+            return StatusCode((int)res.StatusCode, text);
+        }
+
+        [HttpPut]
+        public async Task<IActionResult> UpdateOption(Guid id, [FromBody] OptionUpdateDTO dto, CancellationToken ct)
+        {
+            var res = await _optionSvc.UpdateAsync(id, dto, ct);
+            var text = await res.Content.ReadAsStringAsync(ct);
+            return StatusCode((int)res.StatusCode, text);
+        }
+
+        [HttpDelete]
+        public async Task<IActionResult> DeleteOption(Guid id, CancellationToken ct)
+        {
+            var res = await _optionSvc.DeleteAsync(id, ct);
             var text = await res.Content.ReadAsStringAsync(ct);
             return StatusCode((int)res.StatusCode, text);
         }

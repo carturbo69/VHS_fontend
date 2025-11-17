@@ -31,6 +31,7 @@ namespace VHS_frontend.Areas.Provider.Models.Service
 
         public List<Guid> TagIds { get; set; } = new List<Guid>();
         public List<Guid> OptionIds { get; set; } = new List<Guid>();
+        public Dictionary<Guid, string>? OptionValues { get; set; }  // ✅ Values for text/textarea options (OptionId -> Value)
     }
 }
 

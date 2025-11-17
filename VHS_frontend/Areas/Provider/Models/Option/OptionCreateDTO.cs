@@ -5,17 +5,13 @@ namespace VHS_frontend.Areas.Provider.Models.Option
     public class OptionCreateDTO
     {
         [Required(ErrorMessage = "Tên option không được để trống.")]
-        [StringLength(50, ErrorMessage = "Tên option không được vượt quá 50 ký tự.")]
         public string OptionName { get; set; } = string.Empty;
 
-        [StringLength(500, ErrorMessage = "Mô tả không được vượt quá 500 ký tự.")]
-        public string? Description { get; set; }
+        public Guid? TagId { get; set; }
 
-        [Required(ErrorMessage = "Giá không được để trống.")]
-        [Range(0, double.MaxValue, ErrorMessage = "Giá phải lớn hơn hoặc bằng 0.")]
-        public decimal Price { get; set; }
+        [Required(ErrorMessage = "Loại option không được để trống (checkbox, radio, text, optional, etc.).")]
+        public string Type { get; set; } = string.Empty; // enum: checkbox, radio, text, optional, etc.
 
-        [Required(ErrorMessage = "Đơn vị không được để trống.")]
-        public string UnitType { get; set; } = string.Empty;
+        public Guid? Family { get; set; } // For radio buttons: if one is selected, others are hidden
     }
 }

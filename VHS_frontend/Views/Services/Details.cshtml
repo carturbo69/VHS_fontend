@@ -141,8 +141,8 @@
                     </div>
 
                     <ul class="brief">
-                        <li><strong>Loại:</strong> @Model.CategoryName</li>
-                        @if (Model.Tags != null && Model.Tags.Any())
+                        <li><strong>Danh mục:</strong> @Model.CategoryName</li>
+                        <!-- @if (Model.Tags != null && Model.Tags.Any())
                         {
                             <li>
                                 <strong>Tags:</strong>
@@ -153,9 +153,9 @@
                                     }
                                 </div>
                             </li>
-                        }
+                        } -->
                         <li>
-                            <strong>Thời gian:</strong>
+                            <strong>Loại:</strong>
                             @if (Model.BaseUnit.HasValue)
                             {
                                 @($"{Model.BaseUnit} {GetUnitTypeVietnamese(Model.UnitType)}")
@@ -180,37 +180,51 @@
                         {
                             <section class="svc-options">
                                 <h3 class="addons-title">
-                                    <span class="title-icon">➕</span>
-                                    Tuỳ chọn thêm
+                                    <span class="title-icon">✨</span>
+                                    Tùy chọn đã bao gồm
                                 </h3>
                                 <div class="addons-list">
+                                    @* Hiển thị danh sách options phẳng (không có nhóm) cho Customer *@
                                     @foreach (var o in Model.ServiceOptions)
                                     {
-                                        <label class="addon-item option-select-box">
-                                            <input type="checkbox"
-                                                   name="optionIds"
-                                                   value="@o.OptionId"
-                                                   class="option-checkbox" />
-                                            <span class="option-checkmark"></span>
-
+                                        <div class="addon-item" style="padding: 0.75rem; background: #fff; border-radius: 0.25rem; margin-bottom: 0.5rem;">
                                             <div class="option-body">
                                                 <div class="option-head">
                                                     <div class="addon-name">
-                                                        <span class="addon-icon">✨</span>
-                                                        @o.OptionName
-                                                    </div>
-                                                    <div class="addon-price">
-                                                        @string.Format("{0:#,0}đ / {1}", o.Price, GetUnitTypeVietnamese(o.UnitType))
+                                                        <span class="addon-icon">✓</span>
+                                                        <span class="fw-semibold">@o.OptionName</span>
                                                     </div>
                                                 </div>
-                                                @if (!string.IsNullOrWhiteSpace(o.Description))
+                                                @if (!string.IsNullOrWhiteSpace(o.Value))
                                                 {
-                                                    <div class="addon-desc">@o.Description</div>
+                                                    <div class="addon-desc mt-1">
+                                                        <strong class="small">Giá trị:</strong>
+                                                        @if (o.Type?.ToLower() == "textarea" || o.Type?.ToLower() == "text")
+                                                        {
+                                                            <div class="mt-1 p-2 bg-light rounded" style="white-space: pre-wrap; word-wrap: break-word;">@o.Value</div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>@o.Value</span>
+                                                        }
+                                                    </div>
+                                                }
+                                                else if (o.Type?.ToLower() == "textarea" || o.Type?.ToLower() == "text")
+                                                {
+                                                    <div class="addon-desc mt-1 text-muted small">
+                                                        <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
+                                                    </div>
                                                 }
                                             </div>
-                                        </label>
+                                        </div>
                                     }
                                 </div>
+                                
+                                @* Tự động thêm tất cả options vào form *@
+                                @foreach (var o in Model.ServiceOptions)
+                                {
+                                    <input type="hidden" name="optionIds" value="@o.OptionId" />
+                                }
                             </section>
                         }
 
@@ -934,6 +948,10 @@
           lbImg?.addEventListener('click', closeLB);
           window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeLB(); });
         })();
+
+        // ===== Tự động thêm tất cả options vào form khi submit =====
+        // Tất cả options đã được thêm vào form qua hidden inputs ở trên
+        // Không cần xử lý thêm gì vì options đã tự động đi chung gói tiền
 
         // ===== Related: nút "Xem thêm" =====
         (function(){

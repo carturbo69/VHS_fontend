@@ -270,9 +270,9 @@
         <div class="col-lg-8">
             @if (isPendingUpdate)
             {
-                <div class="alert alert-info mb-4">
+                <div class="alert alert-info mb-3">
                     <div class="d-flex align-items-center">
-                        <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+                        <i class="bi bi-info-circle-fill me-2"></i>
                         <div>
                             <strong>Dịch vụ đang chờ duyệt chỉnh sửa</strong>
                             @if (Model.PendingUpdatedAt.HasValue)
@@ -300,64 +300,165 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <h4 class="mb-1 fw-bold">@displayTitle</h4>
-                                <div class="mb-1">
-                                    <span class="badge bg-secondary">@Model.CategoryName</span>
+                                <h4 class="mb-2 fw-bold">@displayTitle</h4>
+                                <div class="mb-3">
+                                    <span class="fw-semibold me-2">Danh mục:</span>
+                                    <span class="badge bg-primary fs-6 px-3 py-2" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%) !important; box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);">@Model.CategoryName</span>
                                 </div>
-                                <p class="text-muted mb-2 text-start">@displayDescription</p>
+                                <p class="text-muted mb-3 text-start" style="line-height: 1.6;">@displayDescription</p>
                                 
-                                <div class="row g-2 mb-2">
+                                <div class="row g-2 mb-3">
                                     <div class="col-md-4">
-                                        <div class="p-2 bg-light rounded text-center">
-                                            <small class="text-muted d-block mb-1"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
+                                        <div class="p-3 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-2"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
                                             <div class="fs-5 fw-bold text-success">@displayPrice.ToString("N0") VNĐ</div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="p-2 bg-light rounded text-center">
-                                            <small class="text-muted d-block mb-1"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
+                                        <div class="p-3 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-2"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
                                             <div class="fw-semibold">@GetUnitTypeVietnamese(displayUnitType)</div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="p-2 bg-light rounded text-center">
-                                            <small class="text-muted d-block mb-1"><i class="bi bi-hash me-1"></i>Cơ bản</small>
+                                        <div class="p-3 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-2"><i class="bi bi-hash me-1"></i>Cơ bản</small>
                                             <div class="fw-semibold">@displayBaseUnit</div>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                @if (displayTagsList.Any())
-                                {
-                                    <div class="mb-1 text-start">
-                                        <small class="text-muted d-block mb-1"><strong>Thẻ:</strong></small>
-                                        <div>
-                                            @foreach (var tagName in displayTagsList)
-                                            {
-                                                <span class="badge bg-info me-1 mb-1">@tagName</span>
-                                            }
-                                        </div>
-                                    </div>
-                                }
+                                
                                 
                                 @if (displayOptions != null && displayOptions.Any())
                                 {
-                                    <div class="mt-1 text-start">
-                                        <small class="text-muted d-block mb-1"><strong>Tùy chọn:</strong></small>
-                                        <div class="list-group list-group-flush bg-transparent">
-                                            @foreach (var o in displayOptions)
+                                    // Nhóm options theo Family
+                                    var groupedOptions = displayOptions
+                                        .Where(o => o.Family.HasValue)
+                                        .GroupBy(o => o.Family.Value)
+                                        .ToList();
+                                    var ungroupedOptions = displayOptions
+                                        .Where(o => !o.Family.HasValue)
+                                        .ToList();
+                                    
+                                    // Sắp xếp các nhóm theo type (radio, select, checkbox)
+                                    var sortedGroups = groupedOptions.OrderBy(g => {
+                                        var type = g.FirstOrDefault()?.Type?.ToLower() ?? "";
+                                        return type switch {
+                                            "radio" => 1,
+                                            "select" => 2,
+                                            "checkbox" => 3,
+                                            _ => 4
+                                        };
+                                    }).ToList();
+                                    
+                                    <div class="mt-2 text-start">
+                                        <small class="text-muted d-block mb-2 fw-semibold"><i class="bi bi-list-check me-1"></i>Tùy chọn:</small>
+                                        
+                                        @* Hiển thị các nhóm (Family) *@
+                                        @foreach (var group in sortedGroups)
+                                        {
+                                            var firstOption = group.FirstOrDefault();
+                                            var groupType = firstOption?.Type?.ToLower() ?? "";
+                                            var typeLabel = groupType switch {
+                                                "radio" => "Chọn một",
+                                                "select" => "Danh sách chọn",
+                                                "checkbox" => "Chọn nhiều",
+                                                "text" => "Văn bản",
+                                                "textarea" => "Nhập văn bản",
+                                                _ => "Tùy chọn"
+                                            };
+                                            
+                                            // Màu sắc theo loại nhóm
+                                            var borderColor = "#ffc107"; // default (yellow)
+                                            var bgColor = "#fffbf0"; // default
+                                            if (groupType == "radio")
                                             {
-                                                <div class="list-group-item px-0 border-0 border-bottom bg-transparent py-1">
-                                                    <div class="d-flex justify-content-between align-items-start">
-                                                        <div>
-                                                            <strong>@o.OptionName</strong>
-                                                            <div class="text-muted small">@o.Description</div>
+                                                borderColor = "#0d6efd"; // blue
+                                                bgColor = "#e7f3ff";
+                                            }
+                                            else if (groupType == "select")
+                                            {
+                                                borderColor = "#198754"; // green
+                                                bgColor = "#e8f5e9";
+                                            }
+                                            else if (groupType == "checkbox")
+                                            {
+                                                borderColor = "#6f42c1"; // purple
+                                                bgColor = "#f3e8ff";
+                                            }
+                                            
+                                            <div class="mb-3 p-3 text-start" style="background: @bgColor; border-left: 4px solid @borderColor; border-radius: 0.5rem;">
+                                                <div class="mb-2" style="font-weight: 600; color: @borderColor; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                                                    <i class="bi bi-diagram-3" style="color: @borderColor;"></i>
+                                                    <span>Nhóm: @typeLabel (@group.Count() tùy chọn)</span>
+                                                </div>
+                                                
+                                                @foreach (var o in group)
+                                                {
+                                                    <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
+                                                        <div class="fw-semibold mb-1">@o.OptionName</div>
+                                                        @{
+                                                            var optionValue = o.Value;
+                                                            var optionType = o.Type?.ToLower() ?? "";
+                                                            if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
+                                                            {
+                                                                if (optionType == "textarea" || optionType == "text")
+                                                                {
+                                                                    <div class="mt-1 p-2 bg-white rounded border text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">@optionValue</div>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <div class="text-muted small text-start">@optionValue</div>
+                                                                }
+                                                            }
+                                                            else if (optionType == "textarea" || optionType == "text")
+                                                            {
+                                                                <div class="text-muted small mt-1 text-start">
+                                                                    <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
                                                         </div>
-                                                        <span class="text-success fw-bold">@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
+                                                            }
+                                                        }
                                                     </div>
+                                                }
+                                            </div>
+                                        }
+                                        
+                                        @* Hiển thị các options không có nhóm *@
+                                        @if (ungroupedOptions.Any())
+                                        {
+                                            
+                                            
+                                            <div class="text-start">
+                                                @foreach (var o in ungroupedOptions)
+                                                {
+                                                    <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start">
+                                                        <div class="fw-semibold mb-1">@o.OptionName</div>
+                                                        @{
+                                                            var optionValue = o.Value;
+                                                            var optionType = o.Type?.ToLower() ?? "";
+                                                            if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
+                                                            {
+                                                                if (optionType == "textarea" || optionType == "text")
+                                                                {
+                                                                    <div class="mt-1 p-2 bg-white rounded border text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">@optionValue</div>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <div class="text-muted small text-start">@optionValue</div>
+                                                                }
+                                                            }
+                                                            else if (optionType == "textarea" || optionType == "text")
+                                                            {
+                                                                <div class="text-muted small mt-1 text-start">
+                                                                    <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
+                                                                </div>
+                                                            }
+                                                        }
                                                 </div>
                                             }
                                         </div>
+                                        }
                                     </div>
                                 }
                             </div>
@@ -376,36 +477,37 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <h5 class="mb-1 text-muted">
+                                <h5 class="mb-2 text-muted">
                                     <del>@(string.IsNullOrEmpty(Model.CurrentTitle) ? Model.Title : Model.CurrentTitle)</del>
                                 </h5>
-                                <div class="mb-1">
-                                    <span class="badge bg-secondary">@Model.CategoryName</span>
+                                <div class="mb-3">
+                                    <span class="fw-semibold me-2">Danh mục:</span>
+                                    <span class="badge bg-secondary fs-6 px-3 py-2" style="background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%) !important; opacity: 0.8;">@Model.CategoryName</span>
                                 </div>
-                                <p class="text-muted mb-2 text-start">
+                                <p class="text-muted mb-3 text-start" style="line-height: 1.6;">
                                     <del>@(string.IsNullOrEmpty(Model.CurrentDescription) ? Model.Description : Model.CurrentDescription)</del>
                                 </p>
                                 
-                                <div class="row g-2 mb-2">
+                                <div class="row g-2 mb-3">
                                     <div class="col-md-4">
-                                        <div class="p-2 bg-light rounded text-center">
-                                            <small class="text-muted d-block mb-1"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
+                                        <div class="p-3 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-2"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
                                             <div class="fs-5 fw-bold text-muted">
                                                 <del>@((Model.CurrentPrice ?? Model.Price).ToString("N0")) VNĐ</del>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="p-2 bg-light rounded text-center">
-                                            <small class="text-muted d-block mb-1"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
+                                        <div class="p-3 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-2"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
                                             <div class="fw-semibold text-muted">
                                                 <del>@GetUnitTypeVietnamese(string.IsNullOrEmpty(Model.CurrentUnitType) ? Model.UnitType : Model.CurrentUnitType)</del>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="p-2 bg-light rounded text-center">
-                                            <small class="text-muted d-block mb-1"><i class="bi bi-hash me-1"></i>Cơ bản</small>
+                                        <div class="p-3 bg-light rounded text-center">
+                                            <small class="text-muted d-block mb-2"><i class="bi bi-hash me-1"></i>Cơ bản</small>
                                             <div class="fw-semibold text-muted">
                                                 <del>@((Model.CurrentBaseUnit ?? Model.BaseUnit).ToString())</del>
                                             </div>
@@ -413,74 +515,126 @@
                                     </div>
                                 </div>
                                 
-                                @if (Model.CurrentTags != null && Model.CurrentTags.Any())
-                                {
-                                    <div class="mb-1 text-start">
-                                        <small class="text-muted d-block mb-1"><strong>Thẻ:</strong></small>
-                                        <div>
-                                            @foreach (var tag in Model.CurrentTags)
-                                            {
-                                                <span class="badge bg-secondary me-1 mb-1"><del>@tag.Name</del></span>
-                                            }
-                                        </div>
-                                    </div>
-                                }
-                                else if (Model.Tags != null && Model.Tags.Any())
-                                {
-                                    <div class="mb-1 text-start">
-                                        <small class="text-muted d-block mb-1"><strong>Thẻ:</strong></small>
-                                        <div>
-                                            @foreach (var tag in Model.Tags)
-                                            {
-                                                <span class="badge bg-secondary me-1 mb-1"><del>@tag.Name</del></span>
-                                            }
-                                        </div>
-                                    </div>
-                                }
                                 
-                                @if (Model.CurrentOptions != null && Model.CurrentOptions.Any())
-                                {
-                                    <div class="mt-1 text-start">
-                                        <small class="text-muted d-block mb-1"><strong>Tùy chọn:</strong></small>
-                                        <div class="list-group list-group-flush bg-transparent">
-                                            @foreach (var o in Model.CurrentOptions)
+                                @{
+                                    var currentOptionsToShow = Model.CurrentOptions != null && Model.CurrentOptions.Any() 
+                                        ? Model.CurrentOptions 
+                                        : Model.Options;
+                                    
+                                    if (currentOptionsToShow != null && currentOptionsToShow.Any())
+                                    {
+                                        // Nhóm options theo Family
+                                        var currentGroupedOptions = currentOptionsToShow
+                                            .Where(o => o.Family.HasValue)
+                                            .GroupBy(o => o.Family.Value)
+                                            .ToList();
+                                        var currentUngroupedOptions = currentOptionsToShow
+                                            .Where(o => !o.Family.HasValue)
+                                            .ToList();
+                                        
+                                        // Sắp xếp các nhóm theo type
+                                        var currentSortedGroups = currentGroupedOptions.OrderBy(g => {
+                                            var type = g.FirstOrDefault()?.Type?.ToLower() ?? "";
+                                            return type switch {
+                                                "radio" => 1,
+                                                "select" => 2,
+                                                "checkbox" => 3,
+                                                _ => 4
+                                            };
+                                        }).ToList();
+                                        
+                                        <div class="mt-2 text-start">
+                                            <small class="text-muted d-block mb-2 fw-semibold"><i class="bi bi-list-check me-1"></i>Tùy chọn:</small>
+                                            
+                                            @* Hiển thị các nhóm *@
+                                            @foreach (var group in currentSortedGroups)
                                             {
-                                                <div class="list-group-item px-0 border-0 border-bottom bg-transparent py-1">
-                                                    <del class="text-muted">
-                                                        <div class="d-flex justify-content-between align-items-start">
-                                                            <div>
-                                                                <strong>@o.OptionName</strong>
-                                                                <div class="text-muted small">@o.Description</div>
-                                                            </div>
-                                                            <span>@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
+                                                var firstOption = group.FirstOrDefault();
+                                                var groupType = firstOption?.Type?.ToLower() ?? "";
+                                                var typeLabel = groupType switch {
+                                                    "radio" => "Chọn một",
+                                                    "select" => "Danh sách chọn",
+                                                    "checkbox" => "Chọn nhiều",
+                                                    "text" => "Văn bản",
+                                                    "textarea" => "Nhập văn bản",
+                                                    _ => "Tùy chọn"
+                                                };
+                                                
+                                                var borderColor = "#6c757d";
+                                                var bgColor = "#f8f9fa";
+                                                
+                                                <div class="mb-3 p-3 text-start" style="background: @bgColor; border-left: 4px solid @borderColor; border-radius: 0.5rem; opacity: 0.7;">
+                                                    <div class="mb-2" style="font-weight: 600; color: @borderColor; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                                                        <i class="bi bi-diagram-3" style="color: @borderColor;"></i>
+                                                        <span>Nhóm: @typeLabel (@group.Count() tùy chọn)</span>
+                                                    </div>
+                                                    
+                                                    @foreach (var o in group)
+                                                    {
+                                                        <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
+                                                            <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
+                                                            @{
+                                                                var optionValue = o.Value;
+                                                                var optionType = o.Type?.ToLower() ?? "";
+                                                                if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
+                                                                {
+                                                                    if (optionType == "textarea" || optionType == "text")
+                                                                    {
+                                                                        <div class="mt-1 p-2 bg-white rounded border text-muted text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5; opacity: 0.7;"><del>@optionValue</del></div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <div class="text-muted small text-start"><del>@optionValue</del></div>
+                                                                    }
+                                                                }
+                                                                else if (optionType == "textarea" || optionType == "text")
+                                                                {
+                                                                    <div class="text-muted small mt-1 text-start">
+                                                                        <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
+                                                                    </div>
+                                                                }
+                                                            }
                                                         </div>
-                                                    </del>
+                                                    }
+                                                </div>
+                                            }
+                                            
+                                            @* Hiển thị options không có nhóm *@
+                                            @if (currentUngroupedOptions.Any())
+                                            {
+                                                
+                                                <div class="text-start">
+                                                    @foreach (var o in currentUngroupedOptions)
+                                                    {
+                                                        <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start" style="opacity: 0.7;">
+                                                            <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
+                                                            @{
+                                                                var optionValue = o.Value;
+                                                                var optionType = o.Type?.ToLower() ?? "";
+                                                                if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
+                                                                {
+                                                                    if (optionType == "textarea" || optionType == "text")
+                                                                    {
+                                                                        <div class="mt-1 p-2 bg-white rounded border text-muted text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5; opacity: 0.7;"><del>@optionValue</del></div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <div class="text-muted small text-start"><del>@optionValue</del></div>
+                                                                    }
+                                                                }
+                                                                else if (optionType == "textarea" || optionType == "text")
+                                                                {
+                                                                    <div class="text-muted small mt-1 text-start">
+                                                                        <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
+                                                                    </div>
+                                                                }
+                                                            }
+                                                        </div>
+                                                    }
                                                 </div>
                                             }
                                         </div>
-                                    </div>
-                                }
-                                else if (Model.Options != null && Model.Options.Any())
-                                {
-                                    <div class="mt-1 text-start">
-                                        <small class="text-muted d-block mb-1"><strong>Tùy chọn:</strong></small>
-                                        <div class="list-group list-group-flush bg-transparent">
-                                            @foreach (var o in Model.Options)
-                                            {
-                                                <div class="list-group-item px-0 border-0 border-bottom bg-transparent py-1">
-                                                    <del class="text-muted">
-                                                        <div class="d-flex justify-content-between align-items-start">
-                                                            <div>
-                                                                <strong>@o.OptionName</strong>
-                                                                <div class="text-muted small">@o.Description</div>
-                                                            </div>
-                                                            <span>@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
-                                                        </div>
-                                                    </del>
-                                                </div>
-                                            }
-                                        </div>
-                                    </div>
+                                    }
                                 }
                             </div>
                         </div>
@@ -495,64 +649,162 @@
                         <i class="bi bi-info-circle me-2"></i>Thông tin dịch vụ
                     </div>
                     <div class="card-body">
-                        <h3 class="mb-1 fw-bold">@displayTitle</h3>
-                        <div class="mb-1">
-                            <span class="badge bg-secondary">@Model.CategoryName</span>
+                        <h3 class="mb-2 fw-bold">@displayTitle</h3>
+                        <div class="mb-3">
+                            <span class="fw-semibold me-2">Danh mục:</span>
+                            <span class="badge bg-primary fs-6 px-3 py-2" style="background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%) !important; box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);">@Model.CategoryName</span>
                         </div>
-                        <p class="text-muted mb-2 text-start">@displayDescription</p>
+                        <p class="text-muted mb-3 text-start" style="line-height: 1.6;">@displayDescription</p>
                         
-                        <div class="row g-2 mb-2">
+                        <div class="row g-2 mb-3">
                             <div class="col-md-4">
-                                <div class="p-2 bg-light rounded text-center">
-                                    <small class="text-muted d-block mb-1"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
+                                <div class="p-3 bg-light rounded text-center">
+                                    <small class="text-muted d-block mb-2"><i class="bi bi-currency-exchange me-1"></i>Giá</small>
                                     <div class="fs-5 fw-bold text-success">@displayPrice.ToString("N0") VNĐ</div>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="p-2 bg-light rounded text-center">
-                                    <small class="text-muted d-block mb-1"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
+                                <div class="p-3 bg-light rounded text-center">
+                                    <small class="text-muted d-block mb-2"><i class="bi bi-rulers me-1"></i>Đơn vị</small>
                                     <div class="fw-semibold">@GetUnitTypeVietnamese(displayUnitType)</div>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <div class="p-2 bg-light rounded text-center">
-                                    <small class="text-muted d-block mb-1"><i class="bi bi-hash me-1"></i>Cơ bản</small>
+                                <div class="p-3 bg-light rounded text-center">
+                                    <small class="text-muted d-block mb-2"><i class="bi bi-hash me-1"></i>Cơ bản</small>
                                     <div class="fw-semibold">@displayBaseUnit</div>
                                 </div>
                             </div>
                         </div>
                         
-                        @if (displayTagsList.Any())
-                        {
-                            <div class="mb-1 text-start">
-                                <small class="text-muted d-block mb-1"><strong>Thẻ:</strong></small>
-                                <div>
-                                    @foreach (var tagName in displayTagsList)
-                                    {
-                                        <span class="badge bg-info me-1 mb-1">@tagName</span>
-                                    }
-                                </div>
-                            </div>
-                        }
                         
                         @if (displayOptions != null && displayOptions.Any())
                         {
-                            <div class="mt-1 text-start">
-                                <small class="text-muted d-block mb-1"><strong>Tùy chọn:</strong></small>
-                                <div class="list-group list-group-flush bg-transparent">
-                                    @foreach (var o in displayOptions)
+                            // Nhóm options theo Family
+                            var normalGroupedOptions = displayOptions
+                                .Where(o => o.Family.HasValue)
+                                .GroupBy(o => o.Family.Value)
+                                .ToList();
+                            var normalUngroupedOptions = displayOptions
+                                .Where(o => !o.Family.HasValue)
+                                .ToList();
+                            
+                            // Sắp xếp các nhóm theo type
+                            var normalSortedGroups = normalGroupedOptions.OrderBy(g => {
+                                var type = g.FirstOrDefault()?.Type?.ToLower() ?? "";
+                                return type switch {
+                                    "radio" => 1,
+                                    "select" => 2,
+                                    "checkbox" => 3,
+                                    _ => 4
+                                };
+                            }).ToList();
+                            
+                            <div class="mt-2 text-start">
+                                <small class="text-muted d-block mb-2 fw-semibold"><i class="bi bi-list-check me-1"></i>Tùy chọn:</small>
+                                
+                                @* Hiển thị các nhóm *@
+                                @foreach (var group in normalSortedGroups)
+                                {
+                                    var firstOption = group.FirstOrDefault();
+                                    var groupType = firstOption?.Type?.ToLower() ?? "";
+                                    var typeLabel = groupType switch {
+                                        "radio" => "Chọn một",
+                                        "select" => "Danh sách chọn",
+                                        "checkbox" => "Chọn nhiều",
+                                        "text" => "Văn bản",
+                                        "textarea" => "Nhập văn bản",
+                                        _ => "Tùy chọn"
+                                    };
+                                    
+                                    var borderColor = "#ffc107";
+                                    var bgColor = "#fffbf0";
+                                    if (groupType == "radio")
                                     {
-                                        <div class="list-group-item px-0 border-0 border-bottom bg-transparent py-1">
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <div>
-                                                    <strong>@o.OptionName</strong>
-                                                    <div class="text-muted small">@o.Description</div>
-                                                </div>
-                                                <span class="text-success fw-bold">@o.Price.ToString("N0") VNĐ/@GetUnitTypeVietnamese(o.UnitType)</span>
-                                            </div>
-                                        </div>
+                                        borderColor = "#0d6efd";
+                                        bgColor = "#e7f3ff";
                                     }
-                                </div>
+                                    else if (groupType == "select")
+                                    {
+                                        borderColor = "#198754";
+                                        bgColor = "#e8f5e9";
+                                    }
+                                    else if (groupType == "checkbox")
+                                    {
+                                        borderColor = "#6f42c1";
+                                        bgColor = "#f3e8ff";
+                                    }
+                                    
+                                    <div class="mb-3 p-3 text-start" style="background: @bgColor; border-left: 4px solid @borderColor; border-radius: 0.5rem;">
+                                        <div class="mb-2" style="font-weight: 600; color: @borderColor; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                                            <i class="bi bi-diagram-3" style="color: @borderColor;"></i>
+                                            <span>Nhóm: @typeLabel (@group.Count() tùy chọn)</span>
+                                        </div>
+                                        
+                                        @foreach (var o in group)
+                                        {
+                                            <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
+                                                <div class="fw-semibold mb-1">@o.OptionName</div>
+                                                @{
+                                                    var optionValue = o.Value;
+                                                    var optionType = o.Type?.ToLower() ?? "";
+                                                    if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
+                                                    {
+                                                        if (optionType == "textarea" || optionType == "text")
+                                                        {
+                                                            <div class="mt-1 p-2 bg-white rounded border text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">@optionValue</div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="text-muted small text-start">@optionValue</div>
+                                                        }
+                                                    }
+                                                    else if (optionType == "textarea" || optionType == "text")
+                                                    {
+                                                        <div class="text-muted small mt-1 text-start">
+                                                            <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                
+                                @* Hiển thị options không có nhóm *@
+                                @if (normalUngroupedOptions.Any())
+                                {
+                                    
+                                    <div class="text-start">
+                                        @foreach (var o in normalUngroupedOptions)
+                                        {
+                                            <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start">
+                                                <div class="fw-semibold mb-1">@o.OptionName</div>
+                                                @{
+                                                    var optionValue = o.Value;
+                                                    var optionType = o.Type?.ToLower() ?? "";
+                                                    if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
+                                                    {
+                                                        if (optionType == "textarea" || optionType == "text")
+                                                        {
+                                                            <div class="mt-1 p-2 bg-white rounded border text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">@optionValue</div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="text-muted small text-start">@optionValue</div>
+                                                        }
+                                                    }
+                                                    else if (optionType == "textarea" || optionType == "text")
+                                                    {
+                                                        <div class="text-muted small mt-1 text-start">
+                                                            <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
                             </div>
                         }
                     </div>
@@ -561,9 +813,9 @@
             
             @if (isPendingUpdate || Model.Status == "Pending")
             {
-                <div class="card-x mt-4">
+                <div class="card-x mt-3">
                     <div class="card-body">
-                        <div class="d-flex justify-content-end gap-3">
+                        <div class="d-flex justify-content-center gap-3 flex-wrap">
                             @{
                                 var returnUrlForActions = ViewBag.ReturnUrl as string ?? Url.Action("Index", "AdminServiceApproval");
                             }
@@ -628,5 +880,6 @@
         });
     }
 </script>
+
 
 

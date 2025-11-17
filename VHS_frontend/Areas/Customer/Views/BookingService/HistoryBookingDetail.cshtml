@@ -522,7 +522,7 @@
         <div class="d-flex gap-3">
             @{
                 var basePrice = Model?.Service?.UnitPrice ?? 0m;
-                var optionPrice = Model?.Options?.Sum(o => o.Price) ?? 0m;
+                var optionPrice = 0m; // Options no longer have Price
                 var total = basePrice + optionPrice;
             }
             <img src="@GetServiceImage(Model?.ServiceImages)"
@@ -537,11 +537,16 @@
                 <!-- <div class="text-muted">x@(Model?.Service?.Quantity ?? 0)</div> -->
                 @if (Model?.Options?.Any() == true)
                 {
+                    @* Hiển thị danh sách options phẳng (không có nhóm) cho Customer *@
                     <div class="mt-1">
-                        @foreach (var op in Model!.Options)
+                        @foreach (var op in Model.Options)
                         {
-                            <span class="option-badge" title="@op.Description">
-                                @op.OptionName - @op.Price.ToString("N0") @op.UnitType
+                            <span class="option-badge" style="margin-right: 0.5rem; margin-bottom: 0.25rem; display: inline-block;">
+                                @op.OptionName
+                                @if (!string.IsNullOrWhiteSpace(op.Value))
+                                {
+                                    <span class="text-muted">: @op.Value</span>
+                                }
                             </span>
                         }
                     </div>

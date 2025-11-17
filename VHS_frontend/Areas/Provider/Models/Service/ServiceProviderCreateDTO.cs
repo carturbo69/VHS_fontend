@@ -13,6 +13,7 @@ namespace VHS_frontend.Areas.Provider.Models.Service
         [StringLength(200, ErrorMessage = "Tên dịch vụ không được vượt quá 200 ký tự.")]
         public string Title { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "Vui lòng nhập mô tả dịch vụ.")]
         [StringLength(2000, ErrorMessage = "Mô tả không được vượt quá 2000 ký tự.")]
         public string Description { get; set; } = string.Empty;
 
@@ -32,6 +33,7 @@ namespace VHS_frontend.Areas.Provider.Models.Service
 
         public List<Guid> TagIds { get; set; } = new List<Guid>();
         public List<Guid> OptionIds { get; set; } = new List<Guid>();
+        public Dictionary<Guid, string>? OptionValues { get; set; }  // ✅ Values for text/textarea options (OptionId -> Value)
     }
 }
 
