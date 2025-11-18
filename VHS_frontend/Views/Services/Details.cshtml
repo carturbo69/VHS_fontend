@@ -187,7 +187,7 @@
                                     @* Hiển thị danh sách options phẳng (không có nhóm) cho Customer *@
                                     @foreach (var o in Model.ServiceOptions)
                                     {
-                                        <div class="addon-item" style="padding: 0.75rem; background: #fff; border-radius: 0.25rem; margin-bottom: 0.5rem;">
+                                        <div class="addon-item">
                                             <div class="option-body">
                                                 <div class="option-head">
                                                     <div class="addon-name">
@@ -197,21 +197,20 @@
                                                 </div>
                                                 @if (!string.IsNullOrWhiteSpace(o.Value))
                                                 {
-                                                    <div class="addon-desc mt-1">
-                                                        <strong class="small">Giá trị:</strong>
+                                                    <div class="addon-desc">
                                                         @if (o.Type?.ToLower() == "textarea" || o.Type?.ToLower() == "text")
                                                         {
-                                                            <div class="mt-1 p-2 bg-light rounded" style="white-space: pre-wrap; word-wrap: break-word;">@o.Value</div>
+                                                            <div class="addon-value-text">@o.Value</div>
                                                         }
                                                         else
                                                         {
-                                                            <span>@o.Value</span>
+                                                            <span class="addon-value">@o.Value</span>
                                                         }
                                                     </div>
                                                 }
                                                 else if (o.Type?.ToLower() == "textarea" || o.Type?.ToLower() == "text")
                                                 {
-                                                    <div class="addon-desc mt-1 text-muted small">
+                                                    <div class="addon-desc addon-empty">
                                                         <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
                                                     </div>
                                                 }
@@ -225,11 +224,14 @@
                                 {
                                     <input type="hidden" name="optionIds" value="@o.OptionId" />
                                 }
+                                
+                                @* Hidden input để lưu OptionValues dưới dạng JSON *@
+                                <input type="hidden" name="optionValuesJson" id="optionValuesJson" value="" />
                             </section>
                         }
 
                         <div class="actions">
-                            <button type="submit" class="btn btn-cart">Thêm vào giỏ hàng</button>
+                            <button type="submit" class="btn btn-cart" onclick="prepareOptionValues()">Thêm vào giỏ hàng</button>
                             <button type="submit"
                                     class="btn btn-buy"
                                     formaction="@(Url.Action("StartDirect","BookingService", new { area="Customer" }))"
@@ -1006,5 +1008,38 @@
 
           wireImages(document);
         })();
+
+        // Function để chuẩn bị OptionValues trước khi submit form
+        function prepareOptionValues() {
+            const optionValues = {};
+            @if (Model.ServiceOptions?.Any() == true)
+            {
+                foreach (var o in Model.ServiceOptions)
+                {
+                    if (!string.IsNullOrWhiteSpace(o.Value))
+                    {
+                        <text>
+                        optionValues['@o.OptionId.ToString()'] = @Html.Raw(Json.Serialize(o.Value));
+                        </text>
+                    }
+                }
+            }
+            
+            // Set giá trị vào hidden input
+            const jsonInput = document.getElementById('optionValuesJson');
+            if (jsonInput) {
+                jsonInput.value = JSON.stringify(optionValues);
+            }
+        }
+
+        // Gắn event listener cho form submit
+        document.addEventListener('DOMContentLoaded', function() {
+            const cartForm = document.getElementById('cartForm');
+            if (cartForm) {
+                cartForm.addEventListener('submit', function(e) {
+                    prepareOptionValues();
+                });
+            }
+        });
     </script>
 }

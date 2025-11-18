@@ -98,7 +98,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult StartDirect(Guid serviceId, List<Guid>? optionIds)
+        public IActionResult StartDirect(Guid serviceId, List<Guid>? optionIds, string? optionValuesJson)
         {
             if (serviceId == Guid.Empty)
             {
@@ -106,9 +106,35 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return RedirectToAction("Index", "Services", new { area = "Customer" });
             }
 
+            // Parse OptionValues từ JSON string
+            Dictionary<Guid, string>? optionValues = null;
+            if (!string.IsNullOrWhiteSpace(optionValuesJson))
+            {
+                try
+                {
+                    var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(optionValuesJson);
+                    if (dict != null)
+                    {
+                        optionValues = new Dictionary<Guid, string>();
+                        foreach (var kvp in dict)
+                        {
+                            if (Guid.TryParse(kvp.Key, out var optionId))
+                            {
+                                optionValues[optionId] = kvp.Value;
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Nếu parse lỗi, bỏ qua
+                }
+            }
+
             var payload = new DirectCheckoutPayload(
                 serviceId,
-                (optionIds ?? new()).Where(x => x != Guid.Empty).Distinct().ToList()
+                (optionIds ?? new()).Where(x => x != Guid.Empty).Distinct().ToList(),
+                optionValues
             );
 
             HttpContext.Session.SetString(
@@ -225,7 +251,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     TagId      = o.TagId,
                     Type       = o.Type,
                     Family     = o.Family,
-                    Value      = o.Value
+                    // ✅ Ưu tiên Value từ direct.OptionValues (user đã nhập), fallback về o.Value (ServiceOption.Value)
+                    Value      = direct.OptionValues != null && direct.OptionValues.TryGetValue(o.OptionId, out var userValue) 
+                                 ? userValue 
+                                 : o.Value
                 }).ToList()
             }
         };
@@ -554,6 +583,40 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             try
             {
+                // ✅ Deserialize OptionValuesJson từ form và set vào BookItem.OptionValues
+                if (model.Items != null)
+                {
+                    for (int i = 0; i < model.Items.Count; i++)
+                    {
+                        var item = model.Items[i];
+                        // Lấy OptionValuesJson từ Request.Form
+                        var optionValuesJson = Request.Form[$"Items[{i}].OptionValuesJson"].FirstOrDefault();
+                        if (!string.IsNullOrWhiteSpace(optionValuesJson))
+                        {
+                            try
+                            {
+                                var optionValues = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(optionValuesJson);
+                                if (optionValues != null && optionValues.Any())
+                                {
+                                    // Convert Dictionary<string, string> sang Dictionary<Guid, string>
+                                    item.OptionValues = new Dictionary<Guid, string>();
+                                    foreach (var kvp in optionValues)
+                                    {
+                                        if (Guid.TryParse(kvp.Key, out var optionId))
+                                        {
+                                            item.OptionValues[optionId] = kvp.Value;
+                                        }
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Nếu deserialize lỗi, bỏ qua
+                            }
+                        }
+                    }
+                }
+                
                 // MapFromViewModel đã đẩy VoucherId sang DTO
                 var dto = BookingServiceCustomer.MapFromViewModel(model, accountId);
                 var result = await _bookingServiceCustomer.CreateManyBookingsAsync(dto, jwt, ct);
@@ -687,7 +750,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
             // Lưu thông tin vào session để đặt trực tiếp (giống StartDirect)
             var payload = new DirectCheckoutPayload(
                 serviceId,
-                (optionIds ?? new()).Where(x => x != Guid.Empty).Distinct().ToList()
+                (optionIds ?? new()).Where(x => x != Guid.Empty).Distinct().ToList(),
+                null // OptionValues sẽ được lấy từ session hoặc không có
             );
 
             HttpContext.Session.SetString(
@@ -1392,6 +1456,19 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 foreach (var it in items)
                 {
+                    // ✅ Tạo OptionValues dictionary từ Options có Value (textarea/text)
+                    Dictionary<Guid, string>? optionValues = null;
+                    if (it.Options != null && it.Options.Any())
+                    {
+                        var valuesDict = it.Options
+                            .Where(opt => !string.IsNullOrWhiteSpace(opt.Value))
+                            .ToDictionary(opt => opt.OptionId, opt => opt.Value ?? string.Empty);
+                        if (valuesDict.Any())
+                        {
+                            optionValues = valuesDict;
+                        }
+                    }
+
                     vm.Items.Add(new BookItem
                     {
                         CartItemId = it.CartItemId,
@@ -1412,7 +1489,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
                             Type = o.Type ?? "",
                             Family = o.Family,
                             Value = o.Value
-                        }).ToList()
+                        }).ToList(),
+                        OptionValues = optionValues // ✅ Set OptionValues từ cart item options
                     });
                 }
             }

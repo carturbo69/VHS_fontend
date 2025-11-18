@@ -2,6 +2,7 @@
     using System.Collections.Generic;
     using System.Linq;
     using System.Threading.Tasks;
+    using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
     namespace VHS_frontend.Models.ServiceDTOs
     {
         public class ListServiceHomePageDTOs
@@ -22,5 +23,10 @@
             public int TotalReviews { get; set; }
 
             public string CategoryName { get; set; } = null!;
+            
+            public string? ProviderName { get; set; }
+            
+            // ✅ Thêm Options để hiển thị trong card
+            public List<ReadServiceOptionDTOs> ServiceOptions { get; set; } = new();
     }
     }

@@ -10,9 +10,11 @@
 
     public class CreateBookingItemDto
     {
+        public Guid? CartItemId { get; set; }
         public Guid ServiceId { get; set; }
         public DateTime BookingTime { get; set; }   // 🕒 đã có
         public List<Guid> OptionIds { get; set; } = new();
+        public Dictionary<Guid, string>? OptionValues { get; set; } // Giá trị textarea user đã nhập
     }
 
     // API_Backend.DTOs.BookingServiceDTOs

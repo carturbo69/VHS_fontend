@@ -10,6 +10,7 @@ using VHS_frontend.Models.ServiceDTOs;
 using VHS_frontend.Models.ServiceShop;
 using VHS_frontend.Areas.Admin.Models.Category;
 using VHS_frontend.Services.Customer.Interfaces;
+using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
 
 namespace VHS_frontend.Services
 {
@@ -64,7 +65,7 @@ namespace VHS_frontend.Services
                 System.Diagnostics.Debug.WriteLine($"Step 5 Complete: Tags for {categoryTagsMap.Count} categories");
 
                 // BƯỚC 6: Map services thành ServiceItems
-                var allServiceItems = MapServicesToServiceItems(providerServices, allCategories, servicesRatingMap, categoryTagsMap);
+                var allServiceItems = await MapServicesToServiceItemsAsync(providerServices, allCategories, servicesRatingMap, categoryTagsMap);
                 System.Diagnostics.Debug.WriteLine($"Step 6 Complete: Mapped {allServiceItems.Count} ServiceItems");
 
                 // BƯỚC 7: Lọc, sort và phân trang
@@ -183,22 +184,31 @@ namespace VHS_frontend.Services
                     Console.WriteLine($"[GetProviderServicesAsync] First service ProviderId: {allServices[0].ProviderId}, Expected: {providerId}, Match: {allServices[0].ProviderId == providerId}");
                 }
                 
-                // Đảm bảo chỉ lấy services có ProviderId khớp
+                // Đảm bảo chỉ lấy services có ProviderId khớp và status đã được duyệt
+                // Chỉ hiển thị services có status là "Approved", "Active" hoặc null/empty (đã duyệt)
+                // Loại bỏ "Pending" và "PendingUpdate"
                 var validServices = allServices
-                    .Where(s => s != null && s.ProviderId == providerId)
+                    .Where(s => s != null 
+                        && s.ProviderId == providerId
+                        && (string.IsNullOrWhiteSpace(s.Status) 
+                            || s.Status == "Approved" 
+                            || s.Status == "Active")
+                        && s.Status != "Pending"
+                        && s.Status != "PendingUpdate")
                     .ToList();
 
-                if (validServices.Count != allServices.Count)
+                var filteredCount = allServices.Count - validServices.Count;
+                if (filteredCount > 0)
                 {
-                    Console.WriteLine($"[GetProviderServicesAsync] WARNING: Filtered out {allServices.Count - validServices.Count} services with mismatched ProviderId");
-                    System.Diagnostics.Debug.WriteLine($"WARNING: Filtered out {allServices.Count - validServices.Count} services with mismatched ProviderId");
+                    Console.WriteLine($"[GetProviderServicesAsync] WARNING: Filtered out {filteredCount} services (mismatched ProviderId or pending status)");
+                    System.Diagnostics.Debug.WriteLine($"WARNING: Filtered out {filteredCount} services (mismatched ProviderId or pending status)");
                 }
 
                 // Log first few services for debugging
                 foreach (var svc in validServices.Take(3))
                 {
-                    Console.WriteLine($"[GetProviderServicesAsync] Service: {svc.Title}, ProviderId: {svc.ProviderId}, Category: {svc.CategoryName}");
-                    System.Diagnostics.Debug.WriteLine($"  Service: {svc.Title}, ProviderId: {svc.ProviderId}, Category: {svc.CategoryName}");
+                    Console.WriteLine($"[GetProviderServicesAsync] Service: {svc.Title}, ProviderId: {svc.ProviderId}, Status: {svc.Status}, Category: {svc.CategoryName}");
+                    System.Diagnostics.Debug.WriteLine($"  Service: {svc.Title}, ProviderId: {svc.ProviderId}, Status: {svc.Status}, Category: {svc.CategoryName}");
                 }
 
                 Console.WriteLine($"[GetProviderServicesAsync] END - Returning {validServices.Count} valid services");
@@ -636,13 +646,16 @@ namespace VHS_frontend.Services
         /// <summary>
         /// Map services thành ServiceItems
         /// </summary>
-        private List<ServiceItem> MapServicesToServiceItems(
+        private async Task<List<ServiceItem>> MapServicesToServiceItemsAsync(
             List<ServiceProviderReadDTO> providerServices,
             List<CategoryDTO> allCategories,
             Dictionary<Guid, object> servicesRatingMap,
             Dictionary<Guid, List<TagDTO>> categoryTagsMap)
         {
             var serviceItems = new List<ServiceItem>();
+
+            // Fetch options cho tất cả services (batch)
+            var serviceOptionsMap = await GetServicesOptionsMapAsync(providerServices.Select(s => s.ServiceId).ToList());
 
             foreach (var dto in providerServices)
             {
@@ -651,13 +664,18 @@ namespace VHS_frontend.Services
                     // Lấy rating info
                     var ratingInfo = servicesRatingMap.ContainsKey(dto.ServiceId) ? servicesRatingMap[dto.ServiceId] : null;
 
+                    // Lấy options cho service này
+                    var options = serviceOptionsMap.ContainsKey(dto.ServiceId) 
+                        ? serviceOptionsMap[dto.ServiceId] 
+                        : new List<ReadServiceOptionDTOs>();
+
                     // Nếu service không có tags, lấy từ category
                     if ((dto.Tags == null || !dto.Tags.Any()) && categoryTagsMap.ContainsKey(dto.CategoryId))
                     {
                         dto.Tags = categoryTagsMap[dto.CategoryId];
                     }
 
-                    var serviceItem = MapToServiceItem(dto, allCategories, ratingInfo);
+                    var serviceItem = MapToServiceItem(dto, allCategories, ratingInfo, options);
                     serviceItems.Add(serviceItem);
                 }
                 catch (Exception ex)
@@ -670,9 +688,67 @@ namespace VHS_frontend.Services
         }
 
         /// <summary>
+        /// Fetch options cho nhiều services cùng lúc
+        /// </summary>
+        private async Task<Dictionary<Guid, List<ReadServiceOptionDTOs>>> GetServicesOptionsMapAsync(List<Guid> serviceIds)
+        {
+            var optionsMap = new Dictionary<Guid, List<ReadServiceOptionDTOs>>();
+
+            // Fetch options cho từng service (có thể tối ưu thành batch call sau)
+            var tasks = serviceIds.Select(async serviceId =>
+            {
+                try
+                {
+                    var options = await GetServiceOptionsAsync(serviceId);
+                    return new { ServiceId = serviceId, Options = options };
+                }
+                catch
+                {
+                    return new { ServiceId = serviceId, Options = new List<ReadServiceOptionDTOs>() };
+                }
+            });
+
+            var results = await Task.WhenAll(tasks);
+            foreach (var result in results)
+            {
+                optionsMap[result.ServiceId] = result.Options;
+            }
+
+            return optionsMap;
+        }
+
+        /// <summary>
+        /// Fetch options cho một service
+        /// </summary>
+        private async Task<List<ReadServiceOptionDTOs>> GetServiceOptionsAsync(Guid serviceId)
+        {
+            try
+            {
+                var url = $"api/Services/{serviceId}/options-cart";
+                var response = await _httpClient.GetAsync(url);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var options = await response.Content.ReadFromJsonAsync<List<ReadServiceOptionDTOs>>(_json);
+                    return options ?? new List<ReadServiceOptionDTOs>();
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return new List<ReadServiceOptionDTOs>(); // không có option
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error fetching options for service {serviceId}: {ex.Message}");
+            }
+
+            return new List<ReadServiceOptionDTOs>();
+        }
+
+        /// <summary>
         /// Map một ServiceProviderReadDTO thành ServiceItem
         /// </summary>
-        private ServiceItem MapToServiceItem(ServiceProviderReadDTO dto, List<CategoryDTO>? categories = null, object? ratingInfo = null)
+        private ServiceItem MapToServiceItem(ServiceProviderReadDTO dto, List<CategoryDTO>? categories = null, object? ratingInfo = null, List<ReadServiceOptionDTOs>? serviceOptions = null)
         {
             // Parse ảnh từ dto.Images (có thể là JSON array hoặc comma-separated string)
             string? images = null;
@@ -774,7 +850,8 @@ namespace VHS_frontend.Services
                 Category = dto.CategoryName ?? "",
                 CategoryId = mappedCategoryId,
                 Tags = tags,
-                CreatedAt = dto.CreatedAt
+                CreatedAt = dto.CreatedAt,
+                ServiceOptions = serviceOptions ?? new List<ReadServiceOptionDTOs>()
             };
         }
 

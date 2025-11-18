@@ -119,7 +119,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddToCart(Guid serviceId, List<Guid>? optionIds)
+        public async Task<IActionResult> AddToCart(Guid serviceId, List<Guid>? optionIds, string? optionValuesJson)
         {
             // Lấy accountId & token từ Session
             var accountIdStr = HttpContext.Session.GetString("AccountID");
@@ -134,10 +134,36 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             try
             {
+                // Parse OptionValues từ JSON string
+                Dictionary<Guid, string>? optionValues = null;
+                if (!string.IsNullOrWhiteSpace(optionValuesJson))
+                {
+                    try
+                    {
+                        var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(optionValuesJson);
+                        if (dict != null)
+                        {
+                            optionValues = new Dictionary<Guid, string>();
+                            foreach (var kvp in dict)
+                            {
+                                if (Guid.TryParse(kvp.Key, out var optionId))
+                                {
+                                    optionValues[optionId] = kvp.Value;
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Nếu parse lỗi, bỏ qua
+                    }
+                }
+
                 var req = new AddCartItemRequest
                 {
                     ServiceId = serviceId,
-                    OptionIds = optionIds ?? new List<Guid>()
+                    OptionIds = optionIds ?? new List<Guid>(),
+                    OptionValues = optionValues
                 };
 
                 var ok = await _cartService.AddItemToCartAsync(accountId, req, jwtToken);

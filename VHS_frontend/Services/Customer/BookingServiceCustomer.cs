@@ -237,11 +237,26 @@ namespace VHS_frontend.Services.Customer
                     bookingTimeVietnam = it.BookingTime;
                 }
 
+                // Lấy OptionValues từ BookItem (nếu có)
+                Dictionary<Guid, string>? optionValues = null;
+                if (it.OptionValues != null && it.OptionValues.Any())
+                {
+                    optionValues = it.OptionValues;
+                }
+                else if (it.Options != null && it.Options.Any())
+                {
+                    // Fallback: lấy từ Options nếu OptionValues không có
+                    optionValues = it.Options
+                        .Where(opt => !string.IsNullOrWhiteSpace(opt.Value))
+                        .ToDictionary(opt => opt.OptionId, opt => opt.Value ?? string.Empty);
+                }
+
                 items.Add(new CreateBookingItemDto
                 {
                     ServiceId = it.ServiceId,
                     BookingTime = bookingTimeVietnam, // Gửi giờ Việt Nam (Unspecified) lên API
-                    OptionIds = pickedOptionIds
+                    OptionIds = pickedOptionIds,
+                    OptionValues = optionValues
                 });
             }
 

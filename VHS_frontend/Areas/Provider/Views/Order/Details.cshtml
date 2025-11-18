@@ -94,120 +94,60 @@
                             <h5 class="service-name">@Model.ServiceName</h5>
                             <p class="service-description">@Model.ServiceDescription</p>
                             <div class="service-price-box">
-                                <span class="price-label">Giá cơ bản:</span>
+                                <span class="price-label">Giá:</span>
                                 <span class="price-value">@Model.ServicePrice.ToString("N0") VND</span>
                             </div>
                             
                             @if (Model.Options.Any())
                             {
-                                // Nhóm options theo Family
-                                var groupedOptions = Model.Options
-                                    .Where(o => o.Family.HasValue)
-                                    .GroupBy(o => o.Family.Value)
-                                    .ToList();
-                                var ungroupedOptions = Model.Options
-                                    .Where(o => !o.Family.HasValue)
-                                    .ToList();
-                                
-                                // Sắp xếp các nhóm theo type (radio, select, checkbox)
-                                var sortedGroups = groupedOptions.OrderBy(g => {
-                                    var type = g.FirstOrDefault()?.Type?.ToLower() ?? "";
-                                    return type switch {
-                                        "radio" => 1,
-                                        "select" => 2,
-                                        "checkbox" => 3,
-                                        _ => 4
-                                    };
-                                }).ToList();
-                                
                                 <div class="service-options mt-3">
-                                    <strong class="options-title"><i class="bi bi-list-check me-2"></i>Tùy chọn đã chọn:</strong>
-                                    
-                                    @* Hiển thị các nhóm (Family) *@
-                                    @foreach (var group in sortedGroups)
-                                    {
-                                        var firstOption = group.FirstOrDefault();
-                                        var groupType = firstOption?.Type?.ToLower() ?? "";
-                                        var typeLabel = groupType switch {
-                                            "radio" => "Chọn một",
-                                            "select" => "Danh sách chọn",
-                                            "checkbox" => "Chọn nhiều",
-                                            "text" => "Văn bản",
-                                            "textarea" => "Nhập văn bản",
-                                            _ => "Tùy chọn"
-                                        };
-                                        
-                                        // Màu sắc theo loại nhóm
-                                        var borderColor = "#ffc107";
-                                        var bgColor = "#fffbf0";
-                                        if (groupType == "radio")
+                                    <strong class="options-title"><i class="bi bi-list-check me-2"></i>Tùy chọn đã bao gồm:</strong>
+                                    <div class="mt-2">
+                                        @foreach (var option in Model.Options)
                                         {
-                                            borderColor = "#0d6efd";
-                                            bgColor = "#e7f3ff";
-                                        }
-                                        else if (groupType == "select")
-                                        {
-                                            borderColor = "#198754";
-                                            bgColor = "#e8f5e9";
-                                        }
-                                        else if (groupType == "checkbox")
-                                        {
-                                            borderColor = "#6f42c1";
-                                            bgColor = "#f3e8ff";
-                                        }
-                                        
-                                        <div class="mb-2" style="padding: 0.75rem; background: @bgColor; border-left: 4px solid @borderColor; border-radius: 0.5rem;">
-                                            <div class="mb-2" style="font-weight: 600; color: @borderColor; font-size: 0.875rem;">
-                                                <i class="bi bi-diagram-3" style="color: @borderColor;"></i>
-                                                Nhóm: @typeLabel (@group.Count() tùy chọn)
-                                            </div>
-                                            <ul class="options-list" style="margin: 0; padding-left: 1.5rem;">
-                                                @foreach (var option in group)
-                                                {
-                                                    <li class="option-item" style="border-left: 2px solid @borderColor; padding-left: 0.5rem; margin-bottom: 0.25rem;">
-                                                        <i class="bi bi-check-circle-fill"></i>
-                                                        <span class="option-name">@option.OptionName</span>
-                                                        @if (!string.IsNullOrWhiteSpace(option.Type))
+                                            var isTextarea = option.Type?.ToLower() == "textarea" || option.Type?.ToLower() == "text";
+                                            <div style="font-size: 0.9375rem; color: var(--muted-foreground, #6c757d); margin-bottom: 0.25rem;">
+                                                <div style="display: flex; align-items: flex-start;">
+                                                    <i class="bi bi-check-circle-fill me-1" style="color: var(--success, #198754); font-size: 0.75rem; margin-top: 0.125rem; flex-shrink: 0;"></i>
+                                                    <div style="flex: 1; min-width: 0;">
+                                                        <span>@option.OptionName</span>
+                                                        @if (isTextarea && !string.IsNullOrWhiteSpace(option.Value))
                                                         {
-                                                            <span class="badge bg-info ms-1" style="font-size: 0.7rem;">@option.Type</span>
+                                                            @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                            var valueLines = new List<string>();
+                                                            
+                                                            @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                            if (option.Value.Contains('\n') || option.Value.Contains('\r'))
+                                                            {
+                                                                @* Nếu có xuống dòng, split theo \n và \r *@
+                                                                valueLines = option.Value
+                                                                    .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                    .Select(v => v.Trim())
+                                                                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                    .ToList();
+                                                            }
+                                                            else
+                                                            {
+                                                                @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                                valueLines = option.Value
+                                                                    .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                    .Select(v => v.Trim())
+                                                                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                    .ToList();
+                                                            }
+                                                            
+                                                            <div style="margin-top: 0.125rem; font-size: 0.875rem; line-height: 1.4; color: #6c757d;">
+                                                                @foreach (var line in valueLines)
+                                                                {
+                                                                    <div>@line</div>
+                                                                }
+                                                            </div>
                                                         }
-                                                        @if (!string.IsNullOrWhiteSpace(option.Value))
-                                                        {
-                                                            <span class="option-desc text-muted">: @option.Value</span>
-                                                        }
-                                                    </li>
-                                                }
-                                            </ul>
-                                        </div>
-                                    }
-                                    
-                                    @* Hiển thị các options không có nhóm *@
-                                    @if (ungroupedOptions.Any())
-                                    {
-                                        @if (sortedGroups.Any())
-                                        {
-                                            <div style="border-top: 2px solid #dee2e6; margin: 0.75rem 0; padding-top: 0.5rem;">
-                                                <small class="text-muted"><i class="bi bi-three-dots me-1"></i>Options độc lập:</small>
+                                                    </div>
+                                                </div>
                                             </div>
                                         }
-                                        <ul class="options-list">
-                                            @foreach (var option in ungroupedOptions)
-                                            {
-                                                <li class="option-item">
-                                                    <i class="bi bi-check-circle-fill"></i>
-                                                    <span class="option-name">@option.OptionName</span>
-                                                    @if (!string.IsNullOrWhiteSpace(option.Type))
-                                                    {
-                                                        <span class="badge bg-info ms-1">@option.Type</span>
-                                                    }
-                                                    @if (!string.IsNullOrWhiteSpace(option.Value))
-                                                    {
-                                                        <span class="option-desc text-muted">: @option.Value</span>
-                                                    }
-                                                </li>
-                                            }
-                                        </ul>
-                                    }
+                                    </div>
                                 </div>
                             }
                         </div>
@@ -238,7 +178,7 @@
                                 @if (!string.IsNullOrEmpty(Model.RecipientName))
                                 {
                                     <div class="address-recipient mb-2">
-                                        <strong><i class="bi bi-person me-1"></i>Người nhận:</strong> 
+                                        <strong><i class="bi bi-person me-1"></i>Người đặt:</strong> 
                                         <span>@Model.RecipientName</span>
                                         @if (!string.IsNullOrEmpty(Model.RecipientPhone))
                                         {
@@ -753,14 +693,6 @@
                 }
             }
             
-            const confirmMsg = newStatus === 'Confirmed' ? 'xác nhận' : 
-                              newStatus === 'Completed' ? 'hoàn thành' : 'cập nhật';
-            
-            if (!confirm(`Bạn có chắc chắn muốn ${confirmMsg} đơn hàng này?`)) {
-                console.log('[DEBUG] User cancelled');
-                return;
-            }
-
             const payload = {
                 bookingId: bookingId,
                 newStatus: newStatus,

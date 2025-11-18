@@ -195,7 +195,7 @@
                         var key = it.CartItemId;
                         var options = it.Options ?? new List<BookItemOption>();
 
-                        <div class="item-row">
+                        <div class="item-row" data-item-index="@i">
                             <!-- Cột 1: Ảnh -->
                             <img class="thumb" 
                                  src="@GetServiceImage(it.ServiceImages, it.Image)" 
@@ -218,12 +218,32 @@
                                     {
                                         foreach (var a in options)
                                         {
-                                            <div class="opt-row">
-                                                <div class="opt-name">
-                                                    <div>@a.Name</div>
+                                            var isTextarea = a.Type?.ToLower() == "textarea" || a.Type?.ToLower() == "text";
+                                            <div class="opt-row" data-option-id="@a.OptionId">
+                                                <div class="opt-name" style="flex: 1; min-width: 0;">
+                                                    <div style="font-weight: 500; margin-bottom: 8px;">
+                                                        <span>✓</span>
+                                                        <span>@a.Name</span>
+                                                    </div>
                                                     @if (!string.IsNullOrWhiteSpace(a.Value))
                                                     {
-                                                        <div class="muted text-sm">Giá trị: @a.Value</div>
+                                                        <div style="margin-top: 8px;">
+                                                       
+                                                            @if (isTextarea)
+                                                            {
+                                                                <div class="option-value-text" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px; font-size: 0.9em; line-height: 1.5;">@a.Value</div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="text-muted" style="margin-left: 4px;">@a.Value</span>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    else if (isTextarea)
+                                                    {
+                                                        <div style="margin-top: 8px; color: #6c757d; font-size: 0.875em;">
+                                                            <i class="bi bi-info-circle" style="margin-right: 4px;"></i>Chưa có
+                                                        </div>
                                                     }
                                                 </div>
 
@@ -2843,6 +2863,51 @@
             return results.every(r => r === true);
         }
 
+        // ✅ Hàm collect OptionValues từ Options đã hiển thị (từ cart)
+        function collectOptionValues() {
+            const placeOrderForm = document.getElementById('@placeOrderFormId');
+            if (!placeOrderForm) return;
+            
+            // Xóa các hidden input OptionValues cũ (nếu có)
+            document.querySelectorAll('input[name^="Items["][name*="].OptionValuesJson"]').forEach(el => el.remove());
+            
+            // Tìm tất cả các item trong form
+            const items = document.querySelectorAll('.item-row[data-item-index]');
+            items.forEach(item => {
+                const itemIndex = item.getAttribute('data-item-index');
+                if (!itemIndex) return;
+                
+                const optionValues = {};
+                
+                // Tìm tất cả các option rows có Value đã hiển thị
+                const optionRows = item.querySelectorAll('.opt-row[data-option-id]');
+                optionRows.forEach(optRow => {
+                    // Lấy optionId từ data attribute
+                    const optionId = optRow.getAttribute('data-option-id');
+                    if (!optionId) return;
+                    
+                    // Tìm value div (textarea value được hiển thị trong div này)
+                    const valueDiv = optRow.querySelector('.mt-1.p-2.bg-light.rounded');
+                    if (valueDiv) {
+                        const value = valueDiv.textContent?.trim() || '';
+                        if (value) {
+                            optionValues[optionId] = value;
+                        }
+                    }
+                });
+                
+                // Nếu có OptionValues, tạo hidden input JSON
+                if (Object.keys(optionValues).length > 0) {
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = `Items[${itemIndex}].OptionValuesJson`;
+                    hiddenInput.value = JSON.stringify(optionValues);
+                    hiddenInput.form = '@placeOrderFormId';
+                    placeOrderForm.appendChild(hiddenInput);
+                }
+            });
+        }
+
         // Override form submit to validate booking times
         document.addEventListener('DOMContentLoaded', function() {
             const placeOrderForm = document.getElementById('@placeOrderFormId');
@@ -3028,6 +3093,9 @@
                         
                         return false;
                     }
+                    
+                    // ✅ Collect OptionValues từ textarea inputs trước khi submit
+                    collectOptionValues();
                     
                     // Tất cả validation đều pass - submit form
                     placeOrderForm.submit();
