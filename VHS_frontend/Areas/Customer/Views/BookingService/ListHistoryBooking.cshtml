@@ -380,6 +380,48 @@
                             Hủy đơn
                         </button>
                     }
+                    else if (st.Equals("Confirmed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        @* Kiểm tra nếu booking đã được xác nhận nhưng chưa thanh toán, hiển thị nút thanh toán *@
+                        @* Ẩn nút nếu đã thanh toán thành công *@
+                        @* Kiểm tra cả PaidAmount và PaymentStatus để đảm bảo chính xác *@
+                        var hasPaidAmount = (o.PaidAmount ?? 0m) > 0;
+                        var hasSuccessPaymentStatus = !string.IsNullOrWhiteSpace(o.PaymentStatus) && 
+                                                      (o.PaymentStatus.ToUpperInvariant() == "ĐÃ THANH TOÁN" || 
+                                                       o.PaymentStatus.ToUpperInvariant() == "PAID" || 
+                                                       o.PaymentStatus.ToUpperInvariant() == "SUCCESS" || 
+                                                       o.PaymentStatus.ToUpperInvariant() == "COMPLETED" ||
+                                                       o.PaymentStatus.ToUpperInvariant() == "00" || // VNPay success code
+                                                       o.PaymentStatus.Contains("thành công", StringComparison.OrdinalIgnoreCase) ||
+                                                       o.PaymentStatus.Contains("success", StringComparison.OrdinalIgnoreCase));
+                        
+                        var isPaid = hasPaidAmount || hasSuccessPaymentStatus;
+                        
+                        @* Chỉ hiển thị nút thanh toán nếu booking đã được xác nhận và CHƯA thanh toán *@
+                        @* Debug: có thể bỏ comment để kiểm tra giá trị *@
+                        @* <!-- Debug: BookingId=@o.BookingId, PaidAmount=@(o.PaidAmount ?? 0m), PaymentStatus=@(o.PaymentStatus ?? "null"), isPaid=@isPaid --> *@
+                        
+                        if (!isPaid)
+                        {
+                            <form asp-area="Customer" 
+                                  asp-controller="BookingService" 
+                                  asp-action="PayAfterConfirmation" 
+                                  method="post" 
+                                  style="display: inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="bookingIds" value="@o.BookingId" />
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-credit-card me-1"></i> Thanh toán ngay
+                                </button>
+                            </form>
+                        }
+                        
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                onclick="window.location.href='@Url.Action("WithProvider", "ChatCustomer", new { area = "Customer", providerId = o.ProviderId })'">
+                            <i class="bi bi-chat-text me-1"></i> Liên hệ Shop
+                        </button>
+                    }
                     else if (st.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
                     {
                         <form asp-area="Customer" asp-controller="BookingService" asp-action="ReorderBooking" method="post" style="display: inline;">

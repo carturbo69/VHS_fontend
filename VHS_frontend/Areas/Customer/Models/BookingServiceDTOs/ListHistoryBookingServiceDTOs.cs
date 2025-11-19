@@ -43,6 +43,10 @@
 
         public bool HasReview { get; set; } = false;
 
+        // Payment info
+        public decimal? PaidAmount { get; set; }
+        public string? PaymentStatus { get; set; }
+
         // (tuỳ chọn) Tổng chi phí = giá service (Options no longer have Price)
         public decimal TotalPrice => ServicePrice;
 

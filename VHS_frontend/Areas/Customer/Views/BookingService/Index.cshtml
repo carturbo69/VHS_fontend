@@ -231,7 +231,7 @@
                                                        
                                                             @if (isTextarea)
                                                             {
-                                                                <div class="option-value-text" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px; font-size: 0.9em; line-height: 1.5;">@a.Value</div>
+                                                                <div class="option-value-text" data-option-id="@a.OptionId" data-option-value="@Uri.EscapeDataString(a.Value ?? "")" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px; font-size: 0.9em; line-height: 1.5;">@a.Value</div>
                                                             }
                                                             else
                                                             {
@@ -2886,13 +2886,54 @@
                     const optionId = optRow.getAttribute('data-option-id');
                     if (!optionId) return;
                     
-                    // Tìm value div (textarea value được hiển thị trong div này)
-                    const valueDiv = optRow.querySelector('.mt-1.p-2.bg-light.rounded');
-                    if (valueDiv) {
-                        const value = valueDiv.textContent?.trim() || '';
-                        if (value) {
-                            optionValues[optionId] = value;
+                    // ✅ Tìm giá trị textarea từ nhiều nguồn có thể:
+                    let value = '';
+                    
+                    // 1. Ưu tiên: Lấy từ data-attribute (chính xác nhất, không bị ảnh hưởng bởi HTML encoding)
+                    const valueDivWithData = optRow.querySelector('.option-value-text[data-option-id="' + optionId + '"]');
+                    if (valueDivWithData) {
+                        const dataValue = valueDivWithData.getAttribute('data-option-value');
+                        if (dataValue) {
+                            value = decodeURIComponent(dataValue.replace(/\+/g, ' '))?.trim() || '';
                         }
+                    }
+                    
+                    // 2. Nếu không có data-attribute, tìm textarea input nếu có (khi user đang nhập)
+                    if (!value) {
+                        const textareaInput = optRow.querySelector('textarea[data-option-id="' + optionId + '"]');
+                        if (textareaInput) {
+                            value = textareaInput.value?.trim() || '';
+                        }
+                    }
+                    
+                    // 3. Nếu vẫn không có, tìm trong div hiển thị giá trị (.option-value-text)
+                    if (!value) {
+                        const valueDiv = optRow.querySelector('.option-value-text');
+                        if (valueDiv) {
+                            // Ưu tiên textContent (giữ nguyên whitespace), fallback về innerText
+                            value = valueDiv.textContent?.trim() || valueDiv.innerText?.trim() || '';
+                        }
+                    }
+                    
+                    // 4. Nếu vẫn không có, thử tìm trong các div khác
+                    if (!value) {
+                        const valueDiv = optRow.querySelector('.mt-1.p-2.bg-light.rounded');
+                        if (valueDiv) {
+                            value = valueDiv.textContent?.trim() || valueDiv.innerText?.trim() || '';
+                        }
+                    }
+                    
+                    // 5. Cuối cùng, thử tìm trong span text-muted (cho non-textarea options)
+                    if (!value) {
+                        const valueSpan = optRow.querySelector('.text-muted');
+                        if (valueSpan) {
+                            value = valueSpan.textContent?.trim() || valueSpan.innerText?.trim() || '';
+                        }
+                    }
+                    
+                    // Lưu giá trị nếu có
+                    if (value) {
+                        optionValues[optionId] = value;
                     }
                 });
                 
@@ -2904,6 +2945,8 @@
                     hiddenInput.value = JSON.stringify(optionValues);
                     hiddenInput.form = '@placeOrderFormId';
                     placeOrderForm.appendChild(hiddenInput);
+                    
+                    console.log(`✅ Collected OptionValues for item ${itemIndex}:`, optionValues);
                 }
             });
         }

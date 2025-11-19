@@ -253,6 +253,34 @@
             }
             else if (IsWorking || IsConfirmed)
             {
+                @* Kiểm tra nếu booking đã được xác nhận nhưng chưa thanh toán, hiển thị nút thanh toán *@
+                @* Ẩn nút nếu đã thanh toán thành công *@
+                var isPaid = Model.PaidAmount > 0 || 
+                             (!string.IsNullOrWhiteSpace(Model.PaymentStatus) && 
+                              (Model.PaymentStatus.ToUpperInvariant() == "ĐÃ THANH TOÁN" || 
+                               Model.PaymentStatus.ToUpperInvariant() == "PAID" || 
+                               Model.PaymentStatus.ToUpperInvariant() == "SUCCESS" || 
+                               Model.PaymentStatus.ToUpperInvariant() == "COMPLETED" ||
+                               Model.PaymentStatus.ToUpperInvariant() == "00" || // VNPay success code
+                               Model.PaymentStatus.Contains("thành công", StringComparison.OrdinalIgnoreCase) ||
+                               Model.PaymentStatus.Contains("success", StringComparison.OrdinalIgnoreCase)));
+                
+                @* Chỉ hiển thị nút thanh toán nếu booking đã được xác nhận và CHƯA thanh toán *@
+                if (IsConfirmed && !isPaid)
+                {
+                    <form asp-area="Customer" 
+                          asp-controller="BookingService" 
+                          asp-action="PayAfterConfirmation" 
+                          method="post" 
+                          style="display: inline;">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="bookingIds" value="@Model.BookingId" />
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-credit-card me-1"></i> Thanh toán ngay
+                        </button>
+                    </form>
+                }
+                
                 <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#staffInfoModal">
                     <i class="bi bi-person-vcard me-1"></i> Liên hệ nhân viên
                 </button>

@@ -56,6 +56,9 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
 
         // Checker Records
         public List<BookingCheckerDTO> CheckerRecords { get; set; } = new();
+
+        // Auto Cancel Info
+        public int? AutoCancelMinutes { get; set; } // Thời gian tự động hủy riêng cho booking này (phút)
     }
 
     public class BookingOptionDetailDTO

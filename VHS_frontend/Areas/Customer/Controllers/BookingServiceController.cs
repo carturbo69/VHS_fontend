@@ -155,11 +155,13 @@ namespace VHS_frontend.Areas.Customer.Controllers
         [HttpGet]
         public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId, bool refresh = false)
         {
-            var jwt = HttpContext.Session.GetString("JWToken"); // 👈 kéo dòng này lên đầu để dùng cho cancel
+            var jwt = HttpContext.Session.GetString("JWToken");
 
-            // ✅ Luôn kiểm tra và xóa booking chưa thanh toán khi vào trang này
-            // (không chỉ khi refresh=1, để đảm bảo booking được dọn dẹp khi user quay lại)
-            await CancelPendingIfAnyAsync(jwt);
+            // ❌ KHÔNG gọi CancelPendingIfAnyAsync ở đây nữa vì:
+            // - Flow mới: booking được tạo và chờ xác nhận, KHÔNG chờ thanh toán ngay
+            // - Nếu gọi ở đây, booking vừa tạo sẽ bị xóa khi user quay lại trang checkout
+            // - Chỉ hủy booking khi user thực sự hủy từ payment gateway hoặc hủy thủ công
+            // await CancelPendingIfAnyAsync(jwt); // ❌ ĐÃ TẮT
 
             if (refresh)
             {
@@ -195,12 +197,9 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return RedirectToAction("Login", "Account", new { area = "" });
             }
 
-            // ====== Lấy VoucherId từ session nếu không có trên query ======
-            if (!voucherId.HasValue)
-            {
-                var voucherIdStr = HttpContext.Session.GetString(SS_VOUCHER_ID);
-                if (Guid.TryParse(voucherIdStr, out var vid)) voucherId = vid;
-            }
+            // ====== CHỈ lấy VoucherId từ query parameter (từ Cart gửi lên) ======
+            // KHÔNG tự động lấy từ session để tránh tự áp dụng voucher
+            // Chỉ áp dụng voucher nếu đã được chọn ở Cart và truyền qua query parameter
 
             // ----------------------------------------------------------------
             // NHÁNH 1: DIRECT CHECKOUT (Mua ngay - không qua giỏ)
@@ -297,8 +296,16 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 vm.VoucherPercent = (int)Math.Round(pctDec);
                 vm.VoucherMaxAmount = maxCap;
 
-                // Lưu lại voucher cho PlaceOrder
-                HttpContext.Session.SetString(SS_VOUCHER_ID, vm.VoucherId?.ToString() ?? "");
+                // ✅ CHỈ lưu voucher vào session nếu có voucher từ query parameter (từ Cart)
+                // Nếu không có voucher từ query, xóa session để tránh tự áp dụng
+                if (voucherId.HasValue && chosen != null)
+                {
+                    HttpContext.Session.SetString(SS_VOUCHER_ID, vm.VoucherId?.ToString() ?? "");
+                }
+                else
+                {
+                    HttpContext.Session.Remove(SS_VOUCHER_ID);
+                }
                 // GIỮ SS_CHECKOUT_DIRECT để PlaceOrder biết đang đi nhánh direct (không set SS_SELECTED_IDS)
                 HttpContext.Session.SetString(SS_CHECKOUT_DIRECT, directJson);
 
@@ -384,7 +391,16 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                 // Lưu session cho flow (CHỈ NHÁNH GIỎ)
                 HttpContext.Session.SetString(SS_SELECTED_IDS, string.Join(',', ids));
-                HttpContext.Session.SetString(SS_VOUCHER_ID, vm.VoucherId?.ToString() ?? "");
+                // ✅ CHỈ lưu voucher vào session nếu có voucher từ query parameter (từ Cart)
+                // Nếu không có voucher từ query, xóa session để tránh tự áp dụng
+                if (voucherId.HasValue && chosen != null)
+                {
+                    HttpContext.Session.SetString(SS_VOUCHER_ID, vm.VoucherId?.ToString() ?? "");
+                }
+                else
+                {
+                    HttpContext.Session.Remove(SS_VOUCHER_ID);
+                }
 
                 // Dọn cờ direct nếu lỡ còn (đề phòng người dùng quay lại từ giỏ)
                 HttpContext.Session.Remove(SS_CHECKOUT_DIRECT);
@@ -626,6 +642,30 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
+                // ✅ XÓA CÁC CART ITEMS ĐÃ ĐƯỢC ĐẶT KHỎI GIỎ HÀNG
+                if (model.Items != null && model.Items.Any())
+                {
+                    var cartItemIds = model.Items
+                        .Where(item => item.CartItemId != Guid.Empty)
+                        .Select(item => item.CartItemId)
+                        .Distinct()
+                        .ToList();
+                    
+                    if (cartItemIds.Any())
+                    {
+                        try
+                        {
+                            await _cartService.RemoveCartItemsAsync(accountId, cartItemIds, jwt);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log lỗi nhưng không chặn flow (booking đã tạo thành công)
+                            // Có thể log vào file hoặc console
+                            System.Diagnostics.Debug.WriteLine($"Lỗi khi xóa cart items: {ex.Message}");
+                        }
+                    }
+                }
+
                 // ✅ LƯU BOOKING ĐANG CHỜ THANH TOÁN (để hủy nếu user quay lại / hủy thanh toán)
                 HttpContext.Session.SetString(
                     SS_PENDING_BOOKING_IDS,
@@ -662,25 +702,17 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     System.Text.Json.JsonSerializer.Serialize(serviceNamesDict)
                 );
 
-                // ✨ Hiển thị số tiền ngay: truyền amount theo InvariantCulture
-                var amountStr = result.Total.ToString(CultureInfo.InvariantCulture);
-
-                switch (model.SelectedPaymentCode?.ToUpperInvariant())
-                {
-                    case "VNPAY":
-                        return RedirectToAction(
-                            "StartVnPay", "Payment",
-                            new { area = "Customer", bookingIds = result.BookingIds, amount = amountStr });
-
-                    case "MOMO":
-                        return RedirectToAction(
-                            "StartMoMo", "Payment",
-                            new { area = "Customer", bookingIds = result.BookingIds, amount = amountStr });
-
-                    default:
-                        // COD
-                        return RedirectToAction("Success", "Payment", new { area = "Customer", bookingIds = result.BookingIds, total = result.Total });
-                }
+                // ✨ Lưu phương thức thanh toán đã chọn để dùng sau khi xác nhận
+                // ❗ CHỈ HỖ TRỢ VNPAY - Mặc định là VNPAY
+                HttpContext.Session.SetString("PENDING_PAYMENT_METHOD", model.SelectedPaymentCode ?? "VNPAY");
+                
+                // ❗ QUAN TRỌNG: Xóa SS_PENDING_BOOKING_IDS vì booking đã được tạo thành công
+                // và đang chờ xác nhận, KHÔNG phải chờ thanh toán nữa
+                // Nếu giữ lại, khi user quay lại Index, CancelPendingIfAnyAsync sẽ xóa booking này
+                HttpContext.Session.Remove(SS_PENDING_BOOKING_IDS);
+                
+                // ✨ Redirect đến trang chờ xác nhận thay vì thanh toán ngay
+                return RedirectToAction("PendingConfirmation", "BookingService", new { area = "Customer", bookingIds = string.Join(",", result.BookingIds) });
             }
             catch (HttpRequestException ex)
             {
@@ -1269,6 +1301,208 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
 
+
+        /// <summary>
+        /// Trang hiển thị trạng thái chờ xác nhận sau khi đặt dịch vụ
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> PendingConfirmation(string? bookingIds, CancellationToken ct)
+        {
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                TempData["ToastError"] = "Bạn cần đăng nhập.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            if (string.IsNullOrWhiteSpace(bookingIds))
+            {
+                TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+
+            var bookingIdList = bookingIds
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+                .Where(g => g != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            if (bookingIdList.Count == 0)
+            {
+                TempData["ToastError"] = "Danh sách booking không hợp lệ.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+
+            // Lấy thông tin booking để hiển thị
+            var jwt = HttpContext.Session.GetString("JWToken");
+            var bookings = new List<HistoryBookingDetailDTO>();
+            
+            foreach (var bookingId in bookingIdList)
+            {
+                try
+                {
+                    var booking = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, bookingId, jwt, ct);
+                    if (booking != null)
+                    {
+                        bookings.Add(booking);
+                    }
+                }
+                catch
+                {
+                    // Bỏ qua nếu không lấy được
+                }
+            }
+
+            ViewBag.BookingIds = bookingIdList;
+            ViewBag.ServiceNames = GetServiceNamesFromSession();
+            ViewBag.Total = TempData["Total"]?.ToString() ?? "0";
+            
+            return View("PendingConfirmation", bookings);
+        }
+
+        /// <summary>
+        /// Helper để lấy service names từ session
+        /// </summary>
+        private Dictionary<Guid, string> GetServiceNamesFromSession()
+        {
+            var serviceNames = new Dictionary<Guid, string>();
+            var serviceNamesJson = HttpContext.Session.GetString("BookingServiceNamesJson");
+            if (!string.IsNullOrWhiteSpace(serviceNamesJson))
+            {
+                try
+                {
+                    var map = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(serviceNamesJson);
+                    if (map != null)
+                    {
+                        foreach (var kvp in map)
+                        {
+                            if (Guid.TryParse(kvp.Key, out var bookingId))
+                            {
+                                serviceNames[bookingId] = kvp.Value;
+                            }
+                        }
+                    }
+                }
+                catch { /* bỏ qua */ }
+            }
+            return serviceNames;
+        }
+
+        /// <summary>
+        /// Thanh toán sau khi booking được xác nhận
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PayAfterConfirmation(List<Guid> bookingIds, CancellationToken ct)
+        {
+            var accountId = GetAccountId();
+            if (accountId == Guid.Empty)
+            {
+                TempData["ToastError"] = "Bạn cần đăng nhập.";
+                return RedirectToAction("Login", "Account", new { area = "" });
+            }
+
+            if (bookingIds == null || bookingIds.Count == 0)
+            {
+                TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+
+            // Kiểm tra booking có ở trạng thái Confirmed không
+            var jwt = HttpContext.Session.GetString("JWToken");
+            var allConfirmed = true;
+            
+            foreach (var bookingId in bookingIds)
+            {
+                try
+                {
+                    var booking = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, bookingId, jwt, ct);
+                    if (booking == null || booking.NormalizedStatus != "Confirmed")
+                    {
+                        allConfirmed = false;
+                        break;
+                    }
+                }
+                catch
+                {
+                    allConfirmed = false;
+                    break;
+                }
+            }
+
+            if (!allConfirmed)
+            {
+                TempData["ToastError"] = "Một hoặc nhiều đơn hàng chưa được xác nhận. Vui lòng chờ xác nhận trước khi thanh toán.";
+                return RedirectToAction(nameof(ListHistoryBooking));
+            }
+
+            // ❗ CHỈ HỖ TRỢ VNPAY - KHÔNG CÓ COD
+            // Lấy phương thức thanh toán đã chọn từ session, mặc định là VNPAY
+            var paymentMethod = HttpContext.Session.GetString("PENDING_PAYMENT_METHOD") ?? "VNPAY";
+            
+            // Tính tổng tiền từ session
+            var total = 0m;
+            try
+            {
+                total = ComputeAmountFromSession(bookingIds);
+            }
+            catch
+            {
+                // Nếu không lấy được từ session, tính từ booking details
+                foreach (var bookingId in bookingIds)
+                {
+                    try
+                    {
+                        var booking = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, bookingId, jwt, ct);
+                        if (booking != null)
+                        {
+                            var servicePrice = booking.Service?.UnitPrice ?? 0m;
+                            var voucherDiscount = Math.Max(0m, booking.VoucherDiscount);
+                            total += Math.Max(0m, servicePrice - voucherDiscount);
+                        }
+                    }
+                    catch { /* bỏ qua */ }
+                }
+            }
+
+            var amountStr = total.ToString(CultureInfo.InvariantCulture);
+
+            // ❗ CHỈ HỖ TRỢ VNPAY - LUÔN REDIRECT ĐẾN VNPAY
+            // Bỏ COD và MoMo, chỉ giữ VNPAY
+            // Luôn redirect đến VNPay bất kể payment method là gì
+            return RedirectToAction(
+                "StartVnPay", "Payment",
+                new { area = "Customer", bookingIds = bookingIds, amount = amountStr });
+        }
+
+        /// <summary>
+        /// Helper để tính tổng tiền từ session breakdown
+        /// </summary>
+        private decimal ComputeAmountFromSession(List<Guid> bookingIds)
+        {
+            var json = HttpContext.Session.GetString("BookingBreakdownJson");
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                throw new InvalidOperationException("Không tìm thấy breakdown trong phiên làm việc.");
+            }
+
+            var breakdown = System.Text.Json.JsonSerializer.Deserialize<List<BookingAmountItem>>(json) ?? new List<BookingAmountItem>();
+
+            var total = breakdown
+                .Where(b => bookingIds.Contains(b.BookingId))
+                .Sum(b => b.Amount);
+
+            return Math.Max(0m, total);
+        }
+
+        private class BookingAmountItem
+        {
+            public Guid BookingId { get; set; }
+            public decimal Subtotal { get; set; }
+            public decimal Discount { get; set; }
+            public decimal Amount { get; set; }
+        }
 
         public async Task<IActionResult> CanceledDetail(Guid id, CancellationToken ct)
         {

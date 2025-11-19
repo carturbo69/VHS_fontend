@@ -91,36 +91,50 @@
                                                     <i class="bi bi-check-circle-fill me-1" style="color: #198754; font-size: 0.75rem; margin-top: 0.125rem; flex-shrink: 0;"></i>
                                                     <div style="flex: 1; min-width: 0;">
                                                         <span>@option.OptionName</span>
-                                                        @if (isTextarea && !string.IsNullOrWhiteSpace(option.Value))
+                                                        @if (!string.IsNullOrWhiteSpace(option.Value))
                                                         {
-                                                            @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
-                                                            var valueLines = new List<string>();
-                                                            
-                                                            @* Kiểm tra xem có ký tự xuống dòng không *@
-                                                            if (option.Value.Contains('\n') || option.Value.Contains('\r'))
+                                                            @if (isTextarea)
                                                             {
-                                                                @* Nếu có xuống dòng, split theo \n và \r *@
-                                                                valueLines = option.Value
-                                                                    .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
-                                                                    .Select(v => v.Trim())
-                                                                    .Where(v => !string.IsNullOrWhiteSpace(v))
-                                                                    .ToList();
+                                                                @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                                var valueLines = new List<string>();
+                                                                
+                                                                @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                                if (option.Value.Contains('\n') || option.Value.Contains('\r'))
+                                                                {
+                                                                    @* Nếu có xuống dòng, split theo \n và \r *@
+                                                                    valueLines = option.Value
+                                                                        .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                        .Select(v => v.Trim())
+                                                                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                        .ToList();
+                                                                }
+                                                                else
+                                                                {
+                                                                    @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                                    valueLines = option.Value
+                                                                        .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                        .Select(v => v.Trim())
+                                                                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                        .ToList();
+                                                                }
+                                                                
+                                                                <div style="margin-top: 0.125rem; font-size: 0.875rem; line-height: 1.4; color: #6c757d;">
+                                                                    @foreach (var line in valueLines)
+                                                                    {
+                                                                        <div>@line</div>
+                                                                    }
+                                                                </div>
                                                             }
                                                             else
                                                             {
-                                                                @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
-                                                                valueLines = option.Value
-                                                                    .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
-                                                                    .Select(v => v.Trim())
-                                                                    .Where(v => !string.IsNullOrWhiteSpace(v))
-                                                                    .ToList();
+                                                                <span class="text-muted" style="margin-left: 4px;">@option.Value</span>
                                                             }
-                                                            
-                                                            <div style="margin-top: 0.125rem; font-size: 0.875rem; line-height: 1.4; color: #6c757d;">
-                                                                @foreach (var line in valueLines)
-                                                                {
-                                                                    <div>@line</div>
-                                                                }
+                                                        }
+                                                        else if (isTextarea)
+                                                        {
+                                                            @* Hiển thị "Chưa có" nếu là textarea nhưng không có giá trị *@
+                                                            <div style="margin-top: 0.125rem; color: #6c757d; font-size: 0.875rem;">
+                                                                <i class="bi bi-info-circle" style="margin-right: 4px;"></i>Chưa có
                                                             </div>
                                                         }
                                                     </div>
@@ -289,12 +303,55 @@
 
                     @{
                         var statusNorm = (Model.Status ?? string.Empty).Trim();
+                        bool isPending = string.Equals(statusNorm, "Pending", StringComparison.OrdinalIgnoreCase);
                         bool isConfirmed = string.Equals(statusNorm, "Confirmed", StringComparison.OrdinalIgnoreCase);
                         bool isCompleted = string.Equals(statusNorm, "Completed", StringComparison.OrdinalIgnoreCase);
                         bool isServiceCompleted = string.Equals(statusNorm, "Service Completed", StringComparison.OrdinalIgnoreCase) || 
                                                  string.Equals(statusNorm, "Service-Completed", StringComparison.OrdinalIgnoreCase);
                         bool isCanceled = string.Equals(statusNorm, "Canceled", StringComparison.OrdinalIgnoreCase) ||
                                           string.Equals(statusNorm, "Cancelled", StringComparison.OrdinalIgnoreCase);
+                    }
+                    
+                    @* Hiển thị countdown timer cho booking Pending *@
+                    @if (isPending)
+                    {
+                        var cancelMinutes = Model.AutoCancelMinutes ?? 30; // Mặc định 30 phút
+                        // Sử dụng CreatedAt từ Model, nếu không có thì dùng thời gian hiện tại
+                        DateTime validCreatedAt;
+                        if (Model.CreatedAt != default(DateTime) && Model.CreatedAt != DateTime.MinValue && Model.CreatedAt.Year > 2000)
+                        {
+                            validCreatedAt = Model.CreatedAt;
+                        }
+                        else
+                        {
+                            // Fallback: dùng thời gian hiện tại nếu CreatedAt không hợp lệ
+                            validCreatedAt = DateTime.Now;
+                        }
+                        var cancelTime = validCreatedAt.AddMinutes(cancelMinutes);
+                        <div class="alert alert-warning mb-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <i class="bi bi-clock-history me-2"></i>
+                                    <strong>Thời gian tự động hủy:</strong>
+                                </div>
+                                <div class="countdown-timer-detail text-danger fw-bold" 
+                                     data-cancel-time="@cancelTime.ToString("yyyy-MM-ddTHH:mm:ss")"
+                                     data-booking-id="@Model.BookingId"
+                                     style="font-size: 1.1rem;">
+                                    Đang tính...
+                                </div>
+                            </div>
+                            <small class="text-muted mt-2 d-block">
+                                @if (Model.AutoCancelMinutes.HasValue)
+                                {
+                                    <text>Thời gian hủy riêng: @Model.AutoCancelMinutes phút</text>
+                                }
+                                else
+                                {
+                                    <text>Thời gian hủy mặc định: @cancelMinutes phút</text>
+                                }
+                            </small>
+                        </div>
                     }
                     @if (isConfirmed)
                     {
@@ -532,6 +589,95 @@
             box-shadow: 0 2px 6px rgba(217, 119, 6, 0.5) !important;
         }
     </style>
+}
+
+@section Scripts {
+    <script>
+        // Countdown timer cho booking Pending
+        document.addEventListener('DOMContentLoaded', function() {
+            function updateCountdown() {
+                const timer = document.querySelector('.countdown-timer-detail');
+                if (!timer) return;
+                
+                const cancelTimeStr = timer.getAttribute('data-cancel-time');
+                if (!cancelTimeStr) return;
+                
+                // Parse thời gian hủy (đã là giờ Việt Nam từ server)
+                const cancelTime = new Date(cancelTimeStr);
+                const now = new Date();
+                
+                // Tính thời gian còn lại (milliseconds)
+                const diff = cancelTime - now;
+                
+                if (diff <= 0) {
+                    // Đã quá thời gian hủy
+                    timer.innerHTML = '<span class="text-danger">Đã quá thời hạn</span>';
+                    timer.classList.add('text-danger');
+                } else {
+                    // Tính giờ, phút, giây còn lại
+                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                    
+                    // Format hiển thị
+                    let timeStr = '';
+                    if (hours > 0) {
+                        timeStr = `${hours} giờ ${minutes} phút ${seconds} giây`;
+                    } else if (minutes > 0) {
+                        timeStr = `${minutes} phút ${seconds} giây`;
+                    } else {
+                        timeStr = `${seconds} giây`;
+                    }
+                    
+                    // Thêm màu cảnh báo nếu còn < 5 phút
+                    if (diff < 5 * 60 * 1000) {
+                        timer.innerHTML = `<span class="text-danger">⏰ ${timeStr}</span>`;
+                    } else if (diff < 15 * 60 * 1000) {
+                        timer.innerHTML = `<span class="text-warning">⏰ ${timeStr}</span>`;
+                    } else {
+                        timer.innerHTML = `⏰ ${timeStr}`;
+                    }
+                }
+            }
+            
+            // Cập nhật ngay lập tức
+            updateCountdown();
+            
+            // Cập nhật mỗi giây và kiểm tra xem có booking nào hết thời gian không
+            let reloadScheduled = false; // Để tránh reload nhiều lần
+            setInterval(function() {
+                updateCountdown();
+                
+                // Kiểm tra xem có booking nào đã hết thời gian không (ngay lập tức)
+                if (!reloadScheduled) {
+                    const timers = document.querySelectorAll('.countdown-timer');
+                    let hasExpired = false;
+                    
+                    timers.forEach(timer => {
+                        const cancelTimeStr = timer.getAttribute('data-cancel-time');
+                        if (!cancelTimeStr) return;
+                        
+                        const cancelTime = new Date(cancelTimeStr);
+                        const now = new Date();
+                        const diff = cancelTime - now;
+                        
+                        if (diff <= 0) {
+                            hasExpired = true;
+                        }
+                    });
+                    
+                    if (hasExpired) {
+                        reloadScheduled = true; // Đánh dấu đã schedule reload
+                        console.log('⏰ Detected expired booking, reloading page in 2 seconds...');
+                        // Reload sau 2 giây để đảm bảo backend đã xử lý xong
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    }
+                }
+            }, 1000); // Check mỗi giây để phát hiện ngay khi hết thời gian
+        });
+    </script>
 }
 
 @functions {
