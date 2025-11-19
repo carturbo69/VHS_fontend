@@ -459,7 +459,101 @@
                             </div>
                         }
                     </div>
+                    
+                    @* Hiển thị countdown timer cho Confirmed chưa thanh toán *@
+                    @if (isConfirmed)
+                    {
+                        // Kiểm tra chưa thanh toán
+                        var isUnpaid = string.IsNullOrEmpty(Model.PaymentStatus) || 
+                                     (!Model.PaymentStatus.ToLower().Contains("paid") && 
+                                      !Model.PaymentStatus.ToLower().Contains("đã thanh toán") &&
+                                      !Model.PaymentStatus.ToLower().Contains("completed") &&
+                                      Model.PaymentStatus.ToLower() != "00");
+                        
+                        if (isUnpaid)
+                        {
+                            // Hiển thị countdown timer cho Confirmed chưa thanh toán
+                            var cancelMinutes = Model.AutoCancelMinutes ?? 30; // Sử dụng AutoCancelMinutes từ model, mặc định 30 phút
+                            DateTime validCreatedAt;
+                            if (Model.CreatedAt != default(DateTime) && Model.CreatedAt != DateTime.MinValue && Model.CreatedAt.Year > 2000)
+                            {
+                                validCreatedAt = Model.CreatedAt;
+                            }
+                            else
+                            {
+                                validCreatedAt = DateTime.Now;
+                            }
+                            var cancelTime = validCreatedAt.AddMinutes(cancelMinutes);
+                            <div class="alert alert-warning mt-3 mb-0">
+                                <div class="mb-2">
+                                    <i class="bi bi-clock-history me-2"></i>
+                                    <strong>Thời gian tự động hủy (chưa thanh toán):</strong>
                 </div>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="countdown-timer-confirmed-unpaid text-danger fw-bold" 
+                                         data-cancel-time="@cancelTime.ToString("yyyy-MM-ddTHH:mm:ss")"
+                                         data-booking-id="@Model.BookingId"
+                                         data-created-at="@validCreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")"
+                                         data-auto-cancel-minutes="@(Model.AutoCancelMinutes?.ToString() ?? "")"
+                                         style="font-size: 1.1rem;">
+                                        Đang tính...
+            </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCancelTimeModal">
+                                        <i class="bi bi-pencil-square"></i> Chỉnh sửa
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal chỉnh sửa thời gian hủy -->
+<div class="modal fade" id="editCancelTimeModal" tabindex="-1" aria-labelledby="editCancelTimeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editCancelTimeModalLabel">
+                    <i class="bi bi-clock-history me-2"></i>
+                    Sửa thời gian tự động hủy
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Thời gian còn lại hiện tại:</label>
+                    <div class="alert alert-info mb-0">
+                        <strong id="currentRemainingTime">Đang tính...</strong>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="newRemainingMinutes" class="form-label">
+                        Thời gian còn lại mới (phút):
+                    </label>
+                    <input type="number" 
+                           class="form-control" 
+                           id="newRemainingMinutes" 
+                           min="1" 
+                           max="1440" 
+                           value="1"
+                           placeholder="Nhập số phút còn lại">
+                    <div id="errorMessage" class="text-danger mt-1" style="display: none; font-size: 0.875rem;"></div>
+                    <small class="form-text text-muted">
+                        Ví dụ: Nhập 1 để đặt thời gian còn lại là 1 phút
+                    </small>
+                </div>
+                <input type="hidden" id="editBookingId">
+                <input type="hidden" id="editCreatedAt">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-warning" id="saveCancelTimeBtn">
+                    <i class="bi bi-save me-1"></i>
+                    Lưu
+                </button>
             </div>
         </div>
     </div>
@@ -593,26 +687,61 @@
 
 @section Scripts {
     <script>
+        // Get backend URL
+        const metaBackendUrl = document.querySelector('meta[name="backend-url"]')?.getAttribute('content');
+        const backendUrl = metaBackendUrl || 'http://localhost:5154';
+        
         // Countdown timer cho booking Pending
         document.addEventListener('DOMContentLoaded', function() {
-            function updateCountdown() {
-                const timer = document.querySelector('.countdown-timer-detail');
+            function updateCountdown(timerSelector, isConfirmedUnpaid = false) {
+                const timer = document.querySelector(timerSelector);
                 if (!timer) return;
                 
                 const cancelTimeStr = timer.getAttribute('data-cancel-time');
                 if (!cancelTimeStr) return;
                 
-                // Parse thời gian hủy (đã là giờ Việt Nam từ server)
-                const cancelTime = new Date(cancelTimeStr);
+                // Parse thời gian hủy (format: yyyy-MM-ddTHH:mm:ss - local time, không có timezone)
+                // Nếu có 'Z' hoặc timezone offset, parse như UTC/local
+                // Nếu không có, parse như local time
+                let cancelTime;
+                if (cancelTimeStr.includes('Z') || cancelTimeStr.match(/[+-]\d{2}:\d{2}$/)) {
+                    // Có timezone info, parse bình thường
+                    cancelTime = new Date(cancelTimeStr);
+                } else {
+                    // Không có timezone, parse như local time (format: yyyy-MM-ddTHH:mm:ss)
+                    cancelTime = new Date(cancelTimeStr.replace('T', ' '));
+                }
                 const now = new Date();
                 
                 // Tính thời gian còn lại (milliseconds)
                 const diff = cancelTime - now;
                 
                 if (diff <= 0) {
-                    // Đã quá thời gian hủy
-                    timer.innerHTML = '<span class="text-danger">Đã quá thời hạn</span>';
+                    // Đã quá thời gian hủy - CẬP NHẬT NGAY LẬP TỨC TRONG DOM
+                    timer.innerHTML = '<span class="text-danger fw-bold">Đã quá thời hạn</span>';
                     timer.classList.add('text-danger');
+                    
+                    // Nếu là Confirmed chưa thanh toán, cập nhật UI ngay lập tức (không cần chờ server)
+                    if (isConfirmedUnpaid) {
+                        console.log('⏰ Confirmed unpaid booking expired, updating UI immediately...');
+                        
+                        // Tìm alert container chứa countdown timer
+                        const alertContainer = timer.closest('.alert');
+                        if (alertContainer) {
+                            // Ẩn toàn bộ alert container
+                            alertContainer.style.display = 'none';
+                        }
+                        
+                        // Cập nhật status badge thành "Đã hủy" ngay lập tức
+                        const statusBadge = document.querySelector('.status-badge-lg');
+                        if (statusBadge) {
+                            statusBadge.textContent = 'Đã hủy';
+                            statusBadge.className = 'status-badge-lg status-canceled';
+                            statusBadge.style.cssText = 'color: #000000 !important; font-weight: 800 !important;';
+                        }
+                        
+                        console.log('✅ UI updated: Booking expired and auto-canceled');
+                    }
                 } else {
                     // Tính giờ, phút, giây còn lại
                     const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -631,51 +760,218 @@
                     
                     // Thêm màu cảnh báo nếu còn < 5 phút
                     if (diff < 5 * 60 * 1000) {
-                        timer.innerHTML = `<span class="text-danger">⏰ ${timeStr}</span>`;
+                        timer.innerHTML = `<span class="text-danger fw-bold">⏰ ${timeStr}</span>`;
                     } else if (diff < 15 * 60 * 1000) {
-                        timer.innerHTML = `<span class="text-warning">⏰ ${timeStr}</span>`;
+                        timer.innerHTML = `<span class="text-warning fw-bold">⏰ ${timeStr}</span>`;
                     } else {
                         timer.innerHTML = `⏰ ${timeStr}`;
                     }
                 }
             }
             
-            // Cập nhật ngay lập tức
-            updateCountdown();
+            // Cập nhật countdown cho Pending
+            updateCountdown('.countdown-timer-detail', false);
             
-            // Cập nhật mỗi giây và kiểm tra xem có booking nào hết thời gian không
-            let reloadScheduled = false; // Để tránh reload nhiều lần
+            // Cập nhật countdown cho Confirmed chưa thanh toán
+            updateCountdown('.countdown-timer-confirmed-unpaid', true);
+            
+            // Cập nhật mỗi giây
             setInterval(function() {
-                updateCountdown();
-                
-                // Kiểm tra xem có booking nào đã hết thời gian không (ngay lập tức)
-                if (!reloadScheduled) {
-                    const timers = document.querySelectorAll('.countdown-timer');
-                    let hasExpired = false;
-                    
-                    timers.forEach(timer => {
+                updateCountdown('.countdown-timer-detail', false);
+                updateCountdown('.countdown-timer-confirmed-unpaid', true);
+            }, 1000);
+            
+            // ========== Xử lý chỉnh sửa thời gian hủy ==========
+            const editModal = document.getElementById('editCancelTimeModal');
+            const saveBtn = document.getElementById('saveCancelTimeBtn');
+            const newRemainingMinutesInput = document.getElementById('newRemainingMinutes');
+            const errorMessageDiv = document.getElementById('errorMessage');
+            
+            // Function để cập nhật thời gian còn lại hiện tại trong modal
+            function updateCurrentRemainingTime() {
+                const timer = document.querySelector('.countdown-timer-confirmed-unpaid');
+                if (timer) {
+                    const currentText = timer.textContent.trim();
+                    const currentRemainingTimeEl = document.getElementById('currentRemainingTime');
+                    if (currentRemainingTimeEl) {
+                        currentRemainingTimeEl.textContent = currentText || 'Đang tính...';
+                    }
+                }
+            }
+            
+            // Khi mở modal, lấy thông tin booking
+            editModal.addEventListener('show.bs.modal', function(event) {
+                const timer = document.querySelector('.countdown-timer-confirmed-unpaid');
+                if (timer) {
+                    const bookingId = timer.getAttribute('data-booking-id');
+                    const createdAt = timer.getAttribute('data-created-at');
                         const cancelTimeStr = timer.getAttribute('data-cancel-time');
-                        if (!cancelTimeStr) return;
-                        
-                        const cancelTime = new Date(cancelTimeStr);
+                    
+                    // Lưu vào hidden inputs
+                    document.getElementById('editBookingId').value = bookingId || '';
+                    document.getElementById('editCreatedAt').value = createdAt || '';
+                    
+                    // Tính thời gian còn lại hiện tại (phút)
+                    let remainingMinutes = 1;
+                    if (cancelTimeStr) {
+                        const cancelTime = new Date(cancelTimeStr.replace('T', ' '));
                         const now = new Date();
                         const diff = cancelTime - now;
-                        
-                        if (diff <= 0) {
-                            hasExpired = true;
+                        if (diff > 0) {
+                            remainingMinutes = Math.max(1, Math.ceil(diff / (1000 * 60)));
+                        }
+                    }
+                    
+                    // Set giá trị mặc định cho input
+                    if (newRemainingMinutesInput) {
+                        newRemainingMinutesInput.value = remainingMinutes;
+                    }
+                    
+                    // Cập nhật thời gian còn lại hiện tại
+                    updateCurrentRemainingTime();
+                    
+                    // Ẩn thông báo lỗi khi người dùng bắt đầu nhập
+                    if (newRemainingMinutesInput) {
+                        newRemainingMinutesInput.addEventListener('input', function() {
+                            if (errorMessageDiv) {
+                                errorMessageDiv.style.display = 'none';
+                                errorMessageDiv.textContent = '';
+                            }
+                            newRemainingMinutesInput.classList.remove('is-invalid');
+                        });
+                    }
+                }
+            });
+            
+            // Xử lý lưu thời gian hủy
+            saveBtn.addEventListener('click', async function() {
+                const bookingId = document.getElementById('editBookingId').value;
+                const createdAtStr = document.getElementById('editCreatedAt').value;
+                const newRemainingMinutes = parseInt(newRemainingMinutesInput.value);
+                
+                // Ẩn thông báo lỗi trước đó
+                if (errorMessageDiv) {
+                    errorMessageDiv.style.display = 'none';
+                    errorMessageDiv.textContent = '';
+                }
+                
+                // Xóa class lỗi từ input
+                if (newRemainingMinutesInput) {
+                    newRemainingMinutesInput.classList.remove('is-invalid');
+                }
+                
+                if (!bookingId) {
+                    if (errorMessageDiv) {
+                        errorMessageDiv.textContent = 'Không tìm thấy ID đơn hàng';
+                        errorMessageDiv.style.display = 'block';
+                    }
+                    return;
+                }
+                
+                if (!newRemainingMinutes || newRemainingMinutes < 1) {
+                    // Hiển thị thông báo lỗi dưới ô nhập
+                    if (errorMessageDiv) {
+                        errorMessageDiv.textContent = 'Vui lòng nhập số phút hợp lệ (từ 1 phút trở lên)';
+                        errorMessageDiv.style.display = 'block';
+                    }
+                    if (newRemainingMinutesInput) {
+                        newRemainingMinutesInput.classList.add('is-invalid');
+                    }
+                    return;
+                }
+                
+                // Disable button và hiển thị loading
+                saveBtn.disabled = true;
+                const originalText = saveBtn.innerHTML;
+                saveBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Đang xử lý...';
+                
+                try {
+                    // Gọi endpoint UpdateCancelTime (giống Index.cshtml)
+                    const url = `@Url.Action("UpdateCancelTime", "AdminBooking", new { area = "Admin" })?bookingId=${bookingId}&remainingMinutes=${newRemainingMinutes}&createdAt=${encodeURIComponent(createdAtStr)}`;
+                    console.log('Calling URL:', url);
+                    
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
                         }
                     });
                     
-                    if (hasExpired) {
-                        reloadScheduled = true; // Đánh dấu đã schedule reload
-                        console.log('⏰ Detected expired booking, reloading page in 2 seconds...');
-                        // Reload sau 2 giây để đảm bảo backend đã xử lý xong
-                        setTimeout(function() {
-                            location.reload();
-                        }, 2000);
+                    console.log('Response status:', response.status);
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Error response:', errorText);
+                        throw new Error('Lỗi khi cập nhật thời gian hủy: ' + errorText);
                     }
+                    
+                    const result = await response.json();
+                    console.log('Result:', result);
+                    
+                    if (!result.success) {
+                        throw new Error(result.message || 'Lỗi khi cập nhật thời gian hủy');
+                    }
+                    
+                    // Đóng modal
+                    const modal = bootstrap.Modal.getInstance(editModal);
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // Cập nhật countdown timer ngay lập tức mà không cần reload
+                    const timer = document.querySelector('.countdown-timer-confirmed-unpaid');
+                    if (timer) {
+                        // Lấy createdAt từ timer hoặc từ input
+                        const timerCreatedAt = timer.getAttribute('data-created-at') || createdAtStr;
+                        const createdAt = new Date(timerCreatedAt.replace('T', ' '));
+                        
+                        // Tính lại thời gian hủy mới
+                        const newAutoCancelMinutes = result.newAutoCancelMinutes || newRemainingMinutes;
+                        const newCancelTime = new Date(createdAt.getTime() + newAutoCancelMinutes * 60 * 1000);
+                        
+                        // Format: yyyy-MM-ddTHH:mm:ss (giống format từ server)
+                        const year = newCancelTime.getFullYear();
+                        const month = String(newCancelTime.getMonth() + 1).padStart(2, '0');
+                        const day = String(newCancelTime.getDate()).padStart(2, '0');
+                        const hours = String(newCancelTime.getHours()).padStart(2, '0');
+                        const minutes = String(newCancelTime.getMinutes()).padStart(2, '0');
+                        const seconds = String(newCancelTime.getSeconds()).padStart(2, '0');
+                        const formattedTime = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+                        
+                        // Cập nhật attributes
+                        timer.setAttribute('data-cancel-time', formattedTime);
+                        if (result.newAutoCancelMinutes) {
+                            timer.setAttribute('data-auto-cancel-minutes', result.newAutoCancelMinutes.toString());
+                        }
+                        
+                        // Cập nhật ngay lập tức
+                        updateCountdown('.countdown-timer-confirmed-unpaid', true);
+                        
+                        console.log('✅ Đã cập nhật countdown timer ngay lập tức:', {
+                            bookingId: bookingId,
+                            newAutoCancelMinutes: newAutoCancelMinutes,
+                            newCancelTime: newCancelTime
+                        });
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Error updating cancel time:', error);
+                    
+                    // Hiển thị thông báo lỗi dưới ô nhập
+                    if (errorMessageDiv) {
+                        errorMessageDiv.textContent = 'Lỗi: ' + error.message;
+                        errorMessageDiv.style.display = 'block';
+                    }
+                    if (newRemainingMinutesInput) {
+                        newRemainingMinutesInput.classList.add('is-invalid');
+                    }
+                } finally {
+                    // Restore button
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
                 }
-            }, 1000); // Check mỗi giây để phát hiện ngay khi hết thời gian
+            });
         });
     </script>
 }

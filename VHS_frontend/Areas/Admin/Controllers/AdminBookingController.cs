@@ -115,6 +115,86 @@ namespace VHS_frontend.Areas.Admin.Controllers
             }
         }
 
+        // POST: Admin/AdminBooking/UpdateAutoCancelMinutes
+        // Admin cập nhật thời gian tự động hủy cho booking (từ CreatedAt)
+        [HttpPost]
+        public async Task<IActionResult> UpdateAutoCancelMinutes(Guid bookingId, int? minutes)
+        {
+            var token = HttpContext.Session.GetString("JWTToken");
+            if (string.IsNullOrEmpty(token))
+            {
+                return Json(new { success = false, message = "Vui lòng đăng nhập lại." });
+            }
+
+            try
+            {
+                // Gọi API backend để cập nhật
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                
+                var backendUrl = "http://localhost:5154"; // Có thể lấy từ config
+                httpClient.BaseAddress = new Uri(backendUrl);
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+                var requestBody = new { Minutes = minutes };
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var apiUrl = $"/api/AdminSettings/booking/{bookingId}/auto-cancel-minutes";
+                
+                var response = await httpClient.PostAsync(apiUrl, content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        var apiResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(responseContent);
+                        var apiMessage = apiResult.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "Đã cập nhật thành công";
+                        
+                        return Json(new { 
+                            success = true, 
+                            message = apiMessage,
+                            minutes = minutes
+                        });
+                    }
+                    catch
+                    {
+                        return Json(new { 
+                            success = true, 
+                            message = "Đã cập nhật thời gian hủy thành công!",
+                            minutes = minutes
+                        });
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        var errorResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(responseContent);
+                        var errorMessage = errorResult.TryGetProperty("message", out var errProp) ? errProp.GetString() : 
+                                         (errorResult.TryGetProperty("error", out var errField) ? errField.GetString() : null);
+                        
+                        return Json(new { 
+                            success = false, 
+                            message = errorMessage ?? $"Lỗi HTTP {response.StatusCode}" 
+                        });
+                    }
+                    catch
+                    {
+                        return Json(new { 
+                            success = false, 
+                            message = $"Lỗi khi cập nhật: HTTP {response.StatusCode}" 
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Lỗi: " + ex.Message });
+            }
+        }
+
         // POST: Admin/AdminBooking/UpdateCancelTime
         // Admin cập nhật thời gian hủy cho booking
         [HttpPost]

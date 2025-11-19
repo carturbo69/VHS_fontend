@@ -617,8 +617,103 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     ActivityType = "info"
                 }));
             }
+            
+            // Bổ sung hoạt động "Thanh toán thành công" và "Đơn hàng mới" từ bookings
+            var bookingActivities = new List<RecentActivity>();
+            try
+            {
+                // Lấy bookings trong 7 ngày gần đây (mở rộng để bắt được nhiều đơn hàng hơn)
+                var last7DaysStart = DateTime.Now.AddDays(-7);
+                var now = DateTime.Now;
+                var bookingFilter = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                {
+                    FromDate = last7DaysStart,
+                    ToDate = now,
+                    PageNumber = 1,
+                    PageSize = 200 // Tăng số lượng để lấy được nhiều hơn
+                };
+                var recentBookings = await _bookingService.GetAllBookingsAsync(bookingFilter);
+                
+                if (recentBookings != null && recentBookings.Items != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"📦 Total bookings fetched: {recentBookings.Items.Count}");
+                    
+                    // Lấy các booking có thanh toán thành công (PaymentStatus = Paid/Completed) trong 7 ngày
+                    var paidBookings = recentBookings.Items
+                        .Where(b => !string.IsNullOrWhiteSpace(b.PaymentStatus) &&
+                                    (b.PaymentStatus.Contains("Paid", StringComparison.OrdinalIgnoreCase) ||
+                                     b.PaymentStatus.Contains("Completed", StringComparison.OrdinalIgnoreCase) ||
+                                     b.PaymentStatus.Contains("Đã thanh toán", StringComparison.OrdinalIgnoreCase)))
+                        .Select(b => new
+                        {
+                            Booking = b,
+                            ActivityTime = (b.CreatedAt != default(DateTime) && b.CreatedAt.Year > 2000) ? b.CreatedAt : b.BookingTime
+                        })
+                        .Where(x => x.ActivityTime >= last7DaysStart)
+                        .OrderByDescending(x => x.ActivityTime)
+                        .Take(5)
+                        .ToList();
+                    
+                    System.Diagnostics.Debug.WriteLine($"💰 Paid bookings found: {paidBookings.Count}");
+                    
+                    bookingActivities.AddRange(paidBookings.Select(x => new RecentActivity
+                    {
+                        Title = "Thanh toán thành công",
+                        Description = $"{x.Booking.CustomerName ?? "Khách hàng"} - {x.Booking.ServiceName ?? "Dịch vụ"} - {x.Booking.Amount:N0} VND",
+                        CreatedAt = x.ActivityTime,
+                        ActivityType = "success"
+                    }));
+                    
+                    // Lấy các đơn hàng mới (Status = Pending, linh hoạt hơn trong kiểm tra)
+                    var allNewBookings = recentBookings.Items
+                        .Select(b => new
+                        {
+                            Booking = b,
+                            ActivityTime = (b.CreatedAt != default(DateTime) && b.CreatedAt.Year > 2000) ? b.CreatedAt : b.BookingTime,
+                            StatusLower = (b.Status ?? "").Trim().ToLower()
+                        })
+                        .Where(x => !string.IsNullOrWhiteSpace(x.Booking.Status) &&
+                                    (x.StatusLower.Contains("pending") ||
+                                     x.StatusLower.Contains("chờ") ||
+                                     x.StatusLower == "pending" ||
+                                     x.StatusLower == "chờ xử lý") &&
+                                    x.ActivityTime >= last7DaysStart)
+                        .OrderByDescending(x => x.ActivityTime)
+                        .Take(10) // Lấy nhiều hơn để có thể filter thêm
+                        .ToList();
+                    
+                    System.Diagnostics.Debug.WriteLine($"🆕 New bookings (Pending) found: {allNewBookings.Count}");
+                    if (allNewBookings.Any())
+                    {
+                        System.Diagnostics.Debug.WriteLine($"   First booking: Status='{allNewBookings.First().Booking.Status}', CreatedAt={allNewBookings.First().ActivityTime:yyyy-MM-dd HH:mm}");
+                    }
+                    
+                    // Chỉ lấy 5 đơn hàng mới nhất để tránh quá tải
+                    var newBookings = allNewBookings.Take(5).ToList();
+                    
+                    bookingActivities.AddRange(newBookings.Select(x => new RecentActivity
+                    {
+                        Title = "Đơn hàng mới",
+                        Description = $"{x.Booking.CustomerName ?? "Khách hàng"} - {x.Booking.ServiceName ?? "Dịch vụ"} - {x.Booking.Amount:N0} VND",
+                        CreatedAt = x.ActivityTime,
+                        ActivityType = "info"
+                    }));
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("⚠️ RecentBookings is null or Items is null");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error nhưng không làm gián đoạn quá trình
+                System.Diagnostics.Debug.WriteLine($"❌ Error getting booking activities: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"   Stack trace: {ex.StackTrace}");
+            }
+            
             model.RecentActivities = model.RecentActivities
                 .Concat(paymentActivities)
+                .Concat(bookingActivities)
                 .OrderByDescending(a => a.CreatedAt)
                 .Take(6)
                 .ToList();

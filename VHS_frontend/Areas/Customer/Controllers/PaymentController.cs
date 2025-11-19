@@ -55,6 +55,54 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         /// <summary>
+        /// Lấy tên dịch vụ từ API nếu session không có (dùng cho trường hợp mất session sau thanh toán)
+        /// </summary>
+        private async Task<Dictionary<Guid, string>> GetServiceNamesFromApiAsync(List<Guid> bookingIds, CancellationToken ct = default)
+        {
+            var serviceNames = new Dictionary<Guid, string>();
+            
+            if (bookingIds == null || !bookingIds.Any())
+                return serviceNames;
+
+            var jwt = HttpContext.Session.GetString("JWToken");
+            var accountIdStr = HttpContext.Session.GetString("AccountID");
+            
+            // Nếu không có token hoặc accountId, không thể gọi API
+            if (string.IsNullOrWhiteSpace(jwt) || !Guid.TryParse(accountIdStr, out var accountId))
+            {
+                System.Diagnostics.Debug.WriteLine("[Payment] Không có token hoặc accountId, không thể lấy service names từ API");
+                return serviceNames;
+            }
+
+            try
+            {
+                // Lấy tên dịch vụ từ API cho mỗi booking
+                foreach (var bookingId in bookingIds)
+                {
+                    try
+                    {
+                        var bookingDetail = await _bookingServiceCustomer.GetHistoryDetailAsync(accountId, bookingId, jwt, ct);
+                        if (bookingDetail != null && bookingDetail.Service != null && !string.IsNullOrWhiteSpace(bookingDetail.Service.Title))
+                        {
+                            serviceNames[bookingId] = bookingDetail.Service.Title;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[Payment] Lỗi khi lấy booking detail cho {bookingId}: {ex.Message}");
+                        // Tiếp tục với booking khác
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Payment] Lỗi khi lấy service names từ API: {ex.Message}");
+            }
+
+            return serviceNames;
+        }
+
+        /// <summary>
         /// Đọc Session "BookingBreakdownJson" để tính tổng Amount cho các bookingIds được chọn.
         /// "BookingBreakdownJson" đã được set ở PlaceOrder.
         /// </summary>
@@ -347,13 +395,34 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     jwt,
                     ct);
 
+                // Tính total từ session
+                var totalAfterLogin = 0m;
+                try
+                {
+                    totalAfterLogin = ComputeAmountFromSession(bookingIdList);
+                }
+                catch
+                {
+                    // Nếu không lấy được từ session, để mặc định 0
+                    System.Diagnostics.Debug.WriteLine("[VNPay Warning] Không lấy được amount từ session trong ConfirmVnPayAfterLogin.");
+                }
+                
+                // ✅ Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API
+                var serviceNamesAfterLogin = GetServiceNamesFromSession();
+                if (!serviceNamesAfterLogin.Any())
+                {
+                    // Nếu session không có, lấy từ API
+                    serviceNamesAfterLogin = await GetServiceNamesFromApiAsync(bookingIdList, ct);
+                }
+
                 TempData["ToastSuccess"] = $"Thanh toán VNPay thành công! Mã giao dịch: {transactionId}";
                 
                 // 🎉 Hiển thị trang success đẹp
                 ViewBag.TransactionId = transactionId;
                 ViewBag.BookingIds = bookingIdList;
-                ViewBag.ServiceNames = GetServiceNamesFromSession();
+                ViewBag.ServiceNames = serviceNamesAfterLogin;
                 ViewBag.NeedLogin = false;
+                ViewBag.Total = totalAfterLogin;
                 
                 return View("VnPaySuccess");
             }
@@ -506,14 +575,41 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     return RedirectToAction("Index", "Cart", new { area = "Customer" });
                 }
 
+                // ✅ Lấy tên dịch vụ - khai báo ở scope ngoài để dùng chung cho cả 2 trường hợp
+                Dictionary<Guid, string> serviceNames;
+
                 // ✅ Kiểm tra đăng nhập NGAY TẠI ĐÂY (sau khi đã parse được booking IDs)
                 if (NotLoggedIn())
                 {
+                    // Tính total cho trường hợp chưa đăng nhập
+                    var totalBeforeLogin = 0m;
+                    try
+                    {
+                        totalBeforeLogin = ComputeAmountFromSession(bookingIds);
+                    }
+                    catch
+                    {
+                        // ✅ Nếu không lấy được từ session, lấy từ VNPay response Amount (đã chia cho 100 rồi)
+                        if (response.Amount > 0)
+                        {
+                            totalBeforeLogin = response.Amount;
+                        }
+                    }
+                    
+                    // ✅ Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API (nếu đã đăng nhập sau thanh toán)
+                    serviceNames = GetServiceNamesFromSession();
+                    if (!serviceNames.Any() && !NotLoggedIn())
+                    {
+                        // Nếu session không có và đã đăng nhập, lấy từ API
+                        serviceNames = await GetServiceNamesFromApiAsync(bookingIds, ct);
+                    }
+                    
                     // 🎉 Hiển thị trang success đẹp thay vì redirect login
                     ViewBag.TransactionId = response.TransactionId;
                     ViewBag.BookingIds = bookingIds;
-                    ViewBag.ServiceNames = GetServiceNamesFromSession();
+                    ViewBag.ServiceNames = serviceNames;
                     ViewBag.NeedLogin = true;
+                    ViewBag.Total = totalBeforeLogin;
                     
                     TempData["ToastSuccess"] = $"Thanh toán VNPay thành công! Mã giao dịch: {response.TransactionId}";
                     
@@ -558,10 +654,16 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 }
                 catch
                 {
-                    // Nếu không lấy được từ session, lấy từ response
-                    if (decimal.TryParse(response.OrderId, out var amt))
+                    // ✅ Nếu không lấy được từ session, lấy từ VNPay response Amount (đã chia cho 100 rồi)
+                    if (response.Amount > 0)
                     {
-                        total = amt;
+                        total = response.Amount;
+                    }
+                    else
+                    {
+                        // Fallback: nếu response không có Amount, tính tổng từ bookings (nếu có token)
+                        // Không dùng OrderId vì nó là txnRef (timestamp ticks), không phải amount
+                        System.Diagnostics.Debug.WriteLine("[VNPay Warning] Không lấy được amount từ response và session. Sử dụng giá trị mặc định 0.");
                     }
                 }
 
@@ -572,10 +674,18 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                 TempData["ToastSuccess"] = "Thanh toán VNPay thành công!";
                 
+                // ✅ Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API
+                serviceNames = GetServiceNamesFromSession();
+                if (!serviceNames.Any())
+                {
+                    // Nếu session không có, lấy từ API
+                    serviceNames = await GetServiceNamesFromApiAsync(bookingIds, ct);
+                }
+                
                 // 🎉 Hiển thị trang success đẹp
                 ViewBag.TransactionId = response.TransactionId;
                 ViewBag.BookingIds = bookingIds;
-                ViewBag.ServiceNames = GetServiceNamesFromSession();
+                ViewBag.ServiceNames = serviceNames;
                 ViewBag.NeedLogin = false;
                 ViewBag.Total = total;
                 

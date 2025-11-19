@@ -187,6 +187,45 @@
                                         <span class="badge status-badge status-@(booking.Status.ToLower().Replace(" ", "-"))" style="color: #000000 !important; font-weight: 800 !important;">
                                             @GetStatusText(booking.Status)
                                         </span>
+                                        @* Hiển thị countdown timer cho booking Pending *@
+                                        @{
+                                            var statusNorm = (booking.Status ?? string.Empty).Trim();
+                                            // Kiểm tra nhiều cách viết của Pending
+                                            var isPendingBooking = string.Equals(statusNorm, "Pending", StringComparison.OrdinalIgnoreCase) ||
+                                                                   statusNorm.Contains("pending", StringComparison.OrdinalIgnoreCase) ||
+                                                                   statusNorm.Contains("chờ", StringComparison.OrdinalIgnoreCase);
+                                        }
+                                        @if (isPendingBooking)
+                                        {
+                                            var cancelMinutes = booking.AutoCancelMinutes ?? 30; // Mặc định 30 phút
+                                            var createdAt = booking.CreatedAt;
+                                            // Sử dụng CreatedAt từ booking, nếu không có thì dùng thời gian hiện tại
+                                            DateTime validCreatedAt;
+                                            if (createdAt != default(DateTime) && createdAt != DateTime.MinValue && createdAt.Year > 2000)
+                                            {
+                                                validCreatedAt = createdAt;
+                                            }
+                                            else
+                                            {
+                                                // Fallback: dùng thời gian hiện tại nếu CreatedAt không hợp lệ
+                                                validCreatedAt = DateTime.Now;
+                                            }
+                                            var cancelTime = validCreatedAt.AddMinutes(cancelMinutes);
+                                            var remainingMinutes = Math.Max(0, (int)Math.Ceiling((cancelTime - DateTime.Now).TotalMinutes));
+                                            <br />
+                                            <div class="d-flex align-items-center gap-2 mt-1">
+                                                <small class="text-danger" style="font-size: 0.75rem;">
+                                                    <i class="bi bi-clock-history"></i>
+                                                    <span class="countdown-timer" 
+                                                          data-cancel-time="@cancelTime.ToString("yyyy-MM-ddTHH:mm:ss")"
+                                                          data-booking-id="@booking.BookingId"
+                                                          data-created-at="@validCreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")"
+                                                          data-current-cancel-minutes="@cancelMinutes">
+                                                        Đang tính...
+                                                    </span>
+                                                </small>
+                                            </div>
+                                        }
                                     </td>
                                     <td>
                                         @if (!string.IsNullOrEmpty(booking.StaffName))
@@ -459,6 +498,88 @@
             });
         }
         
+        // Biến toàn cục để track các booking đã xử lý khi countdown hết
+        let expiredBookingsProcessed = new Set();
+        
+        // Countdown timer cho booking Pending
+        function updateCountdown() {
+            const timers = document.querySelectorAll('.countdown-timer');
+            
+            timers.forEach(timer => {
+                const cancelTimeStr = timer.getAttribute('data-cancel-time');
+                if (!cancelTimeStr) return;
+                
+                // Parse thời gian hủy (đã là giờ Việt Nam từ server)
+                const cancelTime = new Date(cancelTimeStr);
+                const now = new Date();
+                
+                // Tính thời gian còn lại (milliseconds)
+                const diff = cancelTime - now;
+                
+                if (diff <= 0) {
+                    // Đã quá thời gian hủy - NHƯNG refresh ngay để lấy dữ liệu mới từ server
+                    // (có thể admin đã gia hạn thêm thời gian)
+                    const bookingId = timer.getAttribute('data-booking-id');
+                    if (bookingId && !expiredBookingsProcessed.has(bookingId)) {
+                        console.log(`⏰ Countdown expired for booking ${bookingId}, refreshing to check for admin updates...`);
+                        expiredBookingsProcessed.add(bookingId);
+                        
+                        // Refresh ngay lập tức để lấy dữ liệu mới (có thể AutoCancelMinutes đã được admin cập nhật)
+                        refreshBookingListSilent().then(() => {
+                            // Sau khi refresh, kiểm tra lại xem booking có còn pending không
+                            const updatedTimer = document.querySelector(`.countdown-timer[data-booking-id="${bookingId}"]`);
+                            if (!updatedTimer) {
+                                // Nếu không còn timer, có nghĩa là booking đã bị hủy hoặc đổi trạng thái
+                                console.log(`✅ Booking ${bookingId} status updated after refresh`);
+                            } else {
+                                // Nếu vẫn còn timer, có nghĩa là admin đã gia hạn thêm thời gian
+                                const newCancelTimeStr = updatedTimer.getAttribute('data-cancel-time');
+                                if (newCancelTimeStr) {
+                                    const newCancelTime = new Date(newCancelTimeStr);
+                                    const newDiff = newCancelTime - new Date();
+                                    if (newDiff > 0) {
+                                        console.log(`✅ Booking ${bookingId} was extended by admin, new time remaining: ${Math.ceil(newDiff / 60000)} minutes`);
+                                        // Cập nhật lại countdown với thời gian mới
+                                        updateCountdown();
+                                    }
+                                }
+                            }
+                        }).catch(err => {
+                            console.error('Error refreshing after countdown expired:', err);
+                        });
+                    }
+                    
+                    // Hiển thị tạm thời "Đang kiểm tra..." trong khi refresh
+                    timer.innerHTML = '<span class="text-warning fw-bold">Đang kiểm tra...</span>';
+                    timer.classList.add('text-warning');
+                } else {
+                    // Tính giờ, phút, giây còn lại
+                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                    
+                    // Format hiển thị
+                    let timeStr = '';
+                    if (hours > 0) {
+                        timeStr = `${hours} giờ ${minutes} phút`;
+                    } else if (minutes > 0) {
+                        timeStr = `${minutes} phút ${seconds} giây`;
+                    } else {
+                        timeStr = `${seconds} giây`;
+                    }
+                    
+                    // Thêm màu cảnh báo nếu còn < 5 phút
+                    if (diff < 5 * 60 * 1000) {
+                        timer.innerHTML = `<span class="text-danger fw-bold">Còn ${timeStr}</span>`;
+                    } else if (diff < 15 * 60 * 1000) {
+                        timer.innerHTML = `<span class="text-warning fw-bold">Còn ${timeStr}</span>`;
+                    } else {
+                        timer.innerHTML = `Còn ${timeStr}`;
+                    }
+                }
+            });
+        }
+        
         document.addEventListener('DOMContentLoaded', function() {
             applyBadgeColors();
             
@@ -475,7 +596,371 @@
                 attributes: true,
                 attributeFilter: ['class']
             });
+            
+            // Cập nhật countdown timer ngay lập tức
+            updateCountdown();
+            
+            // Cập nhật mỗi giây và kiểm tra xem có booking nào hết thời gian không
+            let refreshScheduledForExpired = false; // Để tránh refresh nhiều lần
+            setInterval(function() {
+                updateCountdown(); // Cập nhật countdown và cập nhật DOM ngay khi hết thời gian
+                
+                // Kiểm tra xem có booking nào đã hết thời gian không (để sync với server)
+                if (!refreshScheduledForExpired) {
+                    const timers = document.querySelectorAll('.countdown-timer');
+                    let hasExpired = false;
+                    let expiredBookingIds = [];
+                    
+                    timers.forEach(timer => {
+                        const cancelTimeStr = timer.getAttribute('data-cancel-time');
+                        const bookingId = timer.getAttribute('data-booking-id');
+                        if (!cancelTimeStr || !bookingId) return;
+                        
+                        // Chỉ xử lý nếu chưa được xử lý
+                        if (expiredBookingsProcessed.has(bookingId)) return;
+                        
+                        const cancelTime = new Date(cancelTimeStr);
+                        const now = new Date();
+                        const diff = cancelTime - now;
+                        
+                        if (diff <= 0) {
+                            hasExpired = true;
+                            expiredBookingIds.push(bookingId);
+                            expiredBookingsProcessed.add(bookingId); // Đánh dấu đã xử lý
+                        }
+                    });
+                    
+                    // Nếu có booking hết thời gian, sync với server (silently, không thông báo)
+                    if (hasExpired && expiredBookingIds.length > 0) {
+                        refreshScheduledForExpired = true; // Đánh dấu đã schedule refresh
+                        console.log(`⏰ Detected ${expiredBookingIds.length} expired booking(s), syncing with server silently...`);
+                        
+                        // Sync với server sau 1 giây (để backend có thời gian xử lý) - KHÔNG hiển thị notification
+                        setTimeout(() => {
+                            refreshBookingListSilent().finally(() => {
+                                // Reset flag sau 5 giây
+                                setTimeout(() => {
+                                    refreshScheduledForExpired = false;
+                                }, 5000);
+                            });
+                        }, 1000); // Đợi 1 giây để backend xử lý
+                    }
+                }
+            }, 1000); // Check mỗi giây để phát hiện ngay khi hết thời gian
         });
+
+        // ========================================
+        // AUTO-REFRESH: Tự động cập nhật danh sách booking KHÔNG RELOAD TRANG
+        // ========================================
+        let isRefreshing = false;
+        let refreshInterval = null;
+        let refreshScheduledForExpired = false; // Flag để tránh refresh nhiều lần khi phát hiện expired
+        
+        // Function để fetch và cập nhật danh sách booking động (có notification)
+        async function refreshBookingList(showNotification = true) {
+            if (isRefreshing) return;
+            
+            // Kiểm tra nếu user đang tương tác với form hoặc modal
+            const activeModal = document.querySelector('.modal.show');
+            const activeForm = document.querySelector('form:has(input:focus), form:has(textarea:focus)');
+            
+            if (activeModal || activeForm) {
+                console.log('⏸️ Skipping refresh - user is interacting with form/modal');
+                return;
+            }
+            
+            isRefreshing = true;
+            
+            try {
+                // Lưu scroll position trước khi cập nhật
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                
+                // Fetch lại trang với header để nhận HTML - thêm timestamp để tránh cache
+                const url = new URL(window.location.href);
+                url.searchParams.set('_t', Date.now().toString()); // Cache busting
+                const response = await fetch(url.toString(), {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest', // Đánh dấu đây là AJAX request
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    },
+                    cache: 'no-store' // Đảm bảo không cache
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch booking list');
+                }
+                
+                const html = await response.text();
+                
+                // Parse HTML response và extract phần table body
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newTableBody = doc.querySelector('.order-table tbody');
+                const newCardFooter = doc.querySelector('.card-footer');
+                
+                if (newTableBody) {
+                    // Lấy table body hiện tại
+                    const currentTableBody = document.querySelector('.order-table tbody');
+                    const currentCardFooter = document.querySelector('.card-footer');
+                    
+                    if (currentTableBody) {
+                        // Fade out effect (chỉ khi có notification)
+                        if (showNotification) {
+                            currentTableBody.style.opacity = '0.5';
+                            currentTableBody.style.transition = 'opacity 0.3s';
+                        }
+                        
+                        // Replace nội dung sau 300ms (hoặc ngay lập tức nếu không có notification)
+                        setTimeout(() => {
+                            // Replace table body
+                            currentTableBody.innerHTML = newTableBody.innerHTML;
+                            
+                            // Replace pagination nếu có
+                            if (newCardFooter && currentCardFooter) {
+                                currentCardFooter.innerHTML = newCardFooter.innerHTML;
+                            } else if (newCardFooter && !currentCardFooter) {
+                                // Thêm pagination mới nếu không có
+                                const card = document.querySelector('.card.shadow-sm');
+                                if (card) {
+                                    card.insertAdjacentHTML('beforeend', newCardFooter.outerHTML);
+                                }
+                            } else if (!newCardFooter && currentCardFooter) {
+                                // Xóa pagination nếu không còn
+                                currentCardFooter.remove();
+                            }
+                            
+                            // Fade in effect (chỉ khi có notification)
+                            if (showNotification) {
+                                currentTableBody.style.opacity = '1';
+                            }
+                            
+                            // Re-initialize các event handlers cần thiết
+                            initializeEventHandlers();
+                            
+                            // Reset expiredBookingsProcessed để có thể xử lý lại các booking đã được gia hạn
+                            expiredBookingsProcessed.clear();
+                            
+                            // Log để debug đồng bộ và so sánh với giá trị cũ
+                            const allTimers = document.querySelectorAll('.countdown-timer');
+                            console.log(`📊 After refresh: Found ${allTimers.length} countdown timers`);
+                            allTimers.forEach(timer => {
+                                const bid = timer.getAttribute('data-booking-id');
+                                const ctime = timer.getAttribute('data-cancel-time');
+                                const minutes = timer.getAttribute('data-current-cancel-minutes');
+                                const createdAt = timer.getAttribute('data-created-at');
+                                
+                                if (bid && ctime) {
+                                    const cancelTime = new Date(ctime);
+                                    const now = new Date();
+                                    const remaining = Math.max(0, Math.round((cancelTime - now) / 60000));
+                                    
+                                    // So sánh với giá trị cũ
+                                    const oldCancelTime = bookingCancelTimes.get(bid);
+                                    if (oldCancelTime && oldCancelTime !== ctime) {
+                                        const oldTime = new Date(oldCancelTime);
+                                        const oldRemaining = Math.max(0, Math.round((oldTime - now) / 60000));
+                                        const diff = remaining - oldRemaining;
+                                        console.log(`   🔄 Booking ${bid} UPDATED:`);
+                                        console.log(`      Old: ${oldRemaining} min (${oldCancelTime})`);
+                                        console.log(`      New: ${remaining} min (${ctime})`);
+                                        console.log(`      Diff: ${diff > 0 ? '+' : ''}${diff} minutes`);
+                                        console.log(`      AutoCancelMinutes: ${minutes}, CreatedAt: ${createdAt}`);
+                                    } else {
+                                        console.log(`   Booking ${bid}: ${remaining} minutes remaining (AutoCancelMinutes: ${minutes}, CancelTime: ${ctime})`);
+                                    }
+                                }
+                            });
+                            
+                            // Khôi phục scroll position
+                            window.scrollTo(0, scrollTop);
+                            
+                            console.log('✅ Booking list updated successfully' + (showNotification ? '' : ' (silent)'));
+                        }, showNotification ? 300 : 0); // Ngay lập tức nếu không có notification
+                    } else {
+                        throw new Error('Table body container not found');
+                    }
+                } else {
+                    throw new Error('New table body not found in response');
+                }
+            } catch (error) {
+                console.error('❌ Error refreshing booking list:', error);
+            } finally {
+                isRefreshing = false;
+            }
+        }
+        
+        // Function để sync với server im lặng (không hiển thị notification)
+        async function refreshBookingListSilent() {
+            return refreshBookingList(false); // Gọi với showNotification = false
+        }
+        
+        // Function để hiển thị notification refresh
+        function showRefreshNotification(message, type) {
+            // Xóa notification cũ nếu có
+            const existingNotif = document.querySelector('.refresh-notification');
+            if (existingNotif) {
+                existingNotif.remove();
+            }
+            
+            // Tạo notification mới
+            const notification = document.createElement('div');
+            notification.className = 'refresh-notification';
+            const bgColor = type === 'success' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)';
+            notification.style.cssText = `position: fixed; bottom: 20px; right: 20px; background: ${bgColor}; color: white; padding: 12px 20px; border-radius: 8px; font-size: 0.875rem; z-index: 1050; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: slideIn 0.3s ease-out;`;
+            notification.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>${message}`;
+            document.body.appendChild(notification);
+            
+            // Tự động ẩn sau 3 giây
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.5s';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+        
+        // Function để re-initialize event handlers sau khi cập nhật DOM
+        // Lưu trữ cancel time ban đầu của mỗi booking để so sánh khi refresh
+        const bookingCancelTimes = new Map();
+        
+        function initializeEventHandlers() {
+            // Re-apply badge colors
+            applyBadgeColors();
+            
+            // Kiểm tra và cập nhật cancel times
+            const timers = document.querySelectorAll('.countdown-timer');
+            timers.forEach(timer => {
+                const bookingId = timer.getAttribute('data-booking-id');
+                const cancelTimeStr = timer.getAttribute('data-cancel-time');
+                const cancelMinutes = timer.getAttribute('data-current-cancel-minutes');
+                const createdAt = timer.getAttribute('data-created-at');
+                
+                if (bookingId && cancelTimeStr) {
+                    const oldCancelTime = bookingCancelTimes.get(bookingId);
+                    if (oldCancelTime && oldCancelTime !== cancelTimeStr) {
+                        // Cancel time đã thay đổi (admin đã cập nhật)
+                        const oldTime = new Date(oldCancelTime);
+                        const newTime = new Date(cancelTimeStr);
+                        const diffMinutes = Math.round((newTime - oldTime) / 60000);
+                        console.log(`🔄 Booking ${bookingId} cancel time updated:`);
+                        console.log(`   Old: ${oldCancelTime} (${oldTime.toLocaleString('vi-VN')})`);
+                        console.log(`   New: ${cancelTimeStr} (${newTime.toLocaleString('vi-VN')})`);
+                        console.log(`   Diff: ${diffMinutes} minutes`);
+                        console.log(`   AutoCancelMinutes: ${cancelMinutes}, CreatedAt: ${createdAt}`);
+                        bookingCancelTimes.set(bookingId, cancelTimeStr);
+                    } else if (!oldCancelTime) {
+                        // Lần đầu tiên thấy booking này
+                        console.log(`📝 Initializing booking ${bookingId}: cancelTime=${cancelTimeStr}, minutes=${cancelMinutes}, createdAt=${createdAt}`);
+                        bookingCancelTimes.set(bookingId, cancelTimeStr);
+                    }
+                }
+            });
+            
+            // Re-initialize countdown timers
+            updateCountdown();
+            
+            // Re-initialize pagination links (Bootstrap sẽ tự động hoạt động)
+            // Re-initialize modal triggers (Bootstrap sẽ tự động hoạt động với data attributes)
+        }
+        
+        // Auto-refresh định kỳ: mỗi 5 giây để cập nhật nhanh hơn khi admin thay đổi
+        function startAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            
+            refreshInterval = setInterval(() => {
+                refreshBookingList();
+            }, 5000); // 5 giây - cập nhật rất nhanh để đồng bộ với thay đổi từ admin
+        }
+        
+        // Kiểm tra định kỳ xem có booking nào có cancel time thay đổi không (mỗi 2 giây)
+        // Và so sánh với dữ liệu từ server để phát hiện thay đổi từ admin
+        let cancelTimeCheckInterval = null;
+        function startCancelTimeCheck() {
+            if (cancelTimeCheckInterval) {
+                clearInterval(cancelTimeCheckInterval);
+            }
+            
+            cancelTimeCheckInterval = setInterval(() => {
+                // Kiểm tra tất cả countdown timers hiện tại
+                const timers = document.querySelectorAll('.countdown-timer');
+                let needsRefresh = false;
+                
+                timers.forEach(timer => {
+                    const bookingId = timer.getAttribute('data-booking-id');
+                    const currentCancelTime = timer.getAttribute('data-cancel-time');
+                    const currentMinutes = timer.getAttribute('data-current-cancel-minutes');
+                    
+                    if (bookingId && currentCancelTime) {
+                        const storedCancelTime = bookingCancelTimes.get(bookingId);
+                        if (storedCancelTime && storedCancelTime !== currentCancelTime) {
+                            // Cancel time đã thay đổi trong DOM - có thể do refresh
+                            // Nhưng cần kiểm tra xem có phải do admin cập nhật không
+                            console.log(`🔄 Detected cancel time change in DOM for booking ${bookingId}`);
+                            console.log(`   Stored: ${storedCancelTime}, Current: ${currentCancelTime}`);
+                            needsRefresh = true;
+                        }
+                    }
+                });
+                
+                // Nếu có thay đổi, refresh để lấy dữ liệu mới nhất từ server
+                if (needsRefresh) {
+                    console.log('🔄 Refreshing to sync with server...');
+                    refreshBookingListSilent();
+                }
+            }, 2000); // Kiểm tra mỗi 2 giây để phát hiện nhanh hơn
+        }
+        
+        // Khởi động auto-refresh và cancel time check khi page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Bắt đầu auto-refresh
+            startAutoRefresh();
+            
+            // Bắt đầu kiểm tra cancel time changes
+            startCancelTimeCheck();
+            
+            // Khởi tạo bookingCancelTimes map với các booking hiện tại
+            const timers = document.querySelectorAll('.countdown-timer');
+            timers.forEach(timer => {
+                const bookingId = timer.getAttribute('data-booking-id');
+                const cancelTimeStr = timer.getAttribute('data-cancel-time');
+                if (bookingId && cancelTimeStr) {
+                    bookingCancelTimes.set(bookingId, cancelTimeStr);
+                }
+            });
+        });
+        
+        // Tắt auto-refresh và cancel time check khi page unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            if (cancelTimeCheckInterval) {
+                clearInterval(cancelTimeCheckInterval);
+            }
+        });
+        
+        // Thêm CSS animation (chỉ thêm một lần)
+        if (!document.getElementById('refresh-animation-style')) {
+            const style = document.createElement('style');
+            style.id = 'refresh-animation-style';
+            style.textContent = `
+                @@keyframes slideIn {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
     </script>
 }
 

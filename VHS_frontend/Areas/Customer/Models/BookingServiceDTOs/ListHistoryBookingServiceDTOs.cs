@@ -20,6 +20,7 @@
         // Booking
         public Guid BookingId { get; set; }
         public DateTime BookingTime { get; set; }
+        public DateTime? CreatedAt { get; set; } // Thời gian tạo booking
         public string Status { get; set; } = null!;
         public string Address { get; set; } = null!;
 

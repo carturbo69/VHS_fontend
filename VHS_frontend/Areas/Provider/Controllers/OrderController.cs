@@ -40,6 +40,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         // GET: Provider/Order/Index
+        [ResponseCache(NoStore = true, Duration = 0)] // Đảm bảo không cache
         public async Task<IActionResult> Index(
             string? status,
             DateTime? fromDate,
@@ -312,6 +313,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         // GET: Provider/Order/Details/5
+        [ResponseCache(NoStore = true, Duration = 0)] // Đảm bảo không cache để đồng bộ với admin
         public async Task<IActionResult> Details(Guid id)
         {
             Console.WriteLine($"[DEBUG] Details called with BookingId: {id}");

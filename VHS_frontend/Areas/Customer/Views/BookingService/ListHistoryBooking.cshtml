@@ -1,4 +1,5 @@
 ﻿@model VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.ListHistoryBookingServiceDTOs
+@using System.Linq
 @{
     ViewData["Title"] = "Lịch sử đơn dịch vụ";
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -103,7 +104,7 @@
 
     <!-- Danh sách đơn -->
     <div id="order-list" class="d-flex flex-column gap-3">
-        @foreach (var o in Model.Items)
+        @foreach (var o in Model.Items.OrderByDescending(x => x.CreatedAt ?? x.BookingTime))
         {
             var price = $"{o.TotalPrice:N0}đ";
 
@@ -1092,5 +1093,175 @@
                 });
             });
         });
+
+        // ========================================
+        // AUTO-REFRESH: Tự động cập nhật danh sách booking KHÔNG RELOAD TRANG
+        // ========================================
+        let isRefreshing = false;
+        let refreshInterval = null;
+        
+        // Function để fetch và cập nhật danh sách booking động
+        async function refreshBookingList() {
+            if (isRefreshing) return;
+            
+            // Kiểm tra nếu user đang tương tác với form hoặc modal
+            const activeModal = document.querySelector('.modal.show');
+            const activeForm = document.querySelector('form:has(input:focus), form:has(textarea:focus)');
+            
+            if (activeModal || activeForm) {
+                console.log('⏸️ Skipping refresh - user is interacting with form/modal');
+                return;
+            }
+            
+            isRefreshing = true;
+            
+            try {
+                // Lưu scroll position trước khi cập nhật
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                
+                // Fetch lại trang với header để nhận HTML
+                const response = await fetch(window.location.href, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest', // Đánh dấu đây là AJAX request
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch booking list');
+                }
+                
+                const html = await response.text();
+                
+                // Parse HTML response và extract phần order-list
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newOrderList = doc.querySelector('#order-list');
+                
+                if (newOrderList) {
+                    // Lấy container hiện tại
+                    const currentOrderList = document.querySelector('#order-list');
+                    
+                    if (currentOrderList) {
+                        // Fade out effect
+                        currentOrderList.style.opacity = '0.5';
+                        currentOrderList.style.transition = 'opacity 0.3s';
+                        
+                        // Replace nội dung sau 300ms
+                        setTimeout(() => {
+                            // Replace HTML
+                            currentOrderList.innerHTML = newOrderList.innerHTML;
+                            
+                            // Fade in effect
+                            currentOrderList.style.opacity = '1';
+                            
+                            // Re-initialize các event handlers cần thiết
+                            initializeEventHandlers();
+                            
+                            // Khôi phục scroll position
+                            window.scrollTo(0, scrollTop);
+                            
+                            // Hiển thị notification thành công
+                            showRefreshNotification('Đã cập nhật danh sách', 'success');
+                            
+                            console.log('✅ Booking list updated successfully');
+                        }, 300);
+                    } else {
+                        throw new Error('Order list container not found');
+                    }
+                } else {
+                    throw new Error('New order list not found in response');
+                }
+            } catch (error) {
+                console.error('❌ Error refreshing booking list:', error);
+                showRefreshNotification('Không thể cập nhật danh sách', 'error');
+            } finally {
+                isRefreshing = false;
+            }
+        }
+        
+        // Function để hiển thị notification refresh
+        function showRefreshNotification(message, type) {
+            // Xóa notification cũ nếu có
+            const existingNotif = document.querySelector('.refresh-notification');
+            if (existingNotif) {
+                existingNotif.remove();
+            }
+            
+            // Tạo notification mới
+            const notification = document.createElement('div');
+            notification.className = 'refresh-notification';
+            const bgColor = type === 'success' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)';
+            notification.style.cssText = `position: fixed; bottom: 20px; right: 20px; background: ${bgColor}; color: white; padding: 12px 20px; border-radius: 8px; font-size: 0.875rem; z-index: 1050; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: slideIn 0.3s ease-out;`;
+            notification.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>${message}`;
+            document.body.appendChild(notification);
+            
+            // Tự động ẩn sau 3 giây
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.5s';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+        
+        // Function để re-initialize event handlers sau khi cập nhật DOM
+        function initializeEventHandlers() {
+            // Re-initialize cancel booking forms
+            document.querySelectorAll('form[action*="CancelBooking"]').forEach(form => {
+                // Remove old handlers if needed (nếu cần)
+                // Add new handlers (nếu cần)
+            });
+            
+            // Re-initialize review modals
+            document.querySelectorAll('[data-bs-target^="#reviewModal"]').forEach(btn => {
+                // Bootstrap modal sẽ tự động hoạt động với data attributes
+            });
+            
+            // Re-initialize any other event handlers
+        }
+        
+        // Auto-refresh định kỳ: mỗi 30 giây
+        function startAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            
+            refreshInterval = setInterval(() => {
+                refreshBookingList();
+            }, 30000); // 30 giây
+        }
+        
+        // Khởi động auto-refresh khi page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Bắt đầu auto-refresh
+            startAutoRefresh();
+        });
+        
+        // Tắt auto-refresh khi page unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+        
+        // Thêm CSS animation (chỉ thêm một lần)
+        if (!document.getElementById('refresh-animation-style')) {
+            const style = document.createElement('style');
+            style.id = 'refresh-animation-style';
+            style.textContent = `
+                @@keyframes slideIn {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
     </script>
 }

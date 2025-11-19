@@ -10,6 +10,7 @@ namespace VHS_frontend.Models.Payment
         public bool Success { get; set; }
         public string Token { get; set; } = string.Empty;
         public string VnPayResponseCode { get; set; } = string.Empty;
+        public decimal Amount { get; set; } = 0m; // Số tiền từ VNPay response (đã chia cho 100)
     }
 }
 
