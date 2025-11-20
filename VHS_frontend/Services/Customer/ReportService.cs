@@ -232,6 +232,7 @@ namespace VHS_frontend.Services.Customer
                 { ReportTypeEnum.StaffMisconduct, "Hành vi sai trái của nhân viên" },
                 { ReportTypeEnum.Dispute, "Tranh chấp" },
                 { ReportTypeEnum.TechnicalIssue, "Vấn đề kỹ thuật" },
+                { ReportTypeEnum.RefundRequest, "Yêu cầu hoàn tiền" },
                 { ReportTypeEnum.Other, "Khác" }
             };
         }

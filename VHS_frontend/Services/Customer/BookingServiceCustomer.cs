@@ -532,6 +532,10 @@ namespace VHS_frontend.Services.Customer
                 throw new UnauthorizedAccessException("JWT token is required");
             SetAuthHeader(jwtToken);
             var json = System.Text.Json.JsonSerializer.Serialize(model);
+            
+            // Debug: Log request JSON để kiểm tra
+            System.Diagnostics.Debug.WriteLine($"[CancelBookingWithRefundFullAsync] Request JSON: {json}");
+            
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var res = await _httpClient.PostAsync("/api/Bookings/cancel-with-refund", content, ct);
             if (!res.IsSuccessStatusCode)

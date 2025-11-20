@@ -138,12 +138,63 @@ namespace VHS_frontend.Services.Admin
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             
             var res = await _http.PostAsync("/api/PaymentManagement/reject-refund-unconfirmed", content, ct);
-            await HandleErrorAsync(res, ct);
             
             var responseJson = await res.Content.ReadAsStringAsync(ct);
-            var response = JsonSerializer.Deserialize<ApiResponse<object>>(responseJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return response?.Success ?? false;
+            
+            // Chỉ throw exception nếu status code không phải 2xx
+            if (!res.IsSuccessStatusCode)
+            {
+                string msg = "Đã có lỗi xảy ra.";
+                try
+                {
+                    using var doc = JsonDocument.Parse(responseJson);
+                    if (doc.RootElement.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String)
+                        msg = m.GetString() ?? msg;
+                }
+                catch { /* ignore parse error */ }
+                throw new HttpRequestException(msg);
+            }
+            
+            // Parse response (backend trả về { Success, Message, Data } với Success uppercase)
+            try
+            {
+                using var doc = JsonDocument.Parse(responseJson);
+                
+                // Ưu tiên check Success (uppercase) vì backend trả về như vậy
+                if (doc.RootElement.TryGetProperty("Success", out var successProp) && successProp.ValueKind == JsonValueKind.True)
+                {
+                    return true;
+                }
+                else if (doc.RootElement.TryGetProperty("Success", out var successProp2) && successProp2.ValueKind == JsonValueKind.False)
+                {
+                    return false;
+                }
+                // Fallback: check success (lowercase)
+                else if (doc.RootElement.TryGetProperty("success", out var successPropLower))
+                {
+                    if (successPropLower.ValueKind == JsonValueKind.True) return true;
+                    if (successPropLower.ValueKind == JsonValueKind.False) return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log error nhưng vẫn thử deserialize
+                Console.WriteLine($"[RejectRefund] Error parsing response: {ex.Message}");
+            }
+            
+            // Fallback: deserialize với case-insensitive
+            try
+            {
+                var response = JsonSerializer.Deserialize<ApiResponse<object>>(responseJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                return response?.Success ?? false;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RejectRefund] Error deserializing response: {ex.Message}, Response: {responseJson}");
+                // Nếu không parse được, nhưng status code là 200, coi như thành công
+                return res.IsSuccessStatusCode;
+            }
         }
 
 
@@ -348,6 +399,7 @@ namespace VHS_frontend.Services.Admin
         }
     }
 }
+
 
 
 

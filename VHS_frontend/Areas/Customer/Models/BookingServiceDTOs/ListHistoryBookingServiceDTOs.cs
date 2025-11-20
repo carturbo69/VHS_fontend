@@ -44,6 +44,10 @@
 
         public bool HasReview { get; set; } = false;
 
+        // Report info
+        public bool HasReport { get; set; } = false;
+        public Guid? ReportId { get; set; }
+
         // Payment info
         public decimal? PaidAmount { get; set; }
         public string? PaymentStatus { get; set; }

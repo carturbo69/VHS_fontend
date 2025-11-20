@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using VHS_frontend.Areas.Admin.Models.Complaint;
+using VHS_frontend.Areas.Customer.Models.Profile;
 
 namespace VHS_frontend.Services.Admin
 {
@@ -209,7 +210,7 @@ namespace VHS_frontend.Services.Admin
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
 
-        public async Task<object?> HandleComplaintAsync(Guid id, HandleComplaintDTO dto, CancellationToken ct = default)
+        public async Task<ProfileResponseDTO?> HandleComplaintAsync(Guid id, HandleComplaintDTO dto, CancellationToken ct = default)
         {
             AttachAuth();
             
@@ -220,7 +221,7 @@ namespace VHS_frontend.Services.Admin
             await HandleErrorAsync(res, ct);
             
             var responseJson = await res.Content.ReadAsStringAsync(ct);
-            return JsonSerializer.Deserialize<object>(responseJson,
+            return JsonSerializer.Deserialize<ProfileResponseDTO>(responseJson,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
 

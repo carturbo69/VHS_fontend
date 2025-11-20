@@ -20,6 +20,14 @@ namespace VHS_frontend.Areas.Customer.Models.ReportDTOs
         public string? ProviderName { get; set; }
         public string? ServiceName { get; set; }
         public int DaysSinceCreated { get; set; }
+        
+        // ✅ Refund information (khi ComplaintType là "RefundRequest" hoặc "Yêu cầu hoàn tiền")
+        public string? CancelReason { get; set; }
+        public string? RefundStatus { get; set; } // "Pending", "Approved", "Rejected", "NoRefund"
+        public string? BankAccountNumber { get; set; }
+        public string? BankName { get; set; }
+        public string? AccountHolderName { get; set; }
+        public decimal? RefundAmount { get; set; }
     }
 }
 

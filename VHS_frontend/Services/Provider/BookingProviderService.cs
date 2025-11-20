@@ -344,6 +344,48 @@ namespace VHS_frontend.Services.Provider
                 return null;
             }
         }
+
+        public async Task<bool> AutoCancelBookingAsync(Guid bookingId, bool isPendingExpired)
+        {
+            try
+            {
+                Console.WriteLine($"[BookingService] AutoCancelBookingAsync called");
+                Console.WriteLine($"[BookingService] BookingId: {bookingId}, IsPendingExpired: {isPendingExpired}");
+                
+                SetAuthorizationHeader();
+
+                var payload = new
+                {
+                    bookingId = bookingId,
+                    isPendingExpired = isPendingExpired
+                };
+
+                var json = JsonSerializer.Serialize(payload);
+                Console.WriteLine($"[BookingService] Request JSON: {json}");
+                
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var url = "/api/provider/bookings/auto-cancel";
+                
+                Console.WriteLine($"[BookingService] POST {_httpClient.BaseAddress}{url}");
+                var response = await _httpClient.PostAsync(url, content);
+                
+                Console.WriteLine($"[BookingService] Response status: {response.StatusCode}");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[BookingService] Error response: {errorContent}");
+                }
+                
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] AutoCancelBookingAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+                return false;
+            }
+        }
     }
 }
 

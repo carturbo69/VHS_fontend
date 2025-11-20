@@ -71,6 +71,32 @@
 <link href="~/css/list-histrory-booking.css" rel="stylesheet" />
 
 <div class="container my-3">
+    <!-- Toast Notifications -->
+    @if (TempData["ToastSuccess"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert" style="margin-bottom: 20px; border-left: 4px solid #28a745;">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>Thành công!</strong> @TempData["ToastSuccess"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+    @if (TempData["ToastError"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-bottom: 20px; border-left: 4px solid #dc3545;">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>
+            <strong>Lỗi!</strong> @TempData["ToastError"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+    @if (TempData["DuplicateReportError"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show" role="alert" style="margin-bottom: 20px; border-left: 4px solid #ffc107;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Cảnh báo!</strong> @TempData["DuplicateReportError"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
     <!-- Page Header -->
     <div class="page-header">
         <h1 class="page-title">
@@ -351,13 +377,26 @@
                             }
                             <button type="submit" class="btn btn-danger">Đặt lại</button>
                         </form>
-                        <a asp-area="Customer"
-                           asp-controller="BookingService"
-                           asp-action="ReportService"
-                           asp-route-bookingId="@o.BookingId"
-                           class="btn btn-outline-danger btn-report">
-                            Báo cáo
-                        </a>
+                        @if (o.HasReport && o.ReportId.HasValue)
+                        {
+                            <a asp-area="Customer"
+                               asp-controller="BookingService"
+                               asp-action="ReportDetail"
+                               asp-route-reportId="@o.ReportId.Value"
+                               class="btn btn-outline-primary">
+                                <i class="bi bi-file-earmark-text me-1"></i>Xem báo cáo
+                            </a>
+                        }
+                        else
+                        {
+                            <a asp-area="Customer"
+                               asp-controller="BookingService"
+                               asp-action="ReportService"
+                               asp-route-bookingId="@o.BookingId"
+                               class="btn btn-outline-danger btn-report">
+                                Báo cáo
+                            </a>
+                        }
 
                         @if (canReview && !isReviewed)
                         {
@@ -577,7 +616,7 @@
             <div class="modal fade" id="cancelModal-@o.BookingId" tabindex="-1" aria-labelledby="cancelModalLabel-@o.BookingId" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-scrollable modal-lg cancel-order-modal">
                     <div class="modal-content">
-                        <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post" novalidate>
+                        <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post" novalidate data-booking-id="@o.BookingId">
                             @Html.AntiForgeryToken()
                             <div class="modal-header border-bottom">
                                 <h5 class="modal-title d-flex align-items-center gap-2" id="cancelModalLabel-@o.BookingId">
@@ -595,7 +634,7 @@
                                     <i class="bi bi-exclamation-triangle-fill fs-4 mt-1"></i>
                                     <div>
                                         <strong class="d-block mb-1">Lưu ý quan trọng</strong>
-                                        <span>Việc hủy đơn có thể ảnh hưởng đến quá trình hoàn tiền. Vui lòng điền đầy đủ thông tin ngân hàng để nhận hoàn tiền (nếu áp dụng).</span>
+                                        <span>Việc hủy đơn sẽ không thể hoàn tác. Nếu bạn đã thanh toán và muốn yêu cầu hoàn tiền, vui lòng sử dụng chức năng "Báo cáo" với loại "Yêu cầu hoàn tiền".</span>
                                     </div>
                                 </div>
 
@@ -614,64 +653,6 @@
                                     <div class="form-text mt-2 d-flex align-items-start gap-2">
                                         <i class="bi bi-lightbulb-fill text-warning mt-1"></i>
                                         <span>Ví dụ: Đặt nhầm dịch vụ, thay đổi thời gian, tìm được nhà cung cấp khác...</span>
-                                    </div>
-                                </div>
-
-                                <!-- Thông tin ngân hàng -->
-                                <div class="bank-info-section border-top pt-4">
-                                    <div class="d-flex align-items-center gap-2 mb-4">
-                                        <div class="bank-icon-wrapper">
-                                            <i class="bi bi-bank2 text-primary"></i>
-                                        </div>
-                                        <div>
-                                            <h6 class="fw-bold mb-0">Thông tin ngân hàng để hoàn tiền</h6>
-                                            <small class="text-muted">Điền đầy đủ để nhận hoàn tiền (nếu áp dụng)</small>
-                                        </div>
-                                </div>
-
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
-                                                <i class="bi bi-building text-primary"></i>
-                                                <span>Tên ngân hàng</span>
-                                                <span class="text-danger">*</span>
-                                            </label>
-                                            <input class="form-control" name="BankName" placeholder="VD: Vietcombank, Techcombank, BIDV..." />
-                                            <div class="invalid-feedback d-none" id="bankNameError-@o.BookingId">
-                                                <i class="bi bi-exclamation-circle me-1"></i>
-                                                <span></span>
-                                            </div>
-                                </div>
-
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
-                                                <i class="bi bi-person-badge text-primary"></i>
-                                                <span>Tên chủ tài khoản</span>
-                                                <span class="text-danger">*</span>
-                                            </label>
-                                            <input class="form-control text-uppercase" name="AccountHolderName" placeholder="VD: NGUYEN VAN A" />
-                                            <div class="invalid-feedback d-none" id="accountHolderError-@o.BookingId">
-                                                <i class="bi bi-exclamation-circle me-1"></i>
-                                                <span></span>
-                                            </div>
-                                </div>
-
-                                        <div class="col-12">
-                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
-                                                <i class="bi bi-credit-card text-primary"></i>
-                                                <span>Số tài khoản</span>
-                                                <span class="text-danger">*</span>
-                                            </label>
-                                            <input class="form-control" name="BankAccountNumber" inputmode="numeric" placeholder="Chỉ nhập số, từ 6–20 ký tự" />
-                                            <div class="invalid-feedback d-none" id="accountNumberError-@o.BookingId">
-                                                <i class="bi bi-exclamation-circle me-1"></i>
-                                                <span></span>
-                                            </div>
-                                            <div class="form-text mt-2 d-flex align-items-start gap-2">
-                                                <i class="bi bi-shield-check-fill text-success mt-1"></i>
-                                                <span>Thông tin ngân hàng được bảo mật và chỉ dùng để hoàn tiền (nếu áp dụng).</span>
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1022,33 +1003,13 @@
                 
                 // Validate từng field
                 const reason = form.querySelector('textarea[name="Reason"]')?.value?.trim();
-                const bankName = form.querySelector('input[name="BankName"]')?.value?.trim();
-                const accountHolder = form.querySelector('input[name="AccountHolderName"]')?.value?.trim();
-                const accountNumber = form.querySelector('input[name="BankAccountNumber"]')?.value?.trim();
                 
                 // Clear all errors first
                 showError('Reason', 'reasonError', '');
-                showError('BankName', 'bankNameError', '');
-                showError('AccountHolderName', 'accountHolderError', '');
-                showError('BankAccountNumber', 'accountNumberError', '');
                 
                 // Validate và hiển thị lỗi
                 if (!reason) {
                     showError('Reason', 'reasonError', 'Vui lòng nhập lý do hủy đơn hàng.');
-                }
-                
-                if (!bankName) {
-                    showError('BankName', 'bankNameError', 'Vui lòng nhập tên ngân hàng.');
-                }
-                
-                if (!accountHolder) {
-                    showError('AccountHolderName', 'accountHolderError', 'Vui lòng nhập tên chủ tài khoản.');
-                }
-                
-                if (!accountNumber) {
-                    showError('BankAccountNumber', 'accountNumberError', 'Vui lòng nhập số tài khoản.');
-                } else if (!/^\d{6,20}$/.test(accountNumber)) {
-                    showError('BankAccountNumber', 'accountNumberError', 'Số tài khoản phải là số và có từ 6 đến 20 ký tự.');
                 }
                 
                 // Nếu có lỗi, ngăn submit và scroll đến field đầu tiên có lỗi
@@ -1163,7 +1124,7 @@
                             window.scrollTo(0, scrollTop);
                             
                             // Hiển thị notification thành công
-                            showRefreshNotification('Đã cập nhật danh sách', 'success');
+                            // showRefreshNotification('Đã cập nhật danh sách', 'success');
                             
                             console.log('✅ Booking list updated successfully');
                         }, 300);
@@ -1236,6 +1197,15 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Bắt đầu auto-refresh
             startAutoRefresh();
+            
+            // ✅ Tự động ẩn toast notifications sau 5 giây
+            const toastAlerts = document.querySelectorAll('.alert.alert-dismissible');
+            toastAlerts.forEach(alert => {
+                setTimeout(() => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }, 5000); // 5 giây
+            });
         });
         
         // Tắt auto-refresh khi page unload

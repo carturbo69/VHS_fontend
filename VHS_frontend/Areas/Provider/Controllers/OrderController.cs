@@ -411,6 +411,34 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
         }
 
+        // POST: Provider/Order/AutoCancel
+        [HttpPost]
+        public async Task<IActionResult> AutoCancel([FromBody] AutoCancelRequest request)
+        {
+            Console.WriteLine("═══════════════════════════════════════════════");
+            Console.WriteLine($"[FRONTEND AutoCancel] BookingId: {request.BookingId}");
+            Console.WriteLine($"[FRONTEND AutoCancel] IsPendingExpired: {request.IsPendingExpired}");
+            Console.WriteLine("═══════════════════════════════════════════════");
+            
+            try
+            {
+                var success = await _bookingService.AutoCancelBookingAsync(request.BookingId, request.IsPendingExpired);
+                Console.WriteLine($"[FRONTEND AutoCancel] Result: {success}");
+                
+                if (success)
+                {
+                    return Json(new { success = true, message = "Đơn hàng đã được hủy tự động" });
+                }
+                return Json(new { success = false, message = "Không thể hủy đơn hàng" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FRONTEND AutoCancel] ❌ EXCEPTION: {ex.Message}");
+                Console.WriteLine($"[FRONTEND AutoCancel] Stack trace: {ex.StackTrace}");
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
         // POST: Provider/Order/AssignStaff
         [HttpPost]
         public async Task<IActionResult> AssignStaff([FromBody] AssignStaffRequest request)
@@ -471,6 +499,12 @@ namespace VHS_frontend.Areas.Provider.Controllers
     {
         public Guid BookingId { get; set; }
         public Guid StaffId { get; set; }
+    }
+
+    public class AutoCancelRequest
+    {
+        public Guid BookingId { get; set; }
+        public bool IsPendingExpired { get; set; }
     }
 }
 

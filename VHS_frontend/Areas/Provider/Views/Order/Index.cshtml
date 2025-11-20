@@ -829,8 +829,10 @@
             // Re-apply badge colors
             applyBadgeColors();
             
-            // Kiểm tra và cập nhật cancel times
+            // Kiểm tra và cập nhật cancel times - phát hiện thay đổi từ admin
             const timers = document.querySelectorAll('.countdown-timer');
+            let hasAdminChange = false;
+            
             timers.forEach(timer => {
                 const bookingId = timer.getAttribute('data-booking-id');
                 const cancelTimeStr = timer.getAttribute('data-cancel-time');
@@ -841,22 +843,40 @@
                     const oldCancelTime = bookingCancelTimes.get(bookingId);
                     if (oldCancelTime && oldCancelTime !== cancelTimeStr) {
                         // Cancel time đã thay đổi (admin đã cập nhật)
+                        hasAdminChange = true;
                         const oldTime = new Date(oldCancelTime);
                         const newTime = new Date(cancelTimeStr);
                         const diffMinutes = Math.round((newTime - oldTime) / 60000);
-                        console.log(`🔄 Booking ${bookingId} cancel time updated:`);
+                        console.log(`🔄 [ADMIN SYNC] Booking ${bookingId} cancel time updated:`);
                         console.log(`   Old: ${oldCancelTime} (${oldTime.toLocaleString('vi-VN')})`);
                         console.log(`   New: ${cancelTimeStr} (${newTime.toLocaleString('vi-VN')})`);
-                        console.log(`   Diff: ${diffMinutes} minutes`);
+                        console.log(`   Diff: ${diffMinutes > 0 ? '+' : ''}${diffMinutes} minutes`);
                         console.log(`   AutoCancelMinutes: ${cancelMinutes}, CreatedAt: ${createdAt}`);
+                        
+                        // Cập nhật stored value
                         bookingCancelTimes.set(bookingId, cancelTimeStr);
+                        
+                        // Hiển thị thông báo nhẹ nhàng cho user (nếu có thay đổi đáng kể)
+                        if (Math.abs(diffMinutes) >= 1) {
+                            showRefreshNotification(
+                                `Admin đã cập nhật thời gian hủy cho đơn ${bookingId.toString().substring(0, 8).toUpperCase()}`,
+                                'success'
+                            );
+                        }
                     } else if (!oldCancelTime) {
                         // Lần đầu tiên thấy booking này
                         console.log(`📝 Initializing booking ${bookingId}: cancelTime=${cancelTimeStr}, minutes=${cancelMinutes}, createdAt=${createdAt}`);
                         bookingCancelTimes.set(bookingId, cancelTimeStr);
+                    } else {
+                        // Đảm bảo stored value được cập nhật
+                        bookingCancelTimes.set(bookingId, cancelTimeStr);
                     }
                 }
             });
+            
+            if (hasAdminChange) {
+                console.log('✅ [ADMIN SYNC] Detected admin changes, timer values updated');
+            }
             
             // Re-initialize countdown timers
             updateCountdown();
@@ -865,15 +885,15 @@
             // Re-initialize modal triggers (Bootstrap sẽ tự động hoạt động với data attributes)
         }
         
-        // Auto-refresh định kỳ: mỗi 5 giây để cập nhật nhanh hơn khi admin thay đổi
+        // Auto-refresh định kỳ: mỗi 3 giây để cập nhật nhanh hơn khi admin thay đổi
         function startAutoRefresh() {
             if (refreshInterval) {
                 clearInterval(refreshInterval);
             }
             
             refreshInterval = setInterval(() => {
-                refreshBookingList();
-            }, 5000); // 5 giây - cập nhật rất nhanh để đồng bộ với thay đổi từ admin
+                refreshBookingList(false); // Silent refresh để không làm phiền user
+            }, 3000); // 3 giây - cập nhật rất nhanh để đồng bộ với thay đổi từ admin
         }
         
         // Kiểm tra định kỳ xem có booking nào có cancel time thay đổi không (mỗi 2 giây)
@@ -897,8 +917,7 @@
                     if (bookingId && currentCancelTime) {
                         const storedCancelTime = bookingCancelTimes.get(bookingId);
                         if (storedCancelTime && storedCancelTime !== currentCancelTime) {
-                            // Cancel time đã thay đổi trong DOM - có thể do refresh
-                            // Nhưng cần kiểm tra xem có phải do admin cập nhật không
+                            // Cancel time đã thay đổi trong DOM - có thể do admin cập nhật
                             console.log(`🔄 Detected cancel time change in DOM for booking ${bookingId}`);
                             console.log(`   Stored: ${storedCancelTime}, Current: ${currentCancelTime}`);
                             needsRefresh = true;
@@ -908,7 +927,7 @@
                 
                 // Nếu có thay đổi, refresh để lấy dữ liệu mới nhất từ server
                 if (needsRefresh) {
-                    console.log('🔄 Refreshing to sync with server...');
+                    console.log('🔄 Refreshing to sync with admin changes...');
                     refreshBookingListSilent();
                 }
             }, 2000); // Kiểm tra mỗi 2 giây để phát hiện nhanh hơn

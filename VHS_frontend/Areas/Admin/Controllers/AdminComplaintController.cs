@@ -116,13 +116,34 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
                 var result = await _complaintService.HandleComplaintAsync(id, dto);
                 
-                if (result != null)
+                if (result != null && result.Success)
                 {
-                    TempData["Success"] = "Xử lý khiếu nại thành công!";
+                    // Kiểm tra xem có RefundRequest được tạo không
+                    bool refundRequestCreated = false;
+                    if (result.Data != null)
+                    {
+                        // Sử dụng System.Text.Json để parse Data object
+                        var jsonString = System.Text.Json.JsonSerializer.Serialize(result.Data);
+                        using var doc = System.Text.Json.JsonDocument.Parse(jsonString);
+                        if (doc.RootElement.TryGetProperty("RefundRequestCreated", out var refundCreatedProp) && 
+                            refundCreatedProp.ValueKind == System.Text.Json.JsonValueKind.True)
+                        {
+                            refundRequestCreated = true;
+                        }
+                    }
+                    
+                    if (refundRequestCreated && dto.Status == "Resolved")
+                    {
+                        TempData["Success"] = "Xử lý khiếu nại thành công! Yêu cầu hoàn tiền đã được tạo và đang chờ duyệt trong mục Quản lý Thanh toán.";
+                    }
+                    else
+                    {
+                        TempData["Success"] = result.Message ?? "Xử lý khiếu nại thành công!";
+                    }
                 }
                 else
                 {
-                    TempData["Error"] = "Không thể xử lý khiếu nại!";
+                    TempData["Error"] = result?.Message ?? "Không thể xử lý khiếu nại!";
                 }
             }
             catch (Exception ex)

@@ -47,6 +47,25 @@ namespace VHS_frontend.Areas.Customer.Controllers
             _staffService = staffService;
         }
 
+        // Helper: Kiểm tra xem booking đã thanh toán chưa
+        private static bool IsBookingPaid(HistoryBookingDetailDTO? bookingDetail)
+        {
+            if (bookingDetail == null) return false;
+            
+            var paidAmount = bookingDetail.PaidAmount; // decimal is non-nullable, default is 0m
+            var paymentStatus = bookingDetail.PaymentStatus ?? "";
+            var hasPaidAmount = paidAmount > 0;
+            var hasSuccessPaymentStatus = !string.IsNullOrWhiteSpace(paymentStatus) && 
+                                          (paymentStatus.ToUpperInvariant() == "ĐÃ THANH TOÁN" || 
+                                           paymentStatus.ToUpperInvariant() == "PAID" || 
+                                           paymentStatus.ToUpperInvariant() == "SUCCESS" || 
+                                           paymentStatus.ToUpperInvariant() == "COMPLETED" ||
+                                           paymentStatus.ToUpperInvariant() == "00" || // VNPay success code
+                                           paymentStatus.Contains("thành công", StringComparison.OrdinalIgnoreCase) ||
+                                           paymentStatus.Contains("success", StringComparison.OrdinalIgnoreCase));
+            return hasPaidAmount || hasSuccessPaymentStatus;
+        }
+
         // Helper: lấy AccountId từ claim/session với retry logic
         private Guid GetAccountId(bool retry = false)
         {
@@ -829,6 +848,26 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 vm = await _bookingServiceCustomer.GetHistoryByAccountAsync(accountId, jwt, ct)
                      ?? new ListHistoryBookingServiceDTOs { Items = new() };
+                
+                // Populate HasReport và ReportId cho từng booking
+                if (vm.Items != null && vm.Items.Any() && !string.IsNullOrWhiteSpace(jwt))
+                {
+                    foreach (var item in vm.Items)
+                    {
+                        try
+                        {
+                            var (hasReport, report) = await _reportService.CheckBookingHasReportAsync(item.BookingId, jwt, ct);
+                            item.HasReport = hasReport;
+                            item.ReportId = report?.ComplaintId;
+                        }
+                        catch
+                        {
+                            // Nếu có lỗi khi check report, mặc định là false
+                            item.HasReport = false;
+                            item.ReportId = null;
+                        }
+                    }
+                }
             }
             catch (HttpRequestException ex)
             {
@@ -847,9 +886,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         {
             if (!ModelState.IsValid ||
                 model.BookingId == Guid.Empty ||
-                string.IsNullOrWhiteSpace(model.Reason) ||
-                string.IsNullOrWhiteSpace(model.BankName) ||
-                string.IsNullOrWhiteSpace(model.BankAccountNumber))
+                string.IsNullOrWhiteSpace(model.Reason))
             {
                 TempData["ToastError"] = "Vui lòng nhập đầy đủ thông tin hủy đơn.";
                 return RedirectToAction(nameof(ListHistoryBooking));
@@ -867,16 +904,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 {
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
-                var createRefundReq = new {
-                    BookingId = model.BookingId,
-                    BankAccount = model.BankAccountNumber,
-                    BankName = model.BankName,
-                    AccountHolderName = model.AccountHolderName,
-                    CancelReason = model.Reason
-                };
-                // Giả định _bookingServiceCustomer đã cập nhật API call phù hợp BE
-                // Kiểm tra lại status trước khi submit (để tránh submit nhầm)
-                // Sử dụng cả NormalizedStatus và Status gốc để xử lý cả tiếng Anh và tiếng Việt
+                
+                // Kiểm tra lại status và thanh toán trước khi submit
                 HistoryBookingDetailDTO? bookingDetail = null;
                 try
                 {
@@ -918,12 +947,30 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         TempData["ToastError"] = $"Không thể hủy đơn này. Chỉ có thể hủy đơn ở trạng thái 'Chờ xác nhận'. Đơn hiện tại đang ở trạng thái: {statusVi}.";
                         return RedirectToAction(nameof(HistoryBookingDetail), new { id = model.BookingId });
                     }
+                    
                 }
+                
+                // Tạo request - gửi lý do hủy và các field ngân hàng với giá trị mặc định để tránh lỗi validation từ backend
+                // (Backend vẫn yêu cầu các field này, nhưng chúng ta gửi giá trị mặc định vì đây là hủy đơn đơn giản, không phải yêu cầu hoàn tiền)
+                // Gửi cả CancelReason và Reason để đảm bảo backend nhận được lý do hủy
+                var createRefundReq = new {
+                    BookingId = model.BookingId,
+                    CancelReason = model.Reason,
+                    Reason = model.Reason, // Thêm field Reason để đảm bảo backend nhận được
+                    BankName = "N/A", // Giá trị mặc định để tránh lỗi validation
+                    BankAccount = "N/A", // Giá trị mặc định để tránh lỗi validation
+                    BankAccountNumber = "N/A", // Thêm field này để đảm bảo backend nhận được
+                    AccountHolderName = "N/A" // Giá trị mặc định để tránh lỗi validation
+                };
+
+                // Debug: Log request để kiểm tra
+                var requestJson = System.Text.Json.JsonSerializer.Serialize(createRefundReq);
+                System.Diagnostics.Debug.WriteLine($"[CancelBooking] Request JSON: {requestJson}");
 
                 var result = await _bookingServiceCustomer.CancelBookingWithRefundFullAsync(createRefundReq, jwtToken);
                 if (result?.Success == true)
                 {
-                    TempData["ToastSuccess"] = "Hủy đơn thành công. Yêu cầu hoàn tiền sẽ được xử lý trong thời gian sớm nhất.";
+                    TempData["ToastSuccess"] = "Hủy đơn thành công.";
                 }
                 else
                 {
@@ -1071,12 +1118,33 @@ namespace VHS_frontend.Areas.Customer.Controllers
             [FromForm] string? Description,
             [FromForm] Guid? ProviderId,
             [FromForm] List<IFormFile>? Attachments,
+            [FromForm] string? BankName,
+            [FromForm] string? AccountHolderName,
+            [FromForm] string? BankAccountNumber,
             CancellationToken ct)
         {
             if (BookingId == Guid.Empty || string.IsNullOrWhiteSpace(Title))
             {
                 TempData["ToastError"] = "Vui lòng điền đầy đủ thông tin báo cáo.";
                 return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
+            }
+
+            // Nếu là yêu cầu hoàn tiền, validate thông tin ngân hàng
+            if (ReportType == ReportTypeEnum.RefundRequest)
+            {
+                if (string.IsNullOrWhiteSpace(BankName) ||
+                    string.IsNullOrWhiteSpace(AccountHolderName) ||
+                    string.IsNullOrWhiteSpace(BankAccountNumber))
+                {
+                    TempData["ToastError"] = "Vui lòng điền đầy đủ thông tin ngân hàng để hoàn tiền.";
+                    return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
+                }
+
+                if (!System.Text.RegularExpressions.Regex.IsMatch(BankAccountNumber, @"^\d{6,20}$"))
+                {
+                    TempData["ToastError"] = "Số tài khoản phải là số và có từ 6 đến 20 ký tự.";
+                    return RedirectToAction(nameof(ReportService), new { bookingId = BookingId });
+                }
             }
 
             try
@@ -1087,12 +1155,25 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
 
+                // Nếu là yêu cầu hoàn tiền, thêm thông tin ngân hàng vào Description
+                string? finalDescription = Description;
+                if (ReportType == ReportTypeEnum.RefundRequest && !string.IsNullOrWhiteSpace(BankAccountNumber))
+                {
+                    var bankInfo = $"\n\n--- THÔNG TIN NGÂN HÀNG ĐỂ HOÀN TIỀN ---\n" +
+                                  $"Tên ngân hàng: {BankName}\n" +
+                                  $"Tên chủ tài khoản: {AccountHolderName}\n" +
+                                  $"Số tài khoản: {BankAccountNumber}";
+                    finalDescription = string.IsNullOrWhiteSpace(Description) 
+                        ? bankInfo.Trim() 
+                        : Description + bankInfo;
+                }
+
                 var createDto = new CreateReportDTO
                 {
                     BookingId = BookingId,
                     ReportType = ReportType,
                     Title = Title,
-                    Description = Description,
+                    Description = finalDescription,
                     ProviderId = ProviderId,
                     Attachments = Attachments
                 };
@@ -1101,7 +1182,14 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                 if (result != null)
                 {
-                    TempData["ToastSuccess"] = "Gửi báo cáo thành công. Hệ thống sẽ xử lý trong thời gian sớm nhất.";
+                    if (ReportType == ReportTypeEnum.RefundRequest)
+                    {
+                        TempData["ToastSuccess"] = "Yêu cầu hoàn tiền đã được gửi thành công. Hệ thống sẽ xử lý trong thời gian sớm nhất.";
+                    }
+                    else
+                    {
+                        TempData["ToastSuccess"] = "Gửi báo cáo thành công. Hệ thống sẽ xử lý trong thời gian sớm nhất.";
+                    }
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
                 else

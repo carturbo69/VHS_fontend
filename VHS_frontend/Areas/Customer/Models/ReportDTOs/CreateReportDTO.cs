@@ -30,6 +30,7 @@ namespace VHS_frontend.Areas.Customer.Models.ReportDTOs
         StaffMisconduct,     // Hành vi sai trái của nhân viên
         Dispute,            // Tranh chấp
         TechnicalIssue,     // Vấn đề kỹ thuật
+        RefundRequest,      // Yêu cầu hoàn tiền
         Other               // Khác
     }
 

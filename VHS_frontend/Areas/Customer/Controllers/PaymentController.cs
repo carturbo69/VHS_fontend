@@ -278,7 +278,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
 
             // Parse amount từ string (dùng InvariantCulture)
-            if (!decimal.TryParse(amount, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var amountDecimal))
+            decimal amountDecimal = 0m;
+            if (!decimal.TryParse(amount, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out amountDecimal))
             {
                 // Fallback: thử tính từ session nếu amount không hợp lệ
                 try
@@ -287,9 +288,22 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 }
                 catch
                 {
-                    TempData["ToastError"] = "Số tiền thanh toán không hợp lệ.";
+                    TempData["ToastError"] = "Số tiền thanh toán không hợp lệ. Vui lòng thử lại.";
                     return RedirectToAction("Index", "BookingService", new { area = "Customer" });
                 }
+            }
+
+            // ✅ Validate số tiền trước khi gửi đến VNPay
+            if (amountDecimal < 5000m)
+            {
+                TempData["ToastError"] = $"Số tiền thanh toán ({amountDecimal:N0} VND) quá nhỏ. Số tiền tối thiểu là 5,000 VND.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
+
+            if (amountDecimal >= 1000000000m) // 1 tỷ VND
+            {
+                TempData["ToastError"] = $"Số tiền thanh toán ({amountDecimal:N0} VND) quá lớn. Số tiền tối đa là 999,999,999 VND.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
             }
 
             // Lưu booking IDs vào session để callback có thể sử dụng
@@ -319,8 +333,24 @@ namespace VHS_frontend.Areas.Customer.Controllers
             };
 
             // Tạo URL thanh toán và redirect
-            var url = _vnPayService.CreatePaymentUrl(paymentModel, HttpContext);
-            return Redirect(url);
+            try
+            {
+                var url = _vnPayService.CreatePaymentUrl(paymentModel, HttpContext);
+                return Redirect(url);
+            }
+            catch (ArgumentException ex)
+            {
+                // Xử lý lỗi validation từ VnPayService
+                TempData["ToastError"] = ex.Message;
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
+            catch (Exception ex)
+            {
+                // Xử lý các lỗi khác
+                System.Diagnostics.Debug.WriteLine($"[Payment] Lỗi khi tạo URL thanh toán VNPay: {ex.Message}");
+                TempData["ToastError"] = "Có lỗi xảy ra khi tạo liên kết thanh toán. Vui lòng thử lại.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
         }
 
         /// <summary>
@@ -328,8 +358,24 @@ namespace VHS_frontend.Areas.Customer.Controllers
         /// </summary>
         public IActionResult CreatePaymentUrlVnpay(PaymentInformationModel model)
         {
-            var url = _vnPayService.CreatePaymentUrl(model, HttpContext);
-            return Redirect(url);
+            try
+            {
+                var url = _vnPayService.CreatePaymentUrl(model, HttpContext);
+                return Redirect(url);
+            }
+            catch (ArgumentException ex)
+            {
+                // Xử lý lỗi validation từ VnPayService
+                TempData["ToastError"] = ex.Message;
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
+            catch (Exception ex)
+            {
+                // Xử lý các lỗi khác
+                System.Diagnostics.Debug.WriteLine($"[Payment] Lỗi khi tạo URL thanh toán VNPay: {ex.Message}");
+                TempData["ToastError"] = "Có lỗi xảy ra khi tạo liên kết thanh toán. Vui lòng thử lại.";
+                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
+            }
         }
 
         /// <summary>
