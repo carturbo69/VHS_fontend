@@ -293,18 +293,6 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 }
             }
 
-            // ✅ Validate số tiền trước khi gửi đến VNPay
-            if (amountDecimal < 5000m)
-            {
-                TempData["ToastError"] = $"Số tiền thanh toán ({amountDecimal:N0} VND) quá nhỏ. Số tiền tối thiểu là 5,000 VND.";
-                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
-            }
-
-            if (amountDecimal >= 1000000000m) // 1 tỷ VND
-            {
-                TempData["ToastError"] = $"Số tiền thanh toán ({amountDecimal:N0} VND) quá lớn. Số tiền tối đa là 999,999,999 VND.";
-                return RedirectToAction("Index", "BookingService", new { area = "Customer" });
-            }
 
             // Lưu booking IDs vào session để callback có thể sử dụng
             HttpContext.Session.SetString("CHECKOUT_PENDING_BOOKING_IDS", string.Join(",", bookingIds));

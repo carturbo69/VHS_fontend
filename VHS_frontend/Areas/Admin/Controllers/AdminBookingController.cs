@@ -213,20 +213,29 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
             try
             {
-                // Parse createdAt từ string (format: yyyy-MM-ddTHH:mm:ss)
+                // ✨ QUAN TRỌNG: Parse createdAt từ string (có thể là CreatedAt hoặc ConfirmedAt)
+                // Format: yyyy-MM-ddTHH:mm:ss hoặc yyyy-MM-ddTHH:mm:ss+07:00
                 DateTime createdAtDateTime;
+                
+                // Thử parse với nhiều format để đảm bảo nhất quán với frontend
                 if (!DateTime.TryParse(createdAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out createdAtDateTime))
                 {
-                    // Thử parse với format ISO 8601
+                    // Thử parse với format ISO 8601 không có timezone
                     if (!DateTime.TryParseExact(createdAt, "yyyy-MM-ddTHH:mm:ss", null, System.Globalization.DateTimeStyles.None, out createdAtDateTime))
                     {
-                        return Json(new { success = false, message = $"Thời gian tạo booking không hợp lệ: {createdAt}" });
+                        // Thử parse với format có timezone +07:00
+                        if (!DateTime.TryParseExact(createdAt, "yyyy-MM-ddTHH:mm:ss+07:00", null, System.Globalization.DateTimeStyles.None, out createdAtDateTime))
+                        {
+                            return Json(new { success = false, message = $"Thời gian booking không hợp lệ: {createdAt}" });
+                        }
                     }
                 }
 
-                // Tính toán AutoCancelMinutes mới
+                // ✨ QUAN TRỌNG: Tính toán AutoCancelMinutes mới
+                // Với Confirmed booking: createdAtDateTime thực ra là ConfirmedAt (đã được frontend truyền đúng)
+                // Với Pending booking: createdAtDateTime là CreatedAt
                 // Thời gian hủy mới = Now + remainingMinutes
-                // AutoCancelMinutes = (thời gian hủy mới - CreatedAt).TotalMinutes
+                // AutoCancelMinutes = (thời gian hủy mới - createdAtDateTime).TotalMinutes
                 var now = DateTime.Now;
                 var newCancelTime = now.AddMinutes(remainingMinutes);
                 var newAutoCancelMinutes = (int)Math.Ceiling((newCancelTime - createdAtDateTime).TotalMinutes);

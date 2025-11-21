@@ -359,7 +359,7 @@
                             <i class="bi bi-info-circle"></i>
                             <strong>Đơn hàng đã được xác nhận</strong>
                             <p class="mb-0 mt-2 small">
-                                Nhân viên <strong>@(Model.StaffName ?? "chưa phân công")</strong> sẽ thực hiện công việc và cập nhật trạng thái qua ứng dụng Staff.
+                                Nhân viên <strong>@(Model.StaffName ?? "chưa phân công")</strong> sẽ thực hiện công việc và cập nhật trạng thái qua ứng dụng nhân viên.
                             </p>
                         </div>
                     }
@@ -461,52 +461,79 @@
                     </div>
                     
                     @* Hiển thị countdown timer cho Confirmed chưa thanh toán *@
-                    @if (isConfirmed)
+                    @{
+                        var statusNormPayment = (Model.Status ?? string.Empty).Trim();
+                        bool isConfirmedPayment = string.Equals(statusNormPayment, "Confirmed", StringComparison.OrdinalIgnoreCase);
+                    }
+                    @if (isConfirmedPayment)
                     {
-                        // Kiểm tra chưa thanh toán
+                        // ✨ ĐỒNG BỘ: Kiểm tra chưa thanh toán - logic giống Provider
+                        var paymentStatusLowerCheck = (Model.PaymentStatus ?? string.Empty).ToLower().Trim();
                         var isUnpaid = string.IsNullOrEmpty(Model.PaymentStatus) || 
-                                     (!Model.PaymentStatus.ToLower().Contains("paid") && 
-                                      !Model.PaymentStatus.ToLower().Contains("đã thanh toán") &&
-                                      !Model.PaymentStatus.ToLower().Contains("completed") &&
-                                      Model.PaymentStatus.ToLower() != "00");
+                                     paymentStatusLowerCheck == "chưa xác định" ||
+                                     paymentStatusLowerCheck == "chua xac dinh" ||
+                                     (!paymentStatusLowerCheck.Contains("paid") && 
+                                      !paymentStatusLowerCheck.Contains("đã thanh toán") &&
+                                      !paymentStatusLowerCheck.Contains("đã thanh toan") &&
+                                      !paymentStatusLowerCheck.Contains("completed") &&
+                                      paymentStatusLowerCheck != "00");
                         
                         if (isUnpaid)
                         {
-                            // Sử dụng ConfirmedAt thay vì CreatedAt - timer chỉ bắt đầu từ khi xác nhận
+                            // ✨ QUAN TRỌNG: Timer PHẢI bắt đầu từ ConfirmedAt (thời gian provider xác nhận)
+                            // Không dùng CreatedAt cho Confirmed booking - timer chỉ bắt đầu từ khi xác nhận
                             var cancelMinutes = Model.AutoCancelMinutes ?? 30; // Sử dụng AutoCancelMinutes từ model, mặc định 30 phút
                             DateTime validConfirmedAt;
                             
-                            // Ưu tiên dùng ConfirmedAt nếu có, nếu không thì dùng thời gian hiện tại
+                            // ✨ PHẢI dùng ConfirmedAt từ database (để đồng bộ với provider)
+                            // Khi provider xác nhận đơn, ConfirmedAt được lưu vào database ngay lập tức
                             if (Model.ConfirmedAt.HasValue && 
                                 Model.ConfirmedAt.Value != default(DateTime) && 
                                 Model.ConfirmedAt.Value != DateTime.MinValue && 
                                 Model.ConfirmedAt.Value.Year > 2000)
                             {
+                                // Dùng ConfirmedAt từ database (thời gian provider xác nhận)
                                 validConfirmedAt = Model.ConfirmedAt.Value;
+                            }
+                            else if (Model.CreatedAt != default(DateTime) && 
+                                     Model.CreatedAt != DateTime.MinValue && 
+                                     Model.CreatedAt.Year > 2000)
+                            {
+                                // Fallback: Dùng CreatedAt nếu không có ConfirmedAt (không nên xảy ra)
+                                validConfirmedAt = Model.CreatedAt;
                             }
                             else
                             {
-                                // Nếu chưa có ConfirmedAt, dùng thời gian hiện tại (trường hợp đơn vừa được xác nhận)
-                                // JavaScript sẽ kiểm tra localStorage và dùng thời gian từ đó nếu có
+                                // Fallback cuối cùng: Dùng thời gian hiện tại (không nên xảy ra với Confirmed booking)
+                                // Nếu đến đây, có thể booking chưa được confirm đúng cách
                                 validConfirmedAt = DateTime.Now;
                             }
                             
+                            // ✨ QUAN TRỌNG: Tính cancelTime từ ConfirmedAt + cancelMinutes (KHÔNG phải CreatedAt)
+                            // cancelTime = ConfirmedAt (thời gian xác nhận) + autoCancelMinutes
+                            // ✨ ĐỒNG BỘ: Dùng cùng format với Provider để đảm bảo timezone nhất quán
                             var cancelTime = validConfirmedAt.AddMinutes(cancelMinutes);
+                            var confirmedAtStr = Model.ConfirmedAt.HasValue && 
+                                                Model.ConfirmedAt.Value != default(DateTime) && 
+                                                Model.ConfirmedAt.Value != DateTime.MinValue && 
+                                                Model.ConfirmedAt.Value.Year > 2000 
+                                                ? Model.ConfirmedAt.Value.ToString("yyyy-MM-ddTHH:mm:ss") 
+                                                : validConfirmedAt.ToString("yyyy-MM-ddTHH:mm:ss");
                             <div class="alert alert-warning mt-3 mb-0">
                                 <div class="mb-2">
                                     <i class="bi bi-clock-history me-2"></i>
                                     <strong>Thời gian tự động hủy (chưa thanh toán):</strong>
-                </div>
+                                </div>
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <div class="countdown-timer-confirmed-unpaid text-danger fw-bold" 
                                          data-cancel-time="@cancelTime.ToString("yyyy-MM-ddTHH:mm:ss")"
                                          data-booking-id="@Model.BookingId"
-                                         data-confirmed-at="@validConfirmedAt.ToString("yyyy-MM-ddTHH:mm:ss")"
+                                         data-confirmed-at="@confirmedAtStr"
                                          data-auto-cancel-minutes="@(Model.AutoCancelMinutes?.ToString() ?? "")"
-                                         data-use-localstorage="true"
+                                         data-use-localstorage="false"
                                          style="font-size: 1.1rem;">
                                         Đang tính...
-            </div>
+                                    </div>
                                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCancelTimeModal">
                                         <i class="bi bi-pencil-square"></i> Chỉnh sửa
                                     </button>
@@ -696,23 +723,16 @@
 
 @section Scripts {
     <script>
+        // ✨ QUAN TRỌNG: Khai báo bookingId để dùng trong AutoCancelManager (giống Provider)
+        const bookingId = '@Model.BookingId';
+        
         // Get backend URL
         const metaBackendUrl = document.querySelector('meta[name="backend-url"]')?.getAttribute('content');
         const backendUrl = metaBackendUrl || 'http://localhost:5154';
         
         // Countdown timer cho booking Pending
         document.addEventListener('DOMContentLoaded', function() {
-            // Xóa localStorage nếu đơn hàng đã thanh toán hoặc hủy
-            const bookingId = '@Model.BookingId';
-            const currentStatus = '@Model.Status'.trim().toLowerCase();
-            const paymentStatus = '@(Model.PaymentStatus ?? "")'.trim().toLowerCase();
-            const isPaid = paymentStatus.includes('paid') || paymentStatus.includes('đã thanh toán') || paymentStatus === '00';
-            const isCanceled = currentStatus === 'canceled' || currentStatus === 'cancelled' || currentStatus === 'completed';
-            
-            if (isPaid || isCanceled) {
-                const localStorageKey = `booking_confirmed_${bookingId}`;
-                localStorage.removeItem(localStorageKey);
-            }
+            // Admin không cần xóa localStorage vì không dùng localStorage
             
             // AutoCancelManager cho Details page
             const AutoCancelManager = {
@@ -772,73 +792,72 @@
                     }
                 } catch (error) {
                     console.error('[AUTO CANCEL] Error:', error);
-                    alert(`❌ Lỗi khi hủy đơn hàng tự động: ${error.message}`);
+                    // Không hiển thị alert, chỉ log để debug
                     this.inProgress = false;
                 }
                 }
             };
             
-            function updateCountdown(timerSelector, isConfirmedUnpaid = false) {
+            // ✨ Function countdown đơn giản - đồng bộ với Provider và Index
+            function updateCountdown(timerSelector) {
                 const timer = document.querySelector(timerSelector);
                 if (!timer) return;
                 
+                // Dùng data-cancel-time đã được server tính sẵn từ ConfirmedAt (hoặc CreatedAt)
                 const cancelTimeStr = timer.getAttribute('data-cancel-time');
-                if (!cancelTimeStr) return;
+                const confirmedAtStr = timer.getAttribute('data-confirmed-at');
+                const bookingId = timer.getAttribute('data-booking-id');
                 
-                // ✨ Nếu là timer Confirmed chưa thanh toán, PHẢI dùng ConfirmedAt (từ server hoặc localStorage)
-                // KHÔNG BAO GIỜ dùng CreatedAt cho timer này
+                if (!cancelTimeStr) {
+                    timer.innerHTML = '<span class="text-danger">Đang tải...</span>';
+                    return;
+                }
+                
+                // Parse cancelTime - đơn giản, nhất quán
                 let cancelTime;
-                if (isConfirmedUnpaid && timer.getAttribute('data-use-localstorage') === 'true') {
-                    const bookingId = timer.getAttribute('data-booking-id');
-                    const autoCancelMinutes = parseInt(timer.getAttribute('data-auto-cancel-minutes') || '30');
+                try {
+                    // ✨ ĐỒNG BỘ: Parse trực tiếp - JavaScript tự động xử lý timezone
+                    // Đảm bảo format "yyyy-MM-ddTHH:mm:ss" được parse đúng
+                    cancelTime = new Date(cancelTimeStr);
                     
-                    // Ưu tiên 1: Dùng data-confirmed-at từ server (nếu có)
-                    const confirmedAtStr = timer.getAttribute('data-confirmed-at');
-                    let confirmedTime = null;
-                    
-                    if (confirmedAtStr && confirmedAtStr.trim() !== '') {
-                        // Parse thời gian từ server
-                        if (confirmedAtStr.includes('Z') || confirmedAtStr.match(/[+-]\d{2}:\d{2}$/)) {
-                            confirmedTime = new Date(confirmedAtStr);
-                        } else {
-                            confirmedTime = new Date(confirmedAtStr.replace('T', ' '));
-                        }
-                    } else {
-                        // Ưu tiên 2: Dùng localStorage (thời gian xác nhận ngay khi provider bấm nút)
-                        const localStorageKey = `booking_confirmed_${bookingId}`;
-                        const confirmedTimeStr = localStorage.getItem(localStorageKey);
-                        
-                        if (confirmedTimeStr) {
-                            confirmedTime = new Date(confirmedTimeStr);
-                        } else {
-                            // Ưu tiên 3: Dùng thời gian hiện tại (fallback - không nên xảy ra)
-                            confirmedTime = new Date();
-                        }
+                    if (isNaN(cancelTime.getTime())) {
+                        timer.innerHTML = '<span class="text-danger">Lỗi thời gian</span>';
+                        console.error('[Admin Countdown] Invalid cancelTime:', cancelTimeStr);
+                        return;
                     }
-                    
-                    // Tính cancelTime từ ConfirmedAt + autoCancelMinutes
-                    cancelTime = new Date(confirmedTime.getTime() + autoCancelMinutes * 60 * 1000);
-                } else {
-                    // Timer Pending: Parse thời gian hủy từ data-cancel-time (đã tính từ CreatedAt)
-                    if (cancelTimeStr.includes('Z') || cancelTimeStr.match(/[+-]\d{2}:\d{2}$/)) {
-                        cancelTime = new Date(cancelTimeStr);
-                    } else {
-                        cancelTime = new Date(cancelTimeStr.replace('T', ' '));
-                    }
+                } catch (e) {
+                    timer.innerHTML = '<span class="text-danger">Lỗi thời gian</span>';
+                    console.error('[Admin Countdown] Parse error:', e, 'cancelTimeStr:', cancelTimeStr);
+                    return;
                 }
                 
                 const now = new Date();
-                
-                // Tính thời gian còn lại (milliseconds)
                 const diff = cancelTime - now;
+                
+                // Debug: Log mỗi 10 giây để theo dõi
+                if (timerSelector === '.countdown-timer-confirmed-unpaid') {
+                    const logKey = `lastLog_${bookingId}`;
+                    const lastLog = window[logKey] || 0;
+                    if (now.getTime() - lastLog > 10000) { // Log mỗi 10 giây
+                        console.log('[Admin Countdown] Update:', {
+                            bookingId: bookingId,
+                            cancelTimeStr: cancelTimeStr,
+                            cancelTimeISO: cancelTime.toISOString(),
+                            confirmedAtStr: confirmedAtStr,
+                            nowISO: now.toISOString(),
+                            diffMs: diff,
+                            diffSeconds: Math.floor(diff / 1000),
+                            diffMinutes: Math.floor(diff / 60000)
+                        });
+                        window[logKey] = now.getTime();
+                    }
+                }
                 
                 if (diff <= 0) {
                     // Đã quá thời gian hủy
-                    
-                    // Nếu đã được xử lý, không làm gì
                     if (AutoCancelManager.inProgress) {
-                        timer.innerHTML = '<span class="text-warning fw-bold">Đang xử lý...</span>';
-                        timer.classList.add('text-warning');
+                        timer.innerHTML = '<span class="text-danger fw-bold">Đang xử lý...</span>';
+                        timer.classList.add('text-danger');
                         return;
                     }
                     
@@ -848,53 +867,368 @@
                     timer.classList.add('text-warning');
                     
                     // Gọi API auto-cancel và đợi kết quả
-                    AutoCancelManager.call(isConfirmedUnpaid ? false : true).then(() => {
+                    AutoCancelManager.call(true).then(() => {
                         // CHỈ KHI API THÀNH CÔNG mới reload để lấy dữ liệu từ database
                         // Reload sẽ tự động cập nhật UI với dữ liệu thật từ database
                     }).catch(error => {
-                        // Nếu API fail, hiển thị lỗi và reset
+                        // Nếu API fail, chỉ log lỗi, không hiển thị alert
                         timer.innerHTML = '<span class="text-danger fw-bold">Lỗi khi hủy đơn</span>';
                         console.error('[AUTO CANCEL] Error:', error);
-                        alert(`❌ Lỗi khi hủy đơn hàng tự động: ${error.message}`);
+                        // Reload ngay lập tức để cập nhật trạng thái
+                        location.reload();
                     });
                 } else {
-                    // Tính giờ, phút, giây còn lại
+                    // Tính giờ, phút, giây còn lại - format giống Index
                     const hours = Math.floor(diff / (1000 * 60 * 60));
                     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
                     
-                    // Format hiển thị
+                    // Format hiển thị giống Index
                     let timeStr = '';
                     if (hours > 0) {
-                        timeStr = `${hours} giờ ${minutes} phút ${seconds} giây`;
+                        timeStr = `${hours} giờ ${minutes} phút`;
                     } else if (minutes > 0) {
                         timeStr = `${minutes} phút ${seconds} giây`;
                     } else {
                         timeStr = `${seconds} giây`;
                     }
                     
-                    // Thêm màu cảnh báo nếu còn < 5 phút
-                    if (diff < 5 * 60 * 1000) {
-                        timer.innerHTML = `<span class="text-danger fw-bold">⏰ ${timeStr}</span>`;
-                    } else if (diff < 15 * 60 * 1000) {
-                        timer.innerHTML = `<span class="text-warning fw-bold">⏰ ${timeStr}</span>`;
-                    } else {
-                        timer.innerHTML = `⏰ ${timeStr}`;
+                    // ✨ Tối ưu: Chỉ cập nhật text, không thay đổi structure để tránh nhấp nháy
+                    const timeText = `Còn ${timeStr}`;
+                    const currentText = timer.textContent.trim();
+                    
+                    // Chỉ cập nhật nếu text thay đổi
+                    if (currentText !== timeText) {
+                        // Tìm span bên trong để cập nhật text, không thay đổi structure
+                        const innerSpan = timer.querySelector('span');
+                        if (innerSpan) {
+                            // Chỉ cập nhật text, giữ nguyên class
+                            innerSpan.textContent = timeText;
+                        } else {
+                            // Nếu không có span, chỉ cập nhật text
+                            timer.textContent = timeText;
+                        }
+                    }
+                    
+                    // ✨ Cập nhật class màu một lần, không mỗi giây
+                    const shouldBeDanger = diff < 5 * 60 * 1000;
+                    const shouldBeWarning = diff >= 5 * 60 * 1000 && diff < 15 * 60 * 1000;
+                    const innerSpan = timer.querySelector('span');
+                    if (innerSpan) {
+                        if (shouldBeDanger && !innerSpan.classList.contains('text-danger')) {
+                            innerSpan.className = 'text-danger fw-bold';
+                        } else if (shouldBeWarning && !innerSpan.classList.contains('text-warning')) {
+                            innerSpan.className = 'text-warning fw-bold';
+                        } else if (!shouldBeDanger && !shouldBeWarning && innerSpan.classList.contains('text-danger')) {
+                            innerSpan.className = 'fw-bold';
+                        }
                     }
                 }
             }
             
-            // Cập nhật countdown cho Pending
-            updateCountdown('.countdown-timer-detail', false);
+            // ✨ ĐỒNG BỘ: Debug - Log giá trị khi page load
+            const confirmedTimer = document.querySelector('.countdown-timer-confirmed-unpaid');
+            if (confirmedTimer) {
+                const cancelTime = confirmedTimer.getAttribute('data-cancel-time');
+                const confirmedAt = confirmedTimer.getAttribute('data-confirmed-at');
+                const autoCancelMinutes = confirmedTimer.getAttribute('data-auto-cancel-minutes');
+                const bookingId = confirmedTimer.getAttribute('data-booking-id');
+                
+                // Parse và log chi tiết để debug
+                let cancelTimeDate = null;
+                let confirmedAtDate = null;
+                try {
+                    if (cancelTime) cancelTimeDate = new Date(cancelTime);
+                    if (confirmedAt) confirmedAtDate = new Date(confirmedAt);
+                } catch (e) {
+                    console.error('[Admin Details] Parse error:', e);
+                }
+                
+                console.log('[Admin Details] Timer initialized:', {
+                    bookingId: bookingId,
+                    cancelTime: cancelTime,
+                    cancelTimeDate: cancelTimeDate ? cancelTimeDate.toISOString() : null,
+                    confirmedAt: confirmedAt,
+                    confirmedAtDate: confirmedAtDate ? confirmedAtDate.toISOString() : null,
+                    autoCancelMinutes: autoCancelMinutes,
+                    currentTime: new Date().toISOString(),
+                    timeUntilCancel: cancelTimeDate ? Math.floor((cancelTimeDate - new Date()) / 1000) + ' seconds' : null
+                });
+            }
             
-            // Cập nhật countdown cho Confirmed chưa thanh toán
-            updateCountdown('.countdown-timer-confirmed-unpaid', true);
+            // ✨ ĐỒNG BỘ: Cập nhật countdown cho Pending và Confirmed chưa thanh toán
+            updateCountdown('.countdown-timer-detail');
+            updateCountdown('.countdown-timer-confirmed-unpaid');
             
-            // Cập nhật mỗi giây
+            // ✨ ĐỒNG BỘ: Cập nhật timer mỗi giây (đồng bộ với Provider)
+            // Sử dụng setInterval để đảm bảo cả hai trang đều cập nhật cùng lúc
             setInterval(function() {
-                updateCountdown('.countdown-timer-detail', false);
-                updateCountdown('.countdown-timer-confirmed-unpaid', true);
+                updateCountdown('.countdown-timer-detail');
+                updateCountdown('.countdown-timer-confirmed-unpaid');
             }, 1000);
+            
+            // ✨ ĐỒNG BỘ: Đảm bảo timer được cập nhật ngay khi page load
+            // Điều này giúp đồng bộ với Provider khi cả hai trang cùng mở
+            setTimeout(function() {
+                updateCountdown('.countdown-timer-detail');
+                updateCountdown('.countdown-timer-confirmed-unpaid');
+            }, 100);
+            
+            // ========== Auto-refresh để đồng bộ với Provider ==========
+            let refreshInterval = null;
+            
+            // ✨ Function đơn giản: Admin refresh để lấy data-cancel-time mới nhất từ server
+            let isRefreshing = false;
+            async function refreshBookingDetail() {
+                if (isRefreshing) return;
+                isRefreshing = true;
+                
+                try {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('_t', Date.now().toString());
+                    
+                    const response = await fetch(url.toString(), {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                        },
+                        cache: 'no-store'
+                    });
+                    
+                    if (!response.ok) {
+                        isRefreshing = false;
+                        return;
+                    }
+                    
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // ✨ QUAN TRỌNG: Cập nhật status badge ngay lập tức nếu có thay đổi
+                    const newStatusBadge = doc.querySelector('.status-badge-lg');
+                    const currentStatusBadge = document.querySelector('.status-badge-lg');
+                    if (newStatusBadge && currentStatusBadge) {
+                        const newStatusText = newStatusBadge.textContent.trim();
+                        const newStatusClass = newStatusBadge.className;
+                        const currentStatusText = currentStatusBadge.textContent.trim();
+                        
+                        if (newStatusText !== currentStatusText || newStatusClass !== currentStatusBadge.className) {
+                            // Status đã thay đổi - cập nhật mượt mà, không làm giật UI
+                            requestAnimationFrame(() => {
+                                currentStatusBadge.textContent = newStatusText;
+                                currentStatusBadge.className = newStatusClass;
+                                
+                                // ✨ Cập nhật các phần tử liên quan đến status (chỉ khi cần)
+                                const newCancelReasonSection = doc.querySelector('.cancel-reason-section');
+                                const currentCancelReasonSection = document.querySelector('.cancel-reason-section');
+                                if (newCancelReasonSection && currentCancelReasonSection) {
+                                    const newReasonHTML = newCancelReasonSection.innerHTML.trim();
+                                    const currentReasonHTML = currentCancelReasonSection.innerHTML.trim();
+                                    if (newReasonHTML !== currentReasonHTML) {
+                                        currentCancelReasonSection.outerHTML = newCancelReasonSection.outerHTML;
+                                    }
+                                }
+                                
+                                // ✨ Cập nhật alert warning nếu có thay đổi
+                                const newAlertWarning = doc.querySelector('.alert-warning');
+                                const currentAlertWarning = document.querySelector('.alert-warning');
+                                if (newAlertWarning && currentAlertWarning) {
+                                    const newAlertText = newAlertWarning.textContent.trim();
+                                    const currentAlertText = currentAlertWarning.textContent.trim();
+                                    if (newAlertText !== currentAlertText) {
+                                        currentAlertWarning.outerHTML = newAlertWarning.outerHTML;
+                                        // Re-initialize countdown timer nếu có
+                                        setTimeout(() => {
+                                            updateCountdown('.countdown-timer-confirmed-unpaid');
+                                        }, 100);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    
+                    // ✨ Cập nhật Payment Status nếu có thay đổi (chỉ khi thực sự thay đổi)
+                    const newPaymentStatus = doc.querySelector('.payment-status-badge');
+                    const currentPaymentStatus = document.querySelector('.payment-status-badge');
+                    if (newPaymentStatus && currentPaymentStatus) {
+                        const newPaymentText = newPaymentStatus.textContent.trim();
+                        const newPaymentClass = newPaymentStatus.className;
+                        const currentPaymentText = currentPaymentStatus.textContent.trim();
+                        
+                        if (newPaymentText !== currentPaymentText || newPaymentClass !== currentPaymentStatus.className) {
+                            // Cập nhật mượt mà
+                            requestAnimationFrame(() => {
+                                currentPaymentStatus.textContent = newPaymentText;
+                                currentPaymentStatus.className = newPaymentClass;
+                            });
+                        }
+                    }
+                    
+                    // ✨ Cập nhật Payment Method nếu có thay đổi (chỉ khi thực sự thay đổi)
+                    const paymentMethodRows = doc.querySelectorAll('.payment-summary .d-flex');
+                    const currentPaymentMethodRows = document.querySelectorAll('.payment-summary .d-flex');
+                    if (paymentMethodRows.length === currentPaymentMethodRows.length) {
+                        paymentMethodRows.forEach((newRow, index) => {
+                            const currentRow = currentPaymentMethodRows[index];
+                            if (newRow && currentRow) {
+                                const newRowText = newRow.textContent.trim();
+                                const currentRowText = currentRow.textContent.trim();
+                                if (newRowText !== currentRowText) {
+                                    requestAnimationFrame(() => {
+                                        currentRow.outerHTML = newRow.outerHTML;
+                                    });
+                                }
+                            }
+                        });
+                    }
+                    
+                    // ✨ Cập nhật Staff Assignment Card nếu có thay đổi (chỉ khi thực sự thay đổi)
+                    const allNewCards = doc.querySelectorAll('.card');
+                    const allCurrentCards = document.querySelectorAll('.card');
+                    allNewCards.forEach((newCard, index) => {
+                        if (index < allCurrentCards.length) {
+                            const currentCard = allCurrentCards[index];
+                            const newCardHeader = newCard.querySelector('.card-header h5')?.textContent?.trim();
+                            const currentCardHeader = currentCard.querySelector('.card-header h5')?.textContent?.trim();
+                            
+                            // Kiểm tra nếu là staff card hoặc các card quan trọng khác
+                            if (newCardHeader === currentCardHeader && 
+                                (newCardHeader?.includes('Phân công nhân viên') || 
+                                 newCardHeader?.includes('Trạng thái đơn hàng') ||
+                                 newCardHeader?.includes('Thanh toán'))) {
+                                const newCardBody = newCard.querySelector('.card-body');
+                                const currentCardBody = currentCard.querySelector('.card-body');
+                                if (newCardBody && currentCardBody) {
+                                    const newCardBodyHTML = newCardBody.innerHTML.trim();
+                                    const currentCardBodyHTML = currentCardBody.innerHTML.trim();
+                                    if (newCardBodyHTML !== currentCardBodyHTML) {
+                                        // Cập nhật mượt mà
+                                        requestAnimationFrame(() => {
+                                            currentCardBody.innerHTML = newCardBodyHTML;
+                                            
+                                            // Re-initialize countdown timer nếu có trong card này
+                                            const timerInCard = currentCardBody.querySelector('.countdown-timer-confirmed-unpaid');
+                                            if (timerInCard) {
+                                                setTimeout(() => {
+                                                    updateCountdown('.countdown-timer-confirmed-unpaid');
+                                                }, 100);
+                                            }
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    // ✨ Cập nhật data-cancel-time từ server (đã tính từ ConfirmedAt hoặc CreatedAt)
+                    const newPendingTimer = doc.querySelector('.countdown-timer-detail');
+                    const currentPendingTimer = document.querySelector('.countdown-timer-detail');
+                    const newConfirmedTimer = doc.querySelector('.countdown-timer-confirmed-unpaid');
+                    const currentConfirmedTimer = document.querySelector('.countdown-timer-confirmed-unpaid');
+                    
+                    // Cập nhật Pending timer
+                    if (newPendingTimer && currentPendingTimer) {
+                        const newCancelTime = newPendingTimer.getAttribute('data-cancel-time');
+                        const newConfirmedAt = newPendingTimer.getAttribute('data-confirmed-at');
+                        const newAutoCancelMinutes = newPendingTimer.getAttribute('data-auto-cancel-minutes');
+                        if (newCancelTime) {
+                            currentPendingTimer.setAttribute('data-cancel-time', newCancelTime);
+                        }
+                        if (newConfirmedAt) {
+                            currentPendingTimer.setAttribute('data-confirmed-at', newConfirmedAt);
+                        }
+                        if (newAutoCancelMinutes !== null) {
+                            currentPendingTimer.setAttribute('data-auto-cancel-minutes', newAutoCancelMinutes);
+                        }
+                    }
+                    
+                    // ✨ Cập nhật Confirmed timer (tính từ ConfirmedAt) - ĐỒNG BỘ với Provider
+                    if (newConfirmedTimer && currentConfirmedTimer) {
+                        const newCancelTime = newConfirmedTimer.getAttribute('data-cancel-time');
+                        const newConfirmedAt = newConfirmedTimer.getAttribute('data-confirmed-at');
+                        const newAutoCancelMinutes = newConfirmedTimer.getAttribute('data-auto-cancel-minutes');
+                        const oldCancelTime = currentConfirmedTimer.getAttribute('data-cancel-time');
+                        
+                        // ✨ QUAN TRỌNG: Cập nhật data-cancel-time (đã được server tính từ ConfirmedAt)
+                        if (newCancelTime && newCancelTime !== oldCancelTime) {
+                            // Debug: So sánh chi tiết trước khi cập nhật
+                            const oldCancelTimeDate = oldCancelTime ? new Date(oldCancelTime) : null;
+                            const newCancelTimeDate = new Date(newCancelTime);
+                            const timeDiff = oldCancelTimeDate ? Math.abs(newCancelTimeDate - oldCancelTimeDate) : null;
+                            
+                            console.log('[Admin Refresh] ⚠️ Cancel-time changed:', {
+                                old: oldCancelTime,
+                                new: newCancelTime,
+                                oldDate: oldCancelTimeDate ? oldCancelTimeDate.toISOString() : null,
+                                newDate: newCancelTimeDate.toISOString(),
+                                timeDiffMs: timeDiff,
+                                timeDiffSeconds: timeDiff ? Math.floor(timeDiff / 1000) : null
+                            });
+                            
+                            currentConfirmedTimer.setAttribute('data-cancel-time', newCancelTime);
+                        }
+                        
+                        // ✨ QUAN TRỌNG: Cập nhật data-confirmed-at (giống Provider)
+                        if (newConfirmedAt) {
+                            const oldConfirmedAt = currentConfirmedTimer.getAttribute('data-confirmed-at');
+                            if (newConfirmedAt !== oldConfirmedAt) {
+                                // Debug: So sánh chi tiết
+                                const oldConfirmedAtDate = oldConfirmedAt ? new Date(oldConfirmedAt) : null;
+                                const newConfirmedAtDate = new Date(newConfirmedAt);
+                                const timeDiff = oldConfirmedAtDate ? Math.abs(newConfirmedAtDate - oldConfirmedAtDate) : null;
+                                
+                                console.log('[Admin Refresh] ⚠️ Confirmed-at changed:', {
+                                    old: oldConfirmedAt,
+                                    new: newConfirmedAt,
+                                    oldDate: oldConfirmedAtDate ? oldConfirmedAtDate.toISOString() : null,
+                                    newDate: newConfirmedAtDate.toISOString(),
+                                    timeDiffMs: timeDiff,
+                                    timeDiffSeconds: timeDiff ? Math.floor(timeDiff / 1000) : null
+                                });
+                                
+                                currentConfirmedTimer.setAttribute('data-confirmed-at', newConfirmedAt);
+                            }
+                        }
+                        
+                        if (newAutoCancelMinutes !== null) {
+                            currentConfirmedTimer.setAttribute('data-auto-cancel-minutes', newAutoCancelMinutes);
+                        }
+                        
+                        // ✨ Cập nhật countdown timer ngay lập tức nếu có thay đổi
+                        if (newCancelTime && newCancelTime !== oldCancelTime) {
+                            updateCountdown('.countdown-timer-confirmed-unpaid');
+                        }
+                    }
+                    
+                    // ✨ Cập nhật Pending timer display nếu có
+                    if (newPendingTimer && currentPendingTimer) {
+                        updateCountdown('.countdown-timer-detail');
+                    }
+                } catch (error) {
+                    console.error('[Admin Refresh] Error:', error);
+                } finally {
+                    isRefreshing = false;
+                }
+            }
+            
+            // ✨ Tắt auto-refresh liên tục để tránh nhấp nháy
+            // Chỉ refresh khi có thay đổi thực sự hoặc khi user thực hiện action
+            // Refresh một lần sau khi page load để đảm bảo data đúng
+            setTimeout(() => {
+                refreshBookingDetail();
+            }, 1000); // Refresh một lần sau 1 giây khi page load
+            
+            // ✨ KHÔNG auto-refresh liên tục để tránh nhấp nháy UI
+            // Chỉ refresh khi cần thiết (khi có action từ user hoặc khi countdown hết)
+            
+            // Tắt auto-refresh khi page unload
+            window.addEventListener('beforeunload', function() {
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                }
+            });
             
             // ========== Xử lý chỉnh sửa thời gian hủy ==========
             const editModal = document.getElementById('editCancelTimeModal');
@@ -909,60 +1243,100 @@
                     const currentText = timer.textContent.trim();
                     const currentRemainingTimeEl = document.getElementById('currentRemainingTime');
                     if (currentRemainingTimeEl) {
-                        currentRemainingTimeEl.textContent = currentText || 'Đang tính...';
+                        // Lấy text từ timer, loại bỏ emoji nếu có
+                        const cleanText = currentText.replace(/⏰/g, '').trim();
+                        currentRemainingTimeEl.textContent = cleanText || 'Đang tính...';
                     }
                 }
             }
             
+            // Interval để cập nhật thời gian trong modal
+            let modalUpdateInterval = null;
+            
             // Khi mở modal, lấy thông tin booking
-            editModal.addEventListener('show.bs.modal', function(event) {
-                const timer = document.querySelector('.countdown-timer-confirmed-unpaid');
-                if (timer) {
-                    const bookingId = timer.getAttribute('data-booking-id');
-                    // Ưu tiên dùng data-confirmed-at, nếu không có thì dùng data-created-at (backward compatibility)
-                    const confirmedAt = timer.getAttribute('data-confirmed-at') || timer.getAttribute('data-created-at');
-                    const cancelTimeStr = timer.getAttribute('data-cancel-time');
-                    
-                    // Lưu vào hidden inputs
-                    document.getElementById('editBookingId').value = bookingId || '';
-                    document.getElementById('editCreatedAt').value = confirmedAt || '';
-                    
-                    // Tính thời gian còn lại hiện tại (phút)
-                    let remainingMinutes = 1;
-                    if (cancelTimeStr) {
-                        const cancelTime = new Date(cancelTimeStr.replace('T', ' '));
-                        const now = new Date();
-                        const diff = cancelTime - now;
-                        if (diff > 0) {
-                            remainingMinutes = Math.max(1, Math.ceil(diff / (1000 * 60)));
+            if (editModal) {
+                editModal.addEventListener('show.bs.modal', function(event) {
+                    const timer = document.querySelector('.countdown-timer-confirmed-unpaid');
+                    if (timer) {
+                        const bookingId = timer.getAttribute('data-booking-id');
+                        // ✨ QUAN TRỌNG: Ưu tiên dùng data-confirmed-at cho Confirmed booking
+                        // Nếu không có data-confirmed-at, mới dùng data-created-at (backward compatibility)
+                        const confirmedAt = timer.getAttribute('data-confirmed-at') || timer.getAttribute('data-created-at');
+                        const cancelTimeStr = timer.getAttribute('data-cancel-time');
+                        
+                        // Lưu vào hidden inputs
+                        // ✨ QUAN TRỌNG: Lưu confirmedAt (không phải createdAt) để dùng trong UpdateCancelTime
+                        const editBookingIdEl = document.getElementById('editBookingId');
+                        const editCreatedAtEl = document.getElementById('editCreatedAt');
+                        if (editBookingIdEl) {
+                            editBookingIdEl.value = bookingId || '';
                         }
-                    }
-                    
-                    // Set giá trị mặc định cho input
-                    if (newRemainingMinutesInput) {
-                        newRemainingMinutesInput.value = remainingMinutes;
-                    }
-                    
-                    // Cập nhật thời gian còn lại hiện tại
-                    updateCurrentRemainingTime();
-                    
-                    // Ẩn thông báo lỗi khi người dùng bắt đầu nhập
-                    if (newRemainingMinutesInput) {
-                        newRemainingMinutesInput.addEventListener('input', function() {
-                            if (errorMessageDiv) {
-                                errorMessageDiv.style.display = 'none';
-                                errorMessageDiv.textContent = '';
+                        if (editCreatedAtEl) {
+                            // ✨ Lưu confirmedAt (hoặc createdAt nếu không có) để dùng trong UpdateCancelTime
+                            editCreatedAtEl.value = confirmedAt || '';
+                        }
+                        
+                        // Tính thời gian còn lại hiện tại (phút)
+                        let remainingMinutes = 1;
+                        if (cancelTimeStr) {
+                            let cancelTime;
+                            if (cancelTimeStr.includes('Z') || cancelTimeStr.match(/[+-]\d{2}:\d{2}$/)) {
+                                cancelTime = new Date(cancelTimeStr);
+                            } else {
+                                cancelTime = new Date(cancelTimeStr.replace('T', ' '));
                             }
-                            newRemainingMinutesInput.classList.remove('is-invalid');
-                        });
+                            
+                            if (!isNaN(cancelTime.getTime())) {
+                                const now = new Date();
+                                const diff = cancelTime - now;
+                                if (diff > 0) {
+                                    remainingMinutes = Math.max(1, Math.ceil(diff / (1000 * 60)));
+                                }
+                            }
+                        }
+                        
+                        // Set giá trị mặc định cho input
+                        if (newRemainingMinutesInput) {
+                            newRemainingMinutesInput.value = remainingMinutes;
+                        }
+                        
+                        // Cập nhật thời gian còn lại hiện tại
+                        updateCurrentRemainingTime();
+                        
+                        // Cập nhật thời gian trong modal mỗi giây
+                        modalUpdateInterval = setInterval(function() {
+                            updateCurrentRemainingTime();
+                        }, 1000);
                     }
-                }
-            });
+                });
+                
+                // Khi đóng modal, dừng interval
+                editModal.addEventListener('hide.bs.modal', function(event) {
+                    if (modalUpdateInterval) {
+                        clearInterval(modalUpdateInterval);
+                        modalUpdateInterval = null;
+                    }
+                });
+            }
+            
+            // Ẩn thông báo lỗi khi người dùng bắt đầu nhập (chỉ thêm listener một lần)
+            if (newRemainingMinutesInput) {
+                newRemainingMinutesInput.addEventListener('input', function() {
+                    if (errorMessageDiv) {
+                        errorMessageDiv.style.display = 'none';
+                        errorMessageDiv.textContent = '';
+                    }
+                    newRemainingMinutesInput.classList.remove('is-invalid');
+                });
+            }
             
             // Xử lý lưu thời gian hủy
-            saveBtn.addEventListener('click', async function() {
+            if (saveBtn) {
+                saveBtn.addEventListener('click', async function() {
                 const bookingId = document.getElementById('editBookingId').value;
-                const createdAtStr = document.getElementById('editCreatedAt').value;
+                // ✨ QUAN TRỌNG: createdAtStr thực ra là confirmedAt cho Confirmed booking
+                // Đổi tên biến để rõ ràng hơn (nhưng vẫn dùng editCreatedAt vì đã lưu confirmedAt vào đó)
+                const createdAtStr = document.getElementById('editCreatedAt').value; // Thực ra là confirmedAt
                 const newRemainingMinutes = parseInt(newRemainingMinutesInput.value);
                 
                 // Ẩn thông báo lỗi trước đó
@@ -1046,10 +1420,13 @@
                     }
                 } finally {
                     // Restore button
-                    saveBtn.disabled = false;
-                    saveBtn.innerHTML = originalText;
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = originalText;
+                    }
                 }
             });
+            }
         });
     </script>
 }

@@ -167,16 +167,21 @@ namespace VHS_frontend.Areas.Admin.Controllers
             // Lấy dữ liệu booking/payment
             try
             {
-                var today = DateTime.Today;
-                var tomorrow = today.AddDays(1).AddTicks(-1);
-                var yesterday = today.AddDays(-1);
+                // ✅ SỬA: Dùng giờ Việt Nam (UTC+7)
+                var utcNow = DateTime.UtcNow;
+                var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+                var todayVN = vietnamTime.Date;
+                var tomorrow = todayVN.AddDays(1).AddTicks(-1);
+                var yesterday = todayVN.AddDays(-1);
                 
-                todayStats = await _bookingService.GetStatisticsAsync(today, tomorrow);
-                yesterdayStats = await _bookingService.GetStatisticsAsync(yesterday, today.AddTicks(-1));
+                Console.WriteLine($"[AdminDashboard] Getting statistics for today (VN): {todayVN:dd/MM/yyyy}");
+                
+                todayStats = await _bookingService.GetStatisticsAsync(todayVN, tomorrow);
+                yesterdayStats = await _bookingService.GetStatisticsAsync(yesterday, todayVN.AddTicks(-1));
                 
                 // Debug logging
-                System.Diagnostics.Debug.WriteLine($"📊 Today Stats: Revenue={todayStats?.TotalRevenue}, Bookings={todayStats?.TotalBookings}, Completed={todayStats?.CompletedBookings}");
-                System.Diagnostics.Debug.WriteLine($"📊 Yesterday Stats: Revenue={yesterdayStats?.TotalRevenue}, Bookings={yesterdayStats?.TotalBookings}");
+                Console.WriteLine($"[AdminDashboard] 📊 Today Stats: Revenue={todayStats?.TotalRevenue:N0}, Bookings={todayStats?.TotalBookings}, Completed={todayStats?.CompletedBookings}");
+                Console.WriteLine($"[AdminDashboard] 📊 Yesterday Stats: Revenue={yesterdayStats?.TotalRevenue:N0}, Bookings={yesterdayStats?.TotalBookings}");
             }
             catch (Exception ex)
             {

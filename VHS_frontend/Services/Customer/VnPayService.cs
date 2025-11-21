@@ -20,24 +20,8 @@ namespace VHS_frontend.Services.Customer
             var pay = new VnPayLibrary();
             var urlCallBack = _configuration["Vnpay:PaymentBackReturnUrl"];
 
-            // ✅ Validate và tính toán số tiền đúng cách
-            // VNPay yêu cầu số tiền từ 5,000 đến dưới 1 tỷ đồng
-            const double MIN_AMOUNT = 5000.0; // 5,000 VND
-            const double MAX_AMOUNT = 999999999.0; // 999,999,999 VND (dưới 1 tỷ)
-
             // Làm tròn số tiền về số nguyên (VND không có phần thập phân)
             var amountVnd = Math.Round(model.Amount, 0, MidpointRounding.AwayFromZero);
-            
-            // Validate số tiền
-            if (amountVnd < MIN_AMOUNT)
-            {
-                throw new ArgumentException($"Số tiền thanh toán ({amountVnd:N0} VND) quá nhỏ. Số tiền tối thiểu là {MIN_AMOUNT:N0} VND.");
-            }
-            
-            if (amountVnd >= MAX_AMOUNT + 1)
-            {
-                throw new ArgumentException($"Số tiền thanh toán ({amountVnd:N0} VND) quá lớn. Số tiền tối đa là {MAX_AMOUNT:N0} VND.");
-            }
 
             // Chuyển đổi từ VND sang xu (VNPay yêu cầu số tiền theo xu)
             // Sử dụng long để tránh overflow và đảm bảo chính xác

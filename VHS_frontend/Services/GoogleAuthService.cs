@@ -17,13 +17,26 @@ namespace VHS_frontend.Services
 
         public async Task<LoginRespondDTO?> LoginWithGoogleAsync(string idToken)
         {
-            var request = new GoogleLoginRequest { IdToken = idToken };
-            var response = await _httpClient.PostAsJsonAsync("api/auth/google-login", request);
+            try
+            {
+                var request = new GoogleLoginRequest { IdToken = idToken };
+                var response = await _httpClient.PostAsJsonAsync("api/auth/google-login", request);
 
-            if (!response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[GoogleAuthService] Error response: {response.StatusCode} - {errorContent}");
+                    return null;
+                }
+
+                return await response.Content.ReadFromJsonAsync<LoginRespondDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GoogleAuthService] Exception: {ex.Message}");
+                Console.WriteLine($"[GoogleAuthService] StackTrace: {ex.StackTrace}");
                 return null;
-
-            return await response.Content.ReadFromJsonAsync<LoginRespondDTO>();
+            }
         }
 
         public async Task<ReadAccountDTO?> GetAccountInfoAsync(Guid accountId, string jwtToken)
