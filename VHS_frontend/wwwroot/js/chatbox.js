@@ -50,6 +50,7 @@ console.log('=== chatbox.js LOADED ===');
     let isMinimized = false;
     let connection = null; // SignalR connection
     let isConnected = false;
+    let hasInitialized = false; // Flag to prevent duplicate welcome messages
 
     // Generate unique session ID
     function generateSessionId() {
@@ -171,13 +172,9 @@ console.log('=== chatbox.js LOADED ===');
         initSignalR();
 
         // Load conversation if user is authenticated
-        if (jwt) {
-            console.log('[Chatbox] User authenticated, loading conversation...');
-            loadConversation();
-        } else {
-            console.log('[Chatbox] No JWT, showing welcome message');
-            showWelcomeMessage();
-        }
+        // Don't load here - wait for user to open chatbox first
+        // This prevents duplicate welcome messages
+        console.log('[Chatbox] Initialized, waiting for user to open chatbox');
     }
 
     // Initialize SignalR connection
@@ -352,7 +349,15 @@ console.log('=== chatbox.js LOADED ===');
         if (!isOpen) {
             // Chatbox is opening - ensure position is applied
             applyPosition(currentPosition);
-            loadConversation();
+            // Only load conversation if not already initialized
+            // loadConversation() and showWelcomeMessage() will set hasInitialized
+            if (!hasInitialized) {
+                if (jwt) {
+                    loadConversation();
+                } else {
+                    showWelcomeMessage();
+                }
+            }
         }
     }
 
@@ -675,6 +680,12 @@ console.log('=== chatbox.js LOADED ===');
 
     // Load conversation
     async function loadConversation() {
+        // Check if already initialized to prevent duplicate messages
+        if (hasInitialized && elements.messages.children.length > 0) {
+            console.log('[Chatbox] Already initialized, skipping loadConversation');
+            return;
+        }
+        
         try {
             const headers = { 'Content-Type': 'application/json' };
             if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
@@ -695,16 +706,29 @@ console.log('=== chatbox.js LOADED ===');
                         await connection.invoke('JoinConversation', conversationId);
                     }
                     
-                    loadMessageHistory(conversationId);
+                    // loadMessageHistory will set hasInitialized
+                    await loadMessageHistory(conversationId);
                 } else {
-                    showWelcomeMessage();
+                    // Only show welcome if not already shown
+                    if (!hasInitialized) {
+                        showWelcomeMessage();
+                        hasInitialized = true;
+                    }
                 }
             } else {
-                showWelcomeMessage();
+                // Only show welcome if not already shown
+                if (!hasInitialized) {
+                    showWelcomeMessage();
+                    hasInitialized = true;
+                }
             }
         } catch (error) {
             console.error('Error loading conversation:', error);
-            showWelcomeMessage();
+            // Only show welcome if not already shown
+            if (!hasInitialized) {
+                showWelcomeMessage();
+                hasInitialized = true;
+            }
         }
     }
 
@@ -720,17 +744,36 @@ console.log('=== chatbox.js LOADED ===');
 
             if (response.ok) {
                 const data = await response.json();
-                data.messages?.forEach(msg => {
-                    displayMessage(msg.content, msg.senderType, msg.createdAt);
-                });
+                const messages = data.messages || [];
+                if (messages.length > 0) {
+                    messages.forEach(msg => {
+                        displayMessage(msg.content, msg.senderType, msg.createdAt);
+                    });
+                    hasInitialized = true;
+                } else {
+                    // No messages in history, show welcome if not already shown
+                    if (!hasInitialized) {
+                        showWelcomeMessage();
+                    }
+                }
             }
         } catch (error) {
             console.error('Error loading history:', error);
+            // If error and not initialized, show welcome
+            if (!hasInitialized) {
+                showWelcomeMessage();
+            }
         }
     }
 
     // Show welcome message
     function showWelcomeMessage() {
+        // Check if welcome message already shown or messages already exist
+        if (hasInitialized && elements.messages.children.length > 0) {
+            console.log('[Chatbox] Welcome message already shown, skipping');
+            return;
+        }
+        
         const welcomeMessages = [
             "Xin chào! 👋 Tôi là trợ lý AI của Viet Home Service. Tôi có thể giúp bạn:",
             "🔍 Tìm kiếm dịch vụ",
@@ -744,6 +787,8 @@ console.log('=== chatbox.js LOADED ===');
                 displayMessage(msg, 'AI', getVietnamTime());
             }, index * 200);
         });
+        
+        hasInitialized = true;
     }
 
     // Send message (using SignalR real-time)

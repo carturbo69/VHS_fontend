@@ -169,66 +169,29 @@
                         <span class="detail-value">@Model.BookingTime.ToString("dd/MM/yyyy HH:mm")</span>
                     </div>
                     
-                    <!-- Địa chỉ chi tiết từ UserAddresses -->
-                    @if (Model.AddressId.HasValue && (!string.IsNullOrEmpty(Model.ProvinceName) || !string.IsNullOrEmpty(Model.StreetAddress)))
-                    {
-                        <div class="address-detail-section mb-3">
-                            <span class="detail-label mb-2 d-block"><i class="bi bi-geo-alt me-2"></i>Địa chỉ người đặt:</span>
-                            <div class="address-detail-box">
-                                @if (!string.IsNullOrEmpty(Model.RecipientName))
-                                {
-                                    <div class="address-recipient mb-2">
-                                        <strong><i class="bi bi-person me-1"></i>Người đặt:</strong> 
-                                        <span>@Model.RecipientName</span>
-                                        @if (!string.IsNullOrEmpty(Model.RecipientPhone))
-                                        {
-                                            <span class="ms-2 text-muted">
-                                                <i class="bi bi-telephone me-1"></i>@Model.RecipientPhone
-                                            </span>
-                                        }
-                                    </div>
-                                }
-                                
-                                <div class="address-full">
-                                    @if (!string.IsNullOrEmpty(Model.StreetAddress))
+                    <!-- ✅ Địa chỉ từ Booking.Address (không dùng UserAddress nữa) -->
+                    <div class="detail-info-item mb-3">
+                        <span class="detail-label mb-2 d-block"><i class="bi bi-geo-alt me-2"></i>Địa chỉ:</span>
+                        <div class="address-detail-box">
+                            @if (!string.IsNullOrEmpty(Model.RecipientName))
+                            {
+                                <div class="address-recipient mb-2">
+                                    <strong><i class="bi bi-person me-1"></i>Người đặt:</strong> 
+                                    <span>@Model.RecipientName</span>
+                                    @if (!string.IsNullOrEmpty(Model.RecipientPhone))
                                     {
-                                        <div class="address-line">
-                                            <i class="bi bi-house-door me-2 text-primary"></i>
-                                            <span>@Model.StreetAddress</span>
-                                        </div>
-                                    }
-                                    @if (!string.IsNullOrEmpty(Model.WardName) || !string.IsNullOrEmpty(Model.DistrictName) || !string.IsNullOrEmpty(Model.ProvinceName))
-                                    {
-                                        <div class="address-line">
-                                            <i class="bi bi-geo me-2 text-primary"></i>
-                                            <span>
-                                                @if (!string.IsNullOrEmpty(Model.WardName))
-                                                {
-                                                    <text>@Model.WardName, </text>
-                                                }
-                                                @if (!string.IsNullOrEmpty(Model.DistrictName))
-                                                {
-                                                    <text>@Model.DistrictName, </text>
-                                                }
-                                                @if (!string.IsNullOrEmpty(Model.ProvinceName))
-                                                {
-                                                    <text>@Model.ProvinceName</text>
-                                                }
-                                            </span>
-                                        </div>
+                                        <span class="ms-2 text-muted">
+                                            <i class="bi bi-telephone me-1"></i>@Model.RecipientPhone
+                                        </span>
                                     }
                                 </div>
+                            }
+                            <div class="address-line">
+                                <i class="bi bi-house-door me-2 text-primary"></i>
+                                <span class="detail-value">@Model.Address</span>
                             </div>
                         </div>
-                    }
-                    else
-                    {
-                        <!-- Fallback: Hiển thị địa chỉ đơn giản nếu không có thông tin chi tiết -->
-                        <div class="detail-info-item mb-3">
-                            <span class="detail-label"><i class="bi bi-geo-alt me-2"></i>Địa chỉ:</span>
-                            <span class="detail-value">@Model.Address</span>
-                        </div>
-                    }
+                    </div>
                     
                     @if (!string.IsNullOrEmpty(Model.VoucherCode))
                     {
@@ -503,7 +466,7 @@
                             <i class="bi bi-info-circle"></i>
                             <strong>Đơn hàng đã được xác nhận</strong>
                             <p class="mb-0 mt-2 small">
-                                Nhân viên <strong>@(Model.StaffName ?? "chưa phân công")</strong> sẽ thực hiện công việc và cập nhật trạng thái qua ứng dụng Staff.
+                                Nhân viên <strong>@(Model.StaffName ?? "chưa phân công")</strong> sẽ thực hiện công việc và cập nhật trạng thái qua ứng dụng nhân viên.
                             </p>
                         </div>
                         <!-- Chỉ cho phép hủy nếu thực sự cần -->
@@ -734,6 +697,199 @@
             font-weight: 800 !important;
             box-shadow: 0 2px 4px rgba(251, 191, 36, 0.3) !important;
         }
+        
+        /* Provider Cancel Modal - Màu cam đồng bộ với theme Provider */
+        #cancelReasonModal .modal-content {
+            border: 2px solid #f59e0b !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.2) !important;
+            overflow: hidden !important;
+        }
+        
+        .dark #cancelReasonModal .modal-content {
+            background: var(--card) !important;
+            border-color: #f59e0b !important;
+            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.3) !important;
+        }
+        
+        /* Modal Header - Màu cam gradient */
+        .provider-cancel-modal-header {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            color: #ffffff !important;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.15) !important;
+            padding: 1.25rem 1.5rem !important;
+        }
+        
+        .provider-cancel-modal-header .modal-title {
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 1.25rem !important;
+            letter-spacing: 0.3px !important;
+        }
+        
+        .provider-cancel-modal-header .btn-close {
+            filter: invert(1) grayscale(100%) brightness(200%) !important;
+            opacity: 0.9 !important;
+            transition: opacity 0.2s ease !important;
+        }
+        
+        .provider-cancel-modal-header .btn-close:hover {
+            opacity: 1 !important;
+        }
+        
+        .dark .provider-cancel-modal-header {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%) !important;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2) !important;
+        }
+        
+        /* Modal Body - Spacing và styling hiện đại */
+        .provider-cancel-modal-body {
+            padding: 1.5rem !important;
+            background: #ffffff !important;
+        }
+        
+        .dark .provider-cancel-modal-body {
+            background: var(--card) !important;
+        }
+        
+        /* Warning Alert - Styling hiện đại */
+        .provider-cancel-warning {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+            border: 1px solid #f59e0b !important;
+            border-left: 4px solid #f59e0b !important;
+            border-radius: 8px !important;
+            padding: 1rem !important;
+            margin-bottom: 1.5rem !important;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1) !important;
+        }
+        
+        .dark .provider-cancel-warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%) !important;
+            border-color: #f59e0b !important;
+            color: var(--fg) !important;
+        }
+        
+        /* Form Group */
+        .provider-cancel-form-group {
+            margin-bottom: 0 !important;
+        }
+        
+        /* Label - Styling hiện đại */
+        .provider-cancel-label {
+            font-size: 0.875rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px !important;
+            text-transform: uppercase !important;
+            color: var(--fg) !important;
+            margin-bottom: 0.75rem !important;
+        }
+        
+        /* Textarea - Styling hiện đại */
+        .provider-cancel-textarea {
+            border: 2px solid var(--border) !important;
+            border-radius: 8px !important;
+            padding: 0.875rem 1rem !important;
+            font-size: 0.9375rem !important;
+            line-height: 1.6 !important;
+            transition: all 0.2s ease !important;
+            resize: vertical !important;
+        }
+        
+        .provider-cancel-textarea:focus {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1) !important;
+            outline: none !important;
+        }
+        
+        .dark .provider-cancel-textarea {
+            background: var(--muted) !important;
+            border-color: var(--border) !important;
+            color: var(--fg) !important;
+        }
+        
+        .dark .provider-cancel-textarea:focus {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2) !important;
+        }
+        
+        /* Info và Counter */
+        .provider-cancel-info {
+            font-size: 0.8125rem !important;
+        }
+        
+        .provider-cancel-counter {
+            font-size: 0.8125rem !important;
+            font-weight: 500 !important;
+        }
+        
+        /* Modal Footer - Căn giữa và spacing */
+        .provider-cancel-modal-footer {
+            border-top: 2px solid var(--border) !important;
+            padding: 1.25rem 1.5rem !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            gap: 1rem !important;
+            background: var(--muted) !important;
+        }
+        
+        .dark .provider-cancel-modal-footer {
+            background: var(--muted) !important;
+            border-top-color: var(--border) !important;
+        }
+        
+        /* Buttons - Cùng chiều cao, căn giữa, styling hiện đại */
+        .provider-cancel-btn-cancel,
+        .provider-cancel-btn-submit {
+            min-width: 140px !important;
+            height: 44px !important;
+            padding: 0.625rem 1.5rem !important;
+            font-weight: 600 !important;
+            font-size: 0.9375rem !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.2s ease !important;
+            border: 2px solid transparent !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .provider-cancel-btn-cancel {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            color: #ffffff !important;
+        }
+        
+        .provider-cancel-btn-cancel:hover {
+            background-color: #5a6268 !important;
+            border-color: #545b62 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3) !important;
+        }
+        
+        .provider-cancel-btn-cancel:active {
+            transform: translateY(0) !important;
+        }
+        
+        .provider-cancel-btn-submit {
+            background-color: #dc3545 !important;
+            border-color: #dc3545 !important;
+            color: #ffffff !important;
+        }
+        
+        .provider-cancel-btn-submit:hover {
+            background-color: #c82333 !important;
+            border-color: #bd2130 !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3) !important;
+        }
+        
+        .provider-cancel-btn-submit:active {
+            transform: translateY(0) !important;
+        }
+        
+        
     </style>
 }
 
@@ -1741,45 +1897,47 @@
 <div class="modal fade" id="cancelReasonModal" tabindex="-1" aria-labelledby="cancelReasonModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
+            <div class="modal-header provider-cancel-modal-header">
                 <h5 class="modal-title" id="cancelReasonModalLabel">
-                    <i class="bi bi-x-circle"></i> Từ chối đơn hàng
+                    <i class="bi bi-x-circle me-2"></i> Từ chối đơn hàng
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div class="alert alert-warning" role="alert">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <strong>Lưu ý:</strong> Hành động này sẽ từ chối đơn hàng và hoàn tiền cho khách hàng.
+            <div class="modal-body provider-cancel-modal-body">
+                <div class="alert alert-warning provider-cancel-warning d-flex align-items-start" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2 flex-shrink-0"></i>
+                    <div>
+                        <strong>Lưu ý:</strong> Hành động này sẽ từ chối đơn hàng và hoàn tiền cho khách hàng.
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="cancelReason" class="form-label">
-                        <strong>Lý do từ chối: <span class="text-danger">*</span></strong>
+                <div class="provider-cancel-form-group">
+                    <label for="cancelReason" class="form-label provider-cancel-label">
+                        LÝ DO TỪ CHỐI: <span class="text-danger">*</span>
                     </label>
                     <textarea 
-                        class="form-control" 
+                        class="form-control provider-cancel-textarea" 
                         id="cancelReason" 
                         rows="4" 
                         placeholder="Vui lòng nhập lý do từ chối đơn hàng (tối thiểu 10 ký tự)..."
                         maxlength="500"
                         oninput="updateCharCount()"
                         required></textarea>
-                    <div class="d-flex justify-content-between">
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle"></i> Lý do này sẽ được gửi cho khách hàng.
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <small class="text-muted d-flex align-items-center provider-cancel-info">
+                            <i class="bi bi-info-circle me-1"></i> Lý do này sẽ được gửi cho khách hàng.
                         </small>
-                        <small class="text-muted">
-                            <span id="charCount">0</span>/500 ký tự
+                        <small class="text-muted provider-cancel-counter">
+                            <span id="charCount">0</span> /500 ký tự
                         </small>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="bi bi-x"></i> Hủy
+            <div class="modal-footer provider-cancel-modal-footer">
+                <button type="button" class="btn provider-cancel-btn-cancel" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i> HỦY
                 </button>
-                <button type="button" class="btn btn-danger" onclick="submitCancelReason()">
-                    <i class="bi bi-check-circle"></i> Xác nhận từ chối
+                <button type="button" class="btn provider-cancel-btn-submit" onclick="submitCancelReason()">
+                    <i class="bi bi-check-circle me-1"></i> Xác nhận từ chối
                 </button>
             </div>
         </div>

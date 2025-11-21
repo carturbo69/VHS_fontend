@@ -5,6 +5,11 @@
         public Guid AccountId { get; set; }
         public string Address { get; set; } = null!;
         public Guid? VoucherId { get; set; }   // 🎟️ thêm trường này
+        public Guid? AddressId { get; set; }  // ✅ ID của UserAddress (nếu có)
+        public double? Latitude { get; set; }  // ✅ Vĩ độ
+        public double? Longitude { get; set; } // ✅ Kinh độ
+        public string? RecipientName { get; set; }  // ✅ Tên người nhận
+        public string? RecipientPhone { get; set; }  // ✅ Số điện thoại người nhận
         public List<CreateBookingItemDto> Items { get; set; } = new();
     }
 

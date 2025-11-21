@@ -265,6 +265,11 @@ namespace VHS_frontend.Services.Customer
                 AccountId = accountId,
                 Address = vm.AddressText ?? string.Empty,
                 VoucherId = vm.VoucherId,
+                AddressId = vm.SelectedAddressId, // ✅ Lấy AddressId từ ViewModel
+                Latitude = vm.Address?.Latitude,   // ✅ Lấy Latitude từ Address
+                Longitude = vm.Address?.Longitude, // ✅ Lấy Longitude từ Address
+                RecipientName = vm.Address?.RecipientName ?? vm.RecipientFullName, // ✅ Lấy tên từ Address hoặc ViewModel
+                RecipientPhone = vm.Address?.RecipientPhone ?? vm.RecipientPhone, // ✅ Lấy số điện thoại từ Address hoặc ViewModel
                 Items = items
             };
         }
