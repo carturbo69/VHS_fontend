@@ -415,15 +415,9 @@ namespace VHS_frontend.Areas.Provider.Controllers
         [HttpPost]
         public async Task<IActionResult> AutoCancel([FromBody] AutoCancelRequest request)
         {
-            Console.WriteLine("═══════════════════════════════════════════════");
-            Console.WriteLine($"[FRONTEND AutoCancel] BookingId: {request.BookingId}");
-            Console.WriteLine($"[FRONTEND AutoCancel] IsPendingExpired: {request.IsPendingExpired}");
-            Console.WriteLine("═══════════════════════════════════════════════");
-            
             try
             {
                 var success = await _bookingService.AutoCancelBookingAsync(request.BookingId, request.IsPendingExpired);
-                Console.WriteLine($"[FRONTEND AutoCancel] Result: {success}");
                 
                 if (success)
                 {
@@ -433,8 +427,6 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[FRONTEND AutoCancel] ❌ EXCEPTION: {ex.Message}");
-                Console.WriteLine($"[FRONTEND AutoCancel] Stack trace: {ex.StackTrace}");
                 return Json(new { success = false, message = ex.Message });
             }
         }

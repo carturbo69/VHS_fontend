@@ -349,9 +349,6 @@ namespace VHS_frontend.Services.Provider
         {
             try
             {
-                Console.WriteLine($"[BookingService] AutoCancelBookingAsync called");
-                Console.WriteLine($"[BookingService] BookingId: {bookingId}, IsPendingExpired: {isPendingExpired}");
-                
                 SetAuthorizationHeader();
 
                 var payload = new
@@ -360,29 +357,39 @@ namespace VHS_frontend.Services.Provider
                     isPendingExpired = isPendingExpired
                 };
 
-                var json = JsonSerializer.Serialize(payload);
-                Console.WriteLine($"[BookingService] Request JSON: {json}");
-                
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
                 var url = "/api/provider/bookings/auto-cancel";
                 
-                Console.WriteLine($"[BookingService] POST {_httpClient.BaseAddress}{url}");
                 var response = await _httpClient.PostAsync(url, content);
+                var responseContent = await response.Content.ReadAsStringAsync();
                 
-                Console.WriteLine($"[BookingService] Response status: {response.StatusCode}");
-                
-                if (!response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
                 {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"[BookingService] Error response: {errorContent}");
+                    // Kiểm tra response body để đảm bảo backend thực sự xử lý
+                    try
+                    {
+                        var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                        if (result.TryGetProperty("success", out var successElement))
+                        {
+                            return successElement.GetBoolean();
+                        }
+                        // Nếu không có property "success", coi như thành công nếu status code là 200
+                        return true;
+                    }
+                    catch (JsonException)
+                    {
+                        // Nếu không parse được JSON, coi như thành công nếu status code là 200
+                        return true;
+                    }
                 }
-                
-                return response.IsSuccessStatusCode;
+                else
+                {
+                    return false;
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[ERROR] AutoCancelBookingAsync exception: {ex.Message}");
-                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
                 return false;
             }
         }

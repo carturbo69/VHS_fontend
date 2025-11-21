@@ -227,13 +227,9 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // Tính toán AutoCancelMinutes mới
                 // Thời gian hủy mới = Now + remainingMinutes
                 // AutoCancelMinutes = (thời gian hủy mới - CreatedAt).TotalMinutes
-                // Sử dụng giờ Việt Nam để đảm bảo tính toán chính xác
-                var now = DateTime.Now; // Frontend đã ở giờ Việt Nam
+                var now = DateTime.Now;
                 var newCancelTime = now.AddMinutes(remainingMinutes);
                 var newAutoCancelMinutes = (int)Math.Ceiling((newCancelTime - createdAtDateTime).TotalMinutes);
-                
-                // Log để debug
-                System.Diagnostics.Debug.WriteLine($"UpdateCancelTime - BookingId: {bookingId}, CreatedAt: {createdAtDateTime}, Now: {now}, RemainingMinutes: {remainingMinutes}, NewAutoCancelMinutes: {newAutoCancelMinutes}");
 
                 if (newAutoCancelMinutes < 1)
                 {
@@ -243,7 +239,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // Gọi API backend để cập nhật
                 using var httpClient = new HttpClient();
                 httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-                httpClient.BaseAddress = new Uri("http://localhost:5154"); // Thay đổi nếu cần
+                httpClient.BaseAddress = new Uri("http://localhost:5154");
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
                 var requestBody = new { minutes = newAutoCancelMinutes };
@@ -251,12 +247,8 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
                 var apiUrl = $"/api/AdminSettings/booking/{bookingId}/auto-cancel-minutes";
-                System.Diagnostics.Debug.WriteLine($"Calling API: {apiUrl}, Body: {json}");
-                
                 var response = await httpClient.PostAsync(apiUrl, content);
                 var responseContent = await response.Content.ReadAsStringAsync();
-                
-                System.Diagnostics.Debug.WriteLine($"API Response Status: {response.StatusCode}, Content: {responseContent}");
 
                 if (response.IsSuccessStatusCode)
                 {

@@ -717,7 +717,6 @@
 @section Scripts {
     <script>
         const bookingId = '@Model.BookingId';
-        console.log('Booking ID:', bookingId);
 
         function showStatusMessage(message, type) {
             const messageDiv = document.getElementById('statusUpdateMessage');
@@ -800,7 +799,6 @@
         }
 
         function updateStatus(newStatus) {
-            console.log('[DEBUG] updateStatus called with:', newStatus);
             
             // Ẩn thông báo cũ
             const messageDiv = document.getElementById('statusUpdateMessage');
@@ -843,7 +841,6 @@
                 const staffSelect = document.getElementById('staffSelect');
                 if (staffSelect && staffSelect.value) {
                     selectedStaffId = staffSelect.value;
-                    console.log('[DEBUG] Selected staff ID:', selectedStaffId);
                 }
             }
             
@@ -854,7 +851,6 @@
                 selectedStaffId: selectedStaffId  // ✨ Gửi staffId đã chọn (nếu có)
             };
             
-            console.log('[DEBUG] Sending payload:', payload);
 
             fetch('/Provider/Order/UpdateStatus', {
                 method: 'POST',
@@ -864,7 +860,6 @@
                 body: JSON.stringify(payload)
             })
             .then(response => {
-                console.log('[DEBUG] Response status:', response.status);
                 if (!response.ok) {
                     return response.text().then(text => {
                         console.error('[ERROR] Response error:', text);
@@ -874,13 +869,11 @@
                 return response.json();
             })
             .then(data => {
-                console.log('[DEBUG] Response data:', data);
                 if (data.success) {
                     // ✨ Lưu thời gian xác nhận vào localStorage nếu là xác nhận đơn hàng
                     if (newStatus === 'Confirmed') {
                         const confirmedTime = new Date().toISOString();
                         localStorage.setItem(`booking_confirmed_${bookingId}`, confirmedTime);
-                        console.log('[DEBUG] Saved confirmed time to localStorage:', confirmedTime);
                     }
                     
                     showStatusMessage(
@@ -940,7 +933,6 @@
         }
 
         function cancelOrder() {
-            console.log('[DEBUG] cancelOrder called');
             
             // Reset form
             document.getElementById('cancelReason').value = '';
@@ -952,30 +944,22 @@
         }
 
         function submitCancelReason() {
-            console.log('=== [SUBMIT CANCEL] START ===');
-            
             const textarea = document.getElementById('cancelReason');
             const reason = textarea.value.trim();
-            
-            console.log('[SUBMIT CANCEL] Reason length:', reason.length);
-            console.log('[SUBMIT CANCEL] Reason value:', reason);
             
             // Validation
             if (!reason) {
                 alert('⚠️ Vui lòng nhập lý do từ chối đơn hàng!');
-                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Empty reason');
                 return;
             }
             
             if (reason.length < 10) {
                 alert('⚠️ Lý do từ chối phải có ít nhất 10 ký tự! (Hiện tại: ' + reason.length + ' ký tự)');
-                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Too short');
                 return;
             }
             
             if (reason.length > 500) {
                 alert('⚠️ Lý do từ chối không được quá 500 ký tự!');
-                console.log('[SUBMIT CANCEL] VALIDATION FAILED: Too long');
                 return;
             }
 
@@ -983,12 +967,8 @@
             const payload = {
                 bookingId: bookingId,
                 newStatus: 'Canceled',
-                reason: reason  // ✨ LÝ DO Ở ĐÂY
+                reason: reason
             };
-            
-            console.log('=== [SUBMIT CANCEL] PAYLOAD ===');
-            console.log(JSON.stringify(payload, null, 2));
-            console.log('===============================');
 
             // Đóng modal
             const modalElement = document.getElementById('cancelReasonModal');
@@ -1001,8 +981,6 @@
             updateUIOptimistically('Canceled');
 
             // Gửi request
-            console.log('[SUBMIT CANCEL] Sending request to /Provider/Order/UpdateStatus...');
-            
             fetch('/Provider/Order/UpdateStatus', {
                 method: 'POST',
                 headers: {
@@ -1012,24 +990,21 @@
                 body: JSON.stringify(payload)
             })
             .then(response => {
-                console.log('[SUBMIT CANCEL] Response status:', response.status, response.statusText);
                 if (!response.ok) {
                     return response.text().then(text => {
-                        console.error('[SUBMIT CANCEL] ERROR Response:', text);
+                        console.error('[SUBMIT CANCEL] Error:', text);
                         throw new Error('HTTP ' + response.status + ': ' + text);
                     });
                 }
                 return response.json();
             })
             .then(data => {
-                console.log('[SUBMIT CANCEL] SUCCESS Response:', data);
                 if (data.success) {
                     showStatusMessage(
                         '<i class="bi bi-check-circle me-2"></i><strong>' + data.message + '</strong>',
                         'success'
                     );
                     // Reload ngay lập tức để sync với server
-                    console.log('[SUBMIT CANCEL] Reloading page...');
                     location.reload();
                 } else {
                     // Revert UI về trạng thái ban đầu
@@ -1038,13 +1013,11 @@
                 }
             })
             .catch(error => {
-                console.error('[SUBMIT CANCEL] CATCH Error:', error);
+                console.error('[SUBMIT CANCEL] Error:', error);
                 // Revert UI về trạng thái ban đầu
                 revertUI();
                 alert('❌ Có lỗi xảy ra: ' + error.message);
             });
-            
-            console.log('=== [SUBMIT CANCEL] END ===');
         }
 
         function showStaffMessage(message, type) {
@@ -1075,7 +1048,6 @@
         }
 
         function assignStaff() {
-            console.log('[DEBUG] assignStaff called');
             
             // Ẩn thông báo cũ
             const messageDiv = document.getElementById('staffAssignmentMessage');
@@ -1122,7 +1094,6 @@
             
             const staffId = staffSelect.value;
             
-            console.log('[DEBUG] Selected staff ID:', staffId);
             
             if (!staffId || staffId === '') {
                 showStaffMessage(
@@ -1149,7 +1120,6 @@
                 staffId: staffId
             };
             
-            console.log('[DEBUG] Assign staff payload:', payload);
 
             fetch('/Provider/Order/AssignStaff', {
                 method: 'POST',
@@ -1159,7 +1129,6 @@
                 body: JSON.stringify(payload)
             })
             .then(response => {
-                console.log('[DEBUG] Response status:', response.status);
                 if (!response.ok) {
                     return response.text().then(text => {
                         console.error('[ERROR] Response error:', text);
@@ -1169,16 +1138,13 @@
                 return response.json();
             })
             .then(data => {
-                console.log('[DEBUG] Response data:', data);
                 if (data.success) {
                     showStaffMessage(
                         '<i class="bi bi-check-circle me-2"></i><strong>' + data.message + '</strong>',
                         'success'
                     );
-                    // Reload sau 1.5 giây để user thấy thông báo
-                    setTimeout(() => {
+                    // Reload ngay lập tức để cập nhật
                     location.reload();
-                    }, 1500);
                 } else {
                     // Kiểm tra nếu là lỗi nhân viên bị xóa
                     let errorMessage = data.message || 'Có lỗi xảy ra khi phân công nhân viên';
@@ -1209,63 +1175,75 @@
         }
 
         // Test khi trang load xong
-        console.log('[DEBUG] Order details page loaded');
-        console.log('[DEBUG] Current status:', '@Model.Status');
-        
         // ========== Countdown Timer và Auto-Refresh để đồng bộ với admin ==========
         let refreshInterval = null;
         let bookingCancelTime = null;
-        let autoCancelCalled = false; // Track xem đã gọi auto-cancel chưa
+        let currentBookingStatus = '@Model.Status';
         
-        // Function để gọi endpoint auto-cancel
-        async function callAutoCancel(isPendingExpired) {
-            if (autoCancelCalled) {
-                console.log('[AUTO CANCEL] Already called, skipping...');
-                return;
-            }
+        // AutoCancelManager cho Details page
+        const AutoCancelManager = {
+            inProgress: false,
             
-            autoCancelCalled = true;
-            console.log('═══════════════════════════════════════════════');
-            console.log('[AUTO CANCEL] Calling auto-cancel endpoint...');
-            console.log('[AUTO CANCEL] BookingId:', bookingId);
-            console.log('[AUTO CANCEL] IsPendingExpired:', isPendingExpired);
-            console.log('═══════════════════════════════════════════════');
-            
-            try {
-                const response = await fetch('/Provider/Order/AutoCancel', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        bookingId: bookingId,
-                        isPendingExpired: isPendingExpired
-                    })
-                });
-                
-                console.log('[AUTO CANCEL] Response status:', response.status, response.statusText);
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log('[AUTO CANCEL] ✅ Success:', result);
-                    
-                    // Reload trang sau 2 giây để cập nhật trạng thái
-                    setTimeout(() => {
-                        console.log('[AUTO CANCEL] Reloading page...');
-                        location.reload();
-                    }, 2000);
-                } else {
-                    const errorText = await response.text();
-                    console.error('[AUTO CANCEL] ❌ Failed:', response.status, response.statusText);
-                    console.error('[AUTO CANCEL] Error response:', errorText);
+            async call(isPendingExpired) {
+                if (this.inProgress) {
+                    return Promise.resolve();
                 }
-            } catch (error) {
-                console.error('[AUTO CANCEL] ❌ Exception:', error);
-                console.error('[AUTO CANCEL] Error message:', error.message);
-                console.error('[AUTO CANCEL] Stack trace:', error.stack);
+                
+                this.inProgress = true;
+                
+                try {
+                    const bookingIdStr = String(bookingId).trim();
+                    if (!bookingIdStr || bookingIdStr === 'undefined' || bookingIdStr === 'null') {
+                        throw new Error('Invalid bookingId');
+                    }
+                    
+                    const response = await fetch('/Provider/Order/AutoCancel', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                        },
+                        body: JSON.stringify({
+                            bookingId: bookingIdStr,
+                            isPendingExpired: isPendingExpired
+                        })
+                    });
+                    
+                    // ✨ QUAN TRỌNG: Kiểm tra cả HTTP status VÀ response body
+                    const responseText = await response.text();
+                    
+                    if (!response.ok) {
+                        throw new Error(`Auto-cancel failed: ${response.status} - ${responseText}`);
+                    }
+                    
+                    // Parse JSON response để kiểm tra success flag
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (e) {
+                        // Nếu không phải JSON, coi như thành công nếu HTTP status OK
+                        // Reload để lấy dữ liệu từ database
+                        location.reload();
+                        return;
+                    }
+                    
+                    // ✨ KIỂM TRA success flag trong response body
+                    if (result && result.success === true) {
+                        // API thành công và database đã được cập nhật
+                        // Reload để lấy dữ liệu mới từ database
+                        location.reload();
+                    } else {
+                        // API trả về nhưng success = false
+                        throw new Error(result?.message || 'Auto-cancel failed: Backend reported failure');
+                    }
+                } catch (error) {
+                    console.error('[AUTO CANCEL] Error:', error);
+                    alert(`❌ Lỗi khi hủy đơn hàng tự động: ${error.message}`);
+                    this.inProgress = false;
+                }
             }
-        }
+        };
         
         // Function để cập nhật countdown timer
         function updateCountdown(timerSelector, isConfirmedUnpaid = false) {
@@ -1286,32 +1264,28 @@
                 const confirmedAtStr = timer.getAttribute('data-confirmed-at');
                 let confirmedTime = null;
                 
-                if (confirmedAtStr && confirmedAtStr.trim() !== '') {
-                    // Parse thời gian từ server
-                    if (confirmedAtStr.includes('Z') || confirmedAtStr.match(/[+-]\d{2}:\d{2}$/)) {
-                        confirmedTime = new Date(confirmedAtStr);
+                    if (confirmedAtStr && confirmedAtStr.trim() !== '') {
+                        // Parse thời gian từ server
+                        if (confirmedAtStr.includes('Z') || confirmedAtStr.match(/[+-]\d{2}:\d{2}$/)) {
+                            confirmedTime = new Date(confirmedAtStr);
+                        } else {
+                            confirmedTime = new Date(confirmedAtStr.replace('T', ' '));
+                        }
                     } else {
-                        confirmedTime = new Date(confirmedAtStr.replace('T', ' '));
+                        // Ưu tiên 2: Dùng localStorage (thời gian xác nhận ngay khi provider bấm nút)
+                        const localStorageKey = `booking_confirmed_${bookingId}`;
+                        const confirmedTimeStr = localStorage.getItem(localStorageKey);
+                        
+                        if (confirmedTimeStr) {
+                            confirmedTime = new Date(confirmedTimeStr);
+                        } else {
+                            // Ưu tiên 3: Dùng thời gian hiện tại (fallback - không nên xảy ra)
+                            confirmedTime = new Date();
+                        }
                     }
-                    console.log('[DEBUG] Using confirmed time from server (data-confirmed-at):', confirmedTime);
-                } else {
-                    // Ưu tiên 2: Dùng localStorage (thời gian xác nhận ngay khi provider bấm nút)
-                    const localStorageKey = `booking_confirmed_${bookingId}`;
-                    const confirmedTimeStr = localStorage.getItem(localStorageKey);
                     
-                    if (confirmedTimeStr) {
-                        confirmedTime = new Date(confirmedTimeStr);
-                        console.log('[DEBUG] Using confirmed time from localStorage:', confirmedTime);
-                    } else {
-                        // Ưu tiên 3: Dùng thời gian hiện tại (fallback - không nên xảy ra)
-                        confirmedTime = new Date();
-                        console.warn('[DEBUG] No confirmed time found, using current time as fallback');
-                    }
-                }
-                
-                // Tính cancelTime từ ConfirmedAt + autoCancelMinutes
-                cancelTime = new Date(confirmedTime.getTime() + autoCancelMinutes * 60 * 1000);
-                console.log('[DEBUG] Confirmed time:', confirmedTime, 'Cancel time:', cancelTime, 'Minutes:', autoCancelMinutes);
+                    // Tính cancelTime từ ConfirmedAt + autoCancelMinutes
+                    cancelTime = new Date(confirmedTime.getTime() + autoCancelMinutes * 60 * 1000);
             } else {
                 // Timer Pending: Parse thời gian hủy từ data-cancel-time (đã tính từ CreatedAt)
                 if (cancelTimeStr.includes('Z') || cancelTimeStr.match(/[+-]\d{2}:\d{2}$/)) {
@@ -1328,36 +1302,27 @@
             
             if (diff <= 0) {
                 // Đã quá thời gian hủy
-                timer.innerHTML = '<span class="text-danger fw-bold">Đã quá thời hạn</span>';
-                timer.classList.add('text-danger');
-                
-                // Gọi endpoint auto-cancel (chỉ gọi một lần)
-                if (!autoCancelCalled) {
-                    if (isConfirmedUnpaid) {
-                        // Confirmed chưa thanh toán hết thời gian
-                        console.log('⏰ Confirmed unpaid booking expired, calling auto-cancel...');
-                        callAutoCancel(false);
-                    } else {
-                        // Pending hết thời gian chờ xác nhận
-                        console.log('⏰ Pending booking expired, calling auto-cancel...');
-                        callAutoCancel(true);
-                    }
+                if (AutoCancelManager.inProgress) {
+                    timer.innerHTML = '<span class="text-danger fw-bold">Đang xử lý...</span>';
+                    timer.classList.add('text-danger');
+                    return;
                 }
                 
-                // Cập nhật UI ngay lập tức
-                if (isConfirmedUnpaid) {
-                    console.log('⏰ Confirmed unpaid booking expired, updating UI immediately...');
-                    const alertContainer = timer.closest('.alert');
-                    if (alertContainer) {
-                        alertContainer.style.display = 'none';
-                    }
-                    const statusBadge = document.querySelector('.status-badge-lg');
-                    if (statusBadge) {
-                        statusBadge.textContent = 'Đã hủy';
-                        statusBadge.className = 'status-badge-lg status-canceled';
-                        statusBadge.style.cssText = 'color: #000000 !important; font-weight: 800 !important;';
-                    }
-                }
+                // ✨ QUAN TRỌNG: GỌI API TRƯỚC, KHÔNG CẬP NHẬT UI TRƯỚC
+                // Hiển thị "Đang xử lý" trong khi gọi API
+                timer.innerHTML = '<span class="text-warning fw-bold">Đang hủy đơn...</span>';
+                timer.classList.add('text-warning');
+                
+                // Gọi API auto-cancel và đợi kết quả
+                AutoCancelManager.call(isConfirmedUnpaid ? false : true).then(() => {
+                    // CHỈ KHI API THÀNH CÔNG mới reload để lấy dữ liệu từ database
+                    // Reload sẽ tự động cập nhật UI với dữ liệu thật từ database
+                }).catch(error => {
+                    // Nếu API fail, hiển thị lỗi và reset
+                    timer.innerHTML = '<span class="text-danger fw-bold">Lỗi khi hủy đơn</span>';
+                    console.error('[AUTO CANCEL] Error:', error);
+                    alert(`❌ Lỗi khi hủy đơn hàng tự động: ${error.message}`);
+                });
             } else {
                 // Tính giờ, phút, giây còn lại
                 const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -1409,6 +1374,55 @@
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 
+                // ✨ PHÁT HIỆN THAY ĐỔI STATUS TỪ ADMIN
+                const newStatusBadge = doc.querySelector('.status-badge-lg');
+                const currentStatusBadge = document.querySelector('.status-badge-lg');
+                
+                if (newStatusBadge && currentStatusBadge) {
+                    const newStatusClass = Array.from(newStatusBadge.classList).find(cls => cls.startsWith('status-'));
+                    const currentStatusClass = Array.from(currentStatusBadge.classList).find(cls => cls.startsWith('status-'));
+                    const newStatusText = newStatusBadge.textContent.trim();
+                    const currentStatusText = currentStatusBadge.textContent.trim();
+                    
+                    if (newStatusClass !== currentStatusClass || newStatusText !== currentStatusText) {
+                        // Cập nhật status badge
+                        currentStatusBadge.className = newStatusBadge.className;
+                        currentStatusBadge.textContent = newStatusText;
+                        
+                        // Nếu booking bị canceled, cập nhật UI
+                        if (newStatusClass && newStatusClass.includes('canceled')) {
+                            // Ẩn countdown timers
+                            const pendingTimer = document.querySelector('.countdown-timer-detail');
+                            const confirmedTimer = document.querySelector('.countdown-timer-confirmed-unpaid');
+                            if (pendingTimer) {
+                                const alertContainer = pendingTimer.closest('.alert');
+                                if (alertContainer) {
+                                    alertContainer.style.display = 'none';
+                                }
+                            }
+                            if (confirmedTimer) {
+                                const alertContainer = confirmedTimer.closest('.alert');
+                                if (alertContainer) {
+                                    alertContainer.style.display = 'none';
+                                }
+                            }
+                            
+                            // Reset autoCancelCalled để có thể gọi lại nếu cần
+                            autoCancelCalled = false;
+                            
+                            // Cập nhật currentBookingStatus
+                            currentBookingStatus = 'Canceled';
+                            
+                            // Xóa localStorage nếu booking bị canceled
+                            const localStorageKey = `booking_confirmed_${bookingId}`;
+                            localStorage.removeItem(localStorageKey);
+                        } else if (newStatusClass && newStatusClass !== currentStatusClass) {
+                            // Nếu status thay đổi (nhưng chưa canceled), cập nhật currentBookingStatus
+                            currentBookingStatus = newStatusText;
+                        }
+                    }
+                }
+                
                 // Tìm countdown timers mới
                 const newPendingTimer = doc.querySelector('.countdown-timer-detail');
                 const newConfirmedTimer = doc.querySelector('.countdown-timer-confirmed-unpaid');
@@ -1422,7 +1436,6 @@
                     const currentCancelTime = currentPendingTimer.getAttribute('data-cancel-time');
                     
                     if (newCancelTime && newCancelTime !== currentCancelTime) {
-                        console.log('🔄 Pending timer updated:', currentCancelTime, '->', newCancelTime);
                         currentPendingTimer.setAttribute('data-cancel-time', newCancelTime);
                         currentPendingTimer.setAttribute('data-auto-cancel-minutes', newPendingTimer.getAttribute('data-auto-cancel-minutes') || '');
                         bookingCancelTime = newCancelTime;
@@ -1440,10 +1453,6 @@
                                        (newConfirmedAt && newConfirmedAt !== currentConfirmedAt);
                     
                     if (shouldUpdate) {
-                        console.log('🔄 Confirmed unpaid timer updated:');
-                        console.log('   CancelTime:', currentCancelTime, '->', newCancelTime);
-                        console.log('   ConfirmedAt:', currentConfirmedAt, '->', newConfirmedAt);
-                        
                         if (newCancelTime) {
                             currentConfirmedTimer.setAttribute('data-cancel-time', newCancelTime);
                         }
@@ -1456,7 +1465,6 @@
                                     ? newConfirmedAt 
                                     : newConfirmedAt.replace('T', ' '));
                                 localStorage.setItem(`booking_confirmed_${bookingId}`, confirmedTime.toISOString());
-                                console.log('   Updated localStorage with confirmed time from server');
                             }
                         }
                         currentConfirmedTimer.setAttribute('data-auto-cancel-minutes', newConfirmedTimer.getAttribute('data-auto-cancel-minutes') || '');
@@ -1479,7 +1487,6 @@
             if (isPaid || isCanceled) {
                 const localStorageKey = `booking_confirmed_${bookingId}`;
                 localStorage.removeItem(localStorageKey);
-                console.log('[DEBUG] Removed confirmed time from localStorage (paid or canceled)');
             }
             
             // Lưu cancel time ban đầu để so sánh
@@ -1502,12 +1509,10 @@
                 updateCountdown('.countdown-timer-confirmed-unpaid', true);
             }, 1000);
             
-            // Auto-refresh mỗi 5 giây để đồng bộ với admin
-            if (pendingTimer || confirmedTimer) {
-                refreshInterval = setInterval(() => {
-                    refreshBookingDetail();
-                }, 5000); // 5 giây
-            }
+            // Auto-refresh mỗi 1 giây để đồng bộ với admin (ngay lập tức)
+            refreshInterval = setInterval(() => {
+                refreshBookingDetail();
+            }, 1000); // 1 giây - đồng bộ ngay lập tức với admin
         });
         
         // Tắt auto-refresh khi page unload
