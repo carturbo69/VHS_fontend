@@ -1,4 +1,6 @@
-﻿namespace VHS_frontend.Models
+﻿using VHS_frontend.Areas.Customer.Models.ServiceOptionDTOs;
+
+namespace VHS_frontend.Models
 {
     public class ServiceItem
     {
@@ -19,5 +21,6 @@
         public int CategoryId { get; set; }
         public List<string> Tags { get; set; } = new List<string>();  // Tags riêng của dịch vụ
         public DateTime? CreatedAt { get; set; }  // Thời gian tạo dịch vụ
+        public List<ReadServiceOptionDTOs> ServiceOptions { get; set; } = new List<ReadServiceOptionDTOs>();  // Options của service
     }
 }

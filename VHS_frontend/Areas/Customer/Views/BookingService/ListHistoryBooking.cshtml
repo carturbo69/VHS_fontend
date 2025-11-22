@@ -1,4 +1,5 @@
 ﻿@model VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.ListHistoryBookingServiceDTOs
+@using System.Linq
 @{
     ViewData["Title"] = "Lịch sử đơn dịch vụ";
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -70,6 +71,24 @@
 <link href="~/css/list-histrory-booking.css" rel="stylesheet" />
 
 <div class="container my-3">
+    <!-- Toast Notifications -->
+    @if (TempData["ToastSuccess"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert" style="margin-bottom: 20px; border-left: 4px solid #28a745;">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>Thành công!</strong> @TempData["ToastSuccess"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+    @if (TempData["DuplicateReportError"] != null)
+    {
+        <div class="alert alert-warning alert-dismissible fade show" role="alert" style="margin-bottom: 20px; border-left: 4px solid #ffc107;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Cảnh báo!</strong> @TempData["DuplicateReportError"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+
     <!-- Page Header -->
     <div class="page-header">
         <h1 class="page-title">
@@ -103,7 +122,7 @@
 
     <!-- Danh sách đơn -->
     <div id="order-list" class="d-flex flex-column gap-3">
-        @foreach (var o in Model.Items)
+        @foreach (var o in Model.Items.OrderByDescending(x => x.CreatedAt ?? x.BookingTime))
         {
             var price = $"{o.TotalPrice:N0}đ";
 
@@ -208,7 +227,7 @@
 
                 @{
                     // TÍNH TOÁN TIỀN
-                    var optionTotal = o.Options?.Sum(op => op.Price) ?? 0m;
+                    var optionTotal = 0m; // Options no longer have Price
                     var servicePrice = o.ServicePrice;
                     var subTotal = servicePrice + optionTotal;
                     var voucher = Math.Max(0m, o.VoucherDiscount); // bảo vệ số âm
@@ -227,12 +246,39 @@
                         <div class="order-title">@o.ServiceTitle</div>
                         @if (o.Options?.Any() == true)
                         {
-                            <div class="mt-1">
+                            @* Hiển thị danh sách options phẳng (không có nhóm) cho Customer *@
+                            <div class="opt-section mt-1">
                                 @foreach (var opt in o.Options)
                                 {
-                                    <span class="option-badge" title="@opt.Description">
-                                        @opt.OptionName • @opt.Price.ToString("N0") @opt.UnitType
-                                    </span>
+                                    var isTextarea = opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text";
+                                    <div class="opt-row">
+                                        <div class="opt-name" style="flex: 1; min-width: 0;">
+                                            <div style="font-weight: 500; margin-bottom: 8px;">
+                                                <span>✓</span>
+                                                <span>@opt.OptionName</span>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(opt.Value))
+                                            {
+                                                <div style="margin-top: 8px;">
+                                                       
+                                                    @if (isTextarea)
+                                                    {
+                                                        <div class="option-value-text" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px; font-size: 0.9em; line-height: 1.5;">@opt.Value</div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted" style="margin-left: 4px;">@opt.Value</span>
+                                                    }
+                                                </div>
+                                            }
+                                            else if (isTextarea)
+                                            {
+                                                <div style="margin-top: 8px; color: #6c757d; font-size: 0.875em;">
+                                                    <i class="bi bi-info-circle" style="margin-right: 4px;"></i>Chưa có
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
                                 }
                             </div>
                         }
@@ -323,13 +369,26 @@
                             }
                             <button type="submit" class="btn btn-danger">Đặt lại</button>
                         </form>
-                        <a asp-area="Customer"
-                           asp-controller="BookingService"
-                           asp-action="ReportService"
-                           asp-route-bookingId="@o.BookingId"
-                           class="btn btn-outline-danger btn-report">
-                            Báo cáo
-                        </a>
+                        @if (o.HasReport && o.ReportId.HasValue)
+                        {
+                            <a asp-area="Customer"
+                               asp-controller="BookingService"
+                               asp-action="ReportDetail"
+                               asp-route-reportId="@o.ReportId.Value"
+                               class="btn btn-outline-primary">
+                                <i class="bi bi-file-earmark-text me-1"></i>Xem báo cáo
+                            </a>
+                        }
+                        else
+                        {
+                            <a asp-area="Customer"
+                               asp-controller="BookingService"
+                               asp-action="ReportService"
+                               asp-route-bookingId="@o.BookingId"
+                               class="btn btn-outline-danger btn-report">
+                                Báo cáo
+                            </a>
+                        }
 
                         @if (canReview && !isReviewed)
                         {
@@ -351,6 +410,48 @@
                                 data-bs-toggle="modal"
                                 data-bs-target="#cancelModal-@o.BookingId">
                             Hủy đơn
+                        </button>
+                    }
+                    else if (st.Equals("Confirmed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        @* Kiểm tra nếu booking đã được xác nhận nhưng chưa thanh toán, hiển thị nút thanh toán *@
+                        @* Ẩn nút nếu đã thanh toán thành công *@
+                        @* Kiểm tra cả PaidAmount và PaymentStatus để đảm bảo chính xác *@
+                        var hasPaidAmount = (o.PaidAmount ?? 0m) > 0;
+                        var hasSuccessPaymentStatus = !string.IsNullOrWhiteSpace(o.PaymentStatus) && 
+                                                      (o.PaymentStatus.ToUpperInvariant() == "ĐÃ THANH TOÁN" || 
+                                                       o.PaymentStatus.ToUpperInvariant() == "PAID" || 
+                                                       o.PaymentStatus.ToUpperInvariant() == "SUCCESS" || 
+                                                       o.PaymentStatus.ToUpperInvariant() == "COMPLETED" ||
+                                                       o.PaymentStatus.ToUpperInvariant() == "00" || // VNPay success code
+                                                       o.PaymentStatus.Contains("thành công", StringComparison.OrdinalIgnoreCase) ||
+                                                       o.PaymentStatus.Contains("success", StringComparison.OrdinalIgnoreCase));
+                        
+                        var isPaid = hasPaidAmount || hasSuccessPaymentStatus;
+                        
+                        @* Chỉ hiển thị nút thanh toán nếu booking đã được xác nhận và CHƯA thanh toán *@
+                        @* Debug: có thể bỏ comment để kiểm tra giá trị *@
+                        @* <!-- Debug: BookingId=@o.BookingId, PaidAmount=@(o.PaidAmount ?? 0m), PaymentStatus=@(o.PaymentStatus ?? "null"), isPaid=@isPaid --> *@
+                        
+                        if (!isPaid)
+                        {
+                            <form asp-area="Customer" 
+                                  asp-controller="BookingService" 
+                                  asp-action="PayAfterConfirmation" 
+                                  method="post" 
+                                  style="display: inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="bookingIds" value="@o.BookingId" />
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-credit-card me-1"></i> Thanh toán ngay
+                                </button>
+                            </form>
+                        }
+                        
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                onclick="window.location.href='@Url.Action("WithProvider", "ChatCustomer", new { area = "Customer", providerId = o.ProviderId })'">
+                            <i class="bi bi-chat-text me-1"></i> Liên hệ Shop
                         </button>
                     }
                     else if (st.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
@@ -507,7 +608,7 @@
             <div class="modal fade" id="cancelModal-@o.BookingId" tabindex="-1" aria-labelledby="cancelModalLabel-@o.BookingId" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-scrollable modal-lg cancel-order-modal">
                     <div class="modal-content">
-                        <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post" novalidate>
+                        <form asp-area="Customer" asp-controller="BookingService" asp-action="CancelBooking" method="post" novalidate data-booking-id="@o.BookingId">
                             @Html.AntiForgeryToken()
                             <div class="modal-header border-bottom">
                                 <h5 class="modal-title d-flex align-items-center gap-2" id="cancelModalLabel-@o.BookingId">
@@ -525,7 +626,7 @@
                                     <i class="bi bi-exclamation-triangle-fill fs-4 mt-1"></i>
                                     <div>
                                         <strong class="d-block mb-1">Lưu ý quan trọng</strong>
-                                        <span>Việc hủy đơn có thể ảnh hưởng đến quá trình hoàn tiền. Vui lòng điền đầy đủ thông tin ngân hàng để nhận hoàn tiền (nếu áp dụng).</span>
+                                        <span>Việc hủy đơn sẽ không thể hoàn tác. Nếu bạn đã thanh toán và muốn yêu cầu hoàn tiền, vui lòng sử dụng chức năng "Báo cáo" với loại "Yêu cầu hoàn tiền".</span>
                                     </div>
                                 </div>
 
@@ -544,64 +645,6 @@
                                     <div class="form-text mt-2 d-flex align-items-start gap-2">
                                         <i class="bi bi-lightbulb-fill text-warning mt-1"></i>
                                         <span>Ví dụ: Đặt nhầm dịch vụ, thay đổi thời gian, tìm được nhà cung cấp khác...</span>
-                                    </div>
-                                </div>
-
-                                <!-- Thông tin ngân hàng -->
-                                <div class="bank-info-section border-top pt-4">
-                                    <div class="d-flex align-items-center gap-2 mb-4">
-                                        <div class="bank-icon-wrapper">
-                                            <i class="bi bi-bank2 text-primary"></i>
-                                        </div>
-                                        <div>
-                                            <h6 class="fw-bold mb-0">Thông tin ngân hàng để hoàn tiền</h6>
-                                            <small class="text-muted">Điền đầy đủ để nhận hoàn tiền (nếu áp dụng)</small>
-                                        </div>
-                                </div>
-
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
-                                                <i class="bi bi-building text-primary"></i>
-                                                <span>Tên ngân hàng</span>
-                                                <span class="text-danger">*</span>
-                                            </label>
-                                            <input class="form-control" name="BankName" placeholder="VD: Vietcombank, Techcombank, BIDV..." />
-                                            <div class="invalid-feedback d-none" id="bankNameError-@o.BookingId">
-                                                <i class="bi bi-exclamation-circle me-1"></i>
-                                                <span></span>
-                                            </div>
-                                </div>
-
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
-                                                <i class="bi bi-person-badge text-primary"></i>
-                                                <span>Tên chủ tài khoản</span>
-                                                <span class="text-danger">*</span>
-                                            </label>
-                                            <input class="form-control text-uppercase" name="AccountHolderName" placeholder="VD: NGUYEN VAN A" />
-                                            <div class="invalid-feedback d-none" id="accountHolderError-@o.BookingId">
-                                                <i class="bi bi-exclamation-circle me-1"></i>
-                                                <span></span>
-                                            </div>
-                                </div>
-
-                                        <div class="col-12">
-                                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
-                                                <i class="bi bi-credit-card text-primary"></i>
-                                                <span>Số tài khoản</span>
-                                                <span class="text-danger">*</span>
-                                            </label>
-                                            <input class="form-control" name="BankAccountNumber" inputmode="numeric" placeholder="Chỉ nhập số, từ 6–20 ký tự" />
-                                            <div class="invalid-feedback d-none" id="accountNumberError-@o.BookingId">
-                                                <i class="bi bi-exclamation-circle me-1"></i>
-                                                <span></span>
-                                            </div>
-                                            <div class="form-text mt-2 d-flex align-items-start gap-2">
-                                                <i class="bi bi-shield-check-fill text-success mt-1"></i>
-                                                <span>Thông tin ngân hàng được bảo mật và chỉ dùng để hoàn tiền (nếu áp dụng).</span>
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -952,33 +995,13 @@
                 
                 // Validate từng field
                 const reason = form.querySelector('textarea[name="Reason"]')?.value?.trim();
-                const bankName = form.querySelector('input[name="BankName"]')?.value?.trim();
-                const accountHolder = form.querySelector('input[name="AccountHolderName"]')?.value?.trim();
-                const accountNumber = form.querySelector('input[name="BankAccountNumber"]')?.value?.trim();
                 
                 // Clear all errors first
                 showError('Reason', 'reasonError', '');
-                showError('BankName', 'bankNameError', '');
-                showError('AccountHolderName', 'accountHolderError', '');
-                showError('BankAccountNumber', 'accountNumberError', '');
                 
                 // Validate và hiển thị lỗi
                 if (!reason) {
                     showError('Reason', 'reasonError', 'Vui lòng nhập lý do hủy đơn hàng.');
-                }
-                
-                if (!bankName) {
-                    showError('BankName', 'bankNameError', 'Vui lòng nhập tên ngân hàng.');
-                }
-                
-                if (!accountHolder) {
-                    showError('AccountHolderName', 'accountHolderError', 'Vui lòng nhập tên chủ tài khoản.');
-                }
-                
-                if (!accountNumber) {
-                    showError('BankAccountNumber', 'accountNumberError', 'Vui lòng nhập số tài khoản.');
-                } else if (!/^\d{6,20}$/.test(accountNumber)) {
-                    showError('BankAccountNumber', 'accountNumberError', 'Số tài khoản phải là số và có từ 6 đến 20 ký tự.');
                 }
                 
                 // Nếu có lỗi, ngăn submit và scroll đến field đầu tiên có lỗi
@@ -1023,5 +1046,184 @@
                 });
             });
         });
+
+        // ========================================
+        // AUTO-REFRESH: Tự động cập nhật danh sách booking KHÔNG RELOAD TRANG
+        // ========================================
+        let isRefreshing = false;
+        let refreshInterval = null;
+        
+        // Function để fetch và cập nhật danh sách booking động
+        async function refreshBookingList() {
+            if (isRefreshing) return;
+            
+            // Kiểm tra nếu user đang tương tác với form hoặc modal
+            const activeModal = document.querySelector('.modal.show');
+            const activeForm = document.querySelector('form:has(input:focus), form:has(textarea:focus)');
+            
+            if (activeModal || activeForm) {
+                console.log('⏸️ Skipping refresh - user is interacting with form/modal');
+                return;
+            }
+            
+            isRefreshing = true;
+            
+            try {
+                // Lưu scroll position trước khi cập nhật
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                
+                // Fetch lại trang với header để nhận HTML
+                const response = await fetch(window.location.href, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest', // Đánh dấu đây là AJAX request
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch booking list');
+                }
+                
+                const html = await response.text();
+                
+                // Parse HTML response và extract phần order-list
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newOrderList = doc.querySelector('#order-list');
+                
+                if (newOrderList) {
+                    // Lấy container hiện tại
+                    const currentOrderList = document.querySelector('#order-list');
+                    
+                    if (currentOrderList) {
+                        // Fade out effect
+                        currentOrderList.style.opacity = '0.5';
+                        currentOrderList.style.transition = 'opacity 0.3s';
+                        
+                        // Replace nội dung sau 300ms
+                        setTimeout(() => {
+                            // Replace HTML
+                            currentOrderList.innerHTML = newOrderList.innerHTML;
+                            
+                            // Fade in effect
+                            currentOrderList.style.opacity = '1';
+                            
+                            // Re-initialize các event handlers cần thiết
+                            initializeEventHandlers();
+                            
+                            // Khôi phục scroll position
+                            window.scrollTo(0, scrollTop);
+                            
+                            // Hiển thị notification thành công
+                            // showRefreshNotification('Đã cập nhật danh sách', 'success');
+                            
+                            console.log('✅ Booking list updated successfully');
+                        }, 300);
+                    } else {
+                        throw new Error('Order list container not found');
+                    }
+                } else {
+                    throw new Error('New order list not found in response');
+                }
+            } catch (error) {
+                console.error('❌ Error refreshing booking list:', error);
+                showRefreshNotification('Không thể cập nhật danh sách', 'error');
+            } finally {
+                isRefreshing = false;
+            }
+        }
+        
+        // Function để hiển thị notification refresh
+        function showRefreshNotification(message, type) {
+            // Xóa notification cũ nếu có
+            const existingNotif = document.querySelector('.refresh-notification');
+            if (existingNotif) {
+                existingNotif.remove();
+            }
+            
+            // Tạo notification mới
+            const notification = document.createElement('div');
+            notification.className = 'refresh-notification';
+            const bgColor = type === 'success' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)';
+            notification.style.cssText = `position: fixed; bottom: 20px; right: 20px; background: ${bgColor}; color: white; padding: 12px 20px; border-radius: 8px; font-size: 0.875rem; z-index: 1050; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: slideIn 0.3s ease-out;`;
+            notification.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>${message}`;
+            document.body.appendChild(notification);
+            
+            // Tự động ẩn sau 3 giây
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.5s';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+        
+        // Function để re-initialize event handlers sau khi cập nhật DOM
+        function initializeEventHandlers() {
+            // Re-initialize cancel booking forms
+            document.querySelectorAll('form[action*="CancelBooking"]').forEach(form => {
+                // Remove old handlers if needed (nếu cần)
+                // Add new handlers (nếu cần)
+            });
+            
+            // Re-initialize review modals
+            document.querySelectorAll('[data-bs-target^="#reviewModal"]').forEach(btn => {
+                // Bootstrap modal sẽ tự động hoạt động với data attributes
+            });
+            
+            // Re-initialize any other event handlers
+        }
+        
+        // Auto-refresh định kỳ: mỗi 30 giây
+        function startAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            
+            refreshInterval = setInterval(() => {
+                refreshBookingList();
+            }, 30000); // 30 giây
+        }
+        
+        // Khởi động auto-refresh khi page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Bắt đầu auto-refresh
+            startAutoRefresh();
+            
+            // ✅ Tự động ẩn toast notifications sau 5 giây
+            const toastAlerts = document.querySelectorAll('.alert.alert-dismissible');
+            toastAlerts.forEach(alert => {
+                setTimeout(() => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }, 5000); // 5 giây
+            });
+        });
+        
+        // Tắt auto-refresh khi page unload
+        window.addEventListener('beforeunload', function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+        
+        // Thêm CSS animation (chỉ thêm một lần)
+        if (!document.getElementById('refresh-animation-style')) {
+            const style = document.createElement('style');
+            style.id = 'refresh-animation-style';
+            style.textContent = `
+                @@keyframes slideIn {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
     </script>
 }

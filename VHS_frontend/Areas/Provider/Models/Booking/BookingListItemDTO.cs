@@ -14,6 +14,7 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
         public string? PaymentStatus { get; set; }
         public string? StaffName { get; set; }
         public DateTime CreatedAt { get; set; }
+        public int? AutoCancelMinutes { get; set; } // Thời gian tự động hủy riêng cho booking này (phút)
     }
 
     public class BookingListResultDTO

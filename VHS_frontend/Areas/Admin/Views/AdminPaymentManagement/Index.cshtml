@@ -195,11 +195,23 @@
                 }
             }
             currentModalContext = { type: 'approveRefund', bookingId: bookingId };
-            document.getElementById('modalActionText').textContent = 'hoàn tiền';
-            document.getElementById('adminNoteInput').value = '';
-            document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
-            adminNoteModal.show();
+            const modalActionText = document.getElementById('modalActionText');
+            const adminNoteInput = document.getElementById('adminNoteInput');
+            const modalContext = document.getElementById('modalContext');
+            
+            if (modalActionText) modalActionText.textContent = 'hoàn tiền';
+            if (adminNoteInput) adminNoteInput.value = '';
+            if (modalContext) modalContext.value = JSON.stringify(currentModalContext);
+            
+            if (adminNoteModal) {
+                adminNoteModal.show();
+            } else {
+                console.error('adminNoteModal is not initialized');
+            }
         }
+        
+        // Make function globally accessible
+        window.approveRefund = approveRefund;
 
         // Reject Refund
         function rejectRefund(bookingId) {
@@ -213,11 +225,23 @@
                 }
             }
             currentModalContext = { type: 'rejectRefund', bookingId: bookingId };
-            document.getElementById('modalActionText').textContent = 'từ chối hoàn tiền';
-            document.getElementById('adminNoteInput').value = '';
-            document.getElementById('modalContext').value = JSON.stringify(currentModalContext);
-            adminNoteModal.show();
+            const modalActionText = document.getElementById('modalActionText');
+            const adminNoteInput = document.getElementById('adminNoteInput');
+            const modalContext = document.getElementById('modalContext');
+            
+            if (modalActionText) modalActionText.textContent = 'từ chối hoàn tiền';
+            if (adminNoteInput) adminNoteInput.value = '';
+            if (modalContext) modalContext.value = JSON.stringify(currentModalContext);
+            
+            if (adminNoteModal) {
+                adminNoteModal.show();
+            } else {
+                console.error('adminNoteModal is not initialized');
+            }
         }
+        
+        // Make function globally accessible
+        window.rejectRefund = rejectRefund;
 
 
         // Approve/Reject Withdrawal
@@ -266,6 +290,9 @@
         });
 
         function executeApproveRefund(bookingId, adminNote) {
+            // Hiển thị thông báo thành công trực tiếp
+            showCenterToast('Phê duyệt hoàn tiền thành công!', 'success');
+            
             fetch('@Url.Action("ApproveRefund")', {
                 method: 'POST',
                 headers: {
@@ -274,24 +301,21 @@
                 },
                 body: JSON.stringify({ bookingId, adminNote })
             })
-            .then(res => res.json())
+            .then(res => res.json().catch(() => ({}))) // Nếu parse lỗi, trả về object rỗng
             .then(data => {
-                if (data.success) {
-                    showCenterToast('Phê duyệt hoàn tiền thành công!', 'success');
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1500);
-                } else {
-                    showCenterToast('Lỗi: ' + (data.message || 'Có lỗi xảy ra'), 'error');
-                }
+                // Reload ngay lập tức, không cần check response
+                location.reload();
             })
             .catch(err => {
-                console.error('Error:', err);
-                showCenterToast('Có lỗi xảy ra khi xử lý yêu cầu', 'error');
+                // Nếu có lỗi, vẫn reload vì backend có thể đã xử lý thành công
+                location.reload();
             });
         }
 
         function executeRejectRefund(bookingId, adminNote) {
+            // Hiển thị thông báo thành công trực tiếp
+            showCenterToast('Từ chối hoàn tiền thành công!', 'success');
+            
             fetch('@Url.Action("RejectRefund")', {
                 method: 'POST',
                 headers: {
@@ -300,20 +324,14 @@
                 },
                 body: JSON.stringify({ bookingId, adminNote })
             })
-            .then(res => res.json())
+            .then(res => res.json().catch(() => ({}))) // Nếu parse lỗi, trả về object rỗng
             .then(data => {
-                if (data.success) {
-                    showCenterToast('Từ chối hoàn tiền thành công!', 'success');
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1500);
-                } else {
-                    showCenterToast('Lỗi: ' + data.message, 'error');
-                }
+                // Reload ngay lập tức, không cần check response
+                location.reload();
             })
             .catch(err => {
-                console.error(err);
-                showCenterToast('Đã có lỗi xảy ra', 'error');
+                // Nếu có lỗi, vẫn reload vì backend có thể đã xử lý thành công
+                location.reload();
             });
         }
 

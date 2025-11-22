@@ -9,9 +9,10 @@
     {
         public Guid OptionId { get; set; }
         public string OptionName { get; set; } = null!;
-        public string? Description { get; set; }
-        public decimal Price { get; set; }
-        public string UnitType { get; set; } = null!;
+        public Guid? TagId { get; set; }
+        public string Type { get; set; } = null!; // enum: checkbox, radio, text, optional, etc.
+        public Guid? Family { get; set; } // For radio buttons: if one is selected, others are hidden
+        public string? Value { get; set; } // Stores the value if any
     }
 
     public class BookingServiceItemDTO
@@ -19,6 +20,7 @@
         // Booking
         public Guid BookingId { get; set; }
         public DateTime BookingTime { get; set; }
+        public DateTime? CreatedAt { get; set; } // Thời gian tạo booking
         public string Status { get; set; } = null!;
         public string Address { get; set; } = null!;
 
@@ -42,8 +44,16 @@
 
         public bool HasReview { get; set; } = false;
 
-        // (tuỳ chọn) Tổng chi phí = giá service + tổng giá option
-        public decimal TotalPrice => ServicePrice + (Options?.Sum(o => o.Price) ?? 0m);
+        // Report info
+        public bool HasReport { get; set; } = false;
+        public Guid? ReportId { get; set; }
+
+        // Payment info
+        public decimal? PaidAmount { get; set; }
+        public string? PaymentStatus { get; set; }
+
+        // (tuỳ chọn) Tổng chi phí = giá service (Options no longer have Price)
+        public decimal TotalPrice => ServicePrice;
 
 
     }

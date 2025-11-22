@@ -60,56 +60,18 @@ namespace VHS_frontend.Areas.Admin.Controllers
             }
 
             // ✨ THỐNG KÊ THÁNG NÀY - Lấy từng loại riêng biệt
+            // ✅ Sử dụng GetStatisticsAsync để filter theo CreatedAt (đúng cho thống kê)
             var thisMonthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-            var thisMonthEnd = thisMonthStart.AddMonths(1);
+            var thisMonthEnd = thisMonthStart.AddMonths(1).AddTicks(-1); // Cuối tháng
             
-            // Đếm Pending
-            var pendingFilter = new AdminBookingFilterDTO
-            {
-                Status = "Pending",
-                FromDate = thisMonthStart,
-                ToDate = thisMonthEnd,
-                PageNumber = 1,
-                PageSize = 1
-            };
-            var pendingData = await _bookingService.GetAllBookingsAsync(pendingFilter);
-            ViewBag.MonthPending = pendingData?.TotalCount ?? 0;
+            // Lấy thống kê tổng thể (filter theo CreatedAt)
+            var statistics = await _bookingService.GetStatisticsAsync(thisMonthStart, thisMonthEnd);
             
-            // Đếm Confirmed
-            var confirmedFilter = new AdminBookingFilterDTO
-            {
-                Status = "Confirmed",
-                FromDate = thisMonthStart,
-                ToDate = thisMonthEnd,
-                PageNumber = 1,
-                PageSize = 1
-            };
-            var confirmedData = await _bookingService.GetAllBookingsAsync(confirmedFilter);
-            ViewBag.MonthConfirmed = confirmedData?.TotalCount ?? 0;
-            
-            // Đếm Completed
-            var completedFilter = new AdminBookingFilterDTO
-            {
-                Status = "Completed",
-                FromDate = thisMonthStart,
-                ToDate = thisMonthEnd,
-                PageNumber = 1,
-                PageSize = 1
-            };
-            var completedData = await _bookingService.GetAllBookingsAsync(completedFilter);
-            ViewBag.MonthCompleted = completedData?.TotalCount ?? 0;
-            
-            // Đếm Canceled
-            var canceledFilter = new AdminBookingFilterDTO
-            {
-                Status = "Canceled",
-                FromDate = thisMonthStart,
-                ToDate = thisMonthEnd,
-                PageNumber = 1,
-                PageSize = 1
-            };
-            var canceledData = await _bookingService.GetAllBookingsAsync(canceledFilter);
-            ViewBag.MonthCanceled = canceledData?.TotalCount ?? 0;
+            // ✅ Lấy trực tiếp từ statistics (đã filter theo CreatedAt)
+            ViewBag.MonthPending = statistics?.PendingBookings ?? 0;
+            ViewBag.MonthConfirmed = statistics?.ConfirmedBookings ?? 0;
+            ViewBag.MonthCompleted = statistics?.CompletedBookings ?? 0;
+            ViewBag.MonthCanceled = statistics?.CancelledBookings ?? 0;
 
             // Pass filter data to view
             ViewBag.CurrentStatus = status;
@@ -150,6 +112,212 @@ namespace VHS_frontend.Areas.Admin.Controllers
             {
                 TempData["ErrorMessage"] = $"Lỗi khi tải chi tiết đơn hàng: {ex.Message}";
                 return RedirectToAction(nameof(Index));
+            }
+        }
+
+        // POST: Admin/AdminBooking/UpdateAutoCancelMinutes
+        // Admin cập nhật thời gian tự động hủy cho booking (từ CreatedAt)
+        [HttpPost]
+        public async Task<IActionResult> UpdateAutoCancelMinutes(Guid bookingId, int? minutes)
+        {
+            var token = HttpContext.Session.GetString("JWTToken");
+            if (string.IsNullOrEmpty(token))
+            {
+                return Json(new { success = false, message = "Vui lòng đăng nhập lại." });
+            }
+
+            try
+            {
+                // Gọi API backend để cập nhật
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                
+                var backendUrl = "http://localhost:5154"; // Có thể lấy từ config
+                httpClient.BaseAddress = new Uri(backendUrl);
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+                var requestBody = new { Minutes = minutes };
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var apiUrl = $"/api/AdminSettings/booking/{bookingId}/auto-cancel-minutes";
+                
+                var response = await httpClient.PostAsync(apiUrl, content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        var apiResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(responseContent);
+                        var apiMessage = apiResult.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "Đã cập nhật thành công";
+                        
+                        return Json(new { 
+                            success = true, 
+                            message = apiMessage,
+                            minutes = minutes
+                        });
+                    }
+                    catch
+                    {
+                        return Json(new { 
+                            success = true, 
+                            message = "Đã cập nhật thời gian hủy thành công!",
+                            minutes = minutes
+                        });
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        var errorResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(responseContent);
+                        var errorMessage = errorResult.TryGetProperty("message", out var errProp) ? errProp.GetString() : 
+                                         (errorResult.TryGetProperty("error", out var errField) ? errField.GetString() : null);
+                        
+                        return Json(new { 
+                            success = false, 
+                            message = errorMessage ?? $"Lỗi HTTP {response.StatusCode}" 
+                        });
+                    }
+                    catch
+                    {
+                        return Json(new { 
+                            success = false, 
+                            message = $"Lỗi khi cập nhật: HTTP {response.StatusCode}" 
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Lỗi: " + ex.Message });
+            }
+        }
+
+        // POST: Admin/AdminBooking/UpdateCancelTime
+        // Admin cập nhật thời gian hủy cho booking
+        [HttpPost]
+        public async Task<IActionResult> UpdateCancelTime(Guid bookingId, int remainingMinutes, string createdAt)
+        {
+            var token = HttpContext.Session.GetString("JWTToken");
+            if (string.IsNullOrEmpty(token))
+            {
+                return Json(new { success = false, message = "Vui lòng đăng nhập lại." });
+            }
+
+            if (remainingMinutes < 1)
+            {
+                return Json(new { success = false, message = "Thời gian còn lại phải lớn hơn 0 phút." });
+            }
+
+            try
+            {
+                // ✨ QUAN TRỌNG: Parse createdAt từ string (có thể là CreatedAt hoặc ConfirmedAt)
+                // Format: yyyy-MM-ddTHH:mm:ss hoặc yyyy-MM-ddTHH:mm:ss+07:00
+                DateTime createdAtDateTime;
+                
+                // Thử parse với nhiều format để đảm bảo nhất quán với frontend
+                if (!DateTime.TryParse(createdAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out createdAtDateTime))
+                {
+                    // Thử parse với format ISO 8601 không có timezone
+                    if (!DateTime.TryParseExact(createdAt, "yyyy-MM-ddTHH:mm:ss", null, System.Globalization.DateTimeStyles.None, out createdAtDateTime))
+                    {
+                        // Thử parse với format có timezone +07:00
+                        if (!DateTime.TryParseExact(createdAt, "yyyy-MM-ddTHH:mm:ss+07:00", null, System.Globalization.DateTimeStyles.None, out createdAtDateTime))
+                        {
+                            return Json(new { success = false, message = $"Thời gian booking không hợp lệ: {createdAt}" });
+                        }
+                    }
+                }
+
+                // ✨ QUAN TRỌNG: Tính toán AutoCancelMinutes mới
+                // Với Confirmed booking: createdAtDateTime thực ra là ConfirmedAt (đã được frontend truyền đúng)
+                // Với Pending booking: createdAtDateTime là CreatedAt
+                // Thời gian hủy mới = Now + remainingMinutes
+                // AutoCancelMinutes = (thời gian hủy mới - createdAtDateTime).TotalMinutes
+                var now = DateTime.Now;
+                var newCancelTime = now.AddMinutes(remainingMinutes);
+                var newAutoCancelMinutes = (int)Math.Ceiling((newCancelTime - createdAtDateTime).TotalMinutes);
+
+                if (newAutoCancelMinutes < 1)
+                {
+                    return Json(new { success = false, message = "Không thể đặt thời gian hủy trong quá khứ." });
+                }
+
+                // Gọi API backend để cập nhật
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                httpClient.BaseAddress = new Uri("http://localhost:5154");
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+                var requestBody = new { minutes = newAutoCancelMinutes };
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                var apiUrl = $"/api/AdminSettings/booking/{bookingId}/auto-cancel-minutes";
+                var response = await httpClient.PostAsync(apiUrl, content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // API trả về { message, bookingId, minutes }
+                    try
+                    {
+                        var apiResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(responseContent);
+                        var apiMessage = apiResult.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "Đã cập nhật thành công";
+                        
+                        return Json(new { 
+                            success = true, 
+                            message = $"Đã cập nhật thời gian hủy thành công! Booking sẽ bị hủy sau {remainingMinutes} phút.",
+                            newAutoCancelMinutes = newAutoCancelMinutes,
+                            apiResponse = apiMessage
+                        });
+                    }
+                    catch
+                    {
+                        return Json(new { 
+                            success = true, 
+                            message = $"Đã cập nhật thời gian hủy thành công! Booking sẽ bị hủy sau {remainingMinutes} phút.",
+                            newAutoCancelMinutes = newAutoCancelMinutes
+                        });
+                    }
+                }
+                else
+                {
+                    // Parse error response
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(responseContent))
+                        {
+                            return Json(new { success = false, message = $"Lỗi khi cập nhật: HTTP {response.StatusCode} - Response rỗng" });
+                        }
+                        
+                        var errorResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(responseContent);
+                        var errorMessage = errorResult.TryGetProperty("message", out var errProp) ? errProp.GetString() : null;
+                        
+                        if (string.IsNullOrWhiteSpace(errorMessage))
+                        {
+                            // Thử lấy error field
+                            errorMessage = errorResult.TryGetProperty("error", out var errField) ? errField.GetString() : null;
+                        }
+                        
+                        if (string.IsNullOrWhiteSpace(errorMessage))
+                        {
+                            errorMessage = responseContent;
+                        }
+                        
+                        return Json(new { success = false, message = $"Lỗi khi cập nhật: {errorMessage}" });
+                    }
+                    catch (Exception parseEx)
+                    {
+                        return Json(new { success = false, message = $"Lỗi khi cập nhật: HTTP {response.StatusCode} - {responseContent} (Parse error: {parseEx.Message})" });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Lỗi: " + ex.Message });
             }
         }
     }

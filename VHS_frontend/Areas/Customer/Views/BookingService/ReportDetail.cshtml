@@ -32,142 +32,295 @@
         "Rejected" => "Đã từ chối",
         _ => Model?.Status ?? "Không xác định"
     };
+
+    // Helper function để chuyển ComplaintType sang tiếng Việt (đồng bộ với ReportService.cs)
+    // Nếu là "Other" nhưng có thông tin ngân hàng trong description, tự động detect là RefundRequest
+    string GetComplaintTypeVi(string? type, string? description = null)
+    {
+        // Tự động detect refund request từ description nếu ComplaintType là "Other"
+        if (type == "Other" && !string.IsNullOrWhiteSpace(description))
+        {
+            var descLower = description.ToLower();
+            if (descLower.Contains("--- thông tin ngân hàng để hoàn tiền ---") ||
+                descLower.Contains("thông tin ngân hàng") && 
+                (descLower.Contains("hoàn tiền") || descLower.Contains("refund") || 
+                 descLower.Contains("tên ngân hàng") || descLower.Contains("số tài khoản")))
+            {
+                return "Yêu cầu hoàn tiền";
+            }
+        }
+        
+        return type switch
+        {
+            "ServiceQuality" => "Chất lượng dịch vụ",
+            "ProviderMisconduct" => "Hành vi sai trái của nhà cung cấp",
+            "StaffMisconduct" => "Hành vi sai trái của nhân viên",
+            "Dispute" => "Tranh chấp",
+            "TechnicalIssue" => "Vấn đề kỹ thuật",
+            "RefundRequest" => "Yêu cầu hoàn tiền",
+            "Other" => "Khác",
+            // Fallback cho các giá trị cũ (nếu có)
+            "ProviderBehavior" => "Hành vi nhà cung cấp",
+            "PriceIssue" => "Vấn đề giá",
+            "Delay" => "Trễ hẹn",
+            _ => type ?? "Khác"
+        };
+    }
+
+    var complaintTypeVi = GetComplaintTypeVi(Model?.ComplaintType, Model?.Description);
 }
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
 <link rel="stylesheet" href="~/css/report-detail.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/cancel-booking-detail.css" asp-append-version="true" />
 
-<div class="kb container py-4">
+<div class="kb-container">
 
     <!-- Header -->
-    <div class="kb-header d-flex flex-wrap align-items-center justify-content-between mb-4">
-        <div class="d-flex align-items-center gap-2">
-            <h2 class="kb-title mb-0">Chi tiết báo cáo</h2>
+    <div class="kb-header">
+        <div style="display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;">
+            <h2 class="kb-title">Chi tiết báo cáo</h2>
             <span class="kb-badge @statusBadgeClass">
-                <i class="bi bi-shield-exclamation me-1"></i>@statusText
+                <i class="bi bi-shield-exclamation"></i>@statusText
             </span>
         </div>
-        <div class="d-flex gap-2">
+        <div class="kb-header-actions">
             <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" class="btn btn-ghost">
-                <i class="bi bi-clock-history me-1"></i>Lịch sử đơn
+                <i class="bi bi-clock-history"></i>Lịch sử đơn
             </a>
             <a href="javascript:history.back()" class="btn btn-brand">
-                <i class="bi bi-arrow-left-short me-1"></i>Quay lại
+                <i class="bi bi-arrow-left-short"></i>Quay lại
             </a>
         </div>
     </div>
 
     <!-- Service / Product -->
-    <div class="kb-card mb-4">
+    <div class="kb-card">
         <div class="kb-card-header">
-            <i class="bi bi-bag me-2"></i>Dịch vụ
+            <i class="bi bi-bag"></i>Dịch vụ
         </div>
         <div class="kb-card-body">
-            <div class="row g-3 align-items-start">
-                <div class="col">
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                        <div class="fw-bold fs-6">@Model?.ServiceName</div>
-                        @if (!string.IsNullOrWhiteSpace(Model?.ProviderName))
-                        {
-                            <span class="kb-chip"><i class="bi bi-shop me-1"></i>@Model.ProviderName</span>
-                        }
-                    </div>
-
-                    <div class="text-muted small mt-1">
-                        <span>Mã đơn: <strong>@Model?.BookingId</strong></span>
-                    </div>
+            @if (!string.IsNullOrWhiteSpace(Model?.ProviderName))
+            {
+                <div class="kb-provider-name">
+                    <i class="bi bi-shop"></i>@Model.ProviderName
                 </div>
+            }
+            <div class="kb-service-name">@Model?.ServiceName</div>
+            <div class="kb-service-meta">
+                <span>Mã đơn: <strong>@Model?.BookingId</strong></span>
             </div>
         </div>
     </div>
 
     <!-- Complaint Details -->
-    <div class="kb-card mb-4">
+    <div class="kb-card">
         <div class="kb-card-header">
-            <i class="bi bi-flag me-2"></i>Nội dung báo cáo
+            <i class="bi bi-flag"></i>Nội dung báo cáo
         </div>
         <div class="kb-card-body">
-            <div class="row g-3 mb-3">
-                <div class="col-md-4">
+            <div class="kb-info-grid">
+                <div class="kb-info-item">
                     <div class="kb-label">Loại báo cáo</div>
-                    <div class="fw-semibold">@Model?.ComplaintType</div>
+                    <div class="kb-info-value">@complaintTypeVi</div>
                 </div>
-                <div class="col-md-4">
+                <div class="kb-info-item">
                     <div class="kb-label">Ngày tạo</div>
-                    <div class="text-muted">@Model?.CreatedAt?.ToString("dd/MM/yyyy HH:mm")</div>
+                    <div class="kb-info-value text-muted">@Model?.CreatedAt?.ToString("dd/MM/yyyy HH:mm")</div>
                 </div>
-                <div class="col-md-4">
+                <div class="kb-info-item">
                     <div class="kb-label">Trạng thái</div>
-                    <div class="fw-semibold">@statusText</div>
+                    <div class="kb-info-value">@statusText</div>
                 </div>
             </div>
-            <div class="row g-3">
-                <div class="col-12">
+            
+            <div class="kb-content-section">
+                <div class="kb-content-item">
                     <div class="kb-label">Tiêu đề</div>
-                    <div class="fw-semibold">@Model?.Title</div>
+                    <div class="kb-title-value">@Model?.Title</div>
                 </div>
-                <div class="col-12">
+                <div class="kb-content-item">
                     <div class="kb-label">Mô tả chi tiết</div>
-                    <div class="text-muted">@(!string.IsNullOrWhiteSpace(Model?.Description) ? Model!.Description : "—")</div>
+                    <div class="kb-description-value">@(!string.IsNullOrWhiteSpace(Model?.Description) ? Model!.Description : "—")</div>
                 </div>
             </div>
 
             @if (Model?.AttachmentUrls != null && Model.AttachmentUrls.Any())
             {
-                <div class="row g-3 mt-2">
-                    <div class="col-12">
-                        <div class="kb-label">Hình ảnh đính kèm</div>
-                        <div class="d-flex flex-wrap gap-2">
-                            @foreach (var url in Model.AttachmentUrls)
-                            {
-                                var fullImageUrl = GetFullImageUrl(url);
-                                <a href="@fullImageUrl" target="_blank" rel="noopener">
-                                    <img src="@fullImageUrl" class="img-thumbnail" style="width:100px;height:100px;object-fit:cover;" 
-                                         alt="Attachment"
-                                         onerror="this.onerror=null;this.src='/images/placeholder.png';" />
-                                </a>
-                            }
-                        </div>
+                <div class="kb-section">
+                    <div class="kb-label">Hình ảnh đính kèm</div>
+                    <div class="kb-image-gallery">
+                        @foreach (var url in Model.AttachmentUrls)
+                        {
+                            var fullImageUrl = GetFullImageUrl(url);
+                            <a href="@fullImageUrl" target="_blank" rel="noopener" class="kb-image-link">
+                                <img src="@fullImageUrl" class="kb-image-thumb" 
+                                     alt="Hình ảnh đính kèm"
+                                     onerror="this.onerror=null;this.src='/images/placeholder.png';" />
+                            </a>
+                        }
                     </div>
                 </div>
             }
 
             @if (!string.IsNullOrWhiteSpace(Model?.ResolutionNote))
             {
-                <div class="row g-3 mt-3">
-                    <div class="col-12">
-                        <div class="kb-label">Ghi chú xử lý</div>
-                        <div class="alert alert-info mb-0">
-                            <i class="bi bi-info-circle me-2"></i>@Model.ResolutionNote
-                        </div>
+                <div class="kb-section">
+                    <div class="kb-label">Ghi chú xử lý</div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <span>@Model.ResolutionNote</span>
                     </div>
                 </div>
             }
         </div>
     </div>
 
-    <!-- Actions -->
-    @if (Model?.Status == "Pending" || Model?.Status == "InReview")
+    @* ✅ Hiển thị thông tin hoàn tiền khi là báo cáo hoàn tiền *@
+    @{
+        var isRefundReport = Model != null && (
+            Model.ComplaintType == "RefundRequest" || 
+            Model.ComplaintType == "Yêu cầu hoàn tiền" ||
+            Model.ReportType.ToString() == "RefundRequest" ||
+            Model.Description?.Contains("hoàn tiền", StringComparison.OrdinalIgnoreCase) == true ||
+            Model.Title?.Contains("hoàn tiền", StringComparison.OrdinalIgnoreCase) == true
+        );
+    }
+    @if (isRefundReport)
     {
+        <!-- Thông tin hủy & hoàn tiền -->
         <div class="kb-card">
-            <div class="kb-card-body d-flex flex-wrap gap-2 justify-content-end">
-                <a asp-area="Customer"
-                   asp-controller="BookingService"
-                   asp-action="ListHistoryBooking"
-                   class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left me-1"></i>Quay lại danh sách
-                </a>
+            <div class="kb-card-header">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" class="kb-icon">
+                    <path d="M3 4.5a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5zm8-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5z"/>
+                </svg>
+                <span>Thông tin hủy & hoàn tiền</span>
+            </div>
+            <div class="kb-card-body">
+                <!-- Lý do hủy -->
+                @if (!string.IsNullOrWhiteSpace(Model?.CancelReason))
+                {
+                    <div class="kb-cancel-reason-section">
+                        <div class="kb-cancel-reason-label">LÝ DO HỦY</div>
+                        <div class="kb-cancel-reason-value">
+                            @Model.CancelReason
+                        </div>
+                    </div>
+                }
+
+                <!-- Trạng thái hoàn tiền -->
+                @if (!string.IsNullOrWhiteSpace(Model?.RefundStatus) && 
+                     !Model.RefundStatus.Equals("NoRefund", StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="kb-refund-status-section" style="margin-top: 20px;">
+                        <div class="kb-cancel-reason-label">TRẠNG THÁI HOÀN TIỀN</div>
+                        <div style="margin-top: 8px;">
+                            @{
+                                var refundStatus = Model.RefundStatus;
+                                var refundStatusText = "";
+                                var refundStatusClass = "";
+                                var refundStatusIcon = "";
+                                
+                                if (refundStatus.Equals("Approved", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    refundStatusText = "Đã duyệt hoàn tiền";
+                                    refundStatusClass = "kb-refund-status-approved";
+                                    refundStatusIcon = "bi-check-circle-fill";
+                                }
+                                else if (refundStatus.Equals("Rejected", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    refundStatusText = "Đã từ chối hoàn tiền";
+                                    refundStatusClass = "kb-refund-status-rejected";
+                                    refundStatusIcon = "bi-x-circle-fill";
+                                }
+                                else if (refundStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    refundStatusText = "Đang chờ xử lý";
+                                    refundStatusClass = "kb-refund-status-pending";
+                                    refundStatusIcon = "bi-clock-fill";
+                                }
+                                else
+                                {
+                                    refundStatusText = refundStatus;
+                                    refundStatusClass = "kb-refund-status-pending";
+                                    refundStatusIcon = "bi-info-circle-fill";
+                                }
+                            }
+                            <div class="kb-refund-status-badge @refundStatusClass">
+                                <i class="bi @refundStatusIcon"></i>
+                                <span>@refundStatusText</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(Model?.ResolutionNote))
+                            {
+                                <div class="kb-resolution-note" style="margin-top: 12px; padding: 12px; background-color: var(--muted, #f5f5f5); border-radius: 6px; border-left: 3px solid var(--primary, #007bff);">
+                                    <div style="font-weight: 600; margin-bottom: 6px; color: var(--foreground, #333);">Ghi chú từ quản trị viên:</div>
+                                    <div style="color: var(--foreground, #555); white-space: pre-wrap;">@Model.ResolutionNote</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                
+                <!-- Thông tin ngân hàng hoàn tiền -->
+                @{
+                    var hasValidRefund = !string.IsNullOrWhiteSpace(Model?.RefundStatus) && 
+                                         !Model.RefundStatus.Equals("NoRefund", StringComparison.OrdinalIgnoreCase);
+                    var hasValidBankInfo = !string.IsNullOrWhiteSpace(Model?.BankAccountNumber) && 
+                                           !Model.BankAccountNumber.Equals("N/A", StringComparison.OrdinalIgnoreCase);
+                }
+                @if (hasValidRefund && hasValidBankInfo)
+                {
+                    <div class="kb-bank-info" style="margin-top: 20px;">
+                        <div class="kb-bank-info-header">
+                            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" class="kb-icon">
+                                <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1H2zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z"/>
+                                <path d="M2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1zm6 0a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-1z"/>
+                            </svg>
+                            <strong>Thông tin ngân hàng:</strong>
+                        </div>
+                        <div class="kb-bank-info-details">
+                            <div class="kb-bank-info-row">
+                                <span class="kb-bank-info-label">STK:</span>
+                                <span class="kb-bank-info-value">@Model.BankAccountNumber</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(Model?.BankName) && !Model.BankName.Equals("N/A", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <div class="kb-bank-info-row">
+                                    <span class="kb-bank-info-label">Ngân hàng:</span>
+                                    <span class="kb-bank-info-value">@Model.BankName</span>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(Model?.AccountHolderName) && !Model.AccountHolderName.Equals("N/A", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <div class="kb-bank-info-row">
+                                    <span class="kb-bank-info-label">Chủ tài khoản:</span>
+                                    <span class="kb-bank-info-value kb-value-uppercase">@Model.AccountHolderName</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                
+                <div class="kb-alert kb-alert-warning" style="margin-top: 20px;">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" class="kb-alert-icon">
+                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                    </svg>
+                    <div class="kb-alert-content">
+                        Nếu đã thanh toán, khoản hoàn sẽ được xử lý theo quy trình của hệ thống/nhà cung cấp.
+                        Vui lòng theo dõi thông báo để biết thời gian hoàn chính xác.
+                    </div>
+                </div>
             </div>
         </div>
     }
-    else
+
+    @if (Model?.Status != "Pending" && Model?.Status != "InReview")
     {
         <div class="kb-card">
             <div class="kb-card-body">
-                <div class="alert alert-info mb-0">
-                    <i class="bi bi-info-circle me-2"></i>
-                    Báo cáo này đã được xử lý. Nếu bạn có thắc mắc, vui lòng liên hệ bộ phận hỗ trợ.
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <span>Báo cáo này đã được xử lý. Nếu bạn có thắc mắc, vui lòng liên hệ bộ phận hỗ trợ.</span>
                 </div>
             </div>
         </div>

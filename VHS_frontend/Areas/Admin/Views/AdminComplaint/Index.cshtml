@@ -3,17 +3,73 @@
     ViewData["Title"] = "Quản lý Khiếu nại";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
     
-    // Helper function để chuyển ComplaintType sang tiếng Việt
-    string GetComplaintTypeVi(string? type)
+    // Helper function để chuyển ComplaintType sang tiếng Việt (đồng bộ với ReportService.cs)
+    // Nếu là "Other" nhưng có thông tin ngân hàng trong description, tự động detect là RefundRequest
+    string GetComplaintTypeVi(string? type, string? description = null)
     {
+        // Tự động detect refund request từ description nếu ComplaintType là "Other"
+        if (type == "Other" && !string.IsNullOrWhiteSpace(description))
+        {
+            var descLower = description.ToLower();
+            if (descLower.Contains("--- thông tin ngân hàng để hoàn tiền ---") ||
+                descLower.Contains("thông tin ngân hàng") && 
+                (descLower.Contains("hoàn tiền") || descLower.Contains("refund") || 
+                 descLower.Contains("tên ngân hàng") || descLower.Contains("số tài khoản")))
+            {
+                return "Yêu cầu hoàn tiền";
+            }
+        }
+        
         return type switch
         {
             "ServiceQuality" => "Chất lượng dịch vụ",
             "ProviderBehavior" => "Hành vi nhà cung cấp",
+            "ProviderMisconduct" => "Hành vi sai trái của provider",
+            "StaffMisconduct" => "Hành vi sai trái của nhân viên",
             "PriceIssue" => "Vấn đề giá",
+            "Dispute" => "Tranh chấp",
+            "TechnicalIssue" => "Vấn đề kỹ thuật",
+            "RefundRequest" => "Yêu cầu hoàn tiền",
             "Delay" => "Trễ hẹn",
+            "Booking" => "Vấn đề đơn hàng", // ✅ Chuyển "Booking" sang tiếng Việt
             "Other" => "Khác",
             _ => type ?? "Khác"
+        };
+    }
+    
+    // Helper function để loại bỏ thông tin ngân hàng khỏi description khi hiển thị
+    string RemoveBankInfoFromDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return description ?? string.Empty;
+        
+        // Tìm và loại bỏ phần thông tin ngân hàng
+        var bankInfoMarker = "--- THÔNG TIN NGÂN HÀNG ĐỂ HOÀN TIỀN ---";
+        var index = description.IndexOf(bankInfoMarker, StringComparison.OrdinalIgnoreCase);
+        
+        if (index >= 0)
+        {
+            // Lấy phần trước marker
+            var beforeBankInfo = description.Substring(0, index).TrimEnd();
+            return beforeBankInfo;
+        }
+        
+        return description;
+    }
+    
+    // ✅ Helper function để chuyển Complaint Status sang tiếng Việt
+    string GetComplaintStatusVi(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return "Không xác định";
+        
+        return status switch
+        {
+            "Pending" => "Chờ xử lý",
+            "InReview" => "Đang xem xét",
+            "Resolved" => "Đã giải quyết",
+            "Rejected" => "Đã từ chối",
+            _ => status
         };
     }
 }
@@ -83,7 +139,12 @@
                                 <option value="">Tất cả</option>
                                 <option value="ServiceQuality" selected="@(ViewBag.Filter?.Type == "ServiceQuality")">Chất lượng dịch vụ</option>
                                 <option value="ProviderBehavior" selected="@(ViewBag.Filter?.Type == "ProviderBehavior")">Hành vi nhà cung cấp</option>
+                                <option value="ProviderMisconduct" selected="@(ViewBag.Filter?.Type == "ProviderMisconduct")">Hành vi sai trái của provider</option>
+                                <option value="StaffMisconduct" selected="@(ViewBag.Filter?.Type == "StaffMisconduct")">Hành vi sai trái của nhân viên</option>
                                 <option value="PriceIssue" selected="@(ViewBag.Filter?.Type == "PriceIssue")">Vấn đề giá</option>
+                                <option value="Dispute" selected="@(ViewBag.Filter?.Type == "Dispute")">Tranh chấp</option>
+                                <option value="TechnicalIssue" selected="@(ViewBag.Filter?.Type == "TechnicalIssue")">Vấn đề kỹ thuật</option>
+                                <option value="RefundRequest" selected="@(ViewBag.Filter?.Type == "RefundRequest")">Yêu cầu hoàn tiền</option>
                                 <option value="Delay" selected="@(ViewBag.Filter?.Type == "Delay")">Trễ hẹn</option>
                                 <option value="Other" selected="@(ViewBag.Filter?.Type == "Other")">Khác</option>
                             </select>
@@ -179,7 +240,7 @@
                                             </div>
                                             <div class="complaint-date">
                                                 <i class="bi bi-calendar3 me-1"></i>
-                                                <small>@(complaint.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</small>
+                                                <small>@(complaint.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "Không có")</small>
                                             </div>
                                         </div>
                                         <div class="complaint-header-right">
@@ -207,7 +268,7 @@
                                                         </span>
                                                         break;
                                                     default:
-                                                        <span class="badge bg-secondary">@complaint.Status</span>
+                                                        <span class="badge bg-secondary">@GetComplaintStatusVi(complaint.Status)</span>
                                                         break;
                                                 }
                                             </div>
@@ -221,13 +282,24 @@
                                     <div class="complaint-content">
                                         <div class="complaint-title">
                                             <h5 class="mb-1">@complaint.Title</h5>
-                                            <span class="badge bg-info">@GetComplaintTypeVi(complaint.ComplaintType)</span>
+                                            <span class="badge bg-info">@GetComplaintTypeVi(complaint.ComplaintType, complaint.Description)</span>
                                         </div>
                                         
                                         @if (!string.IsNullOrEmpty(complaint.Description))
                                         {
                                             <div class="complaint-description">
-                                                <p class="text-muted mb-2" title="@complaint.Description">@complaint.Description</p>
+                                                @{
+                                                    // Loại bỏ thông tin ngân hàng khỏi description
+                                                    var descriptionWithoutBankInfo = RemoveBankInfoFromDescription(complaint.Description);
+                                                    var maxLength = 200;
+                                                    var displayDescription = descriptionWithoutBankInfo.Length > maxLength 
+                                                        ? descriptionWithoutBankInfo.Substring(0, maxLength) + "..." 
+                                                        : descriptionWithoutBankInfo;
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(displayDescription))
+                                                {
+                                                    <p class="text-muted mb-2" title="@descriptionWithoutBankInfo">@displayDescription</p>
+                                                }
                                             </div>
                                         }
 
@@ -360,15 +432,15 @@
 
 @section Scripts {
     <script>
-        // Auto refresh every 60 seconds
+        // Tự động làm mới mỗi 60 giây
         setInterval(() => {
             location.reload();
         }, 60000);
 
-        // Highlight filter inputs
+        // Làm nổi bật các input filter
         document.querySelectorAll('.filter-select, .filter-input').forEach(input => {
             input.addEventListener('change', function() {
-                // Border color will be handled by CSS focus state
+                // Màu viền sẽ được xử lý bởi CSS focus state
             });
         });
     </script>

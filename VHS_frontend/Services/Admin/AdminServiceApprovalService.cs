@@ -106,7 +106,7 @@ namespace VHS_frontend.Services.Admin
         }
 
         public class TagDTO { public Guid TagId { get; set; } public string Name { get; set; } = string.Empty; }
-        public class OptionDTO { public Guid OptionId { get; set; } public string OptionName { get; set; } = string.Empty; public string? Description { get; set; } public decimal Price { get; set; } public string UnitType { get; set; } = string.Empty; }
+        public class OptionDTO { public Guid OptionId { get; set; } public string OptionName { get; set; } = string.Empty; public Guid? TagId { get; set; } public string Type { get; set; } = string.Empty; public Guid? Family { get; set; } public string? Value { get; set; } }
 
         public async Task<List<PendingServiceItem>?> GetPendingAsync(string? token = null, CancellationToken ct = default)
         {

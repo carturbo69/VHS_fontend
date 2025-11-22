@@ -34,6 +34,25 @@
         }
         return images;
     }
+
+    // Hàm chuyển đổi UnitType sang tiếng Việt
+    string GetUnitTypeVietnamese(string? unitType)
+    {
+        if (string.IsNullOrEmpty(unitType)) return unitType ?? "";
+        return unitType switch
+        {
+            "Hour" => "Giờ",
+            "Day" => "Ngày",
+            "Visit" => "Lần",
+            "Apartment" => "Căn",
+            "Room" => "Phòng",
+            "SquareMeter" => "Mét vuông (m²)",
+            "Person" => "Người",
+            "Package" => "Gói",
+            "Event" => "Sự kiện",
+            _ => unitType
+        };
+    }
 }
 
 <section class="services-hero-section">
@@ -245,35 +264,60 @@
                         <div class="card-content">
                             <h3 class="card-title">@service.Title</h3>
 
-                            @if (!string.IsNullOrWhiteSpace(service.Description))
+                            @* Hiển thị tùy chọn giống ServiceShop *@
+                            @if (service.ServiceOptions != null && service.ServiceOptions.Any())
                             {
-                                <p class="card-description">@service.Description</p>
+                                <div class="card-options">
+                                    @foreach (var opt in service.ServiceOptions.Take(3))
+                                    {
+                                        var isTextarea = opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text";
+                                        <div class="card-option-item @(isTextarea ? "option-item-textarea" : "")">
+                                            <span class="option-icon">✓</span>
+                                            <div class="option-content">
+                                                <span class="option-name">@opt.OptionName</span>
+                                                @if (!string.IsNullOrWhiteSpace(opt.Value) && isTextarea)
+                                                {
+                                                    <div class="option-value">@opt.Value</div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (service.ServiceOptions.Count > 3)
+                                    {
+                                        <div class="card-option-more">+@(service.ServiceOptions.Count - 3) khác</div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="card-no-options">Chưa có tùy chọn</div>
                             }
 
+                            @* Meta info riêng biệt *@
                             @if (service.BaseUnit.HasValue && !string.IsNullOrWhiteSpace(service.UnitType))
                             {
-                                <div class="card-meta">
+                                <div class="card-meta-info">
                                     <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <circle cx="12" cy="12" r="10" stroke-width="2"/>
                                         <path d="M12 6V12L16 14" stroke-width="2" stroke-linecap="round"/>
                                     </svg>
-                                    <span>@service.BaseUnit @service.UnitType</span>
+                                    <span>@service.BaseUnit @GetUnitTypeVietnamese(service.UnitType)</span>
                                 </div>
                             }
                             else if (!string.IsNullOrWhiteSpace(service.UnitType))
                             {
-                                <div class="card-meta">
+                                <div class="card-meta-info">
                                     <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <circle cx="12" cy="12" r="10" stroke-width="2"/>
                                         <path d="M12 6V12L16 14" stroke-width="2" stroke-linecap="round"/>
                                     </svg>
-                                    <span>@service.UnitType</span>
+                                    <span>@GetUnitTypeVietnamese(service.UnitType)</span>
                                 </div>
-                            }
+                            } 
 
                             <div class="card-footer">
                                 <div class="price-section">
-                                    <span class="price-label">Chỉ từ</span>
+                                    <span class="price-label">Giá chỉ</span>
                                     <span class="price-value">@priceDisplay</span>
                                 </div>
 
@@ -314,6 +358,17 @@
                                     </div>
                                     <span class="rating-text">@avg.ToString("0.#") <span class="reviews-count">(@service.TotalReviews)</span></span>
                                 </div>
+                                
+                                @if (!string.IsNullOrWhiteSpace(service.ProviderName))
+                                {
+                                    <div class="provider-section">
+                                        <svg class="provider-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke-width="2" stroke-linecap="round"/>
+                                            <circle cx="12" cy="7" r="4" stroke-width="2"/>
+                                        </svg>
+                                        <span class="provider-name">@service.ProviderName</span>
+                                    </div>
+                                }
                             </div>
                         </div>
                     </a>

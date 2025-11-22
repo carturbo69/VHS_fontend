@@ -40,6 +40,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         // GET: Provider/Order/Index
+        [ResponseCache(NoStore = true, Duration = 0)] // Đảm bảo không cache
         public async Task<IActionResult> Index(
             string? status,
             DateTime? fromDate,
@@ -312,6 +313,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         // GET: Provider/Order/Details/5
+        [ResponseCache(NoStore = true, Duration = 0)] // Đảm bảo không cache để đồng bộ với admin
         public async Task<IActionResult> Details(Guid id)
         {
             Console.WriteLine($"[DEBUG] Details called with BookingId: {id}");
@@ -409,6 +411,26 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
         }
 
+        // POST: Provider/Order/AutoCancel
+        [HttpPost]
+        public async Task<IActionResult> AutoCancel([FromBody] AutoCancelRequest request)
+        {
+            try
+            {
+                var success = await _bookingService.AutoCancelBookingAsync(request.BookingId, request.IsPendingExpired);
+                
+                if (success)
+                {
+                    return Json(new { success = true, message = "Đơn hàng đã được hủy tự động" });
+                }
+                return Json(new { success = false, message = "Không thể hủy đơn hàng" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
         // POST: Provider/Order/AssignStaff
         [HttpPost]
         public async Task<IActionResult> AssignStaff([FromBody] AssignStaffRequest request)
@@ -469,6 +491,12 @@ namespace VHS_frontend.Areas.Provider.Controllers
     {
         public Guid BookingId { get; set; }
         public Guid StaffId { get; set; }
+    }
+
+    public class AutoCancelRequest
+    {
+        public Guid BookingId { get; set; }
+        public bool IsPendingExpired { get; set; }
     }
 }
 

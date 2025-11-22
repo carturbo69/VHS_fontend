@@ -8,22 +8,22 @@ namespace VHS_frontend.Models.Account
 {
     public class RegisterDTO
     {
-        [Required(ErrorMessage = "Vui l�ng nh?p t�n ??ng nh?p")]
-        [MinLength(3, ErrorMessage = "T�n ??ng nh?p t?i thi?u 3 k� t?")]
+        [Required(ErrorMessage = "Vui lòng nhập tên đăng nhập")]
+        [MinLength(3, ErrorMessage = "Tên đăng nhập tối thiểu 3 ký tự")]
         public string Username { get; set; }
 
-        [Required(ErrorMessage = "Vui l�ng nh?p email")]
-        [EmailAddress(ErrorMessage = "Email kh�ng h?p l?")]
+        [Required(ErrorMessage = "Vui lòng nhập email")]
+        [EmailAddress(ErrorMessage = "Email không hợp lệ")]
         public string Email { get; set; }
 
-        [Required(ErrorMessage = "Vui l�ng nh?p m?t kh?u")]
-        [MinLength(6, ErrorMessage = "M?t kh?u t?i thi?u 6 k� t?")]
+        [Required(ErrorMessage = "Vui lòng nhập mật khẩu")]
+        [MinLength(6, ErrorMessage = "Mật khẩu tối thiểu 6 ký tự")]
         [DataType(DataType.Password)]
         public string Password { get; set; }
 
-        [Required(ErrorMessage = "Vui l�ng x�c nh?n m?t kh?u")]
+        [Required(ErrorMessage = "Vui lòng xác nhận mật khẩu")]
         [DataType(DataType.Password)]
-        [Compare(nameof(Password), ErrorMessage = "M?t kh?u x�c nh?n kh�ng kh?p")]
+        [Compare(nameof(Password), ErrorMessage = "Mật khẩu xác nhận không khớp")]
         public string ConfirmPassword { get; set; }
     }
 }

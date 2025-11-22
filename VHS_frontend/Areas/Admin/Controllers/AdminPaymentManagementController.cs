@@ -87,7 +87,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
             if (string.IsNullOrEmpty(accountId) || !string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase))
             {
-                return Json(new { success = false, message = "Unauthorized" });
+                return Json(new { Success = false, success = false, Message = "Unauthorized", message = "Unauthorized" });
             }
 
             var token = HttpContext.Session.GetString("JWToken");
@@ -97,11 +97,23 @@ namespace VHS_frontend.Areas.Admin.Controllers
             try
             {
                 var result = await _paymentService.ApproveRefundForUnconfirmedBookingAsync(request.BookingId, request.AdminNote);
-                return Json(new { success = result, message = result ? "Hoàn tiền thành công" : "Có lỗi xảy ra" });
+                if (result)
+                {
+                    // Trả về cả Success (uppercase) và success (lowercase) để đảm bảo tương thích
+                    return Json(new { Success = true, success = true, Message = "Phê duyệt hoàn tiền thành công", message = "Phê duyệt hoàn tiền thành công" });
+                }
+                else
+                {
+                    return Json(new { Success = false, success = false, Message = "Không thể phê duyệt hoàn tiền. Vui lòng thử lại.", message = "Không thể phê duyệt hoàn tiền. Vui lòng thử lại." });
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                return Json(new { Success = false, success = false, Message = ex.Message, message = ex.Message });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = ex.Message });
+                return Json(new { Success = false, success = false, Message = "Đã xảy ra lỗi: " + ex.Message, message = "Đã xảy ra lỗi: " + ex.Message });
             }
         }
 
@@ -113,7 +125,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
             if (string.IsNullOrEmpty(accountId) || !string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase))
             {
-                return Json(new { success = false, message = "Unauthorized" });
+                return Json(new { Success = false, success = false, Message = "Unauthorized", message = "Unauthorized" });
             }
 
             var token = HttpContext.Session.GetString("JWToken");
@@ -123,11 +135,23 @@ namespace VHS_frontend.Areas.Admin.Controllers
             try
             {
                 var result = await _paymentService.RejectRefundForUnconfirmedBookingAsync(request.BookingId, request.AdminNote);
-                return Json(new { success = result, message = result ? "Từ chối hoàn tiền thành công" : "Có lỗi xảy ra" });
+                if (result)
+                {
+                    // Trả về cả Success (uppercase) và success (lowercase) để đảm bảo tương thích
+                    return Json(new { Success = true, success = true, Message = "Từ chối hoàn tiền thành công", message = "Từ chối hoàn tiền thành công" });
+                }
+                else
+                {
+                    return Json(new { Success = false, success = false, Message = "Không thể từ chối hoàn tiền. Vui lòng thử lại.", message = "Không thể từ chối hoàn tiền. Vui lòng thử lại." });
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                return Json(new { Success = false, success = false, Message = ex.Message, message = ex.Message });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = ex.Message });
+                return Json(new { Success = false, success = false, Message = "Đã xảy ra lỗi: " + ex.Message, message = "Đã xảy ra lỗi: " + ex.Message });
             }
         }
 

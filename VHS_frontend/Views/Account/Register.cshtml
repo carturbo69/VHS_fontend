@@ -15,6 +15,23 @@
 @section Styles {
     <link rel="stylesheet" href="~/css/auth-polish.css" />
     <link rel="stylesheet" href="~/css/otp-modal.css" asp-append-version="true" />
+    <style>
+        /* Đảm bảo validation messages hiển thị đúng font tiếng Việt */
+        .text-danger,
+        span[data-valmsg-for],
+        span.field-validation-error,
+        .validation-summary,
+        .validation-summary-errors,
+        [asp-validation-summary].text-danger,
+        .field-error,
+        .invalid-feedback {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Vietnamese", sans-serif !important;
+            font-weight: 500 !important;
+            line-height: 1.5 !important;
+            unicode-bidi: embed;
+            direction: ltr;
+        }
+    </style>
 }
 
 <section class="auth-wrap">
@@ -56,7 +73,7 @@
                     <a asp-controller="Account" asp-action="Login" class="link">Đăng nhập</a>
                 </p>
 
-                <form asp-controller="Account" asp-action="Register" method="post" class="form" novalidate data-reset-on-reload="true">
+                <form asp-controller="Account" asp-action="Register" method="post" class="form" novalidate data-reset-on-reload="true" onsubmit="this.setAttribute('data-submitted', 'true');">
                     @Html.AntiForgeryToken()
 
                     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -107,6 +124,9 @@
                             Tôi đồng ý với
                         </label>
                         <button type="button" id="btnTerms" class="link link-btn">Điều khoản</button>
+                    </div>
+                    <div id="termsError" class="text-danger" style="display: none; margin-top: 8px; font-size: 0.875rem; font-weight: 500; width: 100%;">
+                        Vui lòng đồng ý với Điều khoản và Chính sách bảo mật để tiếp tục đăng ký.
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-lg w-full btn-glow">Tạo tài khoản</button>
@@ -563,6 +583,12 @@
                     clearValidationMessages(form);
                 });
 
+                // Ẩn thông báo lỗi terms khi reload
+                const termsError = document.getElementById('termsError');
+                if (termsError) {
+                    termsError.style.display = 'none';
+                }
+
                 const authCard = document.querySelector('.auth-card');
                 if (authCard) authCard.classList.remove('has-error');
 
@@ -607,23 +633,42 @@
                 }
             }
 
+            // Thay đổi URL thành GET request để tránh thông báo "Resubmit the form?" khi reload
+            if (window.history && window.history.replaceState) {
+                // Chỉ thay đổi nếu đang ở POST request (có thể detect bằng cách kiểm tra form data)
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('submitted') || document.querySelector('form[method="post"]')?.hasAttribute('data-submitted')) {
+                    url.searchParams.delete('submitted');
+                    window.history.replaceState({}, '', url.toString());
+                }
+            }
+
             document.addEventListener('DOMContentLoaded', handleResetIfNeeded);
+            
+            // Clear form khi reload để tránh thông báo "Resubmit the form?"
+            window.addEventListener('beforeunload', function() {
+                // Đánh dấu form đã được submit để clear khi reload
+                const form = document.querySelector('form[method="post"]');
+                if (form) {
+                    form.setAttribute('data-submitted', 'true');
+                }
+            });
+            
             window.addEventListener('pageshow', function (event) {
                 // Clear form khi back/forward hoặc reload từ cache
                 if (event.persisted || event.type === 'pageshow') {
-                    const hasValidationErrors = document.querySelector('.validation-summary-errors')?.textContent.trim().length > 0 ||
-                                               Array.from(document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess)')).some(el => el.textContent.trim().length > 0);
-                    
+                    // Luôn clear form khi reload để tránh thông báo "Resubmit the form?"
                     const hasOtpModalToShow = document.getElementById('hiddenOtpEmail') !== null;
                     
-                    // Chỉ reset nếu không có lỗi validation và không có OTP modal cần hiển thị
-                    if (!hasValidationErrors && !hasOtpModalToShow) {
+                    if (!hasOtpModalToShow) {
+                        // Clear form hoàn toàn nếu không có OTP modal
                         resetForms();
-                    } else if (!hasValidationErrors && hasOtpModalToShow) {
+                    } else {
                         // Chỉ clear form fields, không reset OTP modal
                         const forms = document.querySelectorAll('form[data-reset-on-reload="true"]');
                         forms.forEach(form => {
                             form.reset();
+                            form.removeAttribute('data-submitted');
                             form.querySelectorAll('input, textarea, select').forEach(field => {
                                 if (field.type === 'hidden' || field.getAttribute('data-preserve') === 'true' || field.id === 'hiddenOtpEmail') {
                                     return;
@@ -638,8 +683,29 @@
                             clearValidationMessages(form);
                         });
                     }
+                    
+                    // Thay đổi URL để tránh resubmit warning
+                    if (window.history && window.history.replaceState) {
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('submitted');
+                        window.history.replaceState({}, '', url.toString());
+                    }
                 }
             });
+            
+            // Clear form ngay khi page load nếu là GET request (reload)
+            (function() {
+                const isPostRequest = '@requestMethod' === 'POST';
+                if (!isPostRequest) {
+                    // Nếu là GET request, clear form ngay lập tức
+                    setTimeout(function() {
+                        const hasOtpModalToShow = document.getElementById('hiddenOtpEmail') !== null;
+                        if (!hasOtpModalToShow) {
+                            resetForms();
+                        }
+                    }, 100);
+                }
+            })();
         })();
 
         // Smooth page transition khi chuyển trang
@@ -712,6 +778,12 @@
                   span.style.display = 'none';
                 }
               });
+              
+              // Ẩn thông báo lỗi terms
+              const termsError = document.getElementById('termsError');
+              if (termsError) {
+                termsError.style.display = 'none';
+              }
               
               // Nếu là GET request (reload), clear form và validation messages
               if (!isPostRequest) {
@@ -927,15 +999,33 @@
             // Validate terms checkbox on submit
             const form = document.querySelector('form[method="post"]');
             const agree = document.getElementById('agreeTermsReg');
+            const termsError = document.getElementById('termsError');
             form?.addEventListener('submit', function(e){
               if (!agree || !agree.checked) {
                 e.preventDefault();
-                alert('Vui lòng đồng ý với Điều khoản và Chính sách bảo mật để tiếp tục đăng ký.');
+                // Hiển thị thông báo lỗi inline thay vì alert
+                if (termsError) {
+                  termsError.style.display = 'block';
+                  // Scroll đến thông báo lỗi
+                  termsError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
                 agree?.focus();
                 return false;
+              } else {
+                // Ẩn thông báo lỗi nếu checkbox đã được chọn
+                if (termsError) {
+                  termsError.style.display = 'none';
+                }
               }
               // Xóa sessionStorage khi submit form để đảm bảo modal có thể mở sau khi submit thành công
               sessionStorage.removeItem('otpModalShown');
+            });
+            
+            // Ẩn thông báo lỗi khi user click vào checkbox
+            agree?.addEventListener('change', function() {
+              if (this.checked && termsError) {
+                termsError.style.display = 'none';
+              }
             });
 
             // Xử lý input OTP - tự động chuyển sang ô tiếp theo
@@ -1449,20 +1539,41 @@
 
     <script>
         function handleGoogleResponse(response) {
-            console.log("Google token:", response.credential);
+            console.log("Google token received:", response.credential ? "Token exists" : "Token is null");
+            
+            if (!response.credential) {
+                alert("Không nhận được token từ Google. Vui lòng thử lại.");
+                return;
+            }
+
             fetch('/Account/GoogleLogin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ idToken: response.credential })
             })
-                .then(res => res.json())
+                .then(async res => {
+                    console.log("Response status:", res.status);
+                    const contentType = res.headers.get("content-type");
+                    
+                    if (!contentType || !contentType.includes("application/json")) {
+                        const text = await res.text();
+                        console.error("Non-JSON response:", text);
+                        throw new Error("Phản hồi từ server không hợp lệ");
+                    }
+                    
+                    return res.json();
+                })
                 .then(data => {
-                    if (data.success) window.location.href = data.redirectUrl;
-                    else alert(data.message || "Đăng nhập Google thất bại");
+                    console.log("Response data:", data);
+                    if (data.success) {
+                        window.location.href = data.redirectUrl;
+                    } else {
+                        alert(data.message || "Đăng nhập Google thất bại");
+                    }
                 })
                 .catch(err => {
-                    console.error(err);
-                    alert("Có lỗi khi đăng nhập Google");
+                    console.error("Google login error:", err);
+                    alert("Có lỗi khi đăng nhập Google: " + (err.message || "Vui lòng thử lại sau"));
                 });
         }
     </script>

@@ -20,10 +20,20 @@ namespace VHS_frontend.Services.Customer
             var pay = new VnPayLibrary();
             var urlCallBack = _configuration["Vnpay:PaymentBackReturnUrl"];
 
+            // Làm tròn số tiền về số nguyên (VND không có phần thập phân)
+            var amountVnd = Math.Round(model.Amount, 0, MidpointRounding.AwayFromZero);
+
+            // Chuyển đổi từ VND sang xu (VNPay yêu cầu số tiền theo xu)
+            // Sử dụng long để tránh overflow và đảm bảo chính xác
+            var amountInXu = (long)amountVnd * 100;
+
+            // Debug log
+            System.Diagnostics.Debug.WriteLine($"[VNPay] Amount (VND): {amountVnd:N0}, Amount (Xu): {amountInXu:N0}");
+
             pay.AddRequestData("vnp_Version", _configuration["Vnpay:Version"] ?? "2.1.0");
             pay.AddRequestData("vnp_Command", _configuration["Vnpay:Command"] ?? "pay");
             pay.AddRequestData("vnp_TmnCode", _configuration["Vnpay:TmnCode"] ?? "");
-            pay.AddRequestData("vnp_Amount", ((int)model.Amount * 100).ToString());
+            pay.AddRequestData("vnp_Amount", amountInXu.ToString());
             pay.AddRequestData("vnp_CreateDate", timeNow.ToString("yyyyMMddHHmmss"));
             pay.AddRequestData("vnp_CurrCode", _configuration["Vnpay:CurrCode"] ?? "VND");
             pay.AddRequestData("vnp_IpAddr", pay.GetIpAddress(context));

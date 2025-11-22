@@ -1015,25 +1015,49 @@ html {
     flex: 1;
     background: var(--card);
     border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+    position: relative; /* ✅ Đảm bảo không bị fixed/sticky */
 }
 
 .card-title {
     font-size: 1.125rem;
     font-weight: 700;
-    color: var(--foreground);
+    color: var(--primary-600); /* ✅ Fallback màu solid */
+    background: linear-gradient(135deg, var(--primary-700), var(--primary-600), var(--primary-500));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     line-height: 1.5;
-    min-height: 3em;
+    /* min-height: 3em; */
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     transition: var(--transition-base);
-    margin-bottom: 4px;
+    /* margin-bottom: 4px; */
+}
+
+/* ✅ Fallback cho trình duyệt không hỗ trợ gradient text */
+@supports not (-webkit-background-clip: text) {
+    .card-title {
+        color: var(--primary-600);
+        background: none;
+    }
 }
 
 .service-card:hover .card-title {
-    color: var(--primary);
+    background: linear-gradient(135deg, var(--primary-700), var(--primary-600), var(--primary-500));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transform: scale(1.02);
+}
+
+@supports not (-webkit-background-clip: text) {
+    .service-card:hover .card-title {
+        color: var(--primary-500);
+        background: none;
+    }
 }
 
 .card-description {
@@ -1047,8 +1071,102 @@ html {
     overflow: hidden;
 }
 
-/* Meta Info */
-.card-meta {
+/* Options Section - Giống ServiceShop */
+.card-options {
+    margin: 8px 0 12px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+}
+
+.card-option-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: var(--foreground);
+    line-height: 1.5;
+}
+
+.card-option-item .option-icon {
+    color: #10b981;
+    font-weight: bold;
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 1rem;
+}
+
+.card-option-item .option-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 4px;
+    min-width: 0;
+}
+
+.card-option-item .option-name {
+    font-weight: 600;
+    color: var(--foreground);
+    flex-shrink: 0;
+}
+
+.card-option-item .option-value {
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Textarea options - multiline display */
+.card-option-item.option-item-textarea {
+    align-items: flex-start;
+}
+
+.card-option-item.option-item-textarea .option-content {
+    gap: 6px;
+}
+
+.card-option-item.option-item-textarea .option-value {
+    display: block;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    -webkit-box-orient: unset;
+    overflow: visible;
+    text-overflow: unset;
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    margin-top: 2px;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.card-option-more {
+    font-size: 0.8125rem;
+    color: var(--primary);
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.card-no-options {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    font-style: italic;
+    margin: 8px 0 12px 0;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Meta Info - riêng biệt */
+.card-meta-info {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -1060,7 +1178,99 @@ html {
     font-weight: 600;
     color: var(--foreground);
     width: fit-content;
+    margin: 8px 0 0 0;
+    flex-shrink: 0;
+}
+
+/* Options và Meta Section - Tất cả badges nằm cùng một flex container (giữ lại cho backward compatibility) */
+.card-options-meta {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px; /* ✅ Khoảng cách đều nhau giữa các badge */
+    margin: 8px 0;
+}
+
+.options-label {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px; /* ✅ Đồng nhất với các badge khác */
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    min-height: 32px; /* ✅ Đồng nhất chiều cao */
+    line-height: 1.4;
+}
+
+.options-label::before {
+    content: "✓";
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.option-badge {
+    display: inline-flex;
+    align-items: center; /* ✅ Căn giữa theo chiều dọc */
+    padding: 6px 12px; /* ✅ Đồng nhất với card-meta */
+    margin: 0; /* ✅ Đảm bảo không có margin mặc định */
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem; /* ✅ Đồng nhất với card-meta */
+    font-weight: 600;
+    color: var(--foreground);
     transition: var(--transition-base);
+    white-space: normal; /* ✅ Cho phép xuống dòng khi quá dài */
+    word-wrap: break-word; /* ✅ Tự động xuống dòng */
+    word-break: break-word; /* ✅ Ngắt từ khi cần */
+    max-width: 300px; /* ✅ Giới hạn độ rộng tối đa trước khi xuống dòng */
+    line-height: 1.4; /* ✅ Đồng nhất line-height */
+    height: fit-content; /* ✅ Chiều cao tự động */
+    min-height: 32px; /* ✅ Chiều cao tối thiểu đồng nhất */
+    flex-shrink: 0; /* ✅ Không cho phép co lại */
+    flex-grow: 0; /* ✅ Không tự động mở rộng */
+}
+
+.option-badge:hover {
+    background: var(--primary);
+    color: var(--white);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.option-more {
+    background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+    color: var(--white);
+    border-color: transparent;
+    font-weight: 700;
+}
+
+/* Meta Info */
+.card-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px; /* ✅ Đồng nhất với option-badge */
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem; /* ✅ Đồng nhất với option-badge */
+    font-weight: 600;
+    color: var(--foreground);
+    width: fit-content;
+    transition: var(--transition-base);
+    position: relative; /* ✅ Đảm bảo không bị fixed/sticky */
+    margin: 0; /* ✅ Bỏ margin vì đã có gap trong wrapper */
+    flex-shrink: 0; /* ✅ Không cho phép co lại */
+    flex-grow: 0; /* ✅ Không tự động mở rộng */
+    height: fit-content; /* ✅ Chiều cao tự động */
+    min-height: 32px; /* ✅ Chiều cao tối thiểu đồng nhất */
+    line-height: 1.4; /* ✅ Đồng nhất line-height */
 }
 
 .meta-icon {
@@ -1161,6 +1371,39 @@ html {
     color: var(--muted-foreground);
     font-weight: 600;
     font-size: 0.875rem;
+}
+
+/* Provider Section */
+.provider-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.provider-icon {
+    width: 18px;
+    height: 18px;
+    stroke: var(--muted-foreground);
+    stroke-width: 2;
+    flex-shrink: 0;
+}
+
+.provider-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    transition: var(--transition-base);
+}
+
+.service-card:hover .provider-name {
+    color: var(--primary-600);
+}
+
+.service-card:hover .provider-icon {
+    stroke: var(--primary-600);
 }
 
 /* ========== EMPTY STATE ========== */
@@ -1568,6 +1811,45 @@ html {
 
 .dark .service-card:hover .card-category-badge {
     background: var(--primary-gradient);
+}
+
+/* Card Options in dark mode */
+.dark .card-options {
+    color: var(--foreground);
+}
+
+.dark .card-option-item {
+    color: var(--foreground);
+}
+
+.dark .card-option-item .option-icon {
+    color: #10b981;
+}
+
+.dark .card-option-item .option-name {
+    color: var(--foreground);
+}
+
+.dark .card-option-item .option-value {
+    color: var(--muted-foreground);
+}
+
+.dark .card-option-item.option-item-textarea .option-value {
+    color: var(--muted-foreground);
+}
+
+.dark .card-option-more {
+    color: #60a5fa;
+}
+
+.dark .card-no-options {
+    color: var(--muted-foreground);
+}
+
+.dark .card-meta-info {
+    background: var(--muted);
+    border-color: var(--border);
+    color: var(--foreground);
 }
 
 /* ========== ACCESSIBILITY ========== */

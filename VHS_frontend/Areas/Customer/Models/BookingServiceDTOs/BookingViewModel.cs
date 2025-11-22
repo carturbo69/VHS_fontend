@@ -85,7 +85,10 @@ namespace VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
         // ✅ thêm: chỉ những OptionIds hiển thị trên trang này sẽ được post về
         public List<Guid> OptionIds { get; set; } = new();
 
-        public decimal OptionsTotal => Options?.Sum(o => o.Price) ?? 0m;
+        // ✅ thêm: OptionValues để lưu giá trị textarea user đã nhập
+        public Dictionary<Guid, string>? OptionValues { get; set; }
+
+        public decimal OptionsTotal => 0m; // Options no longer have Price
 
         public decimal LineTotal => UnitPrice + OptionsTotal;
     }
@@ -94,9 +97,10 @@ namespace VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
     {
         public Guid OptionId { get; set; } = Guid.NewGuid();
         public string Name { get; set; } = string.Empty;
-        public string? Unit { get; set; }
-        public string? Description { get; set; }
-        public decimal Price { get; set; }
+        public Guid? TagId { get; set; }
+        public string Type { get; set; } = string.Empty; // enum: checkbox, radio, text, optional, etc.
+        public Guid? Family { get; set; } // For radio buttons: if one is selected, others are hidden
+        public string? Value { get; set; } // Stores the value if any
     }
 
     public class PaymentMethod

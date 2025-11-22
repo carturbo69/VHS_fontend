@@ -23,7 +23,8 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
         public string Address { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
-        public string? CancelReason { get; set; }  // ✨ Lý do hủy đơn
+        public DateTime? ConfirmedAt { get; set; }  // Thời gian xác nhận đơn hàng
+        public string? CancelReason { get; set; }  // Lý do hủy đơn
 
         // Address Details từ UserAddresses
         public Guid? AddressId { get; set; }
@@ -56,14 +57,19 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
 
         // Checker Records
         public List<BookingCheckerDTO> CheckerRecords { get; set; } = new();
+
+        // Auto Cancel Info
+        public int? AutoCancelMinutes { get; set; } // Thời gian tự động hủy riêng cho booking này (phút)
     }
 
     public class BookingOptionDetailDTO
     {
         public Guid OptionId { get; set; }
         public string OptionName { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public decimal Price { get; set; }
+        public Guid? TagId { get; set; }
+        public string Type { get; set; } = string.Empty; // enum: checkbox, radio, text, optional, etc.
+        public Guid? Family { get; set; } // For radio buttons: if one is selected, others are hidden
+        public string? Value { get; set; } // Stores the value if any
     }
 
     public class BookingCheckerDTO

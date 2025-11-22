@@ -3,7 +3,7 @@
     public class PlaceOrderItemOptionDto
     {
         public Guid OptionId { get; set; }
-        public decimal Price { get; set; }
+        public string? Value { get; set; } // Stores the value for the option (text input, selected value, etc.)
     }
 
     public class PlaceOrderItemDto

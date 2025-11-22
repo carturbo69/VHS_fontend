@@ -72,11 +72,37 @@
                         <small class="form-text text-muted small">Danh mục không thể thay đổi sau khi tạo.</small>
                     </div>
 
-                    <!-- Title -->
+                    <!-- Tag Selection -->
                     <div class="col-md-6">
-                        <label asp-for="Title" class="form-label">Tên dịch vụ <span class="text-danger">*</span></label>
-                        <input asp-for="Title" class="form-control" placeholder="VD: Dọn dẹp nhà ở" required />
-                        <span asp-validation-for="Title" class="text-danger small"></span>
+                        <label class="form-label">Tag <span class="text-danger">*</span></label>
+                        <!-- Selected Tag Display (hiển thị trong khung giống category) -->
+                        <div id="selectedTagDisplay" class="@(Model.TagIds.Any() ? "" : "d-none")">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="selectedTagName" value="@(tags.FirstOrDefault(t => Model.TagIds.Contains(t.TagId))?.Name ?? "")" readonly />
+                                <button type="button" class="btn btn-outline-secondary" id="removeSelectedTagBtn" title="Xóa tag">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <select class="form-select @(Model.TagIds.Any() ? "d-none" : "")" id="tagSelect" required>
+                            <option value="">-- Chọn tag --</option>
+                        </select>
+                        <small class="form-text text-muted small">Chọn tag để xem các tùy chọn</small>
+                        <input type="hidden" name="TagIds" id="selectedTagId" value="@(Model.TagIds.FirstOrDefault().ToString() ?? "")" />
+                    </div>
+                </div>
+
+                <!-- Title - Hidden, tự động lấy từ tag -->
+                <input type="hidden" asp-for="Title" id="titleInput" />
+
+                <!-- Options Section (Options hiển thị ở dưới) -->
+                <div class="mt-3" id="selectedOptionsSection" style="display: @(Model.OptionIds.Any() ? "block" : "none");">
+                    <label class="form-label fw-bold section-label">
+                        <i class="bi bi-list-check me-2"></i>
+                        Tùy chọn
+                    </label>
+                    <div id="selectedOptionsContainer" class="p-3 border rounded">
+                        <!-- Tất cả options của các tags đã chọn sẽ hiển thị ở đây -->
                     </div>
                 </div>
 
@@ -199,104 +225,6 @@
                     </div>
                 </div>
 
-                <!-- Tags Section -->
-                <div class="mt-3">
-                    <label class="form-label fw-bold section-label">
-                        <i class="bi bi-tags me-2"></i>
-                        Tags (Từ khóa)
-                    </label>
-                    <div id="tagsContainer" class="tags-options-container">
-                        @if (tags.Any())
-                        {
-                            <div class="row tags-options-row">
-                                @foreach (var tag in tags)
-                                {
-                                    var isChecked = Model.TagIds.Contains(tag.TagId);
-                                    <div class="col-12 col-sm-6 col-md-6">
-                                        <div class="tag-option-item">
-                                            <input class="form-check-input" type="checkbox" name="TagIds" value="@tag.TagId" id="tag_@tag.TagId" @(isChecked ? "checked" : "") />
-                                            <label class="form-check-label" for="tag_@tag.TagId">
-                                                @tag.Name
-                                            </label>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <p class="text-muted mb-0 small">
-                                <i class="bi bi-info-circle me-1"></i>
-                                Không có tags nào cho danh mục này.
-                            </p>
-                        }
-                    </div>
-                </div>
-
-                <!-- Options Section -->
-                <div class="mt-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <label class="form-label fw-bold section-label mb-0">
-                            <i class="bi bi-list-check me-2"></i>
-                            Options (Lựa chọn bổ sung)
-                        </label>
-                        <button type="button" class="btn btn-success btn-sm btn-create-option" data-bs-toggle="modal" data-bs-target="#createOptionModalEdit">
-                            <i class="bi bi-plus-circle me-1"></i>
-                            Tạo Option
-                        </button>
-                    </div>
-                    <div id="optionsContainer" class="tags-options-container">
-                        @if (options.Any())
-                        {
-                            <div class="row tags-options-row">
-                                @foreach (var option in options)
-                                {
-                                    var isChecked = Model.OptionIds.Contains(option.OptionId);
-                                    <div class="col-12 col-sm-6 col-md-6">
-                                        <div class="tag-option-item">
-                                            <input class="form-check-input" type="checkbox" name="OptionIds" value="@option.OptionId" id="option_@option.OptionId" @(isChecked ? "checked" : "") />
-                                            <label class="form-check-label" for="option_@option.OptionId">
-                                                @option.OptionName
-                                                @{
-                                                    var unitTypeVietnamese = "";
-                                                    switch (option.UnitType)
-                                                    {
-                                                        case "Hour": unitTypeVietnamese = "Giờ"; break;
-                                                        case "Day": unitTypeVietnamese = "Ngày"; break;
-                                                        case "Visit": unitTypeVietnamese = "Lần"; break;
-                                                        case "Apartment": unitTypeVietnamese = "Căn"; break;
-                                                        case "Room": unitTypeVietnamese = "Phòng"; break;
-                                                        case "SquareMeter": unitTypeVietnamese = "Mét vuông (m²)"; break;
-                                                        case "Person": unitTypeVietnamese = "Người"; break;
-                                                        case "Package": unitTypeVietnamese = "Gói"; break;
-                                                        case "Event": unitTypeVietnamese = "Sự kiện"; break;
-                                                    }
-                                                }
-                                                @if (!string.IsNullOrEmpty(option.Description) || option.Price > 0)
-                                                {
-                                                    <small>
-                                                        @(!string.IsNullOrEmpty(option.Description) ? option.Description : "")
-                                                        @(option.Price > 0 ? (!string.IsNullOrEmpty(option.Description) ? " - " : "") + option.Price.ToString("N0") + " VNĐ/" + unitTypeVietnamese : "")
-                                                    </small>
-                                                }
-                                            </label>
-                                            <button type="button" class="remove-option-btn" data-option-id="@option.OptionId" data-option-name="@option.OptionName" title="Xóa option khỏi danh sách">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <p class="text-muted mb-0 small">
-                                <i class="bi bi-info-circle me-1"></i>
-                                Chưa có option nào.
-                            </p>
-                        }
-                    </div>
-                </div>
 
                 <div class="d-flex justify-content-center gap-2 mt-4 pt-3 border-top">
                     <a asp-action="Index" class="btn btn-secondary">
@@ -476,276 +404,617 @@
             }
         }
 
-        function clearAllModalErrorsEdit() {
-            hideFieldErrorEdit('optionNameEdit', 'optionNameEditError');
-            hideFieldErrorEdit('optionPriceEdit', 'optionPriceEditError');
-            hideFieldErrorEdit('optionUnitTypeEdit', 'optionUnitTypeEditError');
-        }
-
-        // Function to convert UnitType from English to Vietnamese
-        function getUnitTypeVietnamese(unitType) {
-            const unitMap = {
-                'Hour': 'Giờ',
-                'Day': 'Ngày',
-                'Visit': 'Lần',
-                'Apartment': 'Căn',
-                'Room': 'Phòng',
-                'SquareMeter': 'Mét vuông (m²)',
-                'Person': 'Người',
-                'Package': 'Gói',
-                'Event': 'Sự kiện'
+        // Function to get Vietnamese label for option type
+        function getTypeLabel(type) {
+            const typeMap = {
+                'checkbox': 'Chọn nhiều',
+                'radio': 'Chọn một',
+                'textarea': 'Nhập văn bản'
             };
-            return unitMap[unitType] || unitType;
+            return typeMap[type?.toLowerCase()] || type || 'Chưa xác định';
         }
 
-        // Notification function - hiển thị ở giữa màn hình
-        function showNotification(message, type) {
-            const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
-            const iconClass = type === 'success' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill';
-            
-            // Xóa thông báo cũ nếu có
-            const existingNotification = document.querySelector('.center-notification');
-            if (existingNotification) {
-                existingNotification.remove();
-            }
-            
-            const notification = document.createElement('div');
-            notification.className = `alert ${alertClass} center-notification notification-show`;
-            notification.innerHTML = `
-                <i class="bi ${iconClass} me-2"></i>
-                ${message}
-            `;
-            document.body.appendChild(notification);
-            
-            // Tự động ẩn sau 2 giây
-            setTimeout(() => {
-                notification.classList.add('notification-hide');
-                setTimeout(() => {
-                    notification.remove();
-                }, 300);
-            }, 2000);
+        // Routes để lấy options theo tag
+        const optionsByTagUrl = '@Url.Action("GetOptions", "Category", new { area = "Admin" })';
+        
+        // Lấy danh sách optionIds và tagIds đã chọn từ model
+        const selectedOptionIds = @Html.Raw(Json.Serialize(Model.OptionIds));
+        const initialTagIds = @Html.Raw(Json.Serialize(Model.TagIds));
+        const categoryId = '@(ViewBag.CategoryId ?? "")';
+        // Lấy giá trị đã lưu của options (từ service options)
+        // Dùng cả ViewBag.OptionValues (đã được tạo trong controller) và ViewBag.Options để đảm bảo có dữ liệu
+        const optionValuesMap = {};
+        
+        // Thử từ ViewBag.OptionValues trước (Dictionary đã được tạo trong controller)
+        @{
+            var optionValuesFromBag = ViewBag.OptionValues as Dictionary<string, string> ?? new Dictionary<string, string>();
         }
-
-        // Clear errors on input - Setup event listeners và Create Option handler
-        document.addEventListener('DOMContentLoaded', function() {
-            // Setup input event listeners
-            const optionName = document.getElementById('optionNameEdit');
-            const optionPrice = document.getElementById('optionPriceEdit');
-            const optionUnitType = document.getElementById('optionUnitTypeEdit');
-
-            if (optionName) {
-                optionName.addEventListener('input', function() {
-                    hideFieldErrorEdit('optionNameEdit', 'optionNameEditError');
-                });
+        @if (optionValuesFromBag != null && optionValuesFromBag.Any())
+        {
+            foreach (var kvp in optionValuesFromBag)
+            {
+                <text>
+                optionValuesMap['@kvp.Key'] = @Html.Raw(Json.Serialize(kvp.Value ?? string.Empty));
+                </text>
             }
-
-            if (optionPrice) {
-                optionPrice.addEventListener('input', function() {
-                    hideFieldErrorEdit('optionPriceEdit', 'optionPriceEditError');
-                });
+        }
+        
+        // Nếu không có từ ViewBag.OptionValues, thử từ ViewBag.Options
+        @if ((optionValuesFromBag == null || !optionValuesFromBag.Any()) && options != null && options.Any())
+        {
+            foreach (var opt in options.Where(o => !string.IsNullOrWhiteSpace(o.Value)))
+            {
+                <text>
+                optionValuesMap['@opt.OptionId.ToString()'] = @Html.Raw(Json.Serialize(opt.Value ?? string.Empty));
+                </text>
             }
+        }
+        
+        // Debug: Log ngay sau khi khởi tạo
+        console.log('=== optionValuesMap INITIALIZED ===');
+        console.log('optionValuesMap:', optionValuesMap);
+        console.log('optionValuesMap keys:', Object.keys(optionValuesMap));
+        console.log('Total options with values:', Object.keys(optionValuesMap).length);
+        console.log('ViewBag.OptionValues count:', @(optionValuesFromBag?.Count ?? 0));
+        console.log('ViewBag.Options count:', @(options?.Count ?? 0));
 
-            if (optionUnitType) {
-                optionUnitType.addEventListener('change', function() {
-                    hideFieldErrorEdit('optionUnitTypeEdit', 'optionUnitTypeEditError');
-                });
-            }
+        let availableTags = [];
+        let selectedTag = null; // Chỉ lưu 1 tag đã chọn: {tagId, name}
 
-        });
-
-        // Create Option (Edit) handler - Sử dụng event delegation để đảm bảo hoạt động
-        // Attach event listener trên document để catch submit từ form trong modal
-        document.addEventListener('submit', async function (e) {
-            const form = e.target;
-            if (form && form.id === 'createOptionFormEdit') {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // Clear previous errors
-                clearAllModalErrorsEdit();
-
-                const optionData = {
-                    OptionName: document.getElementById('optionNameEdit').value.trim(),
-                    Description: document.getElementById('optionDescriptionEdit').value.trim(),
-                    Price: parseFloat(document.getElementById('optionPriceEdit').value) || 0,
-                    UnitType: document.getElementById('optionUnitTypeEdit').value
-                };
-
-                let hasError = false;
-
-                // Validate Option Name
-                if (!optionData.OptionName) {
-                    showFieldErrorEdit('optionNameEdit', 'optionNameEditError', 'Vui lòng nhập tên option!');
-                    hasError = true;
-                } else if (optionData.OptionName.length > 50) {
-                    showFieldErrorEdit('optionNameEdit', 'optionNameEditError', 'Tên option không được vượt quá 50 ký tự!');
-                    hasError = true;
-                }
-
-                // Validate Price
-                const priceInput = document.getElementById('optionPriceEdit');
-                if (!priceInput.value || priceInput.value.trim() === '') {
-                    showFieldErrorEdit('optionPriceEdit', 'optionPriceEditError', 'Vui lòng nhập giá!');
-                    hasError = true;
-                } else if (optionData.Price < 0 || isNaN(optionData.Price)) {
-                    showFieldErrorEdit('optionPriceEdit', 'optionPriceEditError', 'Giá phải lớn hơn hoặc bằng 0!');
-                    hasError = true;
-                }
-
-                // Validate Unit Type
-                if (!optionData.UnitType) {
-                    showFieldErrorEdit('optionUnitTypeEdit', 'optionUnitTypeEditError', 'Vui lòng chọn đơn vị!');
-                    hasError = true;
-                }
-
-                if (hasError) {
-                    return;
-                }
-
-                try {
-                    const resp = await fetch('/Provider/ServiceManagement/CreateOption', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(optionData)
-                    });
-                    const result = await resp.json();
-                    
-                    if (result && result.success) {
-                        const modalElement = document.getElementById('createOptionModalEdit');
-                        const modal = bootstrap.Modal.getInstance(modalElement) ?? new bootstrap.Modal(modalElement);
-                        modal.hide();
-                        form.reset();
-                        clearAllModalErrorsEdit();
-                        
-                        // Thêm option vừa tạo vào danh sách và auto-tick
-                        const opt = result.data;
-                        const container = document.getElementById('optionsContainer');
-                        
-                        if (!container) {
-                            console.error('optionsContainer not found!');
-                            showNotification('Có lỗi xảy ra khi thêm option vào danh sách!', 'error');
-                            return;
-                        }
-                        
-                        // Kiểm tra xem option này đã tồn tại chưa (tránh duplicate)
-                        const existingCheckbox = container.querySelector(`input[type="checkbox"][value="${opt.optionId}"][name="OptionIds"]`);
-                        if (existingCheckbox) {
-                            showNotification('Option này đã được thêm vào danh sách!', 'success');
-                            return;
-                        }
-                        
-                        // Tìm row hiện có hoặc tạo mới
-                        let row = container.querySelector('.tags-options-row');
-                        
-                        // Nếu không có row, tạo mới
-                        if (!row) {
-                            // Kiểm tra xem có text-muted (empty message) không
-                            const textMuted = container.querySelector('.text-muted');
-                            if (textMuted) {
-                                // Xóa text-muted và tạo row mới
-                                container.innerHTML = '';
-                            }
-                            // Tạo row mới
-                            row = document.createElement('div');
-                            row.className = 'row tags-options-row';
-                            container.appendChild(row);
-                        }
-
-                        // Tạo col mới cho option
-                        const col = document.createElement('div');
-                        col.className = 'col-12 col-sm-6 col-md-6';
-                        const descriptionText = opt.description ? opt.description + (opt.price !== undefined ? ' - ' : '') : '';
-                        const unitTypeVietnamese = opt.unitType ? getUnitTypeVietnamese(opt.unitType) : '';
-                        const priceText = opt.price !== undefined ? parseInt(opt.price).toLocaleString() + ' VNĐ/' + unitTypeVietnamese : '';
-                        col.innerHTML = `
-                            <div class="tag-option-item">
-                                <input class="form-check-input" type="checkbox" name="OptionIds" value="${opt.optionId}" id="option_${opt.optionId}" checked />
-                                <label class="form-check-label" for="option_${opt.optionId}">
-                                    ${opt.optionName}
-                                    ${descriptionText || priceText ? `<small>${descriptionText}${priceText}</small>` : ''}
-                                </label>
-                                <button type="button" class="remove-option-btn" data-option-id="${opt.optionId}" data-option-name="${opt.optionName}" title="Xóa option khỏi danh sách">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>`;
-                        row.appendChild(col);
-                        
-                        // Thêm event handler cho nút xóa
-                        const removeBtn = col.querySelector('.remove-option-btn');
-                        removeBtn.addEventListener('click', function() {
-                            removeOptionFromList(opt.optionId, opt.optionName);
-                        });
-                        
-                        showNotification('Tạo option thành công!', 'success');
-                    } else {
-                        showNotification(result?.message || 'Có lỗi xảy ra khi tạo option!', 'error');
-                    }
-                } catch (err) {
-                    console.error('Error creating option:', err);
-                    showNotification('Có lỗi xảy ra khi tạo option!', 'error');
-                }
-            }
-        });
-
-        // Reset form và clear errors when modal is closed
-        document.addEventListener('DOMContentLoaded', function() {
-            const createOptionModalEdit = document.getElementById('createOptionModalEdit');
-            if (createOptionModalEdit) {
-                createOptionModalEdit.addEventListener('hidden.bs.modal', function() {
-                    const form = document.getElementById('createOptionFormEdit');
-                    if (form) {
-                        form.reset();
-                        clearAllModalErrorsEdit();
-                    }
-                });
-            }
-        });
-
-        // Remove option from list (chỉ xóa khỏi UI, không xóa khỏi database)
-        function removeOptionFromList(optionId, optionName) {
-            if (!confirm(`Bạn có muốn xóa option "${optionName}" khỏi danh sách không?`)) {
+        // Load tags vào dropdown khi trang load
+        async function loadTagsToDropdown() {
+            const tagSelect = document.getElementById('tagSelect');
+            
+            if (!categoryId) {
+                tagSelect.innerHTML = '<option value="">-- Không có danh mục --</option>';
+                tagSelect.disabled = true;
                 return;
             }
-            
-            // Tìm và xóa option khỏi UI
-            const checkbox = document.querySelector(`input[type="checkbox"][value="${optionId}"][name="OptionIds"]`);
-            if (checkbox) {
-                const tagOptionItem = checkbox.closest('.tag-option-item');
-                if (tagOptionItem) {
-                    const col = tagOptionItem.closest('[class*="col-"]');
-                    if (col) {
-                        col.remove();
-                        // Nếu row trống, xóa row
-                        const row = col.closest('.tags-options-row');
-                        if (row && row.querySelectorAll('[class*="col-"]').length === 0) {
-                            row.remove();
-                        }
-                        // Nếu container trống, hiển thị message
-                        const container = document.getElementById('optionsContainer');
-                        if (container && container.querySelectorAll('.tags-options-row').length === 0) {
-                            container.innerHTML = '<p class="text-muted mb-0 small"><i class="bi bi-info-circle me-1"></i>Chưa có option nào.</p>';
-                        }
-                        showNotification(`Đã xóa option "${optionName}" khỏi danh sách!`, 'success');
-                    }
+
+            tagSelect.disabled = false;
+            tagSelect.innerHTML = '<option value="">-- Đang tải tags... --</option>';
+
+            try {
+                const response = await fetch(`/Provider/ServiceManagement/GetTagsByCategory?categoryId=${categoryId}`);
+                const tags = await response.json();
+
+                availableTags = tags || [];
+
+                if (availableTags.length > 0) {
+                    let html = '<option value="">-- Chọn tag --</option>';
+                    availableTags.forEach(function (tag) {
+                        // Hiển thị tất cả tags (vì chỉ chọn 1, không cần ẩn tag đã chọn)
+                        html += `<option value="${tag.tagId}" data-tag-name="${tag.name}">${tag.name}</option>`;
+                    });
+                    tagSelect.innerHTML = html;
+                } else {
+                    tagSelect.innerHTML = '<option value="">-- Không có tags --</option>';
                 }
+            } catch (error) {
+                console.error('Error loading tags:', error);
+                tagSelect.innerHTML = '<option value="">-- Lỗi khi tải tags --</option>';
             }
         }
 
-        // Thêm event handler cho tất cả các nút xóa option (options được render từ server)
-        document.addEventListener('DOMContentLoaded', function() {
-            const removeButtons = document.querySelectorAll('.remove-option-btn');
-            removeButtons.forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    const optionId = this.getAttribute('data-option-id');
-                    const optionName = this.getAttribute('data-option-name');
-                    removeOptionFromList(optionId, optionName);
+        // Handle tag selection từ dropdown
+        document.getElementById('tagSelect').addEventListener('change', async function() {
+            const tagId = this.value;
+            if (!tagId) {
+                // Nếu chọn "-- Chọn tag --", xóa tag đã chọn
+                if (selectedTag) {
+                    removeSelectedTag();
+                }
+                return;
+            }
+
+            const selectedOption = this.options[this.selectedIndex];
+            const tagName = selectedOption.getAttribute('data-tag-name');
+
+            // Nếu đã có tag được chọn, xóa tag cũ trước
+            if (selectedTag) {
+                removeSelectedTag();
+            }
+
+            // Chọn tag mới
+            await setSelectedTag(tagId, tagName);
+
+            // Reset dropdown về "-- Chọn tag --"
+            this.value = '';
+        });
+
+        // Handle remove tag button
+        document.getElementById('removeSelectedTagBtn').addEventListener('click', function() {
+            removeSelectedTag();
+            document.getElementById('tagSelect').value = '';
+        });
+
+        // Set tag đã chọn
+        async function setSelectedTag(tagId, tagName) {
+            selectedTag = { tagId, name: tagName };
+
+            // Hiển thị tag đã chọn trong khung input (giống category)
+            const selectedTagDisplay = document.getElementById('selectedTagDisplay');
+            const selectedTagName = document.getElementById('selectedTagName');
+            const selectedTagIdInput = document.getElementById('selectedTagId');
+            const tagSelect = document.getElementById('tagSelect');
+            
+            selectedTagName.value = tagName;
+            selectedTagIdInput.value = tagId;
+            selectedTagDisplay.classList.remove('d-none');
+            tagSelect.classList.add('d-none');
+
+            // Load options cho tag này
+            const selectedOptionsContainer = document.getElementById('selectedOptionsContainer');
+            await loadOptionsForTag(tagId, tagName, selectedOptionsContainer);
+
+            // Hiển thị section options
+            document.getElementById('selectedOptionsSection').style.display = 'block';
+
+            // Cập nhật tên dịch vụ
+            updateServiceTitleFromTags();
+        }
+
+        // Xóa tag đã chọn
+        function removeSelectedTag() {
+            if (!selectedTag) return;
+
+            // Ẩn hiển thị tag đã chọn và hiển thị lại dropdown
+            const selectedTagDisplay = document.getElementById('selectedTagDisplay');
+            const selectedTagIdInput = document.getElementById('selectedTagId');
+            const tagSelect = document.getElementById('tagSelect');
+            
+            selectedTagDisplay.classList.add('d-none');
+            tagSelect.classList.remove('d-none');
+            selectedTagIdInput.value = '';
+
+            // Xóa tất cả options
+            const selectedOptionsContainer = document.getElementById('selectedOptionsContainer');
+            selectedOptionsContainer.innerHTML = '';
+
+            // Ẩn section options
+            document.getElementById('selectedOptionsSection').style.display = 'none';
+
+            // Xóa tag khỏi biến
+            selectedTag = null;
+
+            // Cập nhật tên dịch vụ
+            updateServiceTitleFromTags();
+        }
+
+        // Function để cập nhật tên dịch vụ từ tag đã chọn
+        function updateServiceTitleFromTags() {
+            const titleInput = document.getElementById('titleInput');
+            if (!titleInput) return;
+
+            if (selectedTag) {
+                // Lấy tên của tag đã chọn
+                titleInput.value = selectedTag.name;
+            } else {
+                // Nếu không có tag nào được chọn, để trống
+                titleInput.value = '';
+            }
+        }
+
+        // Load options cho một tag (thêm vào container chung)
+        async function loadOptionsForTag(tagId, tagName, optionsContainer) {
+            // Xóa tất cả options cũ trước khi load mới
+            optionsContainer.innerHTML = '';
+            
+            // Debug: Log optionValuesMap để kiểm tra
+            console.log('=== loadOptionsForTag DEBUG ===');
+            console.log('optionValuesMap:', optionValuesMap);
+            console.log('Type of optionValuesMap:', typeof optionValuesMap);
+            if (optionValuesMap && typeof optionValuesMap === 'object') {
+                console.log('optionValuesMap keys:', Object.keys(optionValuesMap));
+                console.log('optionValuesMap values:', Object.values(optionValuesMap));
+            }
+            
+            // Tạo loading indicator cho tag này
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'text-muted small mb-2';
+            loadingDiv.id = `loading-${tagId}`;
+            loadingDiv.dataset.tagId = tagId;
+            loadingDiv.innerHTML = `<i class="bi bi-hourglass-split me-1"></i>Đang tải tùy chọn cho "${tagName}"...`;
+            optionsContainer.appendChild(loadingDiv);
+            
+            try {
+                const res = await fetch(`${optionsByTagUrl}?tagId=${tagId}`);
+                if (!res.ok) {
+                    loadingDiv.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>Lỗi khi tải tùy chọn cho "${tagName}".</div>`;
+                            return;
+                        }
+                        
+                const options = await res.json();
+                
+                // Xóa loading indicator
+                loadingDiv.remove();
+                
+                if (!options || options.length === 0) {
+                    const noOptionsDiv = document.createElement('div');
+                    noOptionsDiv.className = 'text-muted small mb-2';
+                    noOptionsDiv.dataset.tagId = tagId;
+                    noOptionsDiv.innerHTML = `<i class="bi bi-inbox me-1"></i>Tag "${tagName}" chưa có tùy chọn nào.`;
+                    optionsContainer.appendChild(noOptionsDiv);
+                            return;
+                        }
+                        
+                // Nhóm options theo Family
+                const groupedOptions = {};
+                const ungroupedOptions = [];
+
+                options.forEach(o => {
+                    if (o.family) {
+                        if (!groupedOptions[o.family]) {
+                            groupedOptions[o.family] = [];
+                        }
+                        groupedOptions[o.family].push(o);
+                    } else {
+                        ungroupedOptions.push(o);
+                    }
                 });
-            });
+
+                // Sắp xếp các nhóm theo type (radio, select, checkbox)
+                const groupOrder = ['radio', 'select', 'checkbox'];
+                const sortedGroupIds = Object.keys(groupedOptions).sort((a, b) => {
+                    const typeA = groupedOptions[a][0]?.type?.toLowerCase() || '';
+                    const typeB = groupedOptions[b][0]?.type?.toLowerCase() || '';
+                    const indexA = groupOrder.indexOf(typeA);
+                    const indexB = groupOrder.indexOf(typeB);
+                    if (indexA === -1 && indexB === -1) return 0;
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+                    return indexA - indexB;
+                });
+
+                // Render các nhóm (Family) - Sắp xếp theo thứ tự
+                sortedGroupIds.forEach(familyId => {
+                    const groupOptions = groupedOptions[familyId];
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'option-group mb-3';
+                    groupDiv.dataset.tagId = tagId;
+                    
+                    // Kiểm tra type của nhóm
+                    const groupType = groupOptions[0]?.type?.toLowerCase() || 'checkbox';
+                    const typeLabel = getTypeLabel(groupType);
+                    
+                    // Màu sắc theo loại nhóm
+                    let borderColor = '#ffc107'; // default (yellow)
+                    let bgColor = '#fffbf0'; // default
+                    let textColor = '#856404'; // default
+                    if (groupType === 'radio') {
+                        borderColor = '#0d6efd'; // blue
+                        bgColor = '#e7f3ff';
+                        textColor = '#084298';
+                    } else if (groupType === 'checkbox') {
+                        borderColor = '#6f42c1'; // purple
+                        bgColor = '#f3e8ff';
+                        textColor = '#5a189a';
+                    }
+                    
+                    groupDiv.style.cssText = `padding: 0.75rem; background: ${bgColor}; border-left: 4px solid ${borderColor}; border-radius: 0.5rem;`;
+                    
+                    let groupHtml = `
+                        <div class="group-header mb-2" style="font-weight: 600; color: ${textColor}; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="bi bi-diagram-3" style="color: ${borderColor};"></i>
+                            <span>Nhóm: ${typeLabel} (${groupOptions.length} tùy chọn)</span>
+                            </div>`;
+                    
+                    const radioGroupName = `optionFamily_${tagId}_${familyId}`;
+                    
+                    groupOptions.forEach(o => {
+                        const isChecked = Array.isArray(selectedOptionIds) && selectedOptionIds.includes(o.optionId);
+                        const optionTypeLabel = getTypeLabel(o.type);
+                        const uniqueId = `option_${tagId}_${o.optionId}`;
+                        
+                        if (groupType === 'radio') {
+                            // Radio button - chỉ chọn 1 trong nhóm
+                            groupHtml += `
+                                <div class="mb-2" style="padding-left: 1.5rem; border-left: 2px solid ${borderColor};">
+                                    <input class="form-check-input form-check-input-sm" type="radio" name="${radioGroupName}" value="${o.optionId}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
+                                    <input type="hidden" name="OptionIds" value="${o.optionId}" ${isChecked ? '' : 'disabled'} />
+                                    <label class="form-check-label small" for="${uniqueId}">
+                                        <span class="fw-semibold">${o.optionName}</span>
+                                </label>
+                            </div>`;
+                    } else {
+                            // Checkbox - có thể chọn nhiều
+                            groupHtml += `
+                                <div class="mb-2" style="padding-left: 1.5rem; border-left: 2px solid ${borderColor};">
+                                    <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${o.optionId}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
+                                    <label class="form-check-label small" for="${uniqueId}">
+                                        <span class="fw-semibold">${o.optionName}</span>
+                                    </label>
+                                </div>`;
+                        }
+                    });
+                    
+                    groupDiv.innerHTML = groupHtml;
+                    optionsContainer.appendChild(groupDiv);
+                    
+                    // Xử lý radio buttons - khi chọn radio, enable/disable hidden input
+                    if (groupType === 'radio') {
+                        groupDiv.querySelectorAll(`input[type="radio"][name="${radioGroupName}"]`).forEach(radio => {
+                            radio.addEventListener('change', function() {
+                                // Disable tất cả hidden inputs trong nhóm
+                                groupDiv.querySelectorAll('input[type="hidden"][name="OptionIds"]').forEach(hidden => {
+                                    hidden.disabled = true;
+                                });
+                                // Enable hidden input của radio được chọn
+                                const hiddenInput = groupDiv.querySelector(`input[type="hidden"][value="${this.value}"]`);
+                                if (hiddenInput) {
+                                    hiddenInput.disabled = false;
+                                }
+                            });
+                            
+                            // Khởi tạo trạng thái cho radio đã checked
+                            if (radio.checked) {
+                                const hiddenInput = groupDiv.querySelector(`input[type="hidden"][value="${radio.value}"]`);
+                                if (hiddenInput) {
+                                    hiddenInput.disabled = false;
+                                }
+                    }
+                });
+            }
+        });
+
+                // Render các options không có nhóm - hiển thị sau các nhóm
+                if (ungroupedOptions.length > 0 && sortedGroupIds.length > 0) {
+                    const separator = document.createElement('div');
+                    separator.className = 'mb-2 mt-3';
+                    separator.style.cssText = 'border-top: 2px solid #dee2e6; padding-top: 0.75rem;';
+                    separator.innerHTML = '<small class="text-muted"><i class="bi bi-three-dots me-1"></i>Options độc lập</small>';
+                    optionsContainer.appendChild(separator);
+                }
+                
+                ungroupedOptions.forEach(o => {
+                    const optionDiv = document.createElement('div');
+                    optionDiv.className = 'mb-2';
+                    optionDiv.dataset.tagId = tagId;
+                    
+                    const isChecked = Array.isArray(selectedOptionIds) && selectedOptionIds.includes(o.optionId);
+                    const typeLabel = getTypeLabel(o.type);
+                    const uniqueId = `option_${tagId}_${o.optionId}`;
+                    const optionType = o.type?.toLowerCase() || 'checkbox';
+                    
+                    if (optionType === 'textarea') {
+                        // Textarea - cho phép nhập văn bản nhiều dòng
+                        // Tìm giá trị đã nhập từ service options (nếu có)
+                        // Convert optionId sang string để so sánh với key trong optionValuesMap (keys đã là string)
+                        const optionIdStr = String(o.optionId).toLowerCase().trim();
+                        let existingValue = '';
+                        
+                        // Debug: Log để kiểm tra
+                        console.log(`\n--- Textarea option: ${o.optionName} ---`);
+                        console.log('o.optionId (raw):', o.optionId, 'type:', typeof o.optionId);
+                        console.log('optionIdStr (normalized):', optionIdStr);
+                        console.log('optionValuesMap keys:', Object.keys(optionValuesMap));
+                        
+                        if (optionValuesMap && typeof optionValuesMap === 'object' && Object.keys(optionValuesMap).length > 0) {
+                            // Normalize tất cả keys trong optionValuesMap để so sánh
+                            const normalizedMap = {};
+                            Object.keys(optionValuesMap).forEach(key => {
+                                const normalizedKey = String(key).toLowerCase().trim();
+                                normalizedMap[normalizedKey] = optionValuesMap[key];
+                            });
+                            
+                            // Thử tìm với normalized key
+                            if (normalizedMap[optionIdStr] !== undefined) {
+                                existingValue = normalizedMap[optionIdStr];
+                                console.log('✅ Found with normalized key');
+                            } else {
+                                // Thử tìm với exact match (case-sensitive)
+                                const exactKey = Object.keys(optionValuesMap).find(k => String(k).toLowerCase().trim() === optionIdStr);
+                                if (exactKey) {
+                                    existingValue = optionValuesMap[exactKey];
+                                    console.log('✅ Found with exact match:', exactKey);
+                                } else {
+                                    // Thử tìm với partial match (nếu có format khác)
+                                    const partialKey = Object.keys(optionValuesMap).find(k => {
+                                        const kNorm = String(k).toLowerCase().trim();
+                                        return kNorm.includes(optionIdStr) || optionIdStr.includes(kNorm);
+                                    });
+                                    if (partialKey) {
+                                        existingValue = optionValuesMap[partialKey];
+                                        console.log('✅ Found with partial match:', partialKey);
+                                    } else {
+                                        console.log('❌ NOT FOUND - No matching key');
+                                        console.log('Available normalized keys:', Object.keys(normalizedMap));
+                                    }
+                                }
+                            }
+                        } else {
+                            console.log('⚠️ optionValuesMap is empty or not an object');
+                        }
+                        
+                        console.log('Final existingValue:', existingValue);
+                        
+                        // Escape HTML để tránh XSS và giữ nguyên giá trị
+                        const escapedValue = existingValue.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                        
+                        // Kiểm tra xem option này đã được chọn chưa (có trong selectedOptionIds)
+                        const isChecked = Array.isArray(selectedOptionIds) && selectedOptionIds.includes(o.optionId);
+                        const textareaCheckboxId = `textarea_checkbox_${uniqueId}`;
+                        
+                        optionDiv.innerHTML = `
+                            <div class="mb-2">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input form-check-input-sm" type="checkbox" id="${textareaCheckboxId}" ${isChecked ? 'checked' : ''} />
+                                    <label class="form-check-label small fw-semibold" for="${textareaCheckboxId}">
+                                        ${o.optionName}
+                                    </label>
+                                </div>
+                                <textarea class="form-control form-control-sm" id="${uniqueId}" name="OptionValues[${o.optionId}]" rows="2" placeholder="${o.optionName}..." ${isChecked ? '' : 'disabled'}>${escapedValue}</textarea>
+                                <input type="hidden" name="OptionIds" value="${o.optionId}" ${isChecked ? '' : 'disabled'} />
+                            </div>`;
+                        
+                        // Xử lý checkbox: enable/disable textarea và hidden input
+                        setTimeout(() => {
+                            const checkbox = document.getElementById(textareaCheckboxId);
+                            const textarea = document.getElementById(uniqueId);
+                            const hiddenInput = optionDiv.querySelector('input[type="hidden"][name="OptionIds"]');
+                            
+                            if (checkbox && textarea && hiddenInput) {
+                                // Đảm bảo nếu checkbox đã checked từ đầu, textarea và hidden input phải enabled
+                                if (checkbox.checked) {
+                                    textarea.disabled = false;
+                                    textarea.removeAttribute('disabled');
+                                    hiddenInput.disabled = false;
+                                    hiddenInput.removeAttribute('disabled');
+                                }
+                                
+                                checkbox.addEventListener('change', function() {
+                                    if (this.checked) {
+                                        textarea.disabled = false;
+                                        textarea.removeAttribute('disabled');
+                                        hiddenInput.disabled = false;
+                                        hiddenInput.removeAttribute('disabled');
+                                    } else {
+                                        textarea.disabled = true;
+                                        textarea.setAttribute('disabled', 'disabled');
+                                        textarea.value = ''; // Xóa giá trị khi bỏ chọn
+                                        hiddenInput.disabled = true;
+                                        hiddenInput.setAttribute('disabled', 'disabled');
+                                    }
+                                });
+                            }
+                        }, 100);
+                    } else if (optionType === 'checkbox') {
+                        // Checkbox - có thể chọn nhiều
+                        optionDiv.innerHTML = `
+                            <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${o.optionId}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
+                            <label class="form-check-label small" for="${uniqueId}">
+                                <span class="fw-semibold">${o.optionName}</span>
+                            </label>`;
+                    } else {
+                        // Radio hoặc loại khác - xử lý như checkbox
+                        optionDiv.innerHTML = `
+                            <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${o.optionId}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
+                            <label class="form-check-label small" for="${uniqueId}">
+                                <span class="fw-semibold">${o.optionName}</span>
+                            </label>`;
+                    }
+                    optionsContainer.appendChild(optionDiv);
+                });
+            } catch (error) {
+                console.error('Error loading options:', error);
+                loadingDiv.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>Lỗi khi tải tùy chọn cho "${tagName}".</div>`;
+            }
+        }
+
+        // Load tags và options đã chọn khi trang load
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Debug: Log optionValuesMap ngay khi trang load
+            console.log('=== DOMContentLoaded DEBUG ===');
+            console.log('optionValuesMap on page load:', optionValuesMap);
+            console.log('optionValuesMap type:', typeof optionValuesMap);
+            if (optionValuesMap && typeof optionValuesMap === 'object') {
+                console.log('optionValuesMap keys on page load:', Object.keys(optionValuesMap));
+                console.log('optionValuesMap entries on page load:', Object.entries(optionValuesMap));
+            }
+            
+            // Load tags vào dropdown
+            await loadTagsToDropdown();
+
+            // Load tag đã chọn từ model (chỉ lấy tag đầu tiên vì chỉ chọn 1)
+            if (Array.isArray(initialTagIds) && initialTagIds.length > 0) {
+                const firstTagId = initialTagIds[0];
+                // Cần lấy thông tin tag từ danh sách availableTags
+                try {
+                    const response = await fetch(`/Provider/ServiceManagement/GetTagsByCategory?categoryId=${categoryId}`);
+                    const tags = await response.json();
+
+                    if (tags && tags.length > 0) {
+                        const tag = tags.find(t => t.tagId === firstTagId);
+                        if (tag) {
+                            await setSelectedTag(tag.tagId, tag.name);
+                        }
+                    }
+
+                    // Cập nhật dropdown sau khi load xong tags
+                    await loadTagsToDropdown();
+                } catch (error) {
+                    console.error('Error loading initial tag:', error);
+                }
+            }
+
+            // Cập nhật tên dịch vụ từ tag đã chọn khi trang load
+            updateServiceTitleFromTags();
+        });
+
+        // Handle form submit để preserve images
+        document.addEventListener('DOMContentLoaded', function() {
 
             // Handle form submit to ensure old images are preserved when no new images are uploaded
             const editForm = document.getElementById('editServiceForm');
             if (editForm) {
                 editForm.addEventListener('submit', function(e) {
+                    console.log('=== FORM SUBMIT: Enabling all textareas ===');
+                    
+                    // Đảm bảo tất cả textarea đã checked đều enabled trước khi submit
+                    const textareaCheckboxes = document.querySelectorAll('input[type="checkbox"][id^="textarea_checkbox_"]');
+                    console.log('Found textarea checkboxes:', textareaCheckboxes.length);
+                    
+                    textareaCheckboxes.forEach(checkbox => {
+                        if (checkbox.checked) {
+                            // Tìm textarea: id của textarea = checkbox.id.replace('textarea_checkbox_', '')
+                            const textareaId = checkbox.id.replace('textarea_checkbox_', '');
+                            const textarea = document.getElementById(textareaId);
+                            
+                            // Tìm hidden input trong cùng container với checkbox
+                            const container = checkbox.closest('.mb-2');
+                            const hiddenInput = container ? container.querySelector('input[type="hidden"][name="OptionIds"]') : null;
+                            
+                            if (textarea) {
+                                textarea.disabled = false;
+                                textarea.removeAttribute('disabled'); // Đảm bảo remove disabled attribute
+                                console.log('✅ Enabled textarea:', textareaId, 'value:', textarea.value, 'name:', textarea.name);
+                            } else {
+                                console.warn('❌ Textarea not found:', textareaId);
+                            }
+                            
+                            if (hiddenInput) {
+                                hiddenInput.disabled = false;
+                                hiddenInput.removeAttribute('disabled'); // Đảm bảo remove disabled attribute
+                                console.log('✅ Enabled hidden input for option:', hiddenInput.value);
+                            } else {
+                                console.warn('❌ Hidden input not found for checkbox:', checkbox.id);
+                            }
+                        }
+                    });
+                    
+                    // Đảm bảo tất cả textarea có giá trị đều được enable (kể cả khi không có checkbox hoặc checkbox bị lỗi)
+                    const allTextareas = document.querySelectorAll('textarea[name^="OptionValues["]');
+                    console.log('Found all textareas with OptionValues:', allTextareas.length);
+                    
+                    allTextareas.forEach(textarea => {
+                        const hasValue = textarea.value && textarea.value.trim() !== '';
+                        if (hasValue || !textarea.disabled) {
+                            textarea.disabled = false;
+                            textarea.removeAttribute('disabled');
+                            console.log('✅ Enabled textarea by value check:', textarea.name, 'value:', textarea.value);
+                            
+                            // Tìm và enable hidden input tương ứng
+                            const container = textarea.closest('.mb-2');
+                            if (container) {
+                                const hiddenInput = container.querySelector('input[type="hidden"][name="OptionIds"]');
+                                if (hiddenInput) {
+                                    hiddenInput.disabled = false;
+                                    hiddenInput.removeAttribute('disabled');
+                                    console.log('✅ Enabled hidden input by value check:', hiddenInput.value);
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Final check: Log tất cả OptionValues và OptionIds sẽ được submit
+                    const formData = new FormData(editForm);
+                    console.log('=== FORM DATA TO SUBMIT ===');
+                    for (let [key, value] of formData.entries()) {
+                        if (key.startsWith('OptionValues[') || key === 'OptionIds') {
+                            console.log(key + ':', value);
+                        }
+                    }
+                    
                     const imageInput = document.getElementById('imageInputEdit');
                     const currentImagesData = document.getElementById('currentImagesData');
                     const removedImagesContainer = document.getElementById('removedImagesContainer');
@@ -789,67 +1058,5 @@
         });
     </script>
     
-    <!-- Create Option Modal (Edit) -->
-    <div class="modal fade" id="createOptionModalEdit" tabindex="-1" aria-labelledby="createOptionModalEditLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content modern-modal">
-                <div class="modal-header modern-modal-header">
-                    <h5 class="modal-title" id="createOptionModalEditLabel">
-                        <i class="bi bi-gear me-2"></i>
-                        Tạo Option mới
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form id="createOptionFormEdit" novalidate>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="optionNameEdit" class="form-label">Tên Option <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="optionNameEdit" name="optionName" required placeholder="VD: Thêm 2 giờ">
-                            <div class="text-danger small mt-1" id="optionNameEditError" style="display: none;"></div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="optionDescriptionEdit" class="form-label">Mô tả</label>
-                            <textarea class="form-control" id="optionDescriptionEdit" name="description" rows="3" placeholder="Mô tả chi tiết về option..."></textarea>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="optionPriceEdit" class="form-label">Giá (VNĐ) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="optionPriceEdit" name="price" required min="0" step="1000" placeholder="100000">
-                                <div class="text-danger small mt-1" id="optionPriceEditError" style="display: none;"></div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="optionUnitTypeEdit" class="form-label">
-                                    <i class="bi bi-rulers me-1"></i>Đơn vị tính giá <span class="text-danger">*</span>
-                                </label>
-                                <select class="form-select" id="optionUnitTypeEdit" name="unitType" required>
-                                    <option value="">-- Chọn đơn vị tính giá --</option>
-                                    <option value="Hour">Giờ</option>
-                                    <option value="Day">Ngày</option>
-                                    <option value="Visit">Lần</option>
-                                    <option value="Apartment">Căn</option>
-                                    <option value="Room">Phòng</option>
-                                    <option value="SquareMeter">Mét vuông (m²)</option>
-                                    <option value="Person">Người</option>
-                                    <option value="Package">Gói</option>
-                                    <option value="Event">Sự kiện</option>
-                                </select>
-                                <small class="form-text text-muted small d-block mt-1">
-                                    <i class="bi bi-info-circle me-1"></i>Đơn vị tính giá cho option này
-                                </small>
-                                <div class="text-danger small mt-1" id="optionUnitTypeEditError" style="display: none;"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer justify-content-center">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-check-circle me-1"></i>
-                            Tạo Option
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 }
 

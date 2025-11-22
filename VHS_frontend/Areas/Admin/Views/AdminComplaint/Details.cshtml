@@ -4,7 +4,7 @@
     ViewData["Title"] = "Chi tiết Khiếu nại";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
     
-    // Get backend URL for images
+    // Lấy URL backend cho hình ảnh
     var backendUrl = Configuration["Apis:Backend"] ?? "http://localhost:5154";
     string GetFullImageUrl(string relativePath)
     {
@@ -13,42 +13,238 @@
         return backendUrl + relativePath;
     }
     
-    // Helper function để chuyển ComplaintType sang tiếng Việt
-    string GetComplaintTypeVi(string? type)
+    // Helper function để chuyển ComplaintType sang tiếng Việt (đồng bộ với ReportService.cs)
+    // Nếu là "Other" nhưng có thông tin ngân hàng trong description, tự động detect là RefundRequest
+    string GetComplaintTypeVi(string? type, string? description = null)
     {
+        // Tự động detect refund request từ description nếu ComplaintType là "Other"
+        if (type == "Other" && !string.IsNullOrWhiteSpace(description))
+        {
+            var descLower = description.ToLower();
+            if (descLower.Contains("--- thông tin ngân hàng để hoàn tiền ---") ||
+                descLower.Contains("thông tin ngân hàng") && 
+                (descLower.Contains("hoàn tiền") || descLower.Contains("refund") || 
+                 descLower.Contains("tên ngân hàng") || descLower.Contains("số tài khoản")))
+            {
+                return "Yêu cầu hoàn tiền";
+            }
+        }
+        
         return type switch
         {
             "ServiceQuality" => "Chất lượng dịch vụ",
             "ProviderBehavior" => "Hành vi nhà cung cấp",
+            "ProviderMisconduct" => "Hành vi sai trái của provider",
+            "StaffMisconduct" => "Hành vi sai trái của nhân viên",
             "PriceIssue" => "Vấn đề giá",
+            "Dispute" => "Tranh chấp",
+            "TechnicalIssue" => "Vấn đề kỹ thuật",
+            "RefundRequest" => "Yêu cầu hoàn tiền",
             "Delay" => "Trễ hẹn",
+            "Booking" => "Vấn đề đơn hàng", // ✅ Chuyển "Booking" sang tiếng Việt
             "Other" => "Khác",
             _ => type ?? "Khác"
+        };
+    }
+    
+    // ✅ Helper function để chuyển Complaint Status sang tiếng Việt
+    string GetComplaintStatusVi(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return "Không xác định";
+        
+        return status switch
+        {
+            "Pending" => "Chờ xử lý",
+            "InReview" => "Đang xem xét",
+            "Resolved" => "Đã giải quyết",
+            "Rejected" => "Đã từ chối",
+            _ => status
         };
     }
     
     // Helper function để chuyển BookingStatus sang tiếng Việt
     string GetBookingStatusVi(string? status)
     {
-        return status switch
+        if (string.IsNullOrWhiteSpace(status))
+            return "Không xác định";
+        
+        // Normalize status (case-insensitive)
+        var statusNorm = status.Trim();
+        
+        return statusNorm.ToLowerInvariant() switch
         {
-            "Pending" => "Chờ xử lý",
-            "Confirmed" => "Đã xác nhận",
-            "InProgress" => "Đang thực hiện",
-            "Completed" => "Đã hoàn thành",
-            "Cancelled" => "Đã hủy",
-            "Rejected" => "Đã từ chối",
-            _ => status ?? "Không xác định"
+            "pending" => "Chờ xử lý",
+            "confirmed" => "Đã xác nhận",
+            "inprogress" => "Đang thực hiện",
+            "completed" => "Đã hoàn thành",
+            "cancelled" or "canceled" => "Đã hủy", // ✅ Hỗ trợ cả Cancelled và Canceled
+            "rejected" => "Đã từ chối",
+            _ => status
         };
+    }
+    
+    // Helper function để tách thông tin ngân hàng khỏi description
+    (string descriptionWithoutBankInfo, string? bankName, string? accountHolderName, string? accountNumber) ExtractBankInfo(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return (description ?? string.Empty, null, null, null);
+        
+        var bankInfoMarker = "--- THÔNG TIN NGÂN HÀNG ĐỂ HOÀN TIỀN ---";
+        var index = description.IndexOf(bankInfoMarker, StringComparison.OrdinalIgnoreCase);
+        
+        if (index < 0)
+            return (description, null, null, null);
+        
+        // Lấy phần mô tả chính (trước marker)
+        var descriptionWithoutBankInfo = description.Substring(0, index).TrimEnd();
+        
+        // Lấy phần thông tin ngân hàng (sau marker)
+        var bankInfoSection = description.Substring(index + bankInfoMarker.Length).Trim();
+        
+        // Parse thông tin ngân hàng
+        string? bankName = null;
+        string? accountHolderName = null;
+        string? accountNumber = null;
+        
+        var lines = bankInfoSection.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("Tên ngân hàng:", StringComparison.OrdinalIgnoreCase))
+            {
+                bankName = line.Substring("Tên ngân hàng:".Length).Trim();
+            }
+            else if (line.StartsWith("Tên chủ tài khoản:", StringComparison.OrdinalIgnoreCase))
+            {
+                accountHolderName = line.Substring("Tên chủ tài khoản:".Length).Trim();
+            }
+            else if (line.StartsWith("Số tài khoản:", StringComparison.OrdinalIgnoreCase))
+            {
+                accountNumber = line.Substring("Số tài khoản:".Length).Trim();
+            }
+        }
+        
+        return (descriptionWithoutBankInfo, bankName, accountHolderName, accountNumber);
     }
 }
 
 @section Styles {
     <link rel="stylesheet" href="~/css/admin-service-management.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin-complaint.css" asp-append-version="true" />
+    <style>
+        .toast-container {
+            margin-top: 70px !important;
+        }
+        .toast {
+            min-width: 350px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .toast-header {
+            font-weight: 600;
+        }
+        .toast-body {
+            padding: 0.75rem;
+        }
+        .bank-info-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .bank-info-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            background-color: #f8f9fa;
+            border-radius: 0.375rem;
+            border-left: 3px solid #0d6efd;
+        }
+        .bank-info-item strong {
+            margin-right: 0.5rem;
+            min-width: 140px;
+        }
+        .attachment-item-compact {
+            position: relative;
+            width: 100%;
+            padding-bottom: 100%;
+            overflow: hidden;
+            border-radius: 0.5rem;
+            border: 1px solid #dee2e6;
+            background-color: #f8f9fa;
+            max-width: 120px;
+            margin: 0 auto;
+        }
+        .attachment-image-wrapper-compact {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            border-radius: 0.5rem;
+        }
+        .attachment-image-compact {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        .attachment-item-compact:hover .attachment-image-compact {
+            transform: scale(1.05);
+        }
+        .attachment-overlay-compact {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            border-radius: 0.5rem;
+        }
+        .attachment-item-compact:hover .attachment-overlay-compact {
+            opacity: 1;
+        }
+        .attachment-overlay-compact .btn {
+            padding: 0.5rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
 }
 
 <div class="admin-service-management">
+    <!-- Toast Notification Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055; margin-top: 70px;">
+        <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-success text-white">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <strong class="me-auto">Thành công!</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Đóng"></button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+                @TempData["Success"]
+            </div>
+        </div>
+        <div id="errorToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-danger text-white">
+                <i class="bi bi-exclamation-circle-fill me-2"></i>
+                <strong class="me-auto">Lỗi!</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Đóng"></button>
+            </div>
+            <div class="toast-body" id="toastErrorMessage">
+                @TempData["Error"]
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <div class="admin-service-management__header">
         <h3><i class="bi bi-info-circle-fill"></i>Chi tiết Khiếu nại</h3>
@@ -88,7 +284,7 @@
                                 </span>
                                 break;
                             default:
-                                <span class="badge bg-secondary">@(Model.Status ?? "Không xác định")</span>
+                                <span class="badge bg-secondary">@GetComplaintStatusVi(Model.Status)</span>
                                 break;
                         }
                     </div>
@@ -100,21 +296,59 @@
                             <div class="info-value"><code>@Model.ComplaintId</code></div>
                         </div>
                         <div class="info-row">
+                            <div class="info-label">Loại khiếu nại</div>
+                            <div class="info-value">
+                                <span class="badge badge-type">@GetComplaintTypeVi(Model.ComplaintType, Model.Description)</span>
+                            </div>
+                        </div>
+                        <div class="info-row">
                             <div class="info-label">Tiêu đề</div>
                             <div class="info-value-title">@Model.Title</div>
                         </div>
-                        <div class="info-row">
-                            <div class="info-label">Loại khiếu nại</div>
-                            <div class="info-value">
-                                <span class="badge badge-type">@GetComplaintTypeVi(Model.ComplaintType)</span>
-                            </div>
-                        </div>
+                        
                         @if (!string.IsNullOrEmpty(Model.Description))
+                        {
+                            var (descriptionWithoutBankInfo, bankName, accountHolderName, accountNumber) = ExtractBankInfo(Model.Description);
+                            
+                            @if (!string.IsNullOrWhiteSpace(descriptionWithoutBankInfo))
                         {
                             <div class="info-row info-row-description">
                                 <div class="info-label">Mô tả</div>
-                                <div class="info-value-description">@Model.Description</div>
+                                    <div class="info-value-description">@descriptionWithoutBankInfo</div>
+                                </div>
+                            }
+                            
+                            @if (!string.IsNullOrWhiteSpace(bankName) || !string.IsNullOrWhiteSpace(accountHolderName) || !string.IsNullOrWhiteSpace(accountNumber))
+                            {
+                                <div class="info-row">
+                                    <div class="info-label">Thông tin ngân hàng</div>
+                                    <div class="info-value">
+                                        <div class="bank-info-detail">
+                                            @if (!string.IsNullOrWhiteSpace(bankName))
+                                            {
+                                                <div class="bank-info-item">
+                                                    <i class="bi bi-building text-primary me-2"></i>
+                                                    <strong>Tên ngân hàng:</strong> @bankName
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(accountHolderName))
+                                            {
+                                                <div class="bank-info-item">
+                                                    <i class="bi bi-person-badge text-primary me-2"></i>
+                                                    <strong>Tên chủ tài khoản:</strong> @accountHolderName
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(accountNumber))
+                                            {
+                                                <div class="bank-info-item">
+                                                    <i class="bi bi-credit-card text-primary me-2"></i>
+                                                    <strong>Số tài khoản:</strong> @accountNumber
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
                             </div>
+                            }
                         }
                         <div class="info-row-group">
                             <div class="info-row">
@@ -138,6 +372,37 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Attachments -->
+            @if (Model.AttachmentUrls != null && Model.AttachmentUrls.Any())
+            {
+                <div class="card-x mb-4 mt-4">
+                    <div class="card-header">
+                        <span><i class="bi bi-paperclip me-2"></i>Tệp đính kèm (@Model.AttachmentUrls.Length)</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            @foreach (var attachment in Model.AttachmentUrls)
+                            {
+                                var fullImageUrl = GetFullImageUrl(attachment);
+                                <div class="col-6 col-md-3 col-lg-2">
+                                    <div class="attachment-item-compact">
+                                        <div class="attachment-image-wrapper-compact">
+                                            <img src="@fullImageUrl" alt="Tệp đính kèm" class="attachment-image-compact"
+                                                 onerror="this.onerror=null;this.src='/images/placeholder.png';" />
+                                            <div class="attachment-overlay-compact">
+                                                <a href="@fullImageUrl" target="_blank" rel="noopener" class="btn btn-sm btn-light">
+                                                    <i class="bi bi-box-arrow-up-right"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
 
         <!-- Sidebar Info -->
@@ -276,37 +541,6 @@
         </div>
     </div>
 
-    <!-- Attachments -->
-    @if (Model.AttachmentUrls != null && Model.AttachmentUrls.Any())
-    {
-        <div class="card-x mb-4">
-            <div class="card-header">
-                <span><i class="bi bi-paperclip me-2"></i>Tệp đính kèm (@Model.AttachmentUrls.Length)</span>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    @foreach (var attachment in Model.AttachmentUrls)
-                    {
-                        var fullImageUrl = GetFullImageUrl(attachment);
-                        <div class="col-md-4 col-lg-3">
-                            <div class="attachment-item">
-                                <div class="attachment-image-wrapper">
-                                    <img src="@fullImageUrl" alt="Tệp đính kèm" class="attachment-image"
-                                         onerror="this.onerror=null;this.src='/images/placeholder.png';" />
-                                    <div class="attachment-overlay">
-                                        <a href="@fullImageUrl" target="_blank" rel="noopener" class="btn btn-sm btn-light">
-                                            <i class="bi bi-box-arrow-up-right me-1"></i>Mở
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-    }
-
     <!-- Resolution Info -->
     @if (!string.IsNullOrEmpty(Model.ResolutionNote))
     {
@@ -372,7 +606,7 @@
 
 @section Scripts {
     <script>
-        // Auto refresh every 60 seconds if status is Pending or InReview
+        // Tự động làm mới mỗi 60 giây nếu trạng thái là Pending hoặc InReview
         @if (Model.Status == "Pending" || Model.Status == "InReview")
         {
             <text>
@@ -382,8 +616,32 @@
             </text>
         }
 
-        // Form validation
+        // Xác thực form và thông báo toast
         document.addEventListener('DOMContentLoaded', function() {
+            // Hiển thị toast nếu có thông báo thành công/lỗi từ TempData
+            @if (TempData["Success"] != null)
+            {
+                <text>
+                const successToastEl = document.getElementById('successToast');
+                const successToast = new bootstrap.Toast(successToastEl, {
+                    autohide: true,
+                    delay: 4000 // 4 giây
+                });
+                successToast.show();
+                </text>
+            }
+            @if (TempData["Error"] != null)
+            {
+                <text>
+                const errorToastEl = document.getElementById('errorToast');
+                const errorToast = new bootstrap.Toast(errorToastEl, {
+                    autohide: true,
+                    delay: 4000 // 4 giây
+                });
+                errorToast.show();
+                </text>
+            }
+
             const form = document.querySelector('.handle-form');
             if (form) {
                 form.addEventListener('submit', function(e) {
@@ -392,27 +650,19 @@
 
                     if (!status || !note) {
                         e.preventDefault();
-                        alert('Vui lòng điền đầy đủ thông tin!');
+                        // Hiển thị toast lỗi thay vì alert
+                        const errorToastEl = document.getElementById('errorToast');
+                        document.getElementById('toastErrorMessage').textContent = 'Vui lòng điền đầy đủ thông tin!';
+                        const errorToast = new bootstrap.Toast(errorToastEl, {
+                            autohide: true,
+                            delay: 4000
+                        });
+                        errorToast.show();
                         return false;
                     }
 
-                    // Confirm action based on status
-                    let confirmMsg = '';
-                    switch(status) {
-                        case 'Resolved':
-                            confirmMsg = 'Bạn có chắc muốn đánh dấu khiếu nại này là ĐÃ GIẢI QUYẾT?';
-                            break;
-                        case 'Rejected':
-                            confirmMsg = 'Bạn có chắc muốn TỪ CHỐI khiếu nại này?';
-                            break;
-                        default:
-                            confirmMsg = 'Bạn có chắc muốn xử lý khiếu nại này?';
-                    }
-
-                    if (!confirm(confirmMsg)) {
-                        e.preventDefault();
-                        return false;
-                    }
+                    // Không có hộp thoại xác nhận - chỉ submit
+                    // Toast sẽ được hiển thị sau khi trang reload từ phản hồi server
                 });
             }
         });

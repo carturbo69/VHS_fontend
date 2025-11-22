@@ -141,8 +141,8 @@
                     </div>
 
                     <ul class="brief">
-                        <li><strong>Loại:</strong> @Model.CategoryName</li>
-                        @if (Model.Tags != null && Model.Tags.Any())
+                        <li><strong>Danh mục:</strong> @Model.CategoryName</li>
+                        <!-- @if (Model.Tags != null && Model.Tags.Any())
                         {
                             <li>
                                 <strong>Tags:</strong>
@@ -153,9 +153,9 @@
                                     }
                                 </div>
                             </li>
-                        }
+                        } -->
                         <li>
-                            <strong>Thời gian:</strong>
+                            <strong>Loại:</strong>
                             @if (Model.BaseUnit.HasValue)
                             {
                                 @($"{Model.BaseUnit} {GetUnitTypeVietnamese(Model.UnitType)}")
@@ -178,44 +178,80 @@
 
                         @if (Model.ServiceOptions?.Any() == true)
                         {
+                            // Tách options thành 2 nhóm: không phải textarea/text và textarea/text
+                            var regularOptions = Model.ServiceOptions
+                                .Where(o => o.Type?.ToLower() != "textarea" && o.Type?.ToLower() != "text")
+                                .ToList();
+                            var textareaOptions = Model.ServiceOptions
+                                .Where(o => o.Type?.ToLower() == "textarea" || o.Type?.ToLower() == "text")
+                                .ToList();
                             <section class="svc-options">
                                 <h3 class="addons-title">
-                                    <span class="title-icon">➕</span>
-                                    Tuỳ chọn thêm
+                                    <span class="title-icon">✨</span>
+                                    Tùy chọn đã bao gồm
                                 </h3>
                                 <div class="addons-list">
-                                    @foreach (var o in Model.ServiceOptions)
+                                    @* Hiển thị options thường (không phải textarea/text) trên 1 hàng *@
+                                    @foreach (var o in regularOptions)
                                     {
-                                        <label class="addon-item option-select-box">
-                                            <input type="checkbox"
-                                                   name="optionIds"
-                                                   value="@o.OptionId"
-                                                   class="option-checkbox" />
-                                            <span class="option-checkmark"></span>
-
+                                        <div class="addon-item">
                                             <div class="option-body">
                                                 <div class="option-head">
                                                     <div class="addon-name">
-                                                        <span class="addon-icon">✨</span>
-                                                        @o.OptionName
-                                                    </div>
-                                                    <div class="addon-price">
-                                                        @string.Format("{0:#,0}đ / {1}", o.Price, GetUnitTypeVietnamese(o.UnitType))
+                                                        <span class="addon-icon">✓</span>
+                                                        <span class="fw-semibold">@o.OptionName</span>
                                                     </div>
                                                 </div>
-                                                @if (!string.IsNullOrWhiteSpace(o.Description))
+                                                @if (!string.IsNullOrWhiteSpace(o.Value))
                                                 {
-                                                    <div class="addon-desc">@o.Description</div>
+                                                    <div class="addon-desc">
+                                                        <span class="addon-value">@o.Value</span>
+                                                    </div>
                                                 }
                                             </div>
-                                        </label>
+                                        </div>
+                                    }
+                                    @* Hiển thị textarea/text options ở cuối (full width) *@
+                                    @foreach (var o in textareaOptions)
+                                    {
+                                        <div class="addon-item addon-item-textarea">
+                                            <div class="option-body">
+                                                <div class="option-head">
+                                                    <div class="addon-name">
+                                                        <span class="addon-icon">✓</span>
+                                                        <span class="fw-semibold">@o.OptionName</span>
+                                                    </div>
+                                                </div>
+                                                @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                {
+                                                    <div class="addon-desc">
+                                                        <div class="addon-value-text">@o.Value</div>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="addon-desc addon-empty">
+                                                        <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
                                     }
                                 </div>
+                                
+                                @* Tự động thêm tất cả options vào form *@
+                                @foreach (var o in Model.ServiceOptions)
+                                {
+                                    <input type="hidden" name="optionIds" value="@o.OptionId" />
+                                }
+                                
+                                @* Hidden input để lưu OptionValues dưới dạng JSON *@
+                                <input type="hidden" name="optionValuesJson" id="optionValuesJson" value="" />
                             </section>
                         }
 
                         <div class="actions">
-                            <button type="submit" class="btn btn-cart">Thêm vào giỏ hàng</button>
+                            <button type="submit" class="btn btn-cart" onclick="prepareOptionValues()">Thêm vào giỏ hàng</button>
                             <button type="submit"
                                     class="btn btn-buy"
                                     formaction="@(Url.Action("StartDirect","BookingService", new { area="Customer" }))"
@@ -935,6 +971,10 @@
           window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeLB(); });
         })();
 
+        // ===== Tự động thêm tất cả options vào form khi submit =====
+        // Tất cả options đã được thêm vào form qua hidden inputs ở trên
+        // Không cần xử lý thêm gì vì options đã tự động đi chung gói tiền
+
         // ===== Related: nút "Xem thêm" =====
         (function(){
           const grid = document.getElementById('relatedGrid');
@@ -988,5 +1028,38 @@
 
           wireImages(document);
         })();
+
+        // Function để chuẩn bị OptionValues trước khi submit form
+        function prepareOptionValues() {
+            const optionValues = {};
+            @if (Model.ServiceOptions?.Any() == true)
+            {
+                foreach (var o in Model.ServiceOptions)
+                {
+                    if (!string.IsNullOrWhiteSpace(o.Value))
+                    {
+                        <text>
+                        optionValues['@o.OptionId.ToString()'] = @Html.Raw(Json.Serialize(o.Value));
+                        </text>
+                    }
+                }
+            }
+            
+            // Set giá trị vào hidden input
+            const jsonInput = document.getElementById('optionValuesJson');
+            if (jsonInput) {
+                jsonInput.value = JSON.stringify(optionValues);
+            }
+        }
+
+        // Gắn event listener cho form submit
+        document.addEventListener('DOMContentLoaded', function() {
+            const cartForm = document.getElementById('cartForm');
+            if (cartForm) {
+                cartForm.addEventListener('submit', function(e) {
+                    prepareOptionValues();
+                });
+            }
+        });
     </script>
 }

@@ -70,6 +70,10 @@ builder.Services.AddHttpClient<TagAdminService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
 });
+builder.Services.AddHttpClient<OptionAdminService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154
+});
 builder.Services.AddHttpClient<CustomerAdminService>(client =>
 {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); // => https://localhost:7154

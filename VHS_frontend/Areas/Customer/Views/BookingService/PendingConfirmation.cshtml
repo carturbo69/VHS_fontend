@@ -1,0 +1,62 @@
+@model List<VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTO>
+@using System.Globalization
+@{
+    ViewData["Title"] = "Chờ xác nhận";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var vi = CultureInfo.GetCultureInfo("vi-VN");
+    var bookingIds = ViewBag.BookingIds as List<Guid> ?? new List<Guid>();
+    var serviceNames = ViewBag.ServiceNames as Dictionary<Guid, string> ?? new Dictionary<Guid, string>();
+    var total = ViewBag.Total as string ?? "0";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/pending-confirmation.css" asp-append-version="true" />
+}
+
+<div class="pending-confirmation-wrapper">
+    <div class="pending-card">
+        <div class="pending-icon">⏳</div>
+        <h1 class="pending-title">Đơn hàng đang chờ xác nhận</h1>
+        <p class="pending-message">
+            Đơn hàng của bạn đã được tạo thành công và đang chờ nhà cung cấp xác nhận.
+            <br>Bạn sẽ nhận được email thông báo khi đơn hàng được xác nhận.
+        </p>
+
+        @if (Model != null && Model.Any())
+        {
+            <div class="booking-list">
+                <h3>Danh sách dịch vụ đã đặt:</h3>
+                @for (int i = 0; i < Model.Count; i++)
+                {
+                    var booking = Model[i];
+                    var serviceName = serviceNames.TryGetValue(booking.BookingId, out var name) ? name : (booking.Service?.Title ?? $"Dịch vụ số {i + 1}");
+                    <div class="booking-item">
+                        <div class="booking-info">
+                            <div class="booking-service-name">@serviceName</div>
+                            <div class="booking-code">Mã đơn: @(string.IsNullOrWhiteSpace(booking.BookingCode) ? "—" : booking.BookingCode)</div>
+                        </div>
+                        <span class="booking-status">Chờ xác nhận</span>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="info-box">
+            <p>
+                <strong>ℹ️ Lưu ý:</strong> Sau khi nhà cung cấp xác nhận đơn hàng, bạn sẽ nhận được email thông báo và có thể tiến hành thanh toán.
+            </p>
+        </div>
+
+        <div class="btn-group">
+            <a asp-area="Customer" asp-controller="BookingService" asp-action="ListHistoryBooking" class="btn-primary-pending">
+                <span>📋</span>
+                <span>Xem lịch sử đặt lịch</span>
+            </a>
+            <a asp-area="" asp-controller="Home" asp-action="Index" class="btn-secondary-pending">
+                <span>🏠</span>
+                <span>Về trang chủ</span>
+            </a>
+        </div>
+    </div>
+</div>
+

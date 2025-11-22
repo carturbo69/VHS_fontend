@@ -1,6 +1,6 @@
 ﻿@model VHS_frontend.Areas.Customer.Models.ReportDTOs.ReportServiceViewModel
 @{
-    ViewData["Title"] = "Báo cáo/Hoàn tiền";
+    ViewData["Title"] = "Báo cáo";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
@@ -137,12 +137,39 @@
                 <div class="order-title">@Model.ServiceTitle</div>
                 @if (Model.Options?.Any() == true)
                 {
-                    <div class="mt-1">
+                    @* Hiển thị danh sách options phẳng (không có nhóm) cho Customer *@
+                    <div class="opt-section mt-1">
                         @foreach (var opt in Model.Options)
                         {
-                            <span class="option-badge" title="@opt.Description">
-                                @opt.OptionName • @opt.Price.ToString("N0") @opt.UnitType
-                            </span>
+                            var isTextarea = opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text";
+                            <div class="opt-row">
+                                <div class="opt-name" style="flex: 1; min-width: 0;">
+                                    <div style="font-weight: 500; margin-bottom: 8px;">
+                                        <span>✓</span>
+                                        <span>@opt.OptionName</span>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(opt.Value))
+                                    {
+                                        <div style="margin-top: 8px;">
+                                                       
+                                            @if (isTextarea)
+                                            {
+                                                <div class="option-value-text" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px; font-size: 0.9em; line-height: 1.5;">@opt.Value</div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted" style="margin-left: 4px;">@opt.Value</span>
+                                            }
+                                        </div>
+                                    }
+                                    else if (isTextarea)
+                                    {
+                                        <div style="margin-top: 8px; color: #6c757d; font-size: 0.875em;">
+                                            <i class="bi bi-info-circle" style="margin-right: 4px;"></i>Chưa có
+                                        </div>
+                                    }
+                                </div>
+                            </div>
                         }
                     </div>
                 }
@@ -218,7 +245,7 @@
 
             <div class="mb-3">
                 <label class="form-label fw-bold">* Loại báo cáo</label>
-                <select class="form-select form-control-elevated" name="ReportType" required>
+                <select class="form-select form-control-elevated" name="ReportType" id="report-type-select" required>
                     <option value="">Chọn Loại Báo Cáo</option>
                     @foreach (var reportType in Model.ReportTypes)
                     {
@@ -242,6 +269,66 @@
                 <div class="d-flex justify-content-between mt-1">
                     <small class="text-muted">Tối đa 1000 ký tự</small>
                     <small class="text-muted"><span id="desc-count">0</span>/1000</small>
+                </div>
+            </div>
+
+            <!-- Thông tin ngân hàng - chỉ hiển thị khi chọn "Yêu cầu hoàn tiền" -->
+            <div class="mb-3" id="bank-info-section" style="display: none;">
+                <div class="border-top pt-3 mt-3">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <div class="bank-icon-wrapper">
+                            <i class="bi bi-bank2 text-primary"></i>
+                        </div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Thông tin ngân hàng để hoàn tiền</h6>
+                            <small class="text-muted">Điền đầy đủ để nhận hoàn tiền</small>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                                <i class="bi bi-building text-primary"></i>
+                                <span>Tên ngân hàng</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input class="form-control form-control-elevated" name="BankName" id="bank-name" placeholder="VD: Vietcombank, Techcombank, BIDV..." />
+                            <div class="invalid-feedback d-none" id="bank-name-error">
+                                <i class="bi bi-exclamation-circle me-1"></i>
+                                <span>Vui lòng nhập tên ngân hàng.</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                                <i class="bi bi-person-badge text-primary"></i>
+                                <span>Tên chủ tài khoản</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input class="form-control form-control-elevated text-uppercase" name="AccountHolderName" id="account-holder-name" placeholder="VD: NGUYEN VAN A" />
+                            <div class="invalid-feedback d-none" id="account-holder-error">
+                                <i class="bi bi-exclamation-circle me-1"></i>
+                                <span>Vui lòng nhập tên chủ tài khoản.</span>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                                <i class="bi bi-credit-card text-primary"></i>
+                                <span>Số tài khoản</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input class="form-control form-control-elevated" name="BankAccountNumber" id="bank-account-number" inputmode="numeric" placeholder="Chỉ nhập số, từ 6–20 ký tự" />
+                            <div class="invalid-feedback d-none" id="bank-account-error">
+                                <i class="bi bi-exclamation-circle me-1"></i>
+                                <span>Vui lòng nhập số tài khoản.</span>
+                            </div>
+                            <div class="form-text mt-2 d-flex align-items-start gap-2">
+                                <i class="bi bi-shield-check-fill text-success mt-1"></i>
+                                <span>Thông tin ngân hàng được bảo mật và chỉ dùng để hoàn tiền.</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -289,15 +376,104 @@
             update();
           }
 
+          // Hiển thị/ẩn form thông tin ngân hàng khi chọn loại báo cáo
+          const reportTypeSelect = document.getElementById('report-type-select');
+          const bankInfoSection = document.getElementById('bank-info-section');
+          const REFUND_REQUEST_TYPE = 5; // ReportTypeEnum.RefundRequest = 5
+
+          if (reportTypeSelect && bankInfoSection) {
+            reportTypeSelect.addEventListener('change', function() {
+              const selectedValue = parseInt(this.value);
+              if (selectedValue === REFUND_REQUEST_TYPE) {
+                bankInfoSection.style.display = 'block';
+                // Đặt required cho các field ngân hàng
+                document.getElementById('bank-name').required = true;
+                document.getElementById('account-holder-name').required = true;
+                document.getElementById('bank-account-number').required = true;
+              } else {
+                bankInfoSection.style.display = 'none';
+                // Bỏ required cho các field ngân hàng
+                document.getElementById('bank-name').required = false;
+                document.getElementById('account-holder-name').required = false;
+                document.getElementById('bank-account-number').required = false;
+                // Clear values
+                document.getElementById('bank-name').value = '';
+                document.getElementById('account-holder-name').value = '';
+                document.getElementById('bank-account-number').value = '';
+                // Clear errors
+                document.getElementById('bank-name').classList.remove('is-invalid');
+                document.getElementById('account-holder-name').classList.remove('is-invalid');
+                document.getElementById('bank-account-number').classList.remove('is-invalid');
+              }
+            });
+          }
+
           // Boosted client validation UX
           const form = document.querySelector('form[asp-action="SubmitReport"]');
           if (form) {
             form.addEventListener('submit', (e) => {
-              if (!form.checkValidity()) {
-                e.preventDefault();
-                e.stopPropagation();
+              e.preventDefault();
+              e.stopPropagation();
+              
+              let isValid = true;
+              const reportType = parseInt(reportTypeSelect?.value || '0');
+              
+              // Validate thông tin ngân hàng nếu chọn "Yêu cầu hoàn tiền"
+              if (reportType === REFUND_REQUEST_TYPE) {
+                const bankName = document.getElementById('bank-name').value.trim();
+                const accountHolder = document.getElementById('account-holder-name').value.trim();
+                const accountNumber = document.getElementById('bank-account-number').value.trim();
+                
+                // Clear previous errors
+                document.getElementById('bank-name').classList.remove('is-invalid');
+                document.getElementById('account-holder-name').classList.remove('is-invalid');
+                document.getElementById('bank-account-number').classList.remove('is-invalid');
+                document.getElementById('bank-name-error').classList.add('d-none');
+                document.getElementById('account-holder-error').classList.add('d-none');
+                document.getElementById('bank-account-error').classList.add('d-none');
+                
+                // Validate
+                if (!bankName) {
+                  document.getElementById('bank-name').classList.add('is-invalid');
+                  document.getElementById('bank-name-error').classList.remove('d-none');
+                  isValid = false;
+                }
+                
+                if (!accountHolder) {
+                  document.getElementById('account-holder-name').classList.add('is-invalid');
+                  document.getElementById('account-holder-error').classList.remove('d-none');
+                  isValid = false;
+                }
+                
+                if (!accountNumber) {
+                  document.getElementById('bank-account-number').classList.add('is-invalid');
+                  document.getElementById('bank-account-error').querySelector('span').textContent = 'Vui lòng nhập số tài khoản.';
+                  document.getElementById('bank-account-error').classList.remove('d-none');
+                  isValid = false;
+                } else if (!/^\d{6,20}$/.test(accountNumber)) {
+                  document.getElementById('bank-account-number').classList.add('is-invalid');
+                  document.getElementById('bank-account-error').querySelector('span').textContent = 'Số tài khoản phải là số và có từ 6 đến 20 ký tự.';
+                  document.getElementById('bank-account-error').classList.remove('d-none');
+                  isValid = false;
+                }
               }
-              form.classList.add('was-validated');
+              
+              // Validate form mặc định
+              if (!form.checkValidity()) {
+                isValid = false;
+              }
+              
+              if (isValid) {
+                form.submit();
+              } else {
+                form.classList.add('was-validated');
+                // Scroll to first error
+                const firstError = form.querySelector('.is-invalid');
+                if (firstError) {
+                  firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  firstError.focus();
+                }
+              }
             });
           }
         })();

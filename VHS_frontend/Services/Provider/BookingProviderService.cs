@@ -344,6 +344,55 @@ namespace VHS_frontend.Services.Provider
                 return null;
             }
         }
+
+        public async Task<bool> AutoCancelBookingAsync(Guid bookingId, bool isPendingExpired)
+        {
+            try
+            {
+                SetAuthorizationHeader();
+
+                var payload = new
+                {
+                    bookingId = bookingId,
+                    isPendingExpired = isPendingExpired
+                };
+
+                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                var url = "/api/provider/bookings/auto-cancel";
+                
+                var response = await _httpClient.PostAsync(url, content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    // Kiểm tra response body để đảm bảo backend thực sự xử lý
+                    try
+                    {
+                        var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                        if (result.TryGetProperty("success", out var successElement))
+                        {
+                            return successElement.GetBoolean();
+                        }
+                        // Nếu không có property "success", coi như thành công nếu status code là 200
+                        return true;
+                    }
+                    catch (JsonException)
+                    {
+                        // Nếu không parse được JSON, coi như thành công nếu status code là 200
+                        return true;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] AutoCancelBookingAsync exception: {ex.Message}");
+                return false;
+            }
+        }
     }
 }
 

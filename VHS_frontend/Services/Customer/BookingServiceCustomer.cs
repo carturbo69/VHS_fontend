@@ -237,11 +237,26 @@ namespace VHS_frontend.Services.Customer
                     bookingTimeVietnam = it.BookingTime;
                 }
 
+                // Lấy OptionValues từ BookItem (nếu có)
+                Dictionary<Guid, string>? optionValues = null;
+                if (it.OptionValues != null && it.OptionValues.Any())
+                {
+                    optionValues = it.OptionValues;
+                }
+                else if (it.Options != null && it.Options.Any())
+                {
+                    // Fallback: lấy từ Options nếu OptionValues không có
+                    optionValues = it.Options
+                        .Where(opt => !string.IsNullOrWhiteSpace(opt.Value))
+                        .ToDictionary(opt => opt.OptionId, opt => opt.Value ?? string.Empty);
+                }
+
                 items.Add(new CreateBookingItemDto
                 {
                     ServiceId = it.ServiceId,
                     BookingTime = bookingTimeVietnam, // Gửi giờ Việt Nam (Unspecified) lên API
-                    OptionIds = pickedOptionIds
+                    OptionIds = pickedOptionIds,
+                    OptionValues = optionValues
                 });
             }
 
@@ -250,6 +265,11 @@ namespace VHS_frontend.Services.Customer
                 AccountId = accountId,
                 Address = vm.AddressText ?? string.Empty,
                 VoucherId = vm.VoucherId,
+                AddressId = vm.SelectedAddressId, // ✅ Lấy AddressId từ ViewModel
+                Latitude = vm.Address?.Latitude,   // ✅ Lấy Latitude từ Address
+                Longitude = vm.Address?.Longitude, // ✅ Lấy Longitude từ Address
+                RecipientName = vm.Address?.RecipientName ?? vm.RecipientFullName, // ✅ Lấy tên từ Address hoặc ViewModel
+                RecipientPhone = vm.Address?.RecipientPhone ?? vm.RecipientPhone, // ✅ Lấy số điện thoại từ Address hoặc ViewModel
                 Items = items
             };
         }
@@ -517,6 +537,10 @@ namespace VHS_frontend.Services.Customer
                 throw new UnauthorizedAccessException("JWT token is required");
             SetAuthHeader(jwtToken);
             var json = System.Text.Json.JsonSerializer.Serialize(model);
+            
+            // Debug: Log request JSON để kiểm tra
+            System.Diagnostics.Debug.WriteLine($"[CancelBookingWithRefundFullAsync] Request JSON: {json}");
+            
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var res = await _httpClient.PostAsync("/api/Bookings/cancel-with-refund", content, ct);
             if (!res.IsSuccessStatusCode)

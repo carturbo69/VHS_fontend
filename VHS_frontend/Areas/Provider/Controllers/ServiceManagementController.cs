@@ -3,6 +3,8 @@ using VHS_frontend.Services.Provider;
 using VHS_frontend.Areas.Provider.Models.Service;
 using VHS_frontend.Areas.Provider.Models.Tag;
 using VHS_frontend.Areas.Provider.Models.Option;
+using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace VHS_frontend.Areas.Provider.Controllers
 {
@@ -122,6 +124,28 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
             model.ProviderId = Guid.Parse(providerId);
 
+            // Bind OptionValues từ form data (Dictionary binding từ multipart form)
+            if (model.OptionValues == null)
+            {
+                model.OptionValues = new Dictionary<Guid, string>();
+            }
+            
+            // Thu thập OptionValues từ form data (format: OptionValues[key] = value)
+            var form = await Request.ReadFormAsync();
+            foreach (var key in form.Keys.Where(k => k != null && k.StartsWith("OptionValues[")))
+            {
+                // Parse key từ format "OptionValues[guid]" 
+                var match = Regex.Match(key, @"OptionValues\[([^\]]+)\]");
+                if (match.Success && Guid.TryParse(match.Groups[1].Value, out var optionId))
+                {
+                    var value = form[key].ToString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        model.OptionValues[optionId] = value;
+                    }
+                }
+            }
+
             if (!ModelState.IsValid)
             {
                 // Reload dropdown data
@@ -193,8 +217,20 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 OptionIds = service.Options.Select(o => o.OptionId).ToList()
             };
 
+            // Tạo dictionary OptionValues từ Options (nếu có Value)
+            // Dùng Dictionary<string, string> để đảm bảo keys là string khi serialize sang JSON
+            var optionValues = new Dictionary<string, string>();
+            if (service.Options != null)
+            {
+                foreach (var opt in service.Options.Where(opt => !string.IsNullOrWhiteSpace(opt.Value)))
+                {
+                    optionValues[opt.OptionId.ToString()] = opt.Value ?? string.Empty;
+                }
+            }
+            ViewBag.OptionValues = optionValues;
+
             // Load tags for the service's category
-            var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), token);
+            var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), providerId, token);
             ViewBag.Tags = tags ?? new List<TagDTO>();
 
         // Only pass options already selected with this service
@@ -204,6 +240,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             ViewBag.ServiceId = id;
             ViewBag.CurrentImageUrl = service.Images;
             ViewBag.CategoryName = service.CategoryName;
+            ViewBag.CategoryId = service.CategoryId.ToString();
 
             return View(updateModel);
         }
@@ -221,11 +258,24 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 var service = await _serviceManagementService.GetServiceByIdAsync(id, token);
                 if (service != null)
                 {
-                    var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), token);
+                    var providerId = await GetProviderIdFromSession(token);
+                    var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), providerId, token);
                     ViewBag.Tags = tags ?? new List<TagDTO>();
                     ViewBag.Options = service.Options ?? new List<OptionDTO>();
                     ViewBag.CurrentImageUrl = service.Images;
                     ViewBag.CategoryName = service.CategoryName;
+                    ViewBag.CategoryId = service.CategoryId.ToString();
+                    
+                    // Tạo dictionary OptionValues từ Options (nếu có Value)
+                    var optionValues = new Dictionary<string, string>();
+                    if (service.Options != null)
+                    {
+                        foreach (var opt in service.Options.Where(opt => !string.IsNullOrWhiteSpace(opt.Value)))
+                        {
+                            optionValues[opt.OptionId.ToString()] = opt.Value ?? string.Empty;
+                        }
+                    }
+                    ViewBag.OptionValues = optionValues;
                 }
                 ViewBag.ServiceId = id;
 
@@ -235,6 +285,28 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
             // Không tự động nâng ảnh đầu tiên thành Avatar trong trang chỉnh sửa
             // Ảnh mới sẽ được thêm vào cuối danh sách; Avatar chỉ thay khi người dùng chọn Avatar riêng
+
+            // Bind OptionValues từ form data (Dictionary binding từ multipart form)
+            if (model.OptionValues == null)
+            {
+                model.OptionValues = new Dictionary<Guid, string>();
+            }
+            
+            // Thu thập OptionValues từ form data (format: OptionValues[key] = value)
+            var form = await Request.ReadFormAsync();
+            foreach (var key in form.Keys.Where(k => k != null && k.StartsWith("OptionValues[")))
+            {
+                // Parse key từ format "OptionValues[guid]" 
+                var match = Regex.Match(key, @"OptionValues\[([^\]]+)\]");
+                if (match.Success && Guid.TryParse(match.Groups[1].Value, out var optionId))
+                {
+                    var value = form[key].ToString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        model.OptionValues[optionId] = value;
+                    }
+                }
+            }
 
             var response = await _serviceManagementService.UpdateServiceAsync(id, model, token);
 
@@ -249,11 +321,24 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 var service = await _serviceManagementService.GetServiceByIdAsync(id, token);
                 if (service != null)
                 {
-                    var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), token);
+                    var providerId = await GetProviderIdFromSession(token);
+                    var tags = await _serviceManagementService.GetTagsByCategoryAsync(service.CategoryId.ToString(), providerId, token);
                     ViewBag.Tags = tags ?? new List<TagDTO>();
                     ViewBag.Options = service.Options ?? new List<OptionDTO>();
                     ViewBag.CurrentImageUrl = service.Images;
                     ViewBag.CategoryName = service.CategoryName;
+                    ViewBag.CategoryId = service.CategoryId.ToString();
+                    
+                    // Tạo dictionary OptionValues từ Options (nếu có Value)
+                    var optionValues = new Dictionary<string, string>();
+                    if (service.Options != null)
+                    {
+                        foreach (var opt in service.Options.Where(opt => !string.IsNullOrWhiteSpace(opt.Value)))
+                        {
+                            optionValues[opt.OptionId.ToString()] = opt.Value ?? string.Empty;
+                        }
+                    }
+                    ViewBag.OptionValues = optionValues;
                 }
                 ViewBag.ServiceId = id;
 
@@ -288,7 +373,8 @@ namespace VHS_frontend.Areas.Provider.Controllers
         public async Task<IActionResult> GetTagsByCategory(string categoryId)
         {
             var token = HttpContext.Session.GetString("JWToken");
-            var tags = await _serviceManagementService.GetTagsByCategoryAsync(categoryId, token);
+            var providerId = await GetProviderIdFromSession(token);
+            var tags = await _serviceManagementService.GetTagsByCategoryAsync(categoryId, providerId, token);
             return Json(tags ?? new List<TagDTO>());
         }
 

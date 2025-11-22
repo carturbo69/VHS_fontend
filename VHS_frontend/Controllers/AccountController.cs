@@ -179,9 +179,19 @@ namespace VHS_frontend.Controllers
         [HttpPost]
         public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
         {
-            var result = await _googleAuthService.LoginWithGoogleAsync(request.IdToken);
-            if (result == null)
-                return Json(new { success = false, message = "Đăng nhập Google thất bại." });
+            try
+            {
+                if (request == null || string.IsNullOrWhiteSpace(request.IdToken))
+                {
+                    return Json(new { success = false, message = "IdToken không hợp lệ." });
+                }
+
+                var result = await _googleAuthService.LoginWithGoogleAsync(request.IdToken);
+                if (result == null)
+                {
+                    Console.WriteLine($"[AccountController] GoogleLogin failed: result is null");
+                    return Json(new { success = false, message = "Đăng nhập Google thất bại. Vui lòng thử lại." });
+                }
 
             //  Lưu session
             HttpContext.Session.SetString("JWToken", result.Token);
@@ -217,11 +227,18 @@ namespace VHS_frontend.Controllers
                 }
             }
 
-            // Dùng RedirectByRole() để xác định trang cần đến
-            var redirectResult = RedirectByRole(result.Role) as RedirectToActionResult;
-            var redirectUrl = redirectResult != null ? Url.Action(redirectResult.ActionName!, redirectResult.ControllerName!, redirectResult.RouteValues) : Url.Action("Index", "Home");
+                // Dùng RedirectByRole() để xác định trang cần đến
+                var redirectResult = RedirectByRole(result.Role) as RedirectToActionResult;
+                var redirectUrl = redirectResult != null ? Url.Action(redirectResult.ActionName!, redirectResult.ControllerName!, redirectResult.RouteValues) : Url.Action("Index", "Home");
 
-            return Json(new { success = true, redirectUrl });
+                return Json(new { success = true, redirectUrl });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AccountController] GoogleLogin exception: {ex.Message}");
+                Console.WriteLine($"[AccountController] StackTrace: {ex.StackTrace}");
+                return Json(new { success = false, message = $"Đăng nhập Google thất bại: {ex.Message}" });
+            }
         }
 
         [HttpGet]
