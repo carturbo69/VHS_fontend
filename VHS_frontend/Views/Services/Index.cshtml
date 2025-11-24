@@ -4,6 +4,7 @@
     ViewData["Title"] = "Dịch vụ";
     string search = ViewBag.Search as string ?? "";
     string category = ViewBag.Category as string ?? "";
+    string tag = ViewBag.Tag as string ?? "";
     string sort = ViewBag.Sort as string ?? "";
     int currentPage = ViewBag.CurrentPage ?? 1;
     int totalPages = ViewBag.TotalPages ?? 1;
@@ -12,6 +13,8 @@
 
     string PriceToDisplay(decimal p) => $"{p:n0}đ";
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+    
+    var tags = ViewBag.Tags as List<VHS_frontend.Models.ServiceShop.TagDTO> ?? new List<VHS_frontend.Models.ServiceShop.TagDTO>();
 }
 
 @functions {
@@ -151,7 +154,7 @@
                         Danh mục
                     </label>
                     <div class="select-wrapper">
-                        <select name="category" class="filter-select">
+                        <select name="category" id="categorySelect" class="filter-select">
                             <option value="">Tất cả danh mục</option>
                             @if (ViewBag.Categories is IEnumerable<VHS_frontend.Areas.Admin.Models.Category.CategoryDTO> categories)
                             {
@@ -161,6 +164,30 @@
                                         @cat.Name
                                     </option>
                                 }
+                            }
+                        </select>
+                        <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M6 9L12 15L18 9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="filter-input-group" id="tagFilterGroup" style="@(tags.Any() ? "" : "display: none;")">
+                    <label class="filter-label">
+                        <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M20.59 13.41L13.42 20.58C13.2343 20.766 13.0137 20.9135 12.7709 21.0141C12.5281 21.1148 12.2678 21.1666 12.005 21.1666C11.7422 21.1666 11.4819 21.1148 11.2391 21.0141C10.9963 20.9135 10.7757 20.766 10.59 20.58L2 12V2H12L20.59 10.59C20.9625 10.9647 21.1716 11.4716 21.1716 12C21.1716 12.5284 20.9625 13.0353 20.59 13.41Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="7" cy="7" r="1.5" fill="currentColor"/>
+                        </svg>
+                        Tag
+                    </label>
+                    <div class="select-wrapper">
+                        <select name="tag" id="tagSelect" class="filter-select">
+                            <option value="">Tất cả tags</option>
+                            @foreach (var tagItem in tags)
+                            {
+                                <option value="@tagItem.TagId" selected="@(tag == tagItem.TagId.ToString())">
+                                    @tagItem.Name
+                                </option>
                             }
                         </select>
                         <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -264,27 +291,42 @@
                         <div class="card-content">
                             <h3 class="card-title">@service.Title</h3>
 
-                            @* Hiển thị tùy chọn giống ServiceShop *@
+                            @* Hiển thị tất cả tùy chọn: textarea ở cuối, các loại khác ở trên *@
                             @if (service.ServiceOptions != null && service.ServiceOptions.Any())
                             {
+                                // Tách options thành 2 nhóm: không phải textarea và textarea
+                                var regularOptions = service.ServiceOptions
+                                    .Where(o => o.Type?.ToLower() != "textarea" && o.Type?.ToLower() != "text")
+                                    .ToList();
+                                var textareaOptions = service.ServiceOptions
+                                    .Where(o => o.Type?.ToLower() == "textarea" || o.Type?.ToLower() == "text")
+                                    .ToList();
+                                
                                 <div class="card-options">
-                                    @foreach (var opt in service.ServiceOptions.Take(3))
+                                    @* Hiển thị options thường trước *@
+                                    @foreach (var opt in regularOptions)
                                     {
-                                        var isTextarea = opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text";
-                                        <div class="card-option-item @(isTextarea ? "option-item-textarea" : "")">
+                                        <div class="card-option-item">
                                             <span class="option-icon">✓</span>
                                             <div class="option-content">
                                                 <span class="option-name">@opt.OptionName</span>
-                                                @if (!string.IsNullOrWhiteSpace(opt.Value) && isTextarea)
+                                            </div>
+                                        </div>
+                                    }
+                                    
+                                    @* Hiển thị textarea options ở cuối *@
+                                    @foreach (var opt in textareaOptions)
+                                    {
+                                        <div class="card-option-item option-item-textarea">
+                                            <span class="option-icon">✓</span>
+                                            <div class="option-content">
+                                                <span class="option-name">@opt.OptionName</span>
+                                                @if (!string.IsNullOrWhiteSpace(opt.Value))
                                                 {
                                                     <div class="option-value">@opt.Value</div>
                                                 }
                                             </div>
                                         </div>
-                                    }
-                                    @if (service.ServiceOptions.Count > 3)
-                                    {
-                                        <div class="card-option-more">+@(service.ServiceOptions.Count - 3) khác</div>
                                     }
                                 </div>
                             }
@@ -313,7 +355,7 @@
                                     </svg>
                                     <span>@GetUnitTypeVietnamese(service.UnitType)</span>
                                 </div>
-                            } 
+                            }
 
                             <div class="card-footer">
                                 <div class="price-section">
@@ -382,12 +424,12 @@
                     <div class="pagination-wrapper">
                         @if (currentPage > 1)
                         {
-                            <a asp-action="Index" asp-route-page="1" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-btn page-first">
+                            <a asp-action="Index" asp-route-page="1" asp-route-search="@search" asp-route-category="@category" asp-route-tag="@tag" asp-route-sort="@sort" class="page-btn page-first">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M18 17L13 12L18 7M11 17L6 12L11 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
                             </a>
-                            <a asp-action="Index" asp-route-page="@(currentPage - 1)" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-btn page-prev">
+                            <a asp-action="Index" asp-route-page="@(currentPage - 1)" asp-route-search="@search" asp-route-category="@category" asp-route-tag="@tag" asp-route-sort="@sort" class="page-btn page-prev">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M15 18L9 12L15 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
@@ -403,19 +445,19 @@
                                 }
                                 else
                                 {
-                                    <a asp-action="Index" asp-route-page="@i" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-number">@i</a>
+                                    <a asp-action="Index" asp-route-page="@i" asp-route-search="@search" asp-route-category="@category" asp-route-tag="@tag" asp-route-sort="@sort" class="page-number">@i</a>
                                 }
                             }
                         </div>
 
                         @if (currentPage < totalPages)
                         {
-                            <a asp-action="Index" asp-route-page="@(currentPage + 1)" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-btn page-next">
+                            <a asp-action="Index" asp-route-page="@(currentPage + 1)" asp-route-search="@search" asp-route-category="@category" asp-route-tag="@tag" asp-route-sort="@sort" class="page-btn page-next">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M9 18L15 12L9 6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
                             </a>
-                            <a asp-action="Index" asp-route-page="@totalPages" asp-route-search="@search" asp-route-category="@category" asp-route-sort="@sort" class="page-btn page-last">
+                            <a asp-action="Index" asp-route-page="@totalPages" asp-route-search="@search" asp-route-category="@category" asp-route-tag="@tag" asp-route-sort="@sort" class="page-btn page-last">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M6 17L11 12L6 7M13 17L18 12L13 7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
@@ -438,6 +480,48 @@
 document.addEventListener('DOMContentLoaded', function() {
     const filterForm = document.getElementById('filterForm');
     const servicesResults = document.getElementById('servicesResults');
+    const categorySelect = document.getElementById('categorySelect');
+    const tagSelect = document.getElementById('tagSelect');
+    const tagFilterGroup = document.getElementById('tagFilterGroup');
+    
+    // Load tags khi category thay đổi
+    if (categorySelect) {
+        categorySelect.addEventListener('change', function() {
+            const categoryId = this.value;
+            
+            // Reset tag selection
+            if (tagSelect) {
+                tagSelect.innerHTML = '<option value="">Tất cả tags</option>';
+            }
+            
+            // Ẩn tag filter nếu không có category
+            if (!categoryId) {
+                if (tagFilterGroup) tagFilterGroup.style.display = 'none';
+                return;
+            }
+            
+            // Load tags từ API
+            fetch(`/Services/GetTagsByCategory?categoryId=${categoryId}`)
+                .then(response => response.json())
+                .then(tags => {
+                    if (tags && tags.length > 0 && tagSelect) {
+                        tags.forEach(tag => {
+                            const option = document.createElement('option');
+                            option.value = tag.tagId;
+                            option.textContent = tag.name;
+                            tagSelect.appendChild(option);
+                        });
+                        if (tagFilterGroup) tagFilterGroup.style.display = '';
+                    } else {
+                        if (tagFilterGroup) tagFilterGroup.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading tags:', error);
+                    if (tagFilterGroup) tagFilterGroup.style.display = 'none';
+                });
+        });
+    }
     
     // Handle form submission
     if (filterForm) {
@@ -470,6 +554,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(filterForm);
         const params = new URLSearchParams(formData);
         params.set('page', page);
+        
+        // Đảm bảo tag được thêm vào params
+        const tagValue = tagSelect ? tagSelect.value : '';
+        if (tagValue) {
+            params.set('tag', tagValue);
+        } else {
+            params.delete('tag');
+        }
         
         // Show loading state
         servicesResults.classList.add('loading');

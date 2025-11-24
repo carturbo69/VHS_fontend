@@ -72,11 +72,36 @@
 
 <div class="container my-3">
     <!-- Toast Notifications -->
-    @if (TempData["ToastSuccess"] != null)
+    @{
+        var toastSuccess = TempData["ToastSuccess"]?.ToString();
+        var shouldShowSuccess = !string.IsNullOrWhiteSpace(toastSuccess) && 
+                                !toastSuccess.Contains("address", StringComparison.OrdinalIgnoreCase) &&
+                                !toastSuccess.Contains("Address", StringComparison.OrdinalIgnoreCase) &&
+                                !toastSuccess.Contains("complete", StringComparison.OrdinalIgnoreCase) &&
+                                !toastSuccess.Contains("Complete", StringComparison.OrdinalIgnoreCase);
+    }
+    @if (shouldShowSuccess)
     {
         <div class="alert alert-success alert-dismissible fade show" role="alert" style="margin-bottom: 20px; border-left: 4px solid #28a745;">
             <i class="bi bi-check-circle-fill me-2"></i>
-            <strong>Thành công!</strong> @TempData["ToastSuccess"]
+            <strong>Thành công!</strong> @toastSuccess
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+        </div>
+    }
+    @{
+        var toastError = TempData["ToastError"]?.ToString();
+        var shouldShowError = !string.IsNullOrWhiteSpace(toastError) && 
+                              !toastError.Contains("đăng nhập", StringComparison.OrdinalIgnoreCase) &&
+                              !toastError.Contains("Đăng nhập", StringComparison.OrdinalIgnoreCase) &&
+                              !toastError.Contains("login", StringComparison.OrdinalIgnoreCase) &&
+                              !toastError.Contains("Login", StringComparison.OrdinalIgnoreCase) &&
+                              !toastError.Contains("cần đăng nhập", StringComparison.OrdinalIgnoreCase);
+    }
+    @if (shouldShowError)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-bottom: 20px; border-left: 4px solid #dc3545;">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>
+            <strong>Lỗi!</strong> @toastError
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
         </div>
     }
@@ -205,7 +230,7 @@
                             <i class="bi bi-truck"></i>
                             @(
                                                     isServiceCompleted
-                                                    ? "XÁC NHẬN HOÀN THÀNH"     // ✅ nếu là trạng thái ServiceCompleted
+                                                    ? "XÁC NHẬN HOÀN THÀNH"     // nếu là trạng thái ServiceCompleted
                                                     : (isDone ? "Hoàn thành dịch vụ" : statusText)
                                                     )
                     </div>
@@ -247,8 +272,32 @@
                         @if (o.Options?.Any() == true)
                         {
                             @* Hiển thị danh sách options phẳng (không có nhóm) cho Customer *@
+                            @* Tách options thành 2 nhóm: non-textarea trước, textarea sau *@
+                            var nonTextareaOptions = o.Options.Where(opt => 
+                                !(opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text")).ToList();
+                            var textareaOptions = o.Options.Where(opt => 
+                                opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text").ToList();
                             <div class="opt-section mt-1">
-                                @foreach (var opt in o.Options)
+                                @* Hiển thị non-textarea options trước *@
+                                @foreach (var opt in nonTextareaOptions)
+                                {
+                                    <div class="opt-row">
+                                        <div class="opt-name" style="flex: 1; min-width: 0;">
+                                            <div style="font-weight: 500; margin-bottom: 8px;">
+                                                <span>✓</span>
+                                                <span>@opt.OptionName</span>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(opt.Value))
+                                            {
+                                                <div style="margin-top: 8px;">
+                                                    <span class="text-muted" style="margin-left: 4px;">@opt.Value</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                @* Hiển thị textarea options sau cùng *@
+                                @foreach (var opt in textareaOptions)
                                 {
                                     var isTextarea = opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text";
                                     <div class="opt-row">
@@ -260,7 +309,6 @@
                                             @if (!string.IsNullOrWhiteSpace(opt.Value))
                                             {
                                                 <div style="margin-top: 8px;">
-                                                       
                                                     @if (isTextarea)
                                                     {
                                                         <div class="option-value-text" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px; font-size: 0.9em; line-height: 1.5;">@opt.Value</div>
@@ -663,6 +711,18 @@
             </div>
         }
     </div>
+
+    <!-- Pagination -->
+    <div id="pagination-container" class="pagination-wrapper mt-4" style="display: none;">
+        <nav aria-label="Phân trang">
+            <ul class="pagination justify-content-center mb-0" id="pagination-controls">
+                <!-- Pagination items will be generated by JavaScript -->
+            </ul>
+        </nav>
+        <div class="pagination-info text-center mt-3">
+            <span id="pagination-text" class="text-muted"></span>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -674,20 +734,142 @@
             const tabs = document.querySelectorAll('.nav-status .nav-link');
             const input = document.getElementById('q');
             const cards = () => Array.from(document.querySelectorAll('.order-card'));
+            
+            // Pagination settings
+            const ITEMS_PER_PAGE = 12;
+            let currentPage = 1;
+            let filteredCards = [];
+
+            function getFilteredCards() {
+                const q = (input.value || '').toLowerCase();
+                const activeTab = document.querySelector('.nav-status .nav-link.active');
+                const targetStatus = (activeTab?.dataset.status || 'All').trim().toLowerCase();
+                
+                return cards().filter(c => {
+                    const status = (c.dataset.status || '').trim().toLowerCase();
+                    const okStatus = (targetStatus === 'all') || (status === targetStatus);
+                    const okQuery = (c.dataset.title || '').toLowerCase().includes(q);
+                    return okStatus && okQuery;
+                });
+            }
 
             function applyFilter(statusCode) {
-                const q = (input.value || '').toLowerCase();
-                const targetStatus = (statusCode || '').trim().toLowerCase();
+                filteredCards = getFilteredCards();
+                currentPage = 1; // Reset về trang đầu khi filter
+                renderPage();
+            }
+            
+            function renderPage() {
+                // Ẩn tất cả cards trước
+                cards().forEach(c => c.style.display = 'none');
                 
-                cards().forEach(c => {
-                    const status = (c.dataset.status || '').trim().toLowerCase();
-                    // Debug log để kiểm tra
-                    // console.log('Card status:', status, 'Target:', targetStatus, 'Match:', status === targetStatus || targetStatus === 'all');
+                // Tính toán pagination
+                const totalItems = filteredCards.length;
+                const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+                
+                // Hiển thị pagination nếu có hơn 15 items
+                const paginationContainer = document.getElementById('pagination-container');
+                if (totalItems > ITEMS_PER_PAGE) {
+                    paginationContainer.style.display = 'block';
+                    renderPagination(totalPages);
+                } else {
+                    paginationContainer.style.display = 'none';
+                }
+                
+                // Hiển thị items của trang hiện tại
+                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                const endIndex = startIndex + ITEMS_PER_PAGE;
+                const pageItems = filteredCards.slice(startIndex, endIndex);
+                
+                pageItems.forEach(c => c.style.display = '');
+                
+                // Cập nhật thông tin pagination
+                updatePaginationInfo(totalItems, startIndex + 1, Math.min(endIndex, totalItems));
+            }
+            
+            function renderPagination(totalPages) {
+                const paginationControls = document.getElementById('pagination-controls');
+                paginationControls.innerHTML = '';
+                
+                // Nút Previous
+                const prevLi = document.createElement('li');
+                prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+                prevLi.innerHTML = `<a class="page-link" href="javascript:void(0)" data-page="${currentPage - 1}"><</a>`;
+                paginationControls.appendChild(prevLi);
+                
+                // Số trang
+                const maxVisiblePages = 5;
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                
+                if (endPage - startPage < maxVisiblePages - 1) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                }
+                
+                // Trang đầu
+                if (startPage > 1) {
+                    const firstLi = document.createElement('li');
+                    firstLi.className = 'page-item';
+                    firstLi.innerHTML = `<a class="page-link" href="javascript:void(0)" data-page="1">1</a>`;
+                    paginationControls.appendChild(firstLi);
                     
-                    const okStatus = (targetStatus === 'all') || (status === targetStatus);
-                    const okQuery  = (c.dataset.title || '').toLowerCase().includes(q);
-                    c.style.display = (okStatus && okQuery) ? '' : 'none';
+                    if (startPage > 2) {
+                        const ellipsisLi = document.createElement('li');
+                        ellipsisLi.className = 'page-item disabled';
+                        ellipsisLi.innerHTML = `<span class="page-link">...</span>`;
+                        paginationControls.appendChild(ellipsisLi);
+                    }
+                }
+                
+                // Các trang trong khoảng
+                for (let i = startPage; i <= endPage; i++) {
+                    const li = document.createElement('li');
+                    li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                    li.innerHTML = `<a class="page-link" href="javascript:void(0)" data-page="${i}">${i}</a>`;
+                    paginationControls.appendChild(li);
+                }
+                
+                // Trang cuối
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                        const ellipsisLi = document.createElement('li');
+                        ellipsisLi.className = 'page-item disabled';
+                        ellipsisLi.innerHTML = `<span class="page-link">...</span>`;
+                        paginationControls.appendChild(ellipsisLi);
+                    }
+                    
+                    const lastLi = document.createElement('li');
+                    lastLi.className = 'page-item';
+                    lastLi.innerHTML = `<a class="page-link" href="javascript:void(0)" data-page="${totalPages}">${totalPages}</a>`;
+                    paginationControls.appendChild(lastLi);
+                }
+                
+                // Nút Next
+                const nextLi = document.createElement('li');
+                nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+                nextLi.innerHTML = `<a class="page-link" href="javascript:void(0)" data-page="${currentPage + 1}">></a>`;
+                paginationControls.appendChild(nextLi);
+                
+                // Gắn event listeners cho các nút pagination
+                paginationControls.querySelectorAll('.page-link').forEach(link => {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const page = parseInt(this.dataset.page);
+                        if (page && page >= 1 && page <= totalPages && page !== currentPage) {
+                            currentPage = page;
+                            renderPage();
+                            // Scroll lên đầu danh sách
+                            document.getElementById('order-list').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    });
                 });
+            }
+            
+            function updatePaginationInfo(totalItems, start, end) {
+                const paginationText = document.getElementById('pagination-text');
+                if (paginationText) {
+                    paginationText.textContent = `Hiển thị ${start}-${end} trong tổng số ${totalItems} đơn dịch vụ`;
+                }
             }
 
             tabs.forEach(t => {
@@ -702,6 +884,9 @@
                 const active = document.querySelector('.nav-status .nav-link.active')?.dataset.status || 'All';
                 applyFilter(active);
             });
+            
+            // Khởi tạo filter và pagination khi page load
+            applyFilter('All');
 
             // Rating
             document.querySelectorAll('.rating').forEach(group => {
@@ -1111,6 +1296,12 @@
                             
                             // Re-initialize các event handlers cần thiết
                             initializeEventHandlers();
+                            
+                            // Áp dụng lại filter và pagination sau khi refresh
+                            setTimeout(() => {
+                                const active = document.querySelector('.nav-status .nav-link.active')?.dataset.status || 'All';
+                                applyFilter(active);
+                            }, 100);
                             
                             // Khôi phục scroll position
                             window.scrollTo(0, scrollTop);

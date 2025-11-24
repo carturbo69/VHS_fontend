@@ -1,4 +1,5 @@
 ﻿@model VHS_frontend.Models.Account.LoginDTO
+@using Microsoft.Extensions.Primitives
 @{
     ViewData["Title"] = "Đăng nhập";
     Layout = "~/Views/Shared/_AuthLayout.cshtml";
@@ -47,7 +48,13 @@
                     <a asp-controller="Account" asp-action="Register" class="link">Đăng ký</a>
                 </p>
 
-                @if (Context.Request.Query["activated"] == "true")
+                @{
+                    StringValues activatedQuery;
+                    var isActivated = Context.Request.Query.TryGetValue("activated", out activatedQuery) 
+                        && activatedQuery.Count > 0 
+                        && activatedQuery.ToString() == "true";
+                }
+                @if (isActivated)
                 {
                     <div id="activationSuccessAlert" class="alert alert-success" role="alert" style="margin-bottom: 20px; padding: 16px; border-radius: 8px; background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border: 1.5px solid #28a745; color: #155724; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.15);">
                         <div style="display: flex; align-items: center; gap: 12px;">
@@ -64,7 +71,11 @@
                     </div>
                 }
 
-                @if (TempData["Success"] != null)
+                @{
+                    var successTempData = TempData["Success"] as string;
+                    var hasSuccess = !string.IsNullOrEmpty(successTempData);
+                }
+                @if (hasSuccess)
                 {
                     <div id="resetPasswordSuccessAlert" class="alert alert-success" role="alert" style="margin-bottom: 20px; padding: 16px; border-radius: 8px; background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border: 1.5px solid #28a745; color: #155724; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.15);">
                         <div style="display: flex; align-items: center; gap: 12px;">
@@ -75,7 +86,7 @@
                             </div>
                             <div style="flex: 1;">
                                 <strong style="font-size: 16px; display: block; margin-bottom: 4px;">Thành công!</strong>
-                                <span style="font-size: 14px;">@TempData["Success"]</span>
+                                <span style="font-size: 14px;">@successTempData</span>
                             </div>
                         </div>
                     </div>
@@ -83,9 +94,15 @@
 
                 <form asp-controller="Account" asp-action="Login" method="post" class="form" novalidate>
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+                    @{
+                        var returnUrl = ViewData["ReturnUrl"] as string ?? string.Empty;
+                    }
+                    @if (!string.IsNullOrEmpty(returnUrl))
+                    {
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    }
 
-                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                    <div asp-validation-summary="All" class="text-danger validation-summary-container" style="margin-bottom: 20px;"></div>
 
                     <div class="field">
                         <label class="label" for="Username">Tên đăng nhập hoặc Email</label>
@@ -275,8 +292,8 @@
             <h6>7. Liên hệ về Bảo mật</h6>
             <p>Nếu bạn có bất kỳ câu hỏi, lo ngại hoặc yêu cầu nào liên quan đến chính sách bảo mật này hoặc cách chúng tôi xử lý thông tin cá nhân của bạn, vui lòng liên hệ:</p>
             <ul>
-                <li><strong>Email:</strong> support@vhs.vn</li>
-                <li><strong>Hotline:</strong> 1900-xxxx (thời gian hỗ trợ: 8:00 - 22:00 hàng ngày)</li>
+                <li><strong>Email:</strong> vhsplatform700@gmail.com</li>
+                <li><strong>Hotline:</strong> 0337 868 575 (thời gian hỗ trợ: 8:00 - 22:00 hàng ngày)</li>
             </ul>
             <p>Chúng tôi cam kết phản hồi mọi yêu cầu của bạn trong vòng <strong>7 ngày làm việc</strong>.</p>
             
@@ -321,6 +338,8 @@
           if (u) { try { u.focus(); } catch(_){} }
 
           const sum = document.querySelector('.validation-summary-errors');
+          
+          // Xử lý validation summary khi có lỗi
           if (sum) {
             document.querySelector('.auth-card')?.classList.add('has-error');
             setTimeout(()=>document.querySelector('.auth-card')?.classList.remove('has-error'), 380);

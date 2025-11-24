@@ -85,6 +85,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         // GET: Provider/ServiceManagement/Create
+        // ✅ Lấy categories chỉ từ certificates còn tồn tại của provider này
         public async Task<IActionResult> Create()
         {
             var token = HttpContext.Session.GetString("JWToken");
@@ -96,9 +97,10 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 return RedirectToAction("Login", "Account", new { area = "" });
             }
 
-        // Lấy danh sách Categories khả dụng
-        var categories = await _serviceManagementService.GetAvailableCategoriesAsync(providerId, token);
-        ViewBag.Categories = categories ?? new List<CategoryDTO>();
+            // ✅ Lấy danh sách Categories khả dụng - chỉ lấy từ certificates còn tồn tại của provider này
+            // Backend API sẽ lọc categories từ certificates, nên khi admin xóa certificate thì category sẽ không còn
+            var categories = await _serviceManagementService.GetAvailableCategoriesAsync(providerId, token);
+            ViewBag.Categories = categories ?? new List<CategoryDTO>();
 
             // Không nạp Options dùng chung cho trang tạo mới (bắt đầu trống, provider tự thêm)
 
@@ -369,11 +371,19 @@ namespace VHS_frontend.Areas.Provider.Controllers
         }
 
         // API endpoint to get tags by category (for AJAX)
+        // ✅ Lọc tags theo providerId từ session để chỉ hiển thị tags còn lại trong certificates
         [HttpGet]
         public async Task<IActionResult> GetTagsByCategory(string categoryId)
         {
             var token = HttpContext.Session.GetString("JWToken");
             var providerId = await GetProviderIdFromSession(token);
+            
+            if (string.IsNullOrEmpty(providerId))
+            {
+                return Json(new List<TagDTO>()); // Trả về rỗng nếu không có providerId
+            }
+            
+            // ✅ Truyền providerId vào để backend lọc tags từ certificates còn tồn tại
             var tags = await _serviceManagementService.GetTagsByCategoryAsync(categoryId, providerId, token);
             return Json(tags ?? new List<TagDTO>());
         }

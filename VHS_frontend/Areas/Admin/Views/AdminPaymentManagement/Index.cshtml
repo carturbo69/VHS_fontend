@@ -92,6 +92,10 @@
     <div>
         @if (currentTab == "dashboard")
         {
+            {
+                ViewBag.PendingWithdrawals = Model.PendingWithdrawals;
+                ViewBag.ProcessedWithdrawals = Model.ProcessedWithdrawals;
+            }
             @await Html.PartialAsync("_DashboardPartial", Model.Dashboard)
         }
         else if (currentTab == "refunds")
@@ -349,9 +353,15 @@
             .then(data => {
                 if (data.success) {
                     showCenterToast(data.message, 'success');
+                    // Tăng thời gian đợi để đảm bảo database đã commit xong
+                    // Sau đó reload để cập nhật badge và danh sách
                     setTimeout(() => {
-                    location.reload();
-                    }, 1500);
+                        // Giữ nguyên URL hiện tại (bao gồm query string tab nếu có)
+                        const currentUrl = window.location.href;
+                        // Thêm timestamp để force reload và clear cache
+                        const separator = currentUrl.includes('?') ? '&' : '?';
+                        window.location.href = currentUrl + separator + '_t=' + new Date().getTime();
+                    }, 1000);
                 } else {
                     showCenterToast('Lỗi: ' + data.message, 'error');
                 }

@@ -75,15 +75,39 @@
                         }
                         <div class="flex-grow-1">
                             <h5>@Model.ServiceName</h5>
-                            <p class="text-muted">@Model.ServiceDescription</p>
+                            <div class="service-description">@(Model.ServiceDescription ?? "")</div>
                             <p><strong>Giá cơ bản:</strong> <span class="text-primary">@Model.ServicePrice.ToString("N0") VND</span></p>
                             
                             @if (Model.Options.Any())
                             {
+                                @* Tách options thành 2 nhóm: non-textarea trước, textarea sau *@
+                                var nonTextareaOptions = Model.Options.Where(opt => 
+                                    !(opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text")).ToList();
+                                var textareaOptions = Model.Options.Where(opt => 
+                                    opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text").ToList();
+                                
                                 <div class="mt-3">
                                     <strong>Tùy chọn đã bao gồm:</strong>
                                     <div class="mt-2">
-                                        @foreach (var option in Model.Options)
+                                        @* Hiển thị non-textarea options trước *@
+                                        @foreach (var option in nonTextareaOptions)
+                                        {
+                                            <div style="font-size: 0.9375rem; color: #6c757d; margin-bottom: 0.25rem;">
+                                                <div style="display: flex; align-items: flex-start;">
+                                                    <i class="bi bi-check-circle-fill me-1" style="color: #198754; font-size: 0.75rem; margin-top: 0.125rem; flex-shrink: 0;"></i>
+                                                    <div style="flex: 1; min-width: 0;">
+                                                        <span>@option.OptionName</span>
+                                                        @if (!string.IsNullOrWhiteSpace(option.Value))
+                                                        {
+                                                            <span class="text-muted" style="margin-left: 4px;">@option.Value</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                        
+                                        @* Hiển thị textarea options sau cùng *@
+                                        @foreach (var option in textareaOptions)
                                         {
                                             var isTextarea = option.Type?.ToLower() == "textarea" || option.Type?.ToLower() == "text";
                                             <div style="font-size: 0.9375rem; color: #6c757d; margin-bottom: 0.25rem;">

@@ -42,10 +42,10 @@
                 </h1>
                 <p class="welcome-subtitle">Tổng quan hệ thống Viet Home Service</p>
                 <div class="welcome-stats">
-                    <div class="mini-stat">
+                    <!-- <div class="mini-stat">
                         <i class="bi bi-clock"></i>
                         <span>Thời gian hoạt động: <strong id="uptime">24h 15m</strong></span>
-                    </div>
+                    </div> -->
                     <div class="mini-stat">
                         <i class="bi bi-shield-check"></i>
                         <span>Trạng thái: <strong class="status-online">Trực tuyến</strong></span>
@@ -59,10 +59,10 @@
                     <i class="bi bi-calendar3"></i>
                     <span id="currentDate"></span>
                 </div>
-                <div class="weather-info">
+                <!-- <div class="weather-info">
                     <i class="bi bi-sun"></i>
                     <span>Cần Thơ, 32°C</span>
-                </div>
+                </div> -->
             </div>
             <button class="btn btn-outline-primary btn-refresh" onclick="refreshDashboard()">
                 <i class="bi bi-arrow-clockwise"></i>
@@ -247,7 +247,11 @@
         <div class="chart-container main-chart">
             <div class="chart-header">
                 <div class="chart-title">
-                    <h3><i class="bi bi-graph-up"></i> Doanh thu 7 ngày qua</h3>
+                    <h3><i class="bi bi-graph-up"></i> Doanh thu @{
+                        var revenueDays = Context.Request.Query["revenueDays"].FirstOrDefault();
+                        var days = !string.IsNullOrEmpty(revenueDays) ? int.Parse(revenueDays) : 7;
+                        @($"{days} ngày qua");
+                    }</h3>
                     <div class="chart-summary">
                         <span class="summary-item">
                             <i class="bi bi-arrow-up text-success"></i>
@@ -260,9 +264,13 @@
                     </div>
                 </div>
                 <div class="chart-controls">
-                    <button class="btn btn-sm btn-outline-primary active" data-period="7d">7 ngày</button>
-                    <button class="btn btn-sm btn-outline-primary" data-period="30d">30 ngày</button>
-                    <button class="btn btn-sm btn-outline-primary" data-period="90d">90 ngày</button>
+                    @{
+                        var currentRevenueDays = Context.Request.Query["revenueDays"].FirstOrDefault();
+                        var currentDays = !string.IsNullOrEmpty(currentRevenueDays) ? int.Parse(currentRevenueDays) : 7;
+                    }
+                    <button class="btn btn-sm btn-outline-primary @(currentDays == 7 ? "active" : "")" data-period="7" onclick="changeRevenuePeriod(7)">7 ngày</button>
+                    <button class="btn btn-sm btn-outline-primary @(currentDays == 15 ? "active" : "")" data-period="15" onclick="changeRevenuePeriod(15)">15 ngày</button>
+                    <button class="btn btn-sm btn-outline-primary @(currentDays == 30 ? "active" : "")" data-period="30" onclick="changeRevenuePeriod(30)">30 ngày</button>
                     <button class="btn btn-sm btn-outline-secondary" onclick="exportChart()">
                         <i class="bi bi-download"></i>
                     </button>
@@ -727,19 +735,43 @@
 
         // Rating Chart
         const ratingCtx = document.getElementById('ratingChart').getContext('2d');
+        const ratingDistributions = @Html.Raw(Json.Serialize(Model.RatingDistributions));
+        
+        // Hàm gán màu cho từng mức đánh giá
+        function getRatingColor(stars) {
+            switch(stars) {
+                case 1:
+                    return '#dc2626'; // Đỏ đậm - Tệ nhất
+                case 2:
+                    return '#f97316'; // Cam đậm - Kém
+                case 3:
+                    return '#fbbf24'; // Vàng - Trung bình
+                case 4:
+                    return '#3b82f6'; // Xanh dương - Tốt
+                case 5:
+                    return '#10b981'; // Xanh lá - Tuyệt vời
+                default:
+                    return '#6b7280'; // Xám - Mặc định
+            }
+        }
+        
+        // Sắp xếp theo số sao từ 1 đến 5 và gán màu tương ứng
+        const sortedRatings = ratingDistributions
+            .slice()
+            .sort((a, b) => a.stars - b.stars)
+            .map(r => ({
+                label: r.stars + " sao",
+                data: r.percentage,
+                color: getRatingColor(r.stars)
+            }));
+        
         const ratingChart = new Chart(ratingCtx, {
             type: 'doughnut',
             data: {
-                labels: @Html.Raw(Json.Serialize(Model.RatingDistributions.Select(r => r.Stars + " sao"))),
+                labels: sortedRatings.map(r => r.label),
                 datasets: [{
-                    data: @Html.Raw(Json.Serialize(Model.RatingDistributions.Select(r => r.Percentage))),
-                    backgroundColor: [
-                        '#10b981',
-                        '#34d399',
-                        '#f59e0b',
-                        '#fb923c',
-                        '#ef4444'
-                    ],
+                    data: sortedRatings.map(r => r.data),
+                    backgroundColor: sortedRatings.map(r => r.color),
                     borderWidth: 0
                 }]
             },
@@ -814,10 +846,20 @@
             }
         });
 
+        // Revenue Chart Period Control
+        function changeRevenuePeriod(days) {
+            // Cập nhật URL với query parameter
+            const url = new URL(window.location.href);
+            url.searchParams.set('revenueDays', days);
+            
+            // Reload trang để lấy dữ liệu mới
+            window.location.href = url.toString();
+        }
+
         // Chart period controls for Monthly Revenue
-        document.querySelectorAll('[data-period]').forEach(btn => {
+        document.querySelectorAll('.chart-container:not(.main-chart) [data-period]').forEach(btn => {
             btn.addEventListener('click', function() {
-                document.querySelectorAll('[data-period]').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.chart-container:not(.main-chart) [data-period]').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 const period = this.getAttribute('data-period');
                 const url = new URL(window.location.href);

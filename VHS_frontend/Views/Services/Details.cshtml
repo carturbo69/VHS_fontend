@@ -54,6 +54,44 @@
 
 <link rel="stylesheet" href="~/css/service-detail.css" asp-append-version="true" />
 
+<style>
+    /* Fix thụt lề cho phần mô tả dịch vụ - cách tiếp cận mới */
+    #descContent {
+        padding-left: 0 !important;
+        margin-left: 0 !important;
+        text-indent: 0 !important;
+        padding: 0 !important;
+        white-space: pre-wrap !important;
+        position: relative;
+    }
+    
+    /* Reset tất cả phần tử con - dùng universal selector */
+    #descContent * {
+        padding-left: 0 !important;
+        margin-left: 0 !important;
+        text-indent: 0 !important;
+    }
+    
+    /* Reset phần tử đầu tiên */
+    #descContent > *:first-child {
+        padding-left: 0 !important;
+        margin-left: 0 !important;
+        text-indent: 0 !important;
+        margin-top: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Đảm bảo text node đầu tiên không bị thụt lề */
+    #descContent::before {
+        content: '';
+        display: block;
+        width: 0;
+        height: 0;
+        padding: 0;
+        margin: 0;
+    }
+</style>
+
 <section class="service-detail">
     <div class="container-xl">
         <!-- Breadcrumb -->
@@ -340,8 +378,8 @@
                     </div>
 
                     <div class="stat-pair">
-                        <span class="label">Dịch vụ</span>
-                        <span class="value">@p.TotalServices.ToString("n0")</span>
+                        <span class="label">Dịch vụ:</span>
+                        <span class="value">@(ViewBag.ApprovedServicesCount ?? p.TotalServices)</span>
                     </div>
                     <div class="stat-pair">
                         <span class="label">Đánh giá trung bình</span>
@@ -361,8 +399,22 @@
                 <section class="desc-section" id="desc">
                     <article class="desc-card" id="descCard">
                         <div class="desc-header">Mô tả dịch vụ</div>
-                        <div class="desc-content description-text" id="descContent">
-                            @Html.Raw(Model.Description)
+                        <div class="desc-content description-text" id="descContent" style="padding-left: 0 !important; margin-left: 0 !important; text-indent: 0 !important; padding: 0 !important;">
+                            @{
+                                // Xử lý description: loại bỏ leading spaces/tabs ở đầu
+                                var description = Model.Description ?? "";
+                                if (!string.IsNullOrWhiteSpace(description))
+                                {
+                                    // Trim leading spaces/tabs nhưng giữ line breaks
+                                    description = description.TrimStart(' ', '\t', '\r', '\n');
+                                    // Nếu bắt đầu bằng \n, giữ lại để giữ line breaks
+                                    if (Model.Description.StartsWith("\n") || Model.Description.StartsWith("\r\n"))
+                                    {
+                                        description = "\n" + description.TrimStart('\n', '\r');
+                                    }
+                                }
+                            }
+                            @Html.Raw(description)
                         </div>
                         <button type="button" class="btn-toggle" id="descToggle" hidden>Xem thêm</button>
                     </article>
@@ -1059,6 +1111,60 @@
                 cartForm.addEventListener('submit', function(e) {
                     prepareOptionValues();
                 });
+            }
+            
+            // Fix thụt lề cho phần mô tả dịch vụ - cách đơn giản và hiệu quả
+            const descContent = document.getElementById('descContent');
+            if (descContent) {
+                // Force reset style
+                descContent.style.paddingLeft = '0';
+                descContent.style.marginLeft = '0';
+                descContent.style.textIndent = '0';
+                descContent.style.padding = '0';
+                descContent.style.whiteSpace = 'pre-wrap';
+                
+                // Lấy toàn bộ HTML content
+                let html = descContent.innerHTML;
+                
+                // Nếu text bắt đầu bằng spaces/tabs, loại bỏ chúng
+                if (html) {
+                    // Loại bỏ leading spaces/tabs ở đầu HTML (chỉ ở đầu, không phải mỗi dòng)
+                    html = html.replace(/^[\s\t]+/, '');
+                    descContent.innerHTML = html;
+                }
+                
+                // Reset tất cả phần tử con
+                const allElements = descContent.querySelectorAll('*');
+                allElements.forEach(function(el) {
+                    el.style.paddingLeft = '0';
+                    el.style.marginLeft = '0';
+                    el.style.textIndent = '0';
+                    el.style.padding = '0';
+                });
+                
+                // Xử lý text nodes trực tiếp
+                const walker = document.createTreeWalker(
+                    descContent,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+                
+                let firstTextNode = null;
+                let node;
+                while (node = walker.nextNode()) {
+                    if (!firstTextNode && node.textContent.trim()) {
+                        firstTextNode = node;
+                    }
+                    // Trim leading spaces chỉ ở text node đầu tiên
+                    if (node === firstTextNode) {
+                        const text = node.textContent;
+                        const trimmed = text.replace(/^[\s\t]+/, '');
+                        if (trimmed !== text) {
+                            node.textContent = trimmed;
+                        }
+                    }
+                }
             }
         });
     </script>
