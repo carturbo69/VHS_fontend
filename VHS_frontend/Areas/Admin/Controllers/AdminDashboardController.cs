@@ -240,10 +240,59 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 }
             }
             
+            // Lấy số ngày từ query parameter, mặc định là 7
+            var revenueDaysParam = Request.Query["revenueDays"].FirstOrDefault();
+            var revenueDays = 7; // Mặc định 7 ngày
+            if (!string.IsNullOrEmpty(revenueDaysParam) && int.TryParse(revenueDaysParam, out var parsedDays))
+            {
+                // Chỉ chấp nhận 7, 15, hoặc 30 ngày
+                if (parsedDays == 7 || parsedDays == 15 || parsedDays == 30)
+                {
+                    revenueDays = parsedDays;
+                }
+            }
+            
             try
             {
-                revenueChartData = await _bookingService.GetRevenueChartAsync(days: 7);
-                System.Diagnostics.Debug.WriteLine($"📈 Revenue Chart Data: {revenueChartData.Count} days");
+                revenueChartData = await _bookingService.GetRevenueChartAsync(days: revenueDays);
+                System.Diagnostics.Debug.WriteLine($"📈 Revenue Chart Data from API: {revenueChartData.Count} days (requested: {revenueDays})");
+                
+                // Kiểm tra nếu API không trả về đủ dữ liệu, tự tính từ bookings
+                if (revenueChartData.Count < revenueDays)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ API returned insufficient data ({revenueChartData.Count} < {revenueDays}), calculating from bookings...");
+                    
+                    // Tính toán trực tiếp từ bookings
+                    var startDate = DateTime.Today.AddDays(-(revenueDays - 1));
+                    var endDate = DateTime.Today.AddDays(1).AddTicks(-1);
+                    
+                    var filter = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                    {
+                        FromDate = startDate,
+                        ToDate = endDate,
+                        PageNumber = 1,
+                        PageSize = 10000
+                    };
+                    
+                    var bookingsResult = await _bookingService.GetAllBookingsAsync(filter);
+                    if (bookingsResult != null && bookingsResult.Items != null)
+                    {
+                        // Nhóm theo ngày và tính tổng doanh thu
+                        var revenueByDate = bookingsResult.Items
+                            .Where(b => b.BookingTime >= startDate && b.BookingTime <= endDate)
+                            .GroupBy(b => b.BookingTime.Date)
+                            .Select(g => new VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO
+                            {
+                                Date = g.Key,
+                                Revenue = g.Sum(b => b.Amount)
+                            })
+                            .ToList();
+                        
+                        revenueChartData = revenueByDate;
+                        System.Diagnostics.Debug.WriteLine($"📊 Calculated Revenue Chart Data: {revenueChartData.Count} days");
+                    }
+                }
+                
                 foreach (var item in revenueChartData)
                 {
                     System.Diagnostics.Debug.WriteLine($"   - {item.Date:dd/MM/yyyy}: {item.Revenue:N0} VND");
@@ -252,15 +301,55 @@ namespace VHS_frontend.Areas.Admin.Controllers
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"❌ Error getting revenue chart: {ex.Message}");
-                revenueChartData = new List<VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO>();
+                
+                // Fallback: tự tính từ bookings
+                try
+                {
+                    var startDate = DateTime.Today.AddDays(-(revenueDays - 1));
+                    var endDate = DateTime.Today.AddDays(1).AddTicks(-1);
+                    
+                    var filter = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                    {
+                        FromDate = startDate,
+                        ToDate = endDate,
+                        PageNumber = 1,
+                        PageSize = 10000
+                    };
+                    
+                    var bookingsResult = await _bookingService.GetAllBookingsAsync(filter);
+                    if (bookingsResult != null && bookingsResult.Items != null)
+                    {
+                        revenueChartData = bookingsResult.Items
+                            .Where(b => b.BookingTime >= startDate && b.BookingTime <= endDate)
+                            .GroupBy(b => b.BookingTime.Date)
+                            .Select(g => new VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO
+                            {
+                                Date = g.Key,
+                                Revenue = g.Sum(b => b.Amount)
+                            })
+                            .ToList();
+                        
+                        System.Diagnostics.Debug.WriteLine($"📊 Fallback Revenue Chart Data: {revenueChartData.Count} days");
+                    }
+                    else
+                    {
+                        revenueChartData = new List<VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO>();
+                    }
+                }
+                catch
+                {
+                    revenueChartData = new List<VHS_frontend.Areas.Admin.Models.Booking.RevenueChartDataDTO>();
+                }
             }
             
-            // Chuẩn hóa dữ liệu doanh thu 7 ngày: ngày nào không có thu nhập => 0
+            // Chuẩn hóa dữ liệu doanh thu: ngày nào không có thu nhập => 0
             var normalizedRevenueLabels = new List<string>();
             var normalizedRevenueData = new List<decimal>();
             try
             {
-                const int chartDays = 7;
+                // Sử dụng revenueDays đã lấy ở trên
+                var chartDays = revenueDays;
+                
                 var start = DateTime.Today.AddDays(-(chartDays - 1));
                 var byDate = revenueChartData
                     .GroupBy(x => x.Date.Date)
@@ -275,11 +364,13 @@ namespace VHS_frontend.Areas.Admin.Controllers
             }
             catch
             {
-                // fallback an toàn
-                normalizedRevenueLabels = Enumerable.Range(0, 7)
-                    .Select(i => DateTime.Today.AddDays(-6 + i).ToString("dd/MM"))
+                // fallback an toàn - sử dụng revenueDays đã lấy ở trên
+                var chartDays = revenueDays;
+                
+                normalizedRevenueLabels = Enumerable.Range(0, chartDays)
+                    .Select(i => DateTime.Today.AddDays(-(chartDays - 1) + i).ToString("dd/MM"))
                     .ToList();
-                normalizedRevenueData = Enumerable.Repeat(0m, 7).ToList();
+                normalizedRevenueData = Enumerable.Repeat(0m, chartDays).ToList();
             }
             
             try

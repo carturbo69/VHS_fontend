@@ -39,6 +39,13 @@
             </div>
         </div>
 
+        @{
+            var pendingWithdrawals = ViewBag.PendingWithdrawals as List<VHS_frontend.Areas.Admin.Models.Payment.ProviderWithdrawalDTO> ?? new List<VHS_frontend.Areas.Admin.Models.Payment.ProviderWithdrawalDTO>();
+            var processedWithdrawals = ViewBag.ProcessedWithdrawals as List<VHS_frontend.Areas.Admin.Models.Payment.ProviderWithdrawalDTO> ?? new List<VHS_frontend.Areas.Admin.Models.Payment.ProviderWithdrawalDTO>();
+            var totalPendingWithdrawalAmount = pendingWithdrawals.Sum(w => w.Amount);
+            var totalProcessedWithdrawalAmount = processedWithdrawals.Sum(w => w.Amount);
+        }
+
         @if (Model.Statistics != null)
         {
             <!-- Secondary Stats Cards - 4 cards nhỏ -->
@@ -124,9 +131,9 @@
                     <span><i class="bi bi-clock-history me-2"></i>Giao dịch gần đây</span>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <div class="table-responsive @(Model.RecentTransactions.Count > 10 ? "table-scrollable" : "")" style="@(Model.RecentTransactions.Count > 10 ? "max-height: 550px; overflow-y: auto;" : "")">
                         <table class="table table-hover align-middle mb-0">
-                            <thead>
+                            <thead style="position: sticky; top: 0; background: var(--card-bg, #fff); z-index: 10;">
                                 <tr>
                                     <th><i class="bi bi-hash me-2"></i>ID</th>
                                     <th><i class="bi bi-tag me-2"></i>Loại</th>
@@ -166,6 +173,114 @@
                                             <span class="status-badge @statusClass">@statusText</span>
                                         </td>
                                         <td><small>@transaction.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Withdrawals Summary Cards -->
+        @if (pendingWithdrawals.Any() || processedWithdrawals.Any())
+        {
+            <div class="row g-3 mb-4 mt-4">
+                <div class="col-lg-6">
+                    <div class="card-x stat-card payment-stat-primary">
+                        <div class="stat-card__icon payment-stat-icon-large" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">
+                            <i class="bi bi-bank"></i>
+                        </div>
+                        <div class="stat-card__content payment-stat-content">
+                            <div class="payment-stat-value">@pendingWithdrawals.Count</div>
+                            <div class="payment-stat-label">Yêu cầu rút tiền chờ xử lý</div>
+                            <div class="payment-stat-amount">@totalPendingWithdrawalAmount.ToString("N0") VNĐ</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card-x stat-card payment-stat-primary">
+                        <div class="stat-card__icon payment-stat-icon-large" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%);">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <div class="stat-card__content payment-stat-content">
+                            <div class="payment-stat-value">@processedWithdrawals.Count</div>
+                            <div class="payment-stat-label">Đã xử lý rút tiền</div>
+                            <div class="payment-stat-amount">@totalProcessedWithdrawalAmount.ToString("N0") VNĐ</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Withdrawals Quick View -->
+        @if (pendingWithdrawals.Any() || processedWithdrawals.Any())
+        {
+            <div class="card-x mt-4">
+                <div class="card-header">
+                    <span><i class="bi bi-bank me-2"></i>Yêu cầu rút tiền</span>
+                    <div class="ms-auto">
+                        @if (pendingWithdrawals.Any())
+                        {
+                            <a href="@Url.Action("Index", new { tab = "withdrawals" })" class="btn btn-sm btn-warning">
+                                <i class="bi bi-clock me-1"></i>
+                                @pendingWithdrawals.Count chờ xử lý
+                            </a>
+                        }
+                        @if (processedWithdrawals.Any())
+                        {
+                            <a href="@Url.Action("Index", new { tab = "processed-withdrawals" })" class="btn btn-sm btn-info ms-2">
+                                <i class="bi bi-check-circle me-1"></i>
+                                @processedWithdrawals.Count đã xử lý
+                            </a>
+                        }
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    @{
+                        var totalWithdrawals = pendingWithdrawals.Count + processedWithdrawals.Count;
+                    }
+                    <div class="table-responsive @(totalWithdrawals > 10 ? "table-scrollable" : "")" style="@(totalWithdrawals > 10 ? "max-height: 550px; overflow-y: auto;" : "")">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead style="position: sticky; top: 0; background: var(--card-bg, #fff); z-index: 10;">
+                                <tr>
+                                    <th><i class="bi bi-hash me-2"></i>Mã yêu cầu</th>
+                                    <th><i class="bi bi-building me-2"></i>Nhà cung cấp</th>
+                                    <th><i class="bi bi-currency-exchange me-2"></i>Số tiền</th>
+                                    <th><i class="bi bi-info-circle me-2"></i>Trạng thái</th>
+                                    <th><i class="bi bi-calendar me-2"></i>Thời gian</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var withdrawal in pendingWithdrawals)
+                                {
+                                    <tr>
+                                        <td><code>#@withdrawal.WithdrawalId.ToString().Substring(0, 8)</code></td>
+                                        <td>@withdrawal.ProviderName</td>
+                                        <td><strong class="text-warning">@withdrawal.Amount.ToString("N0") VNĐ</strong></td>
+                                        <td><span class="status-badge status-pending">Chờ phê duyệt</span></td>
+                                        <td><small>@withdrawal.RequestDate.ToString("dd/MM/yyyy HH:mm")</small></td>
+                                    </tr>
+                                }
+                                @foreach (var withdrawal in processedWithdrawals)
+                                {
+                                    <tr>
+                                        <td><code>#@withdrawal.WithdrawalId.ToString().Substring(0, 8)</code></td>
+                                        <td>@withdrawal.ProviderName</td>
+                                        <td><strong class="text-success">@withdrawal.Amount.ToString("N0") VNĐ</strong></td>
+                                        <td>
+                                            @{
+                                                var statusText = withdrawal.Status == "Completed" ? "Đã phê duyệt" : 
+                                                                 withdrawal.Status == "Rejected" ? "Đã từ chối" : 
+                                                                 withdrawal.Status;
+                                                var statusClass = withdrawal.Status == "Completed" ? "status-completed" : 
+                                                                   withdrawal.Status == "Rejected" ? "status-canceled" : 
+                                                                   "status-pending";
+                                            }
+                                            <span class="status-badge @statusClass">@statusText</span>
+                                        </td>
+                                        <td><small>@(withdrawal.ProcessedDate?.ToString("dd/MM/yyyy HH:mm") ?? withdrawal.RequestDate.ToString("dd/MM/yyyy HH:mm"))</small></td>
                                     </tr>
                                 }
                             </tbody>

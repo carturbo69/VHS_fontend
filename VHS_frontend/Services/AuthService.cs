@@ -4,7 +4,6 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using VHS_frontend.Models;
 using VHS_frontend.Models.Account;
-using VHS_frontend.Models.Account;
 
 namespace VHS_frontend.Services
 {
@@ -21,29 +20,72 @@ namespace VHS_frontend.Services
 
         public async Task<LoginRespondDTO?> LoginAsync(LoginDTO dto, CancellationToken ct = default)
         {
-            var res = await _httpClient.PostAsJsonAsync("/api/auth/login", dto, ct);
-            if (!res.IsSuccessStatusCode)
+            try
             {
-                // Nếu là Unauthorized (401), throw exception với message từ API
-                if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                Console.WriteLine($"[AuthService] Attempting login for: {dto.Username}");
+                Console.WriteLine($"[AuthService] HttpClient BaseAddress: {_httpClient.BaseAddress}");
+                Console.WriteLine($"[AuthService] Request URL: {_httpClient.BaseAddress}/api/auth/login");
+                
+                var res = await _httpClient.PostAsJsonAsync("/api/auth/login", dto, ct);
+                
+                Console.WriteLine($"[AuthService] Response Status: {res.StatusCode}");
+                Console.WriteLine($"[AuthService] Response IsSuccessStatusCode: {res.IsSuccessStatusCode}");
+                
+                if (!res.IsSuccessStatusCode)
                 {
-                    try
+                    var errorContent = await res.Content.ReadAsStringAsync(ct);
+                    Console.WriteLine($"[AuthService] Error Response Content: {errorContent}");
+                    
+                    // Nếu là Unauthorized (401), throw exception với message từ API
+                    if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     {
-                        var errorObj = await res.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-                        var message = errorObj.TryGetProperty("Message", out var msgProp) ? msgProp.GetString() : 
-                                     (errorObj.TryGetProperty("message", out var msgProp2) ? msgProp2.GetString() : "Tài khoản đã bị ngừng hoạt động.");
-                        throw new UnauthorizedAccessException(message ?? "Tài khoản đã bị ngừng hoạt động.");
+                        try
+                        {
+                            var errorObj = JsonSerializer.Deserialize<JsonElement>(errorContent);
+                            var message = errorObj.TryGetProperty("Message", out var msgProp) ? msgProp.GetString() : 
+                                         (errorObj.TryGetProperty("message", out var msgProp2) ? msgProp2.GetString() : "Tài khoản đã bị ngừng hoạt động.");
+                            throw new UnauthorizedAccessException(message ?? "Tài khoản đã bị ngừng hoạt động.");
+                        }
+                        catch (JsonException)
+                        {
+                            throw new UnauthorizedAccessException(errorContent ?? "Tài khoản đã bị ngừng hoạt động.");
+                        }
                     }
-                    catch (JsonException)
+                    
+                    // Các lỗi khác
+                    if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
-                        var errorText = await res.Content.ReadAsStringAsync(ct);
-                        throw new UnauthorizedAccessException(errorText ?? "Tài khoản đã bị ngừng hoạt động.");
+                        throw new HttpRequestException($"API endpoint không tìm thấy. Status: {res.StatusCode}");
                     }
+                    
+                    if (res.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                    {
+                        throw new HttpRequestException($"Yêu cầu không hợp lệ. Status: {res.StatusCode}, Response: {errorContent}");
+                    }
+                    
+                    throw new HttpRequestException($"Lỗi khi gọi API đăng nhập. Status: {res.StatusCode}, Response: {errorContent}");
                 }
-                return null;
-            }
 
-            return await res.Content.ReadFromJsonAsync<LoginRespondDTO>(cancellationToken: ct);
+                var loginResponse = await res.Content.ReadFromJsonAsync<LoginRespondDTO>(cancellationToken: ct);
+                Console.WriteLine($"[AuthService] Login successful for: {dto.Username}");
+                return loginResponse;
+            }
+            catch (TaskCanceledException ex)
+            {
+                Console.WriteLine($"[AuthService] Login timeout: {ex.Message}");
+                throw new TaskCanceledException("Kết nối quá thời gian chờ. Vui lòng thử lại.", ex);
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"[AuthService] HTTP error: {ex.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AuthService] Unexpected error during login: {ex.GetType().Name} - {ex.Message}");
+                Console.WriteLine($"[AuthService] StackTrace: {ex.StackTrace}");
+                throw;
+            }
         }
 
         //    public async Task<object?> RegisterAsync(RegisterDTO dto, CancellationToken ct = default)

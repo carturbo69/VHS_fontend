@@ -152,9 +152,35 @@
                             @if (Model?.Options?.Any() ?? false)
                             {
                                 @* Hiển thị danh sách options phẳng (không có nhóm) cho Customer *@
+                                @* Tách options thành 2 nhóm: non-textarea trước, textarea sau *@
+                                var nonTextareaOptions = Model.Options.Where(opt => 
+                                    !(opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text")).ToList();
+                                var textareaOptions = Model.Options.Where(opt => 
+                                    opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text").ToList();
+                                
                                 <div class="kb-options-section">
                                     <div class="opt-section">
-                                        @foreach (var op in Model.Options)
+                                        @* Hiển thị non-textarea options trước *@
+                                        @foreach (var op in nonTextareaOptions)
+                                        {
+                                            <div class="opt-row">
+                                                <div class="opt-name" style="flex: 1; min-width: 0;">
+                                                    <div style="font-weight: 500; margin-bottom: 8px;">
+                                                        <span>✓</span>
+                                                        <span>@op.OptionName</span>
+                                                    </div>
+                                                    @if (!string.IsNullOrWhiteSpace(op.Value))
+                                                    {
+                                                        <div style="margin-top: 8px;">
+                                                            <span class="text-muted" style="margin-left: 4px;">@op.Value</span>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                        
+                                        @* Hiển thị textarea options sau cùng *@
+                                        @foreach (var op in textareaOptions)
                                         {
                                             var isTextarea = op.Type?.ToLower() == "textarea" || op.Type?.ToLower() == "text";
                                             <div class="opt-row">
@@ -229,7 +255,7 @@
                     <span class="kb-payment-total-label">Thành tiền:</span>
                     <span class="kb-payment-total-value">@FmtMoney(total)</span>
                 </div>
-                <div class="kb-payment-status-wrapper">
+                <!-- <div class="kb-payment-status-wrapper">
                     <span class="kb-payment-status-label">Xử lí:</span>
                     @{
                         var paymentStatusTop = Model?.PaymentStatus ?? "";
@@ -288,7 +314,7 @@
                         }
                         <span>@displayStatusTop</span>
                     </div>
-                </div>
+                </div> -->
             </div>
         </div>
     </div>

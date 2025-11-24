@@ -275,7 +275,13 @@ console.log('=== chatbox.js LOADED ===');
             connection.on('MessageError', (data) => {
                 console.error('[Chatbox] Message error:', data);
                 hideTypingIndicator();
-                displayMessage('Xin lỗi, đã xảy ra lỗi. Vui lòng thử lại.', 'AI', new Date());
+                displayMessage(
+                    'Xin lỗi vì sự bất tiện này. Đã xảy ra lỗi khi xử lý tin nhắn của bạn. ' +
+                    'Vui lòng thử lại sau vài giây. Nếu vấn đề vẫn tiếp tục, bạn có thể ' +
+                    'mô tả lại câu hỏi một cách chi tiết hơn hoặc liên hệ bộ phận hỗ trợ. Cảm ơn bạn! 🙏',
+                    'AI',
+                    new Date()
+                );
             });
 
             // Start connection
@@ -775,38 +781,115 @@ console.log('=== chatbox.js LOADED ===');
         }
         
         const welcomeMessages = [
-            "Xin chào! 👋 Tôi là trợ lý AI của Viet Home Service. Tôi có thể giúp bạn:",
-            "🔍 Tìm kiếm dịch vụ",
-            "📝 Đặt lịch dịch vụ",
-            "💬 Trả lời câu hỏi về dịch vụ",
-            "📞 Kết nối với nhân viên hỗ trợ"
+            "Xin chào! 👋 Tôi là trợ lý AI của **Viet Home Service**. Rất vui được hỗ trợ bạn hôm nay!",
+            "",
+            "Tôi có thể giúp bạn với các dịch vụ sau:",
+            "",
+            "• **Tìm kiếm dịch vụ** - Hỗ trợ tìm dịch vụ phù hợp với nhu cầu của bạn",
+            "• **Đặt lịch dịch vụ** - Hướng dẫn đặt lịch và quản lý đặt lịch",
+            "• **Thông tin dịch vụ** - Trả lời các câu hỏi về dịch vụ, giá cả, chính sách",
+            "• **Hỗ trợ kỹ thuật** - Giải đáp thắc mắc và kết nối với nhân viên hỗ trợ",
+            "",
+            "Bạn có thể đặt câu hỏi bất kỳ lúc nào. Tôi sẽ cố gắng trả lời một cách chi tiết và chính xác nhất! 😊"
         ];
 
         welcomeMessages.forEach((msg, index) => {
             setTimeout(() => {
+                if (msg) {
                 displayMessage(msg, 'AI', getVietnamTime());
-            }, index * 200);
+                }
+            }, index * 150);
         });
         
         hasInitialized = true;
     }
 
+    // Normalize and sanitize user input
+    function normalizeInput(input) {
+        if (!input) return '';
+        
+        // Trim whitespace
+        let normalized = input.trim();
+        
+        // Remove excessive whitespace
+        normalized = normalized.replace(/\s+/g, ' ');
+        
+        // Remove excessive punctuation (keep only reasonable amount)
+        normalized = normalized.replace(/[!]{3,}/g, '!');
+        normalized = normalized.replace(/[?]{3,}/g, '?');
+        normalized = normalized.replace(/[.]{3,}/g, '...');
+        
+        return normalized;
+    }
+
+    // Validate user input
+    function validateInput(input) {
+        if (!input || input.trim().length === 0) {
+            return {
+                valid: false,
+                message: 'Vui lòng nhập nội dung tin nhắn của bạn.'
+            };
+        }
+        
+        if (input.length < 2) {
+            return {
+                valid: false,
+                message: 'Tin nhắn quá ngắn. Vui lòng nhập ít nhất 2 ký tự.'
+            };
+        }
+        
+        if (input.length > 1000) {
+            return {
+                valid: false,
+                message: 'Tin nhắn quá dài. Vui lòng giới hạn trong 1000 ký tự.'
+            };
+        }
+        
+        // Check for only whitespace or special characters
+        if (/^[\s\W]+$/.test(input)) {
+            return {
+                valid: false,
+                message: 'Vui lòng nhập nội dung có ý nghĩa.'
+            };
+        }
+        
+        return { valid: true };
+    }
+
     // Send message (using SignalR real-time)
     async function sendMessage() {
-        const content = elements.input.value.trim();
-        if (!content) return;
+        let content = elements.input.value;
+        
+        // Normalize input
+        content = normalizeInput(content);
+        
+        // Validate input
+        const validation = validateInput(content);
+        if (!validation.valid) {
+            // Show validation message professionally
+            displayMessage(
+                `Xin chào! ${validation.message} Tôi sẵn sàng hỗ trợ bạn khi bạn có câu hỏi. 😊`,
+                'AI',
+                getVietnamTime()
+            );
+            elements.input.value = '';
+            elements.input.focus();
+            return;
+        }
 
         console.log('[Chatbox] Sending message:', content);
         console.log('[Chatbox] SignalR connected:', isConnected);
         console.log('[Chatbox] ConversationId:', conversationId);
 
-        // Display user message
-        displayMessage(content, 'User', getVietnamTime());
+        // Display user message (show original input, not normalized)
+        displayMessage(elements.input.value.trim(), 'User', getVietnamTime());
         elements.input.value = '';
         elements.sendBtn.disabled = true;
 
-        // Show typing indicator
+        // Show typing indicator with slight delay for better UX
+        setTimeout(() => {
         showTypingIndicator();
+        }, 100);
 
         try {
             // Create conversation if not exists
@@ -852,10 +935,24 @@ console.log('=== chatbox.js LOADED ===');
                 try {
                     await sendMessageHttp(content);
                 } catch (httpError) {
-                    displayMessage('Không thể kết nối đến server. Vui lòng thử lại sau.', 'AI', new Date());
+                    hideTypingIndicator();
+                    displayMessage(
+                        'Xin lỗi vì sự bất tiện này. Hiện tại hệ thống đang gặp sự cố kỹ thuật. ' +
+                        'Vui lòng thử lại sau vài phút. Nếu vấn đề vẫn tiếp tục, bạn có thể liên hệ ' +
+                        'bộ phận hỗ trợ khách hàng của chúng tôi. Cảm ơn bạn đã kiên nhẫn! 🙏',
+                        'AI',
+                        new Date()
+                    );
                 }
             } else {
-                displayMessage('Không thể kết nối đến server. Vui lòng thử lại sau.', 'AI', new Date());
+                hideTypingIndicator();
+                displayMessage(
+                    'Xin lỗi, hiện tại tôi không thể kết nối đến hệ thống. ' +
+                    'Vui lòng kiểm tra kết nối internet của bạn và thử lại. ' +
+                    'Nếu vấn đề vẫn tiếp tục, xin vui lòng liên hệ bộ phận hỗ trợ. Cảm ơn bạn! 🙏',
+                    'AI',
+                    new Date()
+                );
             }
         } finally {
             elements.sendBtn.disabled = false;
@@ -889,78 +986,50 @@ console.log('=== chatbox.js LOADED ===');
             const messageContent = data.Content || data.content || data.MessageContent || data.messageContent;
             
             if (messageContent) {
+                // Add slight delay for better UX (simulate thinking time)
+                setTimeout(() => {
                 displayMessage(messageContent, 'AI', new Date());
+                }, 300);
             } else {
-                displayMessage('Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.', 'AI', new Date());
+                displayMessage(
+                    'Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. ' +
+                    'Vui lòng thử lại sau hoặc mô tả câu hỏi của bạn một cách chi tiết hơn. ' +
+                    'Nếu vấn đề vẫn tiếp tục, bạn có thể liên hệ bộ phận hỗ trợ để được giúp đỡ. 🙏',
+                    'AI',
+                    new Date()
+                );
             }
 
             const quickActions = data.QuickActions || data.quickActions;
             if (quickActions && quickActions.length > 0) {
+                setTimeout(() => {
                 showQuickActions(quickActions);
+                }, 500);
             }
         } else {
             const errorText = await response.text();
             console.error('[Chatbox] HTTP Error response:', response.status, errorText);
             hideTypingIndicator();
-            displayMessage('Xin lỗi, đã xảy ra lỗi (' + response.status + '). Vui lòng thử lại.', 'AI', new Date());
-        }
-    }
-
-    // Create conversation
-    async function createConversation() {
-        try {
-            const headers = {
-                'Content-Type': 'application/json'
-            };
             
-            if (jwt) {
-                headers['Authorization'] = `Bearer ${jwt}`;
-            }
-            
-            const response = await fetch(`${CONFIG.apiBaseUrl}/conversation`, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify({
-                    content: content,
-                    sessionId: CONFIG.sessionId,
-                    language: CONFIG.language
-                })
-            });
-
-            console.log('[Chatbox] Response status:', response.status);
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('[Chatbox] Response data:', data);
-                hideTypingIndicator();
-                
-                // Display AI response (check both uppercase and lowercase field names)
-                const messageContent = data.Content || data.content || data.MessageContent || data.messageContent;
-                
-                if (messageContent) {
-                    displayMessage(messageContent, 'AI', getVietnamTime());
+            let errorMessage = '';
+            if (response.status === 400) {
+                errorMessage = 'Xin lỗi, yêu cầu của bạn không hợp lệ. Vui lòng kiểm tra lại và thử lại.';
+            } else if (response.status === 401) {
+                errorMessage = 'Phiên đăng nhập của bạn đã hết hạn. Vui lòng đăng nhập lại để tiếp tục sử dụng dịch vụ.';
+            } else if (response.status === 403) {
+                errorMessage = 'Bạn không có quyền thực hiện thao tác này. Vui lòng liên hệ quản trị viên nếu bạn cần hỗ trợ.';
+            } else if (response.status === 404) {
+                errorMessage = 'Không tìm thấy tài nguyên yêu cầu. Vui lòng thử lại hoặc liên hệ hỗ trợ.';
+            } else if (response.status === 429) {
+                errorMessage = 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi một chút và thử lại sau.';
+            } else if (response.status >= 500) {
+                errorMessage = 'Hệ thống đang gặp sự cố kỹ thuật. Chúng tôi đang khắc phục và sẽ sớm hoạt động trở lại. ' +
+                              'Vui lòng thử lại sau vài phút. Xin cảm ơn sự kiên nhẫn của bạn!';
                 } else {
-                    displayMessage('Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.', 'AI', getVietnamTime());
-                    console.warn('[Chatbox] No message content found in response:', data);
-                }
-
-                // Show quick actions if available
-                const quickActions = data.QuickActions || data.quickActions;
-                if (quickActions && quickActions.length > 0) {
-                    showQuickActions(quickActions);
-                }
-            } else {
-                const errorText = await response.text();
-                console.error('[Chatbox] Error response:', response.status, errorText);
-                hideTypingIndicator();
-                displayMessage('Xin lỗi, đã xảy ra lỗi (' + response.status + '). Vui lòng thử lại.', 'AI', getVietnamTime());
+                errorMessage = `Xin lỗi, đã xảy ra lỗi (mã lỗi: ${response.status}). Vui lòng thử lại sau hoặc liên hệ hỗ trợ nếu vấn đề vẫn tiếp tục.`;
             }
-        } catch (error) {
-            console.error('[Chatbox] Error sending message:', error);
-            hideTypingIndicator();
-            displayMessage('Không thể kết nối đến server. Vui lòng thử lại sau.', 'AI', getVietnamTime());
-        } finally {
-            elements.sendBtn.disabled = false;
+            
+            displayMessage(errorMessage, 'AI', new Date());
         }
     }
 
@@ -1017,30 +1086,77 @@ console.log('=== chatbox.js LOADED ===');
         `;
 
         elements.messages.appendChild(messageDiv);
+        
+        // Add click event listeners for service links
+        const serviceLinks = messageDiv.querySelectorAll('.ai-service-link');
+        serviceLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const serviceId = this.getAttribute('data-service-id');
+                if (serviceId) {
+                    console.log('[Chatbox] Clicked service link:', serviceId);
+                    window.location.href = `/Services/Details?id=${serviceId}`;
+                }
+            });
+        });
+        
         scrollToBottom();
     }
 
-    // Format AI message with markdown-like syntax
+    // Format AI message with markdown-like syntax and professional styling
     function formatAIMessage(text) {
+        if (!text) return '';
+        
         let formatted = escapeHtml(text);
         
-        // Convert line breaks to <br>
+        // Convert multiple line breaks to proper spacing (max 2 consecutive breaks)
+        formatted = formatted.replace(/\n{3,}/g, '\n\n');
+        
+        // Convert line breaks to <br> (but preserve intentional spacing)
+        formatted = formatted.replace(/\n\n/g, '<br><br>');
         formatted = formatted.replace(/\n/g, '<br>');
         
-        // Convert bullet points (• or -) to styled lists
-        formatted = formatted.replace(/^[•\-]\s+(.+)$/gm, '<div class="ai-bullet">• $1</div>');
+        // Convert bullet points (•, -, *, or o) to styled lists
+        formatted = formatted.replace(/^[•\-\*o]\s+(.+)$/gm, '<div class="ai-bullet">• $1</div>');
         
-        // Convert numbered lists
+        // Convert numbered lists (1., 2., etc.)
         formatted = formatted.replace(/^(\d+)\.\s+(.+)$/gm, '<div class="ai-numbered"><span class="ai-number">$1.</span> $2</div>');
         
-        // Convert headers (##)
+        // Convert headers (## Header or ### Header)
+        formatted = formatted.replace(/^###\s+(.+)$/gm, '<div class="ai-subheading">$1</div>');
         formatted = formatted.replace(/^##\s+(.+)$/gm, '<div class="ai-heading">$1</div>');
         
-        // Convert bold text (**text**)
-        formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        // Convert bold text (**text** or __text__)
+        formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong class="ai-bold">$1</strong>');
+        formatted = formatted.replace(/__(.+?)__/g, '<strong class="ai-bold">$1</strong>');
+        
+        // Convert italic text (*text* or _text_) - only if not bold
+        // Match single asterisks that are not part of double asterisks
+        formatted = formatted.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em class="ai-italic">$1</em>');
+        // Match single underscores that are not part of double underscores
+        formatted = formatted.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<em class="ai-italic">$1</em>');
         
         // Convert code blocks (`code`)
-        formatted = formatted.replace(/`(.+?)`/g, '<code class="ai-code">$1</code>');
+        formatted = formatted.replace(/`([^`]+)`/g, '<code class="ai-code">$1</code>');
+        
+        // Convert service links [text](SERVICE:guid) - special handling for service links
+        // Match both SERVICE:guid and SERVICE: guid (with space)
+        formatted = formatted.replace(/\[([^\]]+)\]\(SERVICE:\s*([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})\)/gi, 
+            function(match, text, serviceId) {
+                console.log('[Chatbox] Found service link:', text, serviceId);
+                const serviceUrl = `/Services/Details?id=${serviceId}`;
+                return `<a href="${serviceUrl}" class="ai-link ai-service-link" data-service-id="${serviceId}">${text}</a>`;
+            });
+        
+        // Convert regular links [text](url) - basic support
+        formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+            // Skip if it's already a service link
+            if (url.toUpperCase().startsWith('SERVICE:')) return match;
+            return '<a href="' + url + '" target="_blank" rel="noopener noreferrer" class="ai-link">' + text + '</a>';
+        });
+        
+        // Add spacing after paragraphs (divs)
+        formatted = formatted.replace(/<\/div><div/g, '</div><div class="ai-spacing"></div><div');
         
         return formatted;
     }
@@ -1112,12 +1228,22 @@ console.log('=== chatbox.js LOADED ===');
     function handleQuickAction(action) {
         const actionType = action.Action || action.action;
         const actionTitle = action.Title || action.title || action.label;
+        const actionData = action.Data || action.data; // ServiceId for view_service action
         
         // Map actions to actual URLs or messages
         switch(actionType) {
+            case 'view_service':
+                // Navigate to service detail page with ServiceId
+                if (actionData) {
+                    console.log('[Chatbox] Navigating to service:', actionData);
+                    window.location.href = `/Services/Details?id=${actionData}`;
+                } else {
+                    window.location.href = '/Services';
+                }
+                break;
             case 'view_services':
             case 'find_services':
-                window.location.href = '/Customer/ServiceCustomer/ServiceCustomer';
+                window.location.href = '/Services';
                 break;
             case 'view_pricing':
                 elements.input.value = 'Cho tôi xem bảng giá các dịch vụ';
@@ -1128,7 +1254,13 @@ console.log('=== chatbox.js LOADED ===');
                 break;
             case 'book_service':
             case 'book_appointment':
-                window.location.href = '/Customer/ServiceCustomer/ServiceCustomer';
+                // If serviceId is provided, go to detail page, otherwise go to service list
+                if (actionData) {
+                    console.log('[Chatbox] Booking service:', actionData);
+                    window.location.href = `/Services/Details?id=${actionData}`;
+                } else {
+                    window.location.href = '/Services';
+                }
                 break;
             default:
                 elements.input.value = actionTitle;

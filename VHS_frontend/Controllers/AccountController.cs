@@ -20,6 +20,7 @@ namespace VHS_frontend.Controllers
         public IActionResult Login(string? returnUrl = null)
         {
             ViewBag.ReturnUrl = returnUrl;
+            ViewData["ReturnUrl"] = returnUrl ?? string.Empty;
             return View(new LoginDTO());
         }
 
@@ -28,29 +29,70 @@ namespace VHS_frontend.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginDTO model, string? returnUrl = null)
         {
+            Console.WriteLine($"[LOGIN] POST request received");
+            Console.WriteLine($"[LOGIN] Username: {model?.Username ?? "NULL"}");
+            Console.WriteLine($"[LOGIN] Password: {(string.IsNullOrEmpty(model?.Password) ? "NULL" : "***")}");
+            Console.WriteLine($"[LOGIN] ModelState.IsValid: {ModelState.IsValid}");
+            
             if (!ModelState.IsValid)
             {
+                Console.WriteLine($"[LOGIN] ModelState is invalid. Errors:");
+                foreach (var error in ModelState)
+                {
+                    foreach (var err in error.Value.Errors)
+                    {
+                        Console.WriteLine($"[LOGIN] - {error.Key}: {err.ErrorMessage}");
+                    }
+                }
                 ViewBag.ReturnUrl = returnUrl;
+                ViewData["ReturnUrl"] = returnUrl ?? string.Empty;
                 return View(model);
             }
 
             LoginRespondDTO? result = null;
             try
             {
+                Console.WriteLine($"[LOGIN] Attempting login for user: {model.Username}");
                 result = await _authService.LoginAsync(model);
+                Console.WriteLine($"[LOGIN] Login response received: {(result != null ? "Success" : "Null result")}");
             }
             catch (UnauthorizedAccessException ex)
             {
                 // Xử lý trường hợp tài khoản bị khóa hoặc lỗi xác thực khác
+                Console.WriteLine($"[LOGIN ERROR] UnauthorizedAccessException: {ex.Message}");
+                Console.WriteLine($"[LOGIN ERROR] StackTrace: {ex.StackTrace}");
                 ModelState.AddModelError(string.Empty, ex.Message);
                 ViewBag.ReturnUrl = returnUrl;
+                ViewData["ReturnUrl"] = returnUrl ?? string.Empty;
+                return View(model);
+            }
+            catch (HttpRequestException httpEx)
+            {
+                // Xử lý lỗi kết nối HTTP
+                Console.WriteLine($"[LOGIN ERROR] HttpRequestException: {httpEx.Message}");
+                Console.WriteLine($"[LOGIN ERROR] StackTrace: {httpEx.StackTrace}");
+                ModelState.AddModelError(string.Empty, "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng và thử lại.");
+                ViewBag.ReturnUrl = returnUrl;
+                ViewData["ReturnUrl"] = returnUrl ?? string.Empty;
+                return View(model);
+            }
+            catch (TaskCanceledException taskEx)
+            {
+                // Xử lý timeout
+                Console.WriteLine($"[LOGIN ERROR] TaskCanceledException (Timeout): {taskEx.Message}");
+                ModelState.AddModelError(string.Empty, "Kết nối quá thời gian chờ. Vui lòng thử lại sau.");
+                ViewBag.ReturnUrl = returnUrl;
+                ViewData["ReturnUrl"] = returnUrl ?? string.Empty;
                 return View(model);
             }
             catch (Exception ex)
             {
                 // Xử lý các lỗi khác
-                ModelState.AddModelError(string.Empty, "Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại.");
+                Console.WriteLine($"[LOGIN ERROR] Exception: {ex.GetType().Name} - {ex.Message}");
+                Console.WriteLine($"[LOGIN ERROR] StackTrace: {ex.StackTrace}");
+                ModelState.AddModelError(string.Empty, $"Đã xảy ra lỗi khi đăng nhập: {ex.Message}");
                 ViewBag.ReturnUrl = returnUrl;
+                ViewData["ReturnUrl"] = returnUrl ?? string.Empty;
                 return View(model);
             }
 
@@ -58,6 +100,7 @@ namespace VHS_frontend.Controllers
             {
                 ModelState.AddModelError(string.Empty, "Sai tài khoản hoặc mật khẩu");
                 ViewBag.ReturnUrl = returnUrl;
+                ViewData["ReturnUrl"] = returnUrl ?? string.Empty;
                 return View(model);
             }
 

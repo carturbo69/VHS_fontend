@@ -216,18 +216,57 @@
                                 <div class="opt-section">
                                     @if (options.Any())
                                     {
-                                        foreach (var a in options)
+                                        @* Tách options thành 2 nhóm: non-textarea trước, textarea sau *@
+                                        var nonTextareaOptions = options.Where(opt => 
+                                            !(opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text")).ToList();
+                                        var textareaOptions = options.Where(opt => 
+                                            opt.Type?.ToLower() == "textarea" || opt.Type?.ToLower() == "text").ToList();
+                                        
+                                        @* Hiển thị non-textarea options trước *@
+                                        foreach (var a in nonTextareaOptions)
                                         {
-                                            var isTextarea = a.Type?.ToLower() == "textarea" || a.Type?.ToLower() == "text";
                                             <div class="opt-row" data-option-id="@a.OptionId">
                                                 <div class="opt-name" style="flex: 1; min-width: 0;">
-                                                    <div style="font-weight: 500; margin-bottom: 8px;">
+                                                    <div style="font-weight: 500;">
                                                         <span>✓</span>
                                                         <span>@a.Name</span>
                                                     </div>
                                                     @if (!string.IsNullOrWhiteSpace(a.Value))
                                                     {
-                                                        <div style="margin-top: 8px;">
+                                                        <div>
+                                                            <span class="text-muted" style="margin-left: 4px;">@a.Value</span>
+                                                        </div>
+                                                    }
+                                                </div>
+
+                                                <div class="opt-controls">
+                                                    @* Options no longer have Price *@
+                                                    <form asp-area="Customer"
+                                                          asp-controller="Cart"
+                                                          asp-action="RemoveAddon"
+                                                          method="post"
+                                                          onsubmit="lockBtn(this)">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="cartItemId" value="@key" />
+                                                        <input type="hidden" name="optionId" value="@a.OptionId" />
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        }
+                                        
+                                        @* Hiển thị textarea options sau cùng *@
+                                        foreach (var a in textareaOptions)
+                                        {
+                                            var isTextarea = a.Type?.ToLower() == "textarea" || a.Type?.ToLower() == "text";
+                                            <div class="opt-row" data-option-id="@a.OptionId">
+                                                <div class="opt-name" style="flex: 1; min-width: 0;">
+                                                    <div style="font-weight: 500;">
+                                                        <span>✓</span>
+                                                        <span>@a.Name</span>
+                                                    </div>
+                                                    @if (!string.IsNullOrWhiteSpace(a.Value))
+                                                    {
+                                                        <div>
                                                        
                                                             @if (isTextarea)
                                                             {
@@ -289,7 +328,7 @@
                         <!-- Giờ đặt -->
                         <div class="booking-time">
                             <label for="booking-time-@i" class="booking-label">
-                                Chọn giờ thực hiện dịch vụ
+                                Chọn ngày và giờ thực hiện dịch vụ
                                 <span class="hint">(dự kiến bắt đầu sau 30–45 phút kể từ thời điểm đặt)</span>
                             </label>
                             <input type="datetime-local"
@@ -299,7 +338,7 @@
                                    value="@it.BookingTime.ToString("yyyy-MM-ddTHH:mm")"
                                    class="booking-input"
                                    data-provider-id="@it.ProviderId"
-                                   onchange="validateBookingTime(this, @i)" />
+                                   onchange="validateBookingDateTime(this, @i)" />
                             <div id="booking-time-error-@i" class="booking-time-error" style="display: none;"></div>
                         </div>
 
@@ -2709,6 +2748,101 @@
         const API_BASE_URL = 'http://localhost:5154/api';
         const bookingTimeValidations = new Map(); // Track validation state for each input
 
+        // Cập nhật khi trang load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Thêm event listener cho tất cả input datetime-local để validate ngay khi thay đổi
+            document.querySelectorAll('input[type="datetime-local"].booking-input').forEach(input => {
+                const index = parseInt(input.id.replace('booking-time-', ''));
+                if (!isNaN(index)) {
+                    // Validate khi input thay đổi
+                    input.addEventListener('change', function() {
+                        // Đợi một chút để browser hoàn tất việc điều chỉnh giá trị (nếu có)
+                        setTimeout(() => {
+                            validateBookingDateTime(this, index);
+                        }, 100);
+                    });
+                    // Validate khi input blur (rời khỏi input)
+                    input.addEventListener('blur', function() {
+                        setTimeout(() => {
+                            validateBookingDateTime(this, index);
+                        }, 100);
+                    });
+                    // Validate khi input được nhập (input event)
+                    input.addEventListener('input', function() {
+                        // Chỉ validate nếu có giá trị
+                        if (this.value) {
+                            setTimeout(() => {
+                                validateBookingDateTime(this, index);
+                            }, 100);
+                        }
+                    });
+                    // Validate khi input được set giá trị (sau khi browser điều chỉnh)
+                    const observer = new MutationObserver(() => {
+                        if (input.value) {
+                            setTimeout(() => {
+                                validateBookingDateTime(input, index);
+                            }, 100);
+                        }
+                    });
+                    observer.observe(input, { attributes: true, attributeFilter: ['value'] });
+                }
+            });
+        });
+
+        // Hàm kiểm tra thời gian không được trong quá khứ (trước thời điểm hiện tại)
+        function validateBookingDateTime(input, index) {
+            // Lấy giá trị thực tế từ input
+            const dateTimeValue = input.value;
+            const errorDiv = document.getElementById(`booking-time-error-${index}`);
+            
+            if (!dateTimeValue) {
+                if (errorDiv) {
+                    errorDiv.style.display = 'none';
+                    errorDiv.textContent = '';
+                }
+                input.classList.remove('booking-input-error');
+                bookingTimeValidations.set(index, true);
+                return true;
+            }
+            
+            // Parse datetime-local value: "yyyy-MM-ddTHH:mm" (tránh timezone issues)
+            // So sánh trực tiếp từ string format để tránh vấn đề timezone
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const nowString = `${year}-${month}-${day}T${hours}:${minutes}`;
+            
+            // So sánh string trực tiếp (format: yyyy-MM-ddTHH:mm)
+            if (dateTimeValue < nowString) {
+                // Thời gian đã chọn trong quá khứ (trước thời điểm hiện tại)
+                if (errorDiv) {
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = '⚠️ Không thể chọn thời gian trong quá khứ. Vui lòng chọn lại.';
+                    errorDiv.style.borderLeftColor = '';
+                    errorDiv.style.background = '';
+                    errorDiv.style.color = '';
+                }
+                input.classList.add('booking-input-error');
+                bookingTimeValidations.set(index, false);
+                // Không gọi validateBookingTime nếu thời gian không hợp lệ
+                return false;
+            }
+            
+            // Thời gian hợp lệ, ẩn lỗi và gọi validateBookingTime để kiểm tra với API
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+            }
+            input.classList.remove('booking-input-error');
+            
+            // Gọi validateBookingTime để kiểm tra với API
+            validateBookingTime(input, index);
+            return true;
+        }
+
         async function validateBookingTime(input, index) {
             const providerId = input.dataset.providerId;
             const dateTimeValue = input.value;
@@ -3093,10 +3227,32 @@
                             });
                             if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
                         } else if (!isNaN(index)) {
-                            // Validate thời gian đã chọn
-                            const promiseIndex = validationPromises.length;
-                            inputIndexMap.set(promiseIndex, { input, index });
-                            validationPromises.push(validateBookingTime(input, index));
+                            // Kiểm tra thời gian không được trong quá khứ (trước thời điểm hiện tại)
+                            const dateTimeValue = input.value;
+                            
+                            // So sánh string trực tiếp để tránh vấn đề timezone
+                            const now = new Date();
+                            const year = now.getFullYear();
+                            const month = String(now.getMonth() + 1).padStart(2, '0');
+                            const day = String(now.getDate()).padStart(2, '0');
+                            const hours = String(now.getHours()).padStart(2, '0');
+                            const minutes = String(now.getMinutes()).padStart(2, '0');
+                            const nowString = `${year}-${month}-${day}T${hours}:${minutes}`;
+                            
+                            if (dateTimeValue < nowString) {
+                                errors.push({
+                                    type: 'bookingTime',
+                                    element: input.closest('.booking-time') || input,
+                                    errorId: `booking-time-error-${index}`,
+                                    message: '⚠️ Không thể chọn thời gian trong quá khứ. Vui lòng chọn lại.'
+                                });
+                                if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
+                            } else {
+                                // Validate thời gian đã chọn với API
+                                const promiseIndex = validationPromises.length;
+                                inputIndexMap.set(promiseIndex, { input, index });
+                                validationPromises.push(validateBookingTime(input, index));
+                            }
                         }
                     }
                     

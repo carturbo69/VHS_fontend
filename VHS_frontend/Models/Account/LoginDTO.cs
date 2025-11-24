@@ -13,7 +13,5 @@ namespace VHS_frontend.Models.Account
 
         [Required(ErrorMessage = "Vui lòng nhập mật khẩu")]
         public string Password { get; set; }
-
-
     }
 }

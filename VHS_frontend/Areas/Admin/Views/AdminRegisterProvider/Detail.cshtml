@@ -53,6 +53,17 @@
         try { return string.IsNullOrWhiteSpace(json) ? new() : (JsonSerializer.Deserialize<List<Guid>>(json) ?? new()); }
         catch { return new(); }
     }
+
+    // ===== Helper: Format DateTime - Database đã lưu giờ Việt Nam (UTC+7) rồi
+    // Backend sử dụng GetVietnamTime() nên CreatedAt/ApprovedAt đã là giờ Việt Nam
+    // Chỉ cần format hiển thị, không cần convert thêm
+    string ToVietnamTime(DateTime? dateTime)
+    {
+        if (!dateTime.HasValue) return "-";
+        
+        // Database đã lưu giờ Việt Nam rồi, chỉ cần format
+        return dateTime.Value.ToString("dd/MM/yyyy HH:mm");
+    }
 }
 
 @section Styles {
@@ -74,8 +85,8 @@
                 <span class="lbl">Trạng thái</span>
                 <span class="val"><span class="@MapStatusClass(Model.Status)">@MapStatusText(Model.Status)</span></span>
             </div>
-            <div class="pill"><span class="lbl">Tạo:</span><span class="val">@Model.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
-            <div class="pill"><span class="lbl">Duyệt:</span><span class="val">@Model.ApprovedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span></div>
+            <div class="pill"><span class="lbl">Tạo:</span><span class="val">@ToVietnamTime(Model.CreatedAt)</span></div>
+            <div class="pill"><span class="lbl">Duyệt:</span><span class="val">@ToVietnamTime(Model.ApprovedAt)</span></div>
         </div>
     </div>
 

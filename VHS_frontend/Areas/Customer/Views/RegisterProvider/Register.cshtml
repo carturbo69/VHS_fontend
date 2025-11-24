@@ -105,8 +105,17 @@
 
                     <div class="field">
                         <label for="Description">Mô tả dịch vụ <span class="req">*</span></label>
-                        <textarea id="Description" name="Description" class="input autosize" rows="3"
-                                  placeholder="Kinh nghiệm, phạm vi phục vụ, điểm mạnh..." required></textarea>
+                        <p class="field-hint" style="margin-bottom: 8px; color: #64748b; font-size: 14px;">
+                            Vui lòng mô tả chi tiết về dịch vụ của bạn, bao gồm:
+                        </p>
+                        <ul style="margin: 0 0 12px 20px; padding: 0; color: #64748b; font-size: 14px; line-height: 1.8;">
+                            <li><strong>Kinh nghiệm:</strong> Số năm kinh nghiệm, lĩnh vực chuyên môn</li>
+                            <li><strong>Phạm vi phục vụ:</strong> Khu vực địa lý, loại công trình (nhà ở, văn phòng, căn hộ...)</li>
+                            <li><strong>Điểm mạnh:</strong> Ưu điểm nổi bật, cam kết chất lượng, thiết bị hiện đại...</li>
+                            <li><strong>Quy trình làm việc:</strong> Các bước thực hiện dịch vụ (nếu có)</li>
+                        </ul>
+                        <textarea id="Description" name="Description" class="input autosize" rows="5"
+                                  placeholder="Ví dụ: Chúng tôi có hơn 5 năm kinh nghiệm trong lĩnh vực vệ sinh chuyên nghiệp. Sử dụng hóa chất an toàn, thiết bị hiện đại. Cam kết chất lượng 100%, có bảo hành sau dịch vụ. Quy trình: Khảo sát → Báo giá → Thực hiện → Nghiệm thu → Bảo hành." required></textarea>
                         <div class="field-error text-danger small d-none mt-1" id="descError">Vui lòng nhập mô tả dịch vụ.</div>
                     </div>
                 </div>
@@ -224,9 +233,9 @@ Chào mừng bạn đến với VHS Platform. Khi đăng ký trở thành Provid
 - Provider cần cung cấp thông tin tài khoản ngân hàng chính xác để nhận thanh toán
 
 4. Chính sách Hủy và Hoàn tiền
-- Provider có thể hủy dịch vụ tối đa 24 giờ trước khi thực hiện mà không bị phạt
-- Hủy trong vòng 24 giờ hoặc không thực hiện dịch vụ sẽ bị phạt 50% giá trị dịch vụ
-- Khách hàng được hoàn tiền 100% nếu Provider hủy hoặc không thực hiện dịch vụ
+- Sau 30 phút, hệ thống sẽ tự động hủy nếu nhà cung cấp chưa xác nhận và khách hàng chưa thanh toán
+- Nếu khách hàng không thanh toán, đơn hàng sẽ tự động bị hủy
+- Khách hàng được hoàn tiền 100% nếu báo cáo được xác nhận là đúng
 
 5. Chấm dứt Tài khoản
 VHS Platform có quyền tạm ngưng hoặc chấm dứt tài khoản Provider nếu vi phạm điều khoản, nhận nhiều đánh giá xấu, hoặc có hành vi gian lận.
@@ -304,10 +313,9 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                             </h6>
                             <p style="margin-left: 12px; line-height: 1.7; margin-bottom: 8px;"><strong>Quy định hủy dịch vụ:</strong></p>
                             <ul style="margin-left: 12px; line-height: 1.8; padding-left: 20px;">
-                                <li>Provider có thể hủy dịch vụ <strong>tối đa 24 giờ</strong> trước khi thực hiện mà không bị phạt.</li>
-                                <li>Hủy dịch vụ trong vòng <strong>24 giờ</strong> hoặc không thực hiện dịch vụ sẽ bị phạt <strong>50% giá trị dịch vụ</strong>.</li>
-                                <li>Khách hàng được hoàn tiền <strong>100%</strong> nếu Provider hủy hoặc không thực hiện dịch vụ mà không có lý do chính đáng.</li>
-                                <li>Trong trường hợp hủy do thiên tai, bất khả kháng hoặc lỗi từ phía khách hàng, Provider sẽ không bị phạt.</li>
+                                <li>Sau 30 phút, hệ thống sẽ tự động hủy nếu nhà cung cấp chưa xác nhận và khách hàng chưa thanh toán</li>
+                                <li>Nếu khách hàng không thanh toán, đơn hàng sẽ tự động bị hủy</li>
+                                <li>Khách hàng được hoàn tiền 100% nếu báo cáo được xác nhận là đúng</li>
                             </ul>
 
                             <h6 style="color: #0ea5e9; margin-top: 24px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
@@ -1240,10 +1248,11 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               if (phoneTrim) fd.append('PhoneNumber', phoneTrim);
               fd.append('Description', descVal);
 
-              // ✅ Terms & Insurance với timestamp đồng ý
+              // ✅ Terms & Insurance với timestamp đồng ý (giờ Việt Nam UTC+7)
               const now = new Date();
-              const vietnamTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // UTC+7
-              const agreementDate = vietnamTime.toLocaleString('vi-VN', {
+              // Sử dụng Intl.DateTimeFormat với timeZone để đảm bảo đúng giờ Việt Nam
+              const agreementDate = new Intl.DateTimeFormat('vi-VN', {
+                timeZone: 'Asia/Ho_Chi_Minh',
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
@@ -1251,7 +1260,7 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 minute: '2-digit',
                 second: '2-digit',
                 hour12: false
-              });
+              }).format(now);
 
               fd.append('TermsInsurance.Title', form.querySelector('#TI_Title')?.value || '');
               const termsDescription = (form.querySelector('#TI_Description')?.value || '').replace('{{AGREEMENT_DATE}}', agreementDate);

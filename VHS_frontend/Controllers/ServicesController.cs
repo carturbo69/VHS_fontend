@@ -2,19 +2,43 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
 using VHS_frontend.Models.ServiceDTOs;
+using VHS_frontend.Models.ServiceShop;
 using VHS_frontend.Services.Customer.Implementations;
 using VHS_frontend.Services.Customer.Interfaces;
+using Microsoft.Extensions.Configuration;
 
 namespace VHS_frontend.Controllers
 {
     public class ServicesController : Controller
     {
         private readonly IServiceCustomerService _serviceCustomerService;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _configuration;
+        private readonly JsonSerializerOptions _jsonOptions;
 
-        public ServicesController(IServiceCustomerService serviceCustomerService)
+        public ServicesController(IServiceCustomerService serviceCustomerService, IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             _serviceCustomerService = serviceCustomerService;
+            _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
+            _jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+        }
+        
+        private HttpClient GetHttpClient()
+        {
+            var client = _httpClientFactory.CreateClient();
+            var backendBase = _configuration["Apis:Backend"];
+            if (!string.IsNullOrWhiteSpace(backendBase))
+            {
+                client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+            }
+            return client;
         }
 
         [HttpGet]
@@ -22,6 +46,7 @@ namespace VHS_frontend.Controllers
          int page = 1,
          string? search = null,
          string? category = null,
+         string? tag = null,
          string? sort = null)
         {
             const int pageSize = 20;
@@ -30,6 +55,25 @@ namespace VHS_frontend.Controllers
 
             var categories = await _serviceCustomerService.GetAllAsync();
             ViewBag.Categories = categories;
+
+            // Lấy tags theo category đã chọn (nếu có)
+            List<TagDTO>? tags = null;
+            if (!string.IsNullOrWhiteSpace(category) && Guid.TryParse(category, out var selectedCategoryId))
+            {
+                try
+                {
+                    var httpClient = GetHttpClient();
+                    var tagsResponse = await httpClient.GetAsync($"api/tag?categoryId={selectedCategoryId}&includeDeleted=false");
+                    if (tagsResponse.IsSuccessStatusCode)
+                    {
+                        tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagDTO>>(_jsonOptions);
+                        tags = tags?.Where(t => t != null && !string.IsNullOrWhiteSpace(t.Name) && !(t.IsDeleted ?? false)).ToList();
+                    }
+                }
+                catch { /* ignore errors */ }
+            }
+
+            ViewBag.Tags = tags ?? new List<TagDTO>();
 
             var all = dtos.AsQueryable();
 
@@ -51,6 +95,54 @@ namespace VHS_frontend.Controllers
                     all = all.Where(s =>
                         !string.IsNullOrWhiteSpace(s.CategoryName) &&
                         s.CategoryName.Equals(category, StringComparison.OrdinalIgnoreCase));
+                }
+            }
+
+            // Filter theo tag (nếu có)
+            if (!string.IsNullOrWhiteSpace(tag) && Guid.TryParse(tag, out var tagId))
+            {
+                // Lấy tagName từ tags list đã load
+                string? tagName = null;
+                if (tags != null)
+                {
+                    var selectedTag = tags.FirstOrDefault(t => t.TagId == tagId);
+                    if (selectedTag != null && !string.IsNullOrWhiteSpace(selectedTag.Name))
+                    {
+                        tagName = selectedTag.Name;
+                    }
+                }
+
+                // Nếu không tìm thấy trong tags đã load, gọi API để lấy tag info
+                if (string.IsNullOrWhiteSpace(tagName))
+                {
+                    try
+                    {
+                        var httpClient = GetHttpClient();
+                        // Thử lấy tag từ category đã chọn
+                        if (!string.IsNullOrWhiteSpace(category) && Guid.TryParse(category, out var catId))
+                        {
+                            var tagsResponse = await httpClient.GetAsync($"api/tag?categoryId={catId}&includeDeleted=false");
+                            if (tagsResponse.IsSuccessStatusCode)
+                            {
+                                var allTags = await tagsResponse.Content.ReadFromJsonAsync<List<TagDTO>>(_jsonOptions);
+                                var foundTag = allTags?.FirstOrDefault(t => t.TagId == tagId);
+                                if (foundTag != null)
+                                {
+                                    tagName = foundTag.Name;
+                                }
+                            }
+                        }
+                    }
+                    catch { /* ignore errors */ }
+                }
+
+                // Filter services theo tagName (kiểm tra trong title hoặc description)
+                if (!string.IsNullOrWhiteSpace(tagName))
+                {
+                    all = all.Where(s =>
+                        (!string.IsNullOrEmpty(s.Title) && s.Title.Contains(tagName, StringComparison.OrdinalIgnoreCase)) ||
+                        (!string.IsNullOrEmpty(s.Description) && s.Description.Contains(tagName, StringComparison.OrdinalIgnoreCase))
+                    );
                 }
             }
 
@@ -78,6 +170,7 @@ namespace VHS_frontend.Controllers
             ViewBag.TotalPages = totalPages;
             ViewBag.Search = search;
             ViewBag.Category = category;
+            ViewBag.Tag = tag;
             ViewBag.Sort = sort;
 
             return View(models);
@@ -106,7 +199,51 @@ namespace VHS_frontend.Controllers
                 .ToList()
                 ?? new System.Collections.Generic.List<ListServiceHomePageDTOs>();
 
+            // Tính số dịch vụ đã duyệt của provider (chỉ đếm Approved/Active, không đếm Pending)
+            var providerIdToUse = dto.ProviderId != Guid.Empty ? dto.ProviderId : (dto.Provider?.ProviderId ?? Guid.Empty);
+            if (providerIdToUse != Guid.Empty)
+            {
+                var approvedServicesCount = all?
+                    .Where(s => s != null && s.ProviderId == providerIdToUse)
+                    .Count() ?? 0;
+                ViewBag.ApprovedServicesCount = approvedServicesCount;
+            }
+            else
+            {
+                ViewBag.ApprovedServicesCount = dto.Provider?.TotalServices ?? 0;
+            }
+
             return View(dto);
+        }
+
+        /// <summary>
+        /// API endpoint: Lấy tags theo category
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetTagsByCategory(string categoryId)
+        {
+            if (string.IsNullOrWhiteSpace(categoryId) || !Guid.TryParse(categoryId, out var catId))
+            {
+                return Json(new List<TagDTO>());
+            }
+
+            try
+            {
+                var httpClient = GetHttpClient();
+                var tagsResponse = await httpClient.GetAsync($"api/tag?categoryId={catId}&includeDeleted=false");
+                if (tagsResponse.IsSuccessStatusCode)
+                {
+                    var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagDTO>>(_jsonOptions);
+                    tags = tags?.Where(t => t != null && !string.IsNullOrWhiteSpace(t.Name) && !(t.IsDeleted ?? false)).ToList();
+                    return Json(tags ?? new List<TagDTO>());
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ServicesController] Error getting tags: {ex.Message}");
+            }
+
+            return Json(new List<TagDTO>());
         }
 
     }

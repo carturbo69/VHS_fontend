@@ -47,6 +47,7 @@
             <form asp-action="Create" method="post" enctype="multipart/form-data" id="createServiceForm">
                 @Html.AntiForgeryToken()
                 <input type="hidden" asp-for="ProviderId" />
+                <input type="hidden" id="currentProviderId" value="@ViewBag.ProviderId" />
 
                 <script>
                     // Validation functions - must be defined before form fields
@@ -423,12 +424,25 @@
                 return;
             }
 
+            // Lấy providerId từ hidden input
+            const providerIdInput = document.getElementById('currentProviderId');
+            const providerId = providerIdInput ? providerIdInput.value : null;
+
             tagSelect.disabled = false;
             tagSelect.innerHTML = '<option value="">-- Đang tải tags... --</option>';
 
             try {
-                const response = await fetch(`/Provider/ServiceManagement/GetTagsByCategory?categoryId=${currentCategoryId}`);
+                // ✅ Đảm bảo API được gọi với categoryId (providerId sẽ được lấy từ session trong controller)
+                const url = `/Provider/ServiceManagement/GetTagsByCategory?categoryId=${currentCategoryId}`;
+                console.log(`[Create] Loading tags for categoryId=${currentCategoryId}, providerId from session`);
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const tags = await response.json();
+                console.log(`[Create] Received ${tags?.length || 0} tags from API`);
 
                 availableTags = tags || [];
 
@@ -439,11 +453,13 @@
                         html += `<option value="${tag.tagId}" data-tag-name="${tag.name}">${tag.name}</option>`;
                     });
                     tagSelect.innerHTML = html;
+                    console.log(`[Create] Displayed ${availableTags.length} tags in dropdown`);
                 } else {
                     tagSelect.innerHTML = '<option value="">-- Không có tags --</option>';
+                    console.log(`[Create] No tags available for this category`);
                 }
             } catch (error) {
-                console.error('Error loading tags:', error);
+                console.error('[Create] Error loading tags:', error);
                 tagSelect.innerHTML = '<option value="">-- Lỗi khi tải tags --</option>';
             }
         }
@@ -623,16 +639,21 @@
                     let borderColor = '#ffc107'; // default (yellow)
                     let bgColor = '#fffbf0'; // default
                     let textColor = '#856404'; // default
+                    let groupClass = 'option-group-yellow';
                     if (groupType === 'radio') {
                         borderColor = '#0d6efd'; // blue
                         bgColor = '#e7f3ff';
                         textColor = '#084298';
+                        groupClass = 'option-group-radio';
                     } else if (groupType === 'checkbox') {
                         borderColor = '#6f42c1'; // purple
                         bgColor = '#f3e8ff';
                         textColor = '#5a189a';
+                        groupClass = 'option-group-checkbox';
                     }
                     
+                    // Thêm class để CSS có thể override cho dark mode
+                    groupDiv.className = `option-group mb-3 ${groupClass}`;
                     groupDiv.style.cssText = `padding: 0.75rem; background: ${bgColor}; border-left: 4px solid ${borderColor}; border-radius: 0.5rem;`;
                     
                     let groupHtml = `
@@ -650,7 +671,7 @@
                         if (groupType === 'radio') {
                             // Radio button - chỉ chọn 1 trong nhóm
                             groupHtml += `
-                                <div class="mb-2" style="padding-left: 1.5rem; border-left: 2px solid ${borderColor};">
+                                <div class="mb-2 option-item-radio" style="padding-left: 1.5rem; border-left: 2px solid ${borderColor};">
                                     <input class="form-check-input form-check-input-sm" type="radio" name="${radioGroupName}" value="${o.optionId}" id="${uniqueId}" />
                                     <input type="hidden" name="OptionIds" value="${o.optionId}" disabled />
                                     <label class="form-check-label small" for="${uniqueId}">
@@ -660,7 +681,7 @@
                     } else {
                             // Checkbox - có thể chọn nhiều
                             groupHtml += `
-                                <div class="mb-2" style="padding-left: 1.5rem; border-left: 2px solid ${borderColor};">
+                                <div class="mb-2 option-item-checkbox" style="padding-left: 1.5rem; border-left: 2px solid ${borderColor};">
                                     <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${o.optionId}" id="${uniqueId}" />
                                     <label class="form-check-label small" for="${uniqueId}">
                                         <span class="fw-semibold">${o.optionName}</span>
