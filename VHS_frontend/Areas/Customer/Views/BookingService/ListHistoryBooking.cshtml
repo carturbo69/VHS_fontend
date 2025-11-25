@@ -160,10 +160,10 @@
             stRaw.Equals("ServiceCompleted", StringComparison.OrdinalIgnoreCase) ||
             stRaw.Equals("Service Completed", StringComparison.OrdinalIgnoreCase);
 
-            // Text hiển thị ban đầu
+            // Text hiển thị ban đầu - mặc định là tiếng Việt từ map hoặc fallback
             var statusText = statusViMap.TryGetValue(stRaw, out var viText) ? viText : stRaw;
 
-            // Chuẩn hoá trạng thái
+            // Chuẩn hoá trạng thái và đảm bảo tất cả đều được chuyển sang tiếng Việt
             if (stRaw.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
             || stRaw.Equals("Canceled", StringComparison.OrdinalIgnoreCase)
             || stRaw.Equals("Đã hủy", StringComparison.OrdinalIgnoreCase)
@@ -190,7 +190,9 @@
                 statusText = statusViMap["Confirmed"];
             }
             else if (stRaw.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Equals("In Progress", StringComparison.OrdinalIgnoreCase)
             || stRaw.Equals("Bắt đầu làm việc", StringComparison.OrdinalIgnoreCase)
+            || stRaw.Equals("Bắt Đầu Làm Việc", StringComparison.OrdinalIgnoreCase)
             || stRaw.Equals("Đang thực hiện", StringComparison.OrdinalIgnoreCase))
             {
                 stCode = "InProgress";
@@ -203,6 +205,25 @@
                 // Gộp cả ServiceCompleted vào Completed để hiển thị
                 stCode = "Completed";
                 statusText = statusViMap["Completed"];
+            }
+            else
+            {
+                // ✅ Fallback: Nếu không khớp với bất kỳ trạng thái nào, thử tìm trong map hoặc giữ nguyên
+                // Nhưng ưu tiên chuyển sang tiếng Việt nếu có trong map
+                if (statusViMap.TryGetValue(stRaw, out var fallbackText))
+                {
+                    statusText = fallbackText;
+                }
+                else
+                {
+                    // Nếu vẫn không có, thử normalize và tìm lại
+                    var normalized = stRaw.Replace(" ", "").Replace("-", "");
+                    if (statusViMap.TryGetValue(normalized, out var normalizedText))
+                    {
+                        statusText = normalizedText;
+                    }
+                    // Nếu vẫn không tìm thấy, giữ nguyên (có thể là tiếng Việt rồi hoặc trạng thái đặc biệt)
+                }
             }
 
             // ✅ Cờ logic

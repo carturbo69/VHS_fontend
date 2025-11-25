@@ -18,6 +18,25 @@
 
     var rawStatus = (Model?.Status ?? "").Trim();
 
+    // ✅ Fallback: Nếu NormalizedStatus không được set đúng, normalize từ rawStatus
+    if (string.IsNullOrWhiteSpace(statusCode) || statusCode == rawStatus)
+    {
+        // Normalize rawStatus thủ công
+        if (rawStatus.Equals("In Progress", StringComparison.OrdinalIgnoreCase))
+        {
+            statusCode = "InProgress";
+        }
+        else if (rawStatus.Equals("Service Completed", StringComparison.OrdinalIgnoreCase))
+        {
+            statusCode = "Completed";
+        }
+        else if (statusCode == "Pending" && !rawStatus.Equals("Pending", StringComparison.OrdinalIgnoreCase))
+        {
+            // Nếu statusCode là "Pending" nhưng rawStatus không phải, có thể cần normalize lại
+            statusCode = Model?.NormalizedStatus ?? "Pending";
+        }
+    }
+
     // DB có thể lưu "ServiceCompleted" hoặc "Service Completed"
     var IsServiceCompleted =
         rawStatus.Equals("ServiceCompleted", StringComparison.OrdinalIgnoreCase)
@@ -26,7 +45,9 @@
     // Sử dụng IsPendingStatus property để check cả tiếng Anh và tiếng Việt
     var IsPending = Model?.IsPendingStatus ?? statusCode.Equals("Pending", StringComparison.OrdinalIgnoreCase);
     var IsConfirmed = statusCode.Equals("Confirmed", StringComparison.OrdinalIgnoreCase);
-    var IsWorking = statusCode.Equals("InProgress", StringComparison.OrdinalIgnoreCase);
+    // ✅ Xử lý cả "InProgress" và "In Progress" (có khoảng trắng)
+    var IsWorking = statusCode.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
+                 || rawStatus.Equals("In Progress", StringComparison.OrdinalIgnoreCase);
     var IsCompleted = statusCode.Equals("Completed", StringComparison.OrdinalIgnoreCase)
                   || IsServiceCompleted; // <-- thêm điều kiện này
     var IsCancelled = statusCode.Equals("Cancelled", StringComparison.OrdinalIgnoreCase);
@@ -469,7 +490,10 @@
             <div class="card-block p-3 h-100">
                 <div class="h6">Tiến trình dịch vụ</div>
                 <div class="timeline">
-                    @foreach (var e in (Model?.Timeline ?? new List<VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTO.TrackingEventDTO>()).OrderBy(t => t.Time))
+                    @* Timeline hiển thị từ trên xuống (grid), nên sắp xếp giảm dần (mới nhất trước) để:
+                       - Item đầu tiên (CHECK OUT - mới nhất) ở trên cùng
+                       - Item cuối cùng (CREATED - cũ nhất) ở dưới cùng *@
+                    @foreach (var e in (Model?.Timeline ?? new List<VHS_frontend.Areas.Customer.Models.BookingServiceDTOs.HistoryBookingDetailDTO.TrackingEventDTO>()).OrderByDescending(t => t.Time))
                     {
                         var code = (e.Code ?? "").Trim().ToUpperInvariant();
 
