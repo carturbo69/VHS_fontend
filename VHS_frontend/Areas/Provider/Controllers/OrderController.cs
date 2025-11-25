@@ -359,7 +359,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                             Time = new DateTimeOffset(booking.ConfirmedAt.Value, TimeSpan.FromHours(7)),
                             Code = "CONFIRMED",
                             Title = "Đơn hàng đã được xác nhận",
-                            Description = booking.StaffName != null ? $"Đơn hàng đã được xác nhận bởi nhân viên {booking.StaffName}" : "Đơn hàng đã được xác nhận"
+                            Description = booking.StaffName != null ? $"Đơn hàng đã được xác nhận bởi nhà cung cấp và nhân viên {booking.StaffName} đã được giao" : "Đơn hàng đã được xác nhận"
                         });
                     }
                     
