@@ -755,6 +755,25 @@
                 formError.textContent = '';
             }
             
+            // Reset lỗi các trường bắt buộc
+            const requiredFields = [
+              { id: 'streetAddress', errorId: 'streetAddressError' },
+              { id: 'wardName', errorId: 'wardNameError' },
+              { id: 'provinceName', errorId: 'provinceNameError' },
+              { id: 'recipientName', errorId: 'recipientNameError' }
+            ];
+            requiredFields.forEach(({ id, errorId }) => {
+              const field = document.getElementById(id);
+              const error = document.getElementById(errorId);
+              if (field) {
+                field.classList.remove('input-error');
+              }
+              if (error) {
+                error.style.display = 'none';
+                error.textContent = '';
+              }
+            });
+            
             // Reset lỗi số điện thoại
             const phoneInput = document.getElementById('recipientPhone');
             const phoneError = document.getElementById('recipientPhoneError');
@@ -783,6 +802,25 @@
         window.closeUpsertModal = function() {
             const modal = document.getElementById('addressUpsertModal');
             if (modal) modal.classList.remove('open');
+            
+            // Reset lỗi các trường bắt buộc
+            const requiredFields = [
+              { id: 'streetAddress', errorId: 'streetAddressError' },
+              { id: 'wardName', errorId: 'wardNameError' },
+              { id: 'provinceName', errorId: 'provinceNameError' },
+              { id: 'recipientName', errorId: 'recipientNameError' }
+            ];
+            requiredFields.forEach(({ id, errorId }) => {
+              const field = document.getElementById(id);
+              const error = document.getElementById(errorId);
+              if (field) {
+                field.classList.remove('input-error');
+              }
+              if (error) {
+                error.style.display = 'none';
+                error.textContent = '';
+              }
+            });
             
             // Reset lỗi số điện thoại
             const phoneInput = document.getElementById('recipientPhone');
@@ -838,7 +876,7 @@
             <button class="btn-upsert-close" type="button" onclick="closeUpsertModal()" aria-label="Đóng">✕</button>
         </div>
 
-        <form id="addressUpsertForm" asp-area="Customer" asp-controller="Address" asp-action="Upsert" method="post" class="upsert-form">
+        <form id="addressUpsertForm" asp-area="Customer" asp-controller="Address" asp-action="Upsert" method="post" class="upsert-form" novalidate>
             @Html.AntiForgeryToken()
             <input type="hidden" name="AddressId" id="AddressId" />
             <!-- Hidden fields để lưu tọa độ -->
@@ -854,32 +892,36 @@
 
             <div class="form-row">
                 <div class="form-label-row">
-                    <label for="streetAddress" class="form-label">Địa chỉ</label>
+                    <label for="streetAddress" class="form-label">Địa chỉ <span style="color: red;">*</span></label>
                     <button type="button" id="btnGeocode" class="btn-geocode" title="Lấy địa chỉ từ tọa độ đã chọn">
                         <span class="btn-icon">🔍</span>
                         <span>Lấy địa chỉ từ vị trí đã chọn</span>
                     </button>
                 </div>
                 <input type="text" id="streetAddress" name="streetAddress" required placeholder="Nhập địa chỉ hoặc chọn trên bản đồ" class="form-input" />
+                <small class="field-error-message" id="streetAddressError" style="display: none; color: var(--danger); margin-top: 4px; font-size: 0.875rem;"></small>
             </div>
 
             <div class="form-row">
-                <label for="wardName">Phường/Xã</label>
-                <input type="text" id="wardName" name="wardName" required />
+                <label for="wardName">Phường/Xã <span style="color: red;">*</span></label>
+                <input type="text" id="wardName" name="wardName" required class="form-input" />
+                <small class="field-error-message" id="wardNameError" style="display: none; color: var(--danger); margin-top: 4px; font-size: 0.875rem;"></small>
             </div>
             <div class="form-row">
-                <label for="provinceName">Tỉnh/Thành</label>
-                <input type="text" id="provinceName" name="provinceName" required />
+                <label for="provinceName">Tỉnh/Thành <span style="color: red;">*</span></label>
+                <input type="text" id="provinceName" name="provinceName" required class="form-input" />
+                <small class="field-error-message" id="provinceNameError" style="display: none; color: var(--danger); margin-top: 4px; font-size: 0.875rem;"></small>
             </div>
 
             <div class="form-grid-2">
                 <div class="form-row">
-                    <label for="recipientName" class="form-label">Tên người đặt</label>
-                    <input type="text" id="recipientName" name="recipientName" placeholder="Nhập tên người đặt" class="form-input" />
+                    <label for="recipientName" class="form-label">Tên người đặt <span style="color: red;">*</span></label>
+                    <input type="text" id="recipientName" name="recipientName" required placeholder="Nhập tên người đặt" class="form-input" />
+                    <small class="field-error-message" id="recipientNameError" style="display: none; color: var(--danger); margin-top: 4px; font-size: 0.875rem;"></small>
                 </div>
                 <div class="form-row">
-                    <label for="recipientPhone" class="form-label">Số điện thoại người đặt</label>
-                    <input type="tel" id="recipientPhone" name="recipientPhone" placeholder="Nhập số điện thoại (VD: 0901234567)" class="form-input" />
+                    <label for="recipientPhone" class="form-label">Số điện thoại người đặt <span style="color: red;">*</span></label>
+                    <input type="tel" id="recipientPhone" name="recipientPhone" required placeholder="Nhập số điện thoại (VD: 0901234567)" class="form-input" />
                     <small class="phone-error-message" id="recipientPhoneError" style="display: none; color: var(--danger); margin-top: 4px; font-size: 0.875rem;"></small>
                 </div>
             </div>
@@ -894,7 +936,7 @@
         <script>
         // Hàm validate số điện thoại Việt Nam
         function validateVietnamesePhone(phone) {
-          if (!phone) return true; // Cho phép để trống (optional field)
+          if (!phone) return false; // Bắt buộc phải có số điện thoại
           
           // Loại bỏ khoảng trắng, dấu gạch ngang, dấu ngoặc
           const cleaned = phone.replace(/[\s\-\(\)]/g, '');
@@ -924,12 +966,75 @@
           return false;
         }
         
+        // Hàm hiển thị/ẩn lỗi cho một trường
+        function showFieldError(fieldId, errorId, message) {
+          const field = document.getElementById(fieldId);
+          const error = document.getElementById(errorId);
+          if (field && error) {
+            field.classList.add('input-error');
+            error.textContent = '⚠️ ' + message;
+            error.style.display = 'block';
+          }
+        }
+        
+        function hideFieldError(fieldId, errorId) {
+          const field = document.getElementById(fieldId);
+          const error = document.getElementById(errorId);
+          if (field && error) {
+            field.classList.remove('input-error');
+            error.style.display = 'none';
+            error.textContent = '';
+          }
+        }
+        
         // Validate và submit form bằng AJAX
         (function() {
           const form = document.getElementById('addressUpsertForm');
           if (!form) return;
           
-          // Real-time validation cho số điện thoại
+          // Ngăn popup validation mặc định của browser cho tất cả các input
+          const allInputs = form.querySelectorAll('input[required], textarea[required]');
+          allInputs.forEach(input => {
+            input.addEventListener('invalid', function(e) {
+              e.preventDefault();
+              // Validation tùy chỉnh sẽ xử lý việc hiển thị lỗi
+            });
+          });
+          
+          // Real-time validation cho các trường bắt buộc
+          const requiredFields = [
+            { id: 'streetAddress', errorId: 'streetAddressError', label: 'Địa chỉ' },
+            { id: 'wardName', errorId: 'wardNameError', label: 'Phường/Xã' },
+            { id: 'provinceName', errorId: 'provinceNameError', label: 'Tỉnh/Thành' },
+            { id: 'recipientName', errorId: 'recipientNameError', label: 'Tên người đặt' }
+          ];
+          
+          requiredFields.forEach(({ id, errorId, label }) => {
+            const field = document.getElementById(id);
+            const error = document.getElementById(errorId);
+            
+            if (field && error) {
+              // Validate khi blur (rời khỏi input)
+              field.addEventListener('blur', function() {
+                const value = this.value.trim();
+                if (!value) {
+                  showFieldError(id, errorId, `${label} không được để trống.`);
+                } else {
+                  hideFieldError(id, errorId);
+                }
+              });
+              
+              // Xóa lỗi khi bắt đầu nhập lại
+              field.addEventListener('input', function() {
+                const value = this.value.trim();
+                if (value) {
+                  hideFieldError(id, errorId);
+                }
+              });
+            }
+          });
+          
+          // Real-time validation cho số điện thoại (bắt buộc)
           const phoneInput = document.getElementById('recipientPhone');
           const phoneError = document.getElementById('recipientPhoneError');
           
@@ -937,11 +1042,18 @@
             // Validate khi blur (rời khỏi input)
             phoneInput.addEventListener('blur', function() {
               const phone = this.value.trim();
-              if (phone && !validateVietnamesePhone(phone)) {
+              if (!phone) {
+                // Trường bắt buộc - không được để trống
+                this.classList.add('input-error');
+                phoneError.textContent = '⚠️ Số điện thoại không được để trống.';
+                phoneError.style.display = 'block';
+              } else if (!validateVietnamesePhone(phone)) {
+                // Có nhập nhưng format không đúng
                 this.classList.add('input-error');
                 phoneError.textContent = '⚠️ Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại 10 số (bắt đầu bằng 0) hoặc 11 số (bắt đầu bằng 84)';
                 phoneError.style.display = 'block';
               } else {
+                // Hợp lệ
                 this.classList.remove('input-error');
                 phoneError.style.display = 'none';
               }
@@ -951,7 +1063,7 @@
             phoneInput.addEventListener('input', function() {
               if (this.classList.contains('input-error')) {
                 const phone = this.value.trim();
-                if (!phone || validateVietnamesePhone(phone)) {
+                if (phone && validateVietnamesePhone(phone)) {
                   this.classList.remove('input-error');
                   phoneError.style.display = 'none';
                 }
@@ -962,6 +1074,18 @@
           form.addEventListener('submit', async function(e) {
             e.preventDefault();
             e.stopPropagation();
+            
+            // Ẩn tất cả lỗi cũ trước khi validate
+            requiredFields.forEach(({ id, errorId }) => {
+              hideFieldError(id, errorId);
+            });
+            const formError = document.getElementById('upsertFormError');
+            if (formError) {
+              formError.style.display = 'none';
+              formError.style.visibility = 'hidden';
+              formError.style.opacity = '0';
+              formError.textContent = '';
+            }
             
             const addressId = document.getElementById('AddressId')?.value.trim() || '';
             const street = document.getElementById('streetAddress')?.value.trim() || '';
@@ -974,37 +1098,66 @@
             
             console.log('Form values:', { addressId, street, ward, province, lat, lng, recipientName, recipientPhone });
             
-            if (!street || !ward || !province) {
-              const errorEl = document.getElementById('upsertFormError');
-              if (errorEl) {
-                errorEl.textContent = '⚠️ Vui lòng điền đầy đủ thông tin địa chỉ (Địa chỉ, Phường/Xã, Tỉnh/Thành)';
-                errorEl.style.display = 'block';
-                errorEl.style.visibility = 'visible';
-                errorEl.style.opacity = '1';
-                // Scroll đến thông báo lỗi
-                setTimeout(() => {
-                  errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
-                // Tự động ẩn sau 3 giây
-                setTimeout(() => {
-                  errorEl.style.display = 'none';
-                  errorEl.style.visibility = 'hidden';
-                  errorEl.style.opacity = '0';
-                }, 3000);
-              }
-              return false;
+            // Validate từng trường bắt buộc và hiển thị lỗi cụ thể
+            let hasError = false;
+            let firstErrorField = null;
+            
+            if (!street) {
+              showFieldError('streetAddress', 'streetAddressError', 'Địa chỉ không được để trống.');
+              hasError = true;
+              if (!firstErrorField) firstErrorField = document.getElementById('streetAddress');
             }
             
-            // Validate số điện thoại nếu có nhập
-            if (recipientPhone && !validateVietnamesePhone(recipientPhone)) {
+            if (!ward) {
+              showFieldError('wardName', 'wardNameError', 'Phường/Xã không được để trống.');
+              hasError = true;
+              if (!firstErrorField) firstErrorField = document.getElementById('wardName');
+            }
+            
+            if (!province) {
+              showFieldError('provinceName', 'provinceNameError', 'Tỉnh/Thành không được để trống.');
+              hasError = true;
+              if (!firstErrorField) firstErrorField = document.getElementById('provinceName');
+            }
+            
+            // Validate tên người đặt (bắt buộc)
+            if (!recipientName) {
+              showFieldError('recipientName', 'recipientNameError', 'Tên người đặt không được để trống.');
+              hasError = true;
+              if (!firstErrorField) firstErrorField = document.getElementById('recipientName');
+            }
+            
+            // Validate số điện thoại (bắt buộc)
+            if (!recipientPhone) {
+              const phoneInput = document.getElementById('recipientPhone');
+              const phoneError = document.getElementById('recipientPhoneError');
+              if (phoneInput && phoneError) {
+                phoneInput.classList.add('input-error');
+                phoneError.textContent = '⚠️ Số điện thoại không được để trống.';
+                phoneError.style.display = 'block';
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = document.getElementById('recipientPhone');
+            } else if (!validateVietnamesePhone(recipientPhone)) {
+              // Có nhập nhưng format không đúng
               const phoneInput = document.getElementById('recipientPhone');
               const phoneError = document.getElementById('recipientPhoneError');
               if (phoneInput && phoneError) {
                 phoneInput.classList.add('input-error');
                 phoneError.textContent = '⚠️ Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại 10 số (bắt đầu bằng 0) hoặc 11 số (bắt đầu bằng 84)';
                 phoneError.style.display = 'block';
-                phoneInput.focus();
-                phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+              hasError = true;
+              if (!firstErrorField) firstErrorField = document.getElementById('recipientPhone');
+            }
+            
+            if (hasError) {
+              // Scroll đến trường lỗi đầu tiên
+              if (firstErrorField) {
+                setTimeout(() => {
+                  firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  firstErrorField.focus();
+                }, 100);
               }
               return false;
             }
@@ -1755,6 +1908,24 @@
             formError.textContent = '';
           }
           
+          // Reset lỗi các trường bắt buộc
+          const requiredFields = [
+            { id: 'streetAddress', errorId: 'streetAddressError' },
+            { id: 'wardName', errorId: 'wardNameError' },
+            { id: 'provinceName', errorId: 'provinceNameError' }
+          ];
+          requiredFields.forEach(({ id, errorId }) => {
+            const field = document.getElementById(id);
+            const error = document.getElementById(errorId);
+            if (field) {
+              field.classList.remove('input-error');
+            }
+            if (error) {
+              error.style.display = 'none';
+              error.textContent = '';
+            }
+          });
+          
           // Reset lỗi số điện thoại
           const phoneInput = document.getElementById('recipientPhone');
           const phoneError = document.getElementById('recipientPhoneError');
@@ -2230,6 +2401,24 @@
             formError.textContent = '';
           }
           
+          // Reset lỗi các trường bắt buộc
+          const requiredFields = [
+            { id: 'streetAddress', errorId: 'streetAddressError' },
+            { id: 'wardName', errorId: 'wardNameError' },
+            { id: 'provinceName', errorId: 'provinceNameError' }
+          ];
+          requiredFields.forEach(({ id, errorId }) => {
+            const field = document.getElementById(id);
+            const error = document.getElementById(errorId);
+            if (field) {
+              field.classList.remove('input-error');
+            }
+            if (error) {
+              error.style.display = 'none';
+              error.textContent = '';
+            }
+          });
+          
           // Reset lỗi số điện thoại
           const phoneInput = document.getElementById('recipientPhone');
           const phoneError = document.getElementById('recipientPhoneError');
@@ -2309,6 +2498,24 @@
         window.closeUpsertModal = function(){ 
               const modal = document.getElementById('addressUpsertModal');
               if (modal) modal.classList.remove('open');
+              
+              // Reset lỗi các trường bắt buộc
+              const requiredFields = [
+                { id: 'streetAddress', errorId: 'streetAddressError' },
+                { id: 'wardName', errorId: 'wardNameError' },
+                { id: 'provinceName', errorId: 'provinceNameError' }
+              ];
+              requiredFields.forEach(({ id, errorId }) => {
+                const field = document.getElementById(id);
+                const error = document.getElementById(errorId);
+                if (field) {
+                  field.classList.remove('input-error');
+                }
+                if (error) {
+                  error.style.display = 'none';
+                  error.textContent = '';
+                }
+              });
               
               // Reset lỗi số điện thoại
               const phoneInput = document.getElementById('recipientPhone');

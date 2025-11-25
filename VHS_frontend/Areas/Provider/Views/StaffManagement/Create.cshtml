@@ -634,7 +634,25 @@
             
             if (!fileInput || !placeholder) return;
             
-            // Click handler for placeholder
+            // Helper function to ensure click handler is added to container
+            function ensureClickHandler(container) {
+                if (container) {
+                    // Remove old listener by cloning (this removes all event listeners)
+                    const hasParent = container.parentNode !== null;
+                    const newContainer = container.cloneNode(true);
+                    if (hasParent) {
+                        container.parentNode.replaceChild(newContainer, container);
+                    }
+                    // Add click handler
+                    newContainer.addEventListener('click', function() {
+                        fileInput.click();
+                    });
+                    return newContainer;
+                }
+                return container;
+            }
+            
+            // Click handler for placeholder (initial)
             placeholder.addEventListener('click', function() {
                 fileInput.click();
             });
@@ -701,30 +719,62 @@
                 // Create preview
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    // Create new image container
-                    const newContainer = document.createElement('div');
-                    newContainer.className = 'image-container';
-                    newContainer.setAttribute('data-target-input', inputId);
-                    newContainer.style.cssText = `width: ${width}px; height: ${height}px; cursor: pointer;`;
+                    // Tìm container hiện tại (có thể là placeholder hoặc image-container)
+                    let currentContainer = document.querySelector(`div[data-target-input="${inputId}"]`);
                     
-                    newContainer.innerHTML = `
-                        <img src="${e.target.result}" alt="Preview" 
-                             style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;" />
-                        <div class="edit-overlay">
-                            <div class="edit-overlay-content">
-                                <i class="bi bi-pencil-square edit-icon"></i>
-                                <div class="edit-text">Click để thay đổi</div>
+                    // Nếu chưa có container hoặc là placeholder, tạo mới
+                    if (!currentContainer || currentContainer.classList.contains('placeholder-container')) {
+                        // Create new image container
+                        const newContainer = document.createElement('div');
+                        newContainer.className = 'image-container';
+                        newContainer.setAttribute('data-target-input', inputId);
+                        newContainer.style.cssText = `width: ${width}px; height: ${height}px; cursor: pointer;`;
+                        
+                        newContainer.innerHTML = `
+                            <img src="${e.target.result}" alt="Preview" 
+                                 style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;" />
+                            <div class="edit-overlay">
+                                <div class="edit-overlay-content">
+                                    <i class="bi bi-pencil-square edit-icon"></i>
+                                    <div class="edit-text">Click để thay đổi</div>
+                                </div>
                             </div>
-                        </div>
-                    `;
-                    
-                    // Replace placeholder with new container
-                    placeholder.parentNode.replaceChild(newContainer, placeholder);
-                    
-                    // Re-add click handler to new element
-                        newContainer.addEventListener('click', function() {
-                            fileInput.click();
-                        });
+                        `;
+                        
+                        // Replace placeholder with new container
+                        if (currentContainer && currentContainer.parentNode) {
+                            currentContainer.parentNode.replaceChild(newContainer, currentContainer);
+                            currentContainer = newContainer;
+                        } else if (placeholder && placeholder.parentNode) {
+                            placeholder.parentNode.replaceChild(newContainer, placeholder);
+                            currentContainer = newContainer;
+                        }
+                        
+                        // Add click handler to new element
+                        currentContainer = ensureClickHandler(currentContainer);
+                    } else {
+                        // Đã có image-container, chỉ cập nhật ảnh bên trong
+                        const img = currentContainer.querySelector('img');
+                        if (img) {
+                            img.src = e.target.result;
+                        } else {
+                            // Nếu không tìm thấy img, tạo lại HTML
+                            currentContainer.innerHTML = `
+                                <img src="${e.target.result}" alt="Preview" 
+                                     style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;" />
+                                <div class="edit-overlay">
+                                    <div class="edit-overlay-content">
+                                        <i class="bi bi-pencil-square edit-icon"></i>
+                                        <div class="edit-text">Click để thay đổi</div>
+                                    </div>
+                                </div>
+                            `;
+                            // Thêm lại click handler sau khi thay đổi innerHTML
+                            currentContainer.addEventListener('click', function() {
+                                fileInput.click();
+                            });
+                        }
+                    }
                     
                     // Clear validation errors and validate
                     const inputEl = document.getElementById(inputId);
@@ -743,7 +793,7 @@
                     }
                     
                     // Show success message
-                    showToast('success', 'Thành công', 'Ảnh đã được chọn thành công');
+                    showToast('success', 'Thành công', 'Ảnh đã được cập nhật thành công');
                 };
                 reader.readAsDataURL(file);
             });
