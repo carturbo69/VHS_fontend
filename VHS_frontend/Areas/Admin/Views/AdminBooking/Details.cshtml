@@ -562,7 +562,31 @@
                         || code == "CHECK OUT";
 
                         var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
-                        var staffImage = "/images/staff-placeholder.png"; // Provider DTO chưa có StaffImage
+                        
+                        // Lấy ảnh staff: ưu tiên từ Model.StaffImage, nếu không có thì lấy từ StaffList
+                        string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
+                        
+                        var staffImage = "/images/staff-placeholder.png";
+                        if (!string.IsNullOrWhiteSpace(Model?.StaffImage))
+                        {
+                            staffImage = ToUrl(Model.StaffImage);
+                        }
+                        else if (Model?.StaffId.HasValue == true && ViewBag.StaffList != null)
+                        {
+                            var staffListForImage = ViewBag.StaffList as List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>;
+                            var assignedStaff = staffListForImage?.FirstOrDefault(s => 
+                                Guid.TryParse(s.StaffId, out var staffGuid) && staffGuid == Model.StaffId.Value);
+                            if (assignedStaff != null && !string.IsNullOrWhiteSpace(assignedStaff.FaceImage))
+                            {
+                                staffImage = ToUrl(assignedStaff.FaceImage);
+                            }
+                        }
+                        
+                        // Fallback về placeholder nếu vẫn rỗng
+                        if (string.IsNullOrWhiteSpace(staffImage) || staffImage == string.Empty)
+                        {
+                            staffImage = "/images/staff-placeholder.png";
+                        }
 
                         <div class="tl-item">
                             <div class="fw-semibold">@e.Title</div>

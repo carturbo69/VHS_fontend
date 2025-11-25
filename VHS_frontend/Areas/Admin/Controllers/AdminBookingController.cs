@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Admin.Models.Booking;
 using VHS_frontend.Areas.Provider.Models.Booking;
+using VHS_frontend.Areas.Provider.Models.Staff;
 using VHS_frontend.Services.Admin;
+using VHS_frontend.Services.Provider;
 
 namespace VHS_frontend.Areas.Admin.Controllers
 {
@@ -9,10 +11,12 @@ namespace VHS_frontend.Areas.Admin.Controllers
     public class AdminBookingController : Controller
     {
         private readonly AdminBookingService _bookingService;
+        private readonly StaffManagementService _staffService;
 
-        public AdminBookingController(AdminBookingService bookingService)
+        public AdminBookingController(AdminBookingService bookingService, StaffManagementService staffService)
         {
             _bookingService = bookingService;
+            _staffService = staffService;
         }
 
         // GET: Admin/AdminBooking/Index
@@ -269,6 +273,37 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
                     // Sort timeline
                     booking.Timeline = booking.Timeline.OrderBy(t => t.Time).ToList();
+                }
+
+                // Lấy danh sách staff để hiển thị ảnh trong timeline
+                // Admin không có ProviderId trong session, nên sẽ lấy staff từ StaffId nếu có
+                // token đã được khai báo ở đầu method
+                if (booking.StaffId.HasValue && !string.IsNullOrEmpty(token))
+                {
+                    try
+                    {
+                        var staffIdStr = booking.StaffId.Value.ToString();
+                        var staff = await _staffService.GetStaffByIdAsync(staffIdStr, token);
+                        
+                        if (staff != null)
+                        {
+                            // Tạo danh sách staff với 1 phần tử để view có thể sử dụng
+                            ViewBag.StaffList = new List<StaffDTO> { staff };
+                        }
+                        else
+                        {
+                            ViewBag.StaffList = new List<StaffDTO>();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[Admin] Error fetching staff: {ex.Message}");
+                        ViewBag.StaffList = new List<StaffDTO>();
+                    }
+                }
+                else
+                {
+                    ViewBag.StaffList = new List<StaffDTO>();
                 }
 
                 return View(booking);

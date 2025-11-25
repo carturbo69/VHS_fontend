@@ -50,6 +50,8 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
         // Staff Info
         public Guid? StaffId { get; set; }
         public string? StaffName { get; set; }
+        [JsonPropertyName("staffImage")]
+        public string? StaffImage { get; set; }
         public string? StaffPhone { get; set; }
 
         // Voucher Info
