@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Provider.Models.Booking;
 using VHS_frontend.Areas.Provider.Models.Staff;
 using VHS_frontend.Services.Provider;
+using TrackingEventDTO = VHS_frontend.Areas.Provider.Models.Booking.TrackingEventDTO;
+using MediaProofDTO = VHS_frontend.Areas.Provider.Models.Booking.MediaProofDTO;
 
 namespace VHS_frontend.Areas.Provider.Controllers
 {
@@ -331,6 +333,200 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 }
 
                 Console.WriteLine($"[DEBUG] Booking details: {booking.BookingCode}, Status: {booking.Status}");
+                Console.WriteLine($"[DEBUG] Timeline count from API: {booking.Timeline?.Count ?? 0}");
+                Console.WriteLine($"[DEBUG] CheckerRecords count: {booking.CheckerRecords?.Count ?? 0}");
+
+                // ✨ Nếu Timeline rỗng, populate Timeline từ các thông tin có sẵn
+                if (booking.Timeline == null || !booking.Timeline.Any())
+                {
+                    Console.WriteLine($"[DEBUG] Populating Timeline from booking data");
+                    booking.Timeline = new List<TrackingEventDTO>();
+                    
+                    // 1. CREATED event - Luôn có
+                    booking.Timeline.Add(new TrackingEventDTO
+                    {
+                        Time = new DateTimeOffset(booking.CreatedAt, TimeSpan.FromHours(7)),
+                        Code = "CREATED",
+                        Title = "Đơn hàng được tạo",
+                        Description = $"Đơn hàng {booking.BookingCode} đã được tạo"
+                    });
+                    
+                    // 2. CONFIRMED event (nếu có ConfirmedAt)
+                    if (booking.ConfirmedAt.HasValue)
+                    {
+                        booking.Timeline.Add(new TrackingEventDTO
+                        {
+                            Time = new DateTimeOffset(booking.ConfirmedAt.Value, TimeSpan.FromHours(7)),
+                            Code = "CONFIRMED",
+                            Title = "Đơn hàng đã được xác nhận",
+                            Description = booking.StaffName != null ? $"Đơn hàng đã được xác nhận bởi nhân viên {booking.StaffName}" : "Đơn hàng đã được xác nhận"
+                        });
+                    }
+                    
+                    // 3. CheckerRecords -> CHECK IN / CHECK OUT (nếu có)
+                    if (booking.CheckerRecords != null && booking.CheckerRecords.Any())
+                    {
+                        Console.WriteLine($"[DEBUG] Processing {booking.CheckerRecords.Count} CheckerRecords");
+                        foreach (var checker in booking.CheckerRecords.OrderBy(c => c.UploadedAt))
+                        {
+                            var forStatus = checker.ForStatus?.Trim().ToUpperInvariant() ?? "";
+                            Console.WriteLine($"[DEBUG] CheckerRecord ForStatus: '{forStatus}', UploadedAt: {checker.UploadedAt}");
+                            
+                            string code, title;
+                            
+                            // Normalize: thay thế underscore và các ký tự đặc biệt
+                            var normalized = forStatus.Replace("_", " ").Replace("-", " ").Trim();
+                            
+                            // ✅ CHECK OUT phải được check TRƯỚC CHECK IN để tránh match nhầm
+                            // Vì "CHECKOUT" chứa cả "CHECK" và "OUT", nếu check CHECK IN trước sẽ match nhầm
+                            if (normalized == "CHECKOUT" || normalized == "CHECK OUT" ||
+                                normalized.StartsWith("CHECKOUT") || normalized.StartsWith("CHECK OUT") ||
+                                (normalized.Contains("CHECK") && normalized.Contains("OUT") && !normalized.Contains("IN")))
+                            {
+                                code = "CHECK OUT";
+                                title = "Check Out";
+                            }
+                            // ✅ CHECK IN: check sau CHECK OUT
+                            else if (normalized == "CHECKIN" || normalized == "CHECK IN" ||
+                                     normalized.StartsWith("CHECKIN") || normalized.StartsWith("CHECK IN") ||
+                                     (normalized.Contains("CHECK") && normalized.Contains("IN") && !normalized.Contains("OUT")))
+                            {
+                                code = "CHECK IN";
+                                title = "Check In";
+                            }
+                            // ✅ Các status khác
+                            else if (normalized.Contains("INPROGRESS") || normalized.Contains("IN PROGRESS"))
+                            {
+                                code = "INPROGRESS";
+                                title = "Bắt đầu làm việc";
+                            }
+                            else if (normalized.Contains("COMPLETED") || normalized.Contains("SERVICE COMPLETED"))
+                            {
+                                code = "COMPLETED";
+                                title = "Hoàn thành dịch vụ";
+                            }
+                            else
+                            {
+                                // Fallback: giữ nguyên ForStatus và thử detect lại
+                                code = forStatus;
+                                title = $"Cập nhật: {forStatus}";
+                                
+                                // Nếu vẫn chưa match, log để debug
+                                Console.WriteLine($"[DEBUG] WARNING: Unmatched ForStatus: '{forStatus}' -> using as-is");
+                            }
+                            
+                            Console.WriteLine($"[DEBUG] Mapped to Code: '{code}', Title: '{title}'");
+                            
+                            var proofs = new List<MediaProofDTO>();
+                            if (!string.IsNullOrEmpty(checker.FileUrl))
+                            {
+                                proofs.Add(new MediaProofDTO
+                                {
+                                    MediaType = checker.MediaType?.ToLower() ?? "image",
+                                    Url = checker.FileUrl,
+                                    Caption = checker.Description
+                                });
+                            }
+                            
+                            booking.Timeline.Add(new TrackingEventDTO
+                            {
+                                Time = new DateTimeOffset(checker.UploadedAt, TimeSpan.FromHours(7)),
+                                Code = code,
+                                Title = title,
+                                Description = checker.Description,
+                                Proofs = proofs
+                            });
+                        }
+                    }
+                    
+                    // 3.5. Nếu có CHECK OUT nhưng chưa có CHECK IN, tạo CHECK IN event (trước CHECK OUT)
+                    var hasCheckOut = booking.Timeline.Any(t => t.Code == "CHECK OUT");
+                    var hasCheckIn = booking.Timeline.Any(t => t.Code == "CHECK IN");
+                    if (hasCheckOut && !hasCheckIn)
+                    {
+                        // Tìm CHECK OUT event để lấy thời gian
+                        var checkOutEvent = booking.Timeline.FirstOrDefault(t => t.Code == "CHECK OUT");
+                        if (checkOutEvent != null)
+                        {
+                            // CHECK IN thường xảy ra trước CHECK OUT (ví dụ: 30 phút trước)
+                            var checkInTime = checkOutEvent.Time.AddMinutes(-30);
+                            
+                            // Đảm bảo CHECK IN không sớm hơn CONFIRMED hoặc CREATED
+                            var earliestTime = booking.ConfirmedAt ?? booking.CreatedAt;
+                            if (checkInTime < new DateTimeOffset(earliestTime, TimeSpan.FromHours(7)))
+                            {
+                                checkInTime = new DateTimeOffset(earliestTime, TimeSpan.FromHours(7));
+                            }
+                            
+                            Console.WriteLine($"[DEBUG] Creating CHECK IN event (inferred from CHECK OUT) at {checkInTime}");
+                            
+                            booking.Timeline.Add(new TrackingEventDTO
+                            {
+                                Time = checkInTime,
+                                Code = "CHECK IN",
+                                Title = "Check In",
+                                Description = booking.StaffName != null ? $"Nhân viên {booking.StaffName} đã check in" : "Đã check in",
+                                Proofs = new List<MediaProofDTO>()
+                            });
+                        }
+                    }
+                    
+                    // 4. INPROGRESS event (nếu status là InProgress và chưa có)
+                    var statusUpper = booking.Status?.Trim().ToUpperInvariant() ?? "";
+                    if ((statusUpper.Contains("INPROGRESS") || statusUpper.Contains("IN PROGRESS")) && 
+                        !booking.Timeline.Any(t => t.Code == "INPROGRESS"))
+                    {
+                        var inProgressTime = booking.ConfirmedAt ?? booking.CreatedAt;
+                        booking.Timeline.Add(new TrackingEventDTO
+                        {
+                            Time = new DateTimeOffset(inProgressTime, TimeSpan.FromHours(7)),
+                            Code = "INPROGRESS",
+                            Title = "Bắt đầu làm việc",
+                            Description = booking.StaffName != null ? $"Nhân viên {booking.StaffName} đã bắt đầu làm việc" : "Đã bắt đầu làm việc"
+                        });
+                    }
+                    
+                    // 5. COMPLETED event (nếu status là Completed và chưa có)
+                    if (statusUpper.Contains("COMPLETED") && !booking.Timeline.Any(t => t.Code == "COMPLETED"))
+                    {
+                        var completedTime = booking.CheckerRecords?
+                            .Where(c => c.ForStatus?.Contains("COMPLETED") == true || c.ForStatus?.Contains("CHECK OUT") == true)
+                            .OrderByDescending(c => c.UploadedAt)
+                            .FirstOrDefault()?.UploadedAt 
+                            ?? booking.PaymentDate 
+                            ?? booking.ConfirmedAt 
+                            ?? booking.CreatedAt;
+                            
+                        booking.Timeline.Add(new TrackingEventDTO
+                        {
+                            Time = new DateTimeOffset(completedTime, TimeSpan.FromHours(7)),
+                            Code = "COMPLETED",
+                            Title = "Hoàn thành",
+                            Description = booking.StaffName != null ? $"Đơn hàng đã được nhân viên {booking.StaffName} hoàn thành" : "Đơn hàng đã hoàn thành"
+                        });
+                    }
+                    
+                    // 6. PAYMENT event (nếu có PaymentDate)
+                    if (booking.PaymentDate.HasValue && !booking.Timeline.Any(t => t.Code == "PAYMENT"))
+                    {
+                        booking.Timeline.Add(new TrackingEventDTO
+                        {
+                            Time = new DateTimeOffset(booking.PaymentDate.Value, TimeSpan.FromHours(7)),
+                            Code = "PAYMENT",
+                            Title = "Đã thanh toán",
+                            Description = $"Đã thanh toán {booking.TotalAmount:N0} VND bằng {booking.PaymentMethod ?? "VNPAY"}"
+                        });
+                    }
+                    
+                    // 7. Sort timeline theo thời gian (tăng dần: cũ nhất -> mới nhất)
+                    booking.Timeline = booking.Timeline.OrderBy(t => t.Time).ToList();
+                    
+                    Console.WriteLine($"[DEBUG] Populated Timeline with {booking.Timeline.Count} events");
+                    foreach (var evt in booking.Timeline.OrderBy(t => t.Time))
+                    {
+                        Console.WriteLine($"[DEBUG] Timeline event: {evt.Code} - {evt.Title} at {evt.Time:yyyy-MM-dd HH:mm}");
+                    }
+                }
 
                 // Lấy danh sách staff để hiển thị trong dropdown (nếu cần assign)
                 var providerIdStr = HttpContext.Session.GetString("ProviderId");

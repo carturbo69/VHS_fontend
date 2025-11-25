@@ -533,6 +533,95 @@
                     }
                 </div>
             </div>
+
+            <!-- Timeline Card -->
+            <div class="card-block p-3 h-100 mb-4">
+                <div class="h6">Tiến trình dịch vụ</div>
+                @{
+                    var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+                }
+                <div class="timeline">
+                    @* Timeline hiển thị từ trên xuống (grid), nên sắp xếp giảm dần (mới nhất trước) để:
+                       - Item đầu tiên (CHECK OUT - mới nhất) ở trên cùng
+                       - Item cuối cùng (CREATED - cũ nhất) ở dưới cùng *@
+                    @foreach (var e in (Model?.Timeline ?? new List<VHS_frontend.Areas.Provider.Models.Booking.TrackingEventDTO>()).OrderByDescending(t => t.Time))
+                    {
+                        var code = (e.Code ?? "").Trim().ToUpperInvariant();
+
+                        // Cho CONFIRMED, INPROGRESS, COMPLETED, CHECK IN, CHECK OUT đều hiện ảnh + staff
+                        var onlyShowProofFor = code == "CONFIRMED"
+                        || code == "INPROGRESS"
+                        || code == "COMPLETED"
+                        || code == "CHECK IN"
+                        || code == "CHECK OUT";
+
+                        var showStaffFor = code == "CONFIRMED"
+                        || code == "INPROGRESS"
+                        || code == "COMPLETED"
+                        || code == "CHECK IN"
+                        || code == "CHECK OUT";
+
+                        var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
+                        var staffImage = "/images/staff-placeholder.png"; // Provider DTO chưa có StaffImage
+
+                        <div class="tl-item">
+                            <div class="fw-semibold">@e.Title</div>
+                            <div class="text-muted small">@(e.Time.ToString("dd-MM-yyyy HH:mm"))</div>
+
+                            @if (code == "CREATED" && (Model?.TotalAmount ?? 0m) > 0)
+                            {
+                                <div class="small text-success">Đã thanh toán: <b>@Model.TotalAmount.ToString("N0") VND</b></div>
+                            }
+
+                            @if (showStaffFor && !string.IsNullOrWhiteSpace(staffName))
+                            {
+                                <div class="staff">
+                                    <img src="@staffImage"
+                                         alt="Ảnh @staffName"
+                                         class="zoomable"
+                                         loading="lazy"
+                                         decoding="async"
+                                         onerror="this.onerror=null;this.src='@fallbackImg';" />
+                                    <div class="meta">
+                                        <div class="fw-semibold">@staffName</div>
+                                        <div class="role">Nhân viên phụ trách</div>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(e.Description))
+                            {
+                                <div class="small">@e.Description</div>
+                            }
+
+                            @if (onlyShowProofFor && (e.Proofs?.Any() == true))
+                            {
+                                <div class="proofs mt-2">
+                                    @foreach (var p in e.Proofs)
+                                    {
+                                        if ((p.MediaType ?? "image").ToLower() == "image")
+                                        {
+                                            var src = !string.IsNullOrWhiteSpace(p.Url) ? p.Url : fallbackImg;
+                                            <img src="@src"
+                                                 alt="@p.Caption"
+                                                 class="zoomable"
+                                                 loading="lazy"
+                                                 decoding="async"
+                                                 onerror="this.onerror=null;this.src='@fallbackImg';" />
+                                        }
+                                        else
+                                        {
+                                            <a class="btn btn-sm btn-outline-secondary" href="@p.Url" target="_blank" rel="noopener">
+                                                <i class="bi bi-play-circle"></i> Xem video
+                                            </a>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -588,6 +677,7 @@
 @section Styles {
     <link rel="stylesheet" href="~/css/booking-management.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/provider-timeline.css" asp-append-version="true" />
     <style>
         /* Status Pending Badge - Vàng (Chờ xử lý) */
         .status-badge-lg.status-pending {
@@ -1418,8 +1508,47 @@
             });
             }
         });
+
+        // Image zoom modal (giống Provider)
+        document.addEventListener('DOMContentLoaded', function() {
+            const zoomableImages = document.querySelectorAll('.zoomable');
+            const imgModal = document.getElementById('imageZoomModal');
+            const imgEl = imgModal?.querySelector('img');
+            const bsImgModal = imgModal ? new bootstrap.Modal(imgModal) : null;
+
+            if (zoomableImages.length > 0 && bsImgModal && imgEl) {
+                zoomableImages.forEach(img => {
+                    img.style.cursor = 'pointer';
+                    img.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const src = this.getAttribute('data-full') || this.getAttribute('src') || this.dataset.src;
+                        const alt = this.getAttribute('alt') || '';
+                        if (src) { 
+                            imgEl.src = src; 
+                            imgEl.alt = alt; 
+                            bsImgModal.show(); 
+                        }
+                    });
+                });
+            }
+        });
     </script>
 }
+
+<!-- Modal: Zoom Image -->
+<div class="modal fade" id="imageZoomModal" tabindex="-1" aria-labelledby="imageZoomModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageZoomModalLabel">Xem ảnh</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img src="" alt="" class="img-fluid" style="max-height: 80vh; width: auto;" />
+            </div>
+        </div>
+    </div>
+</div>
 
 @functions {
     string GetStatusText(string status)

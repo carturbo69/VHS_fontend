@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace VHS_frontend.Areas.Provider.Models.Booking
 {
     public class BookingDetailDTO
@@ -56,10 +58,45 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
         public decimal? DiscountAmount { get; set; }
 
         // Checker Records
+        [JsonPropertyName("checkerRecords")]
         public List<BookingCheckerDTO> CheckerRecords { get; set; } = new();
 
         // Auto Cancel Info
         public int? AutoCancelMinutes { get; set; } // Thời gian tự động hủy riêng cho booking này (phút)
+
+        // Timeline / Tracking Events
+        [JsonPropertyName("timeline")]
+        public List<TrackingEventDTO> Timeline { get; set; } = new();
+    }
+
+    public class TrackingEventDTO
+    {
+        [JsonPropertyName("time")]
+        public DateTimeOffset Time { get; set; }
+        
+        [JsonPropertyName("code")]
+        public string Code { get; set; } = string.Empty; // CREATED/CONFIRMED/...
+        
+        [JsonPropertyName("title")]
+        public string Title { get; set; } = string.Empty;
+        
+        [JsonPropertyName("description")]
+        public string? Description { get; set; }
+        
+        [JsonPropertyName("proofs")]
+        public List<MediaProofDTO> Proofs { get; set; } = new();
+    }
+
+    public class MediaProofDTO
+    {
+        [JsonPropertyName("mediaType")]
+        public string MediaType { get; set; } = "image"; // hoặc enum
+        
+        [JsonPropertyName("url")]
+        public string Url { get; set; } = string.Empty;
+        
+        [JsonPropertyName("caption")]
+        public string? Caption { get; set; }
     }
 
     public class BookingOptionDetailDTO
@@ -74,12 +111,25 @@ namespace VHS_frontend.Areas.Provider.Models.Booking
 
     public class BookingCheckerDTO
     {
+        [JsonPropertyName("checkerId")]
         public Guid CheckerId { get; set; }
+        
+        [JsonPropertyName("forStatus")]
         public string ForStatus { get; set; } = string.Empty;
+        
+        [JsonPropertyName("mediaType")]
         public string MediaType { get; set; } = string.Empty;
+        
+        [JsonPropertyName("fileUrl")]
         public string FileUrl { get; set; } = string.Empty;
+        
+        [JsonPropertyName("description")]
         public string? Description { get; set; }
+        
+        [JsonPropertyName("uploadedAt")]
         public DateTime UploadedAt { get; set; }
+        
+        [JsonPropertyName("staffName")]
         public string? StaffName { get; set; }
     }
 }

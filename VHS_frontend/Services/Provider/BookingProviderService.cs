@@ -109,6 +109,64 @@ namespace VHS_frontend.Services.Provider
                     if (result != null)
                     {
                         Console.WriteLine($"[BookingService] Booking: {result.BookingCode}, Status: {result.Status}");
+                        Console.WriteLine($"[BookingService] Timeline count: {result.Timeline?.Count ?? 0}");
+                        Console.WriteLine($"[BookingService] CheckerRecords count: {result.CheckerRecords?.Count ?? 0}");
+                        
+                        if (result.CheckerRecords != null && result.CheckerRecords.Any())
+                        {
+                            foreach (var checker in result.CheckerRecords)
+                            {
+                                Console.WriteLine($"[BookingService] CheckerRecord: ForStatus='{checker.ForStatus}', UploadedAt={checker.UploadedAt}, FileUrl={(string.IsNullOrEmpty(checker.FileUrl) ? "NULL" : "HAS")}");
+                            }
+                        }
+                        
+                        if (result.Timeline != null && result.Timeline.Any())
+                        {
+                            foreach (var evt in result.Timeline)
+                            {
+                                Console.WriteLine($"[BookingService] Timeline event: {evt.Code} - {evt.Title} at {evt.Time}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[BookingService] WARNING: Timeline is null or empty!");
+                            // Debug: Check raw JSON for timeline
+                            if (responseContent.Contains("timeline", StringComparison.OrdinalIgnoreCase))
+                            {
+                                Console.WriteLine($"[BookingService] JSON contains 'timeline' field");
+                                try
+                                {
+                                    using var doc = JsonDocument.Parse(responseContent);
+                                    if (doc.RootElement.TryGetProperty("timeline", out var timelineProp))
+                                    {
+                                        Console.WriteLine($"[BookingService] Found timeline in JSON: {timelineProp.GetRawText()}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"[BookingService] Error parsing JSON: {ex.Message}");
+                                }
+                            }
+                            
+                            // Debug: Check raw JSON for checkerRecords
+                            if (responseContent.Contains("checker", StringComparison.OrdinalIgnoreCase))
+                            {
+                                Console.WriteLine($"[BookingService] JSON contains 'checker' field");
+                                try
+                                {
+                                    using var doc = JsonDocument.Parse(responseContent);
+                                    if (doc.RootElement.TryGetProperty("checkerRecords", out var checkerProp) || 
+                                        doc.RootElement.TryGetProperty("checkerrecords", out checkerProp))
+                                    {
+                                        Console.WriteLine($"[BookingService] Found checkerRecords in JSON: {checkerProp.GetRawText()}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"[BookingService] Error parsing JSON for checkerRecords: {ex.Message}");
+                                }
+                            }
+                        }
                     }
                     
                     return result;
