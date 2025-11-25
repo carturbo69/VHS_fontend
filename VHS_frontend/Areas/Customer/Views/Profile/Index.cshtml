@@ -461,6 +461,34 @@
                 const modalElement = document.getElementById('imageUploadModal');
                 if (modalElement && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
                     const modal = new bootstrap.Modal(modalElement);
+                    
+                    // Reset form and button state when opening modal
+                    const form = document.getElementById('imageUploadForm');
+                    if (form) {
+                        form.reset();
+                    }
+                    const imagePreview = document.getElementById('imagePreview');
+                    if (imagePreview) {
+                        imagePreview.style.display = 'none';
+                    }
+                    
+                    // Reset upload button state
+                    const uploadBtn = modalElement.querySelector('.btn-primary');
+                    if (uploadBtn) {
+                        uploadBtn.disabled = false;
+                    }
+                    const uploadSpinner = document.getElementById('uploadSpinner');
+                    if (uploadSpinner) {
+                        uploadSpinner.classList.add('d-none');
+                    }
+                    const uploadIcon = document.getElementById('uploadIcon');
+                    if (uploadIcon) {
+                        uploadIcon.style.display = 'inline';
+                    }
+                    
+                    // Reset preview URL
+                    currentPreviewImageUrl = null;
+                    
                     modal.show();
                 } else {
                     console.error('Bootstrap Modal not available');
@@ -537,11 +565,24 @@
             let currentPreviewImageUrl = null;
 
             window.uploadProfileImage = async function() {
+                console.log('uploadProfileImage called');
                 const fileInput = document.getElementById('profileImage');
+                if (!fileInput) {
+                    console.error('File input not found');
+                    showToast('Không tìm thấy input file', 'error');
+                    return;
+                }
+                
                 const file = fileInput.files[0];
                 const uploadBtn = document.querySelector('#imageUploadModal .btn-primary');
                 const uploadSpinner = document.getElementById('uploadSpinner');
                 const uploadIcon = document.getElementById('uploadIcon');
+                
+                // Check if button is already disabled (prevent double click)
+                if (uploadBtn && uploadBtn.disabled) {
+                    console.log('Upload button is already disabled, ignoring click');
+                    return;
+                }
                 
                 if (!file) {
                     showToast('Vui lòng chọn ảnh để tải lên', 'error');
@@ -631,8 +672,18 @@
                         // Close modal and reset form
                         const modal = bootstrap.Modal.getInstance(document.getElementById('imageUploadModal'));
                         if (modal) modal.hide();
-                        document.getElementById('imageUploadForm').reset();
-                        document.getElementById('imagePreview').style.display = 'none';
+                        
+                        // Reset form and preview
+                        const form = document.getElementById('imageUploadForm');
+                        if (form) form.reset();
+                        const preview = document.getElementById('imagePreview');
+                        if (preview) preview.style.display = 'none';
+                        
+                        // Reset button state
+                        if (uploadBtn) uploadBtn.disabled = false;
+                        if (uploadSpinner) uploadSpinner.classList.add('d-none');
+                        if (uploadIcon) uploadIcon.style.display = 'inline';
+                        currentPreviewImageUrl = null;
                         
                         // Update avatar with server URL after a delay to ensure it's saved
                         // First try to get URL from response
@@ -681,7 +732,30 @@
             if (profileImageInput) {
                 profileImageInput.addEventListener('change', function(e) {
                     const file = e.target.files[0];
+                    const uploadBtn = document.querySelector('#imageUploadModal .btn-primary');
+                    
+                    // Enable upload button when file is selected
+                    if (uploadBtn) {
+                        uploadBtn.disabled = false;
+                    }
+                    
                     if (file) {
+                        // Validate file before showing preview
+                        if (file.size > 5 * 1024 * 1024) {
+                            showToast('Kích thước file không được vượt quá 5MB', 'error');
+                            e.target.value = ''; // Clear input
+                            if (uploadBtn) uploadBtn.disabled = true;
+                            return;
+                        }
+                        
+                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
+                        if (!allowedTypes.includes(file.type)) {
+                            showToast('Chỉ chấp nhận file ảnh JPG, PNG, GIF, BMP, WEBP', 'error');
+                            e.target.value = ''; // Clear input
+                            if (uploadBtn) uploadBtn.disabled = true;
+                            return;
+                        }
+                        
                         const reader = new FileReader();
                         reader.onload = function(e) {
                             const previewUrl = e.target.result;
@@ -694,10 +768,38 @@
                             if (imagePreview) {
                                 imagePreview.style.display = 'block';
                             }
+                            
+                            // Ensure upload button is enabled
+                            if (uploadBtn) {
+                                uploadBtn.disabled = false;
+                            }
+                        };
+                        reader.onerror = function() {
+                            showToast('Lỗi khi đọc file ảnh', 'error');
+                            if (uploadBtn) uploadBtn.disabled = true;
                         };
                         reader.readAsDataURL(file);
                     } else {
                         currentPreviewImageUrl = null;
+                        const imagePreview = document.getElementById('imagePreview');
+                        if (imagePreview) {
+                            imagePreview.style.display = 'none';
+                        }
+                        // Disable upload button if no file
+                        if (uploadBtn) uploadBtn.disabled = true;
+                    }
+                });
+            }
+            
+            // Ensure upload button is initially disabled until file is selected
+            const modalElement = document.getElementById('imageUploadModal');
+            if (modalElement) {
+                modalElement.addEventListener('show.bs.modal', function() {
+                    const uploadBtn = modalElement.querySelector('.btn-primary');
+                    const fileInput = document.getElementById('profileImage');
+                    if (uploadBtn && fileInput) {
+                        // Enable button only if file is already selected
+                        uploadBtn.disabled = !fileInput.files || fileInput.files.length === 0;
                     }
                 });
             }
