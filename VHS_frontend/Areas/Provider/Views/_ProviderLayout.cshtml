@@ -248,15 +248,30 @@
     setInterval(updateProviderChatUnreadCount, 30000); // 30s/lần
   });
                 // =========================
-        // Sidebar: giữ trạng thái + chống giật khi load
+        // Sidebar: giữ trạng thái + chống giật khi load + Mobile support
         // =========================
         (function () {
           const SIDEBAR_KEY = 'vhs-sidebar';
           const btn = document.getElementById('btnSidebarToggle');
 
+          function isMobile() {
+            return window.matchMedia('(max-width: 768px)').matches;
+          }
+
           function applySidebarState(state) {
             const collapsed = state === 'collapsed';
-            document.body.classList.toggle('sidebar-collapsed', collapsed);
+            const mobile = isMobile();
+            
+            if (mobile) {
+              // Trên mobile: dùng class sidebar-open để hiện/ẩn
+              document.body.classList.toggle('sidebar-open', !collapsed);
+              document.body.classList.remove('sidebar-collapsed');
+            } else {
+              // Trên desktop: dùng class sidebar-collapsed
+              document.body.classList.toggle('sidebar-collapsed', collapsed);
+              document.body.classList.remove('sidebar-open');
+            }
+            
             if (btn) {
               btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
               btn.classList.toggle('is-active', collapsed);
@@ -264,12 +279,18 @@
           }
 
           function currentState() {
+            const mobile = isMobile();
+            if (mobile) {
+              return document.body.classList.contains('sidebar-open') ? 'expanded' : 'collapsed';
+            }
             return document.body.classList.contains('sidebar-collapsed') ? 'collapsed' : 'expanded';
           }
 
           // Khởi tạo theo localStorage (fallback expanded)
           document.addEventListener('DOMContentLoaded', () => {
-            const saved = localStorage.getItem(SIDEBAR_KEY) || 'expanded';
+            // Trên mobile: mặc định ẩn sidebar
+            const mobile = isMobile();
+            const saved = mobile ? 'collapsed' : (localStorage.getItem(SIDEBAR_KEY) || 'expanded');
             applySidebarState(saved);
 
             // Bỏ .preload sau khi frame đầu đã áp xong trạng thái → không giật
@@ -284,10 +305,28 @@
           if (btn) {
             btn.addEventListener('click', () => {
               const next = currentState() === 'collapsed' ? 'expanded' : 'collapsed';
-              localStorage.setItem(SIDEBAR_KEY, next);
+              
+              // Chỉ lưu state trên desktop
+              if (!isMobile()) {
+                localStorage.setItem(SIDEBAR_KEY, next);
+              }
+              
               applySidebarState(next);
             });
           }
+
+          // Đóng sidebar khi click bên ngoài trên mobile
+          document.addEventListener('click', (e) => {
+            if (!isMobile()) return;
+            
+            const sidebar = document.getElementById('sidebar');
+            const isClickInsideSidebar = sidebar && sidebar.contains(e.target);
+            const isClickOnToggle = btn && btn.contains(e.target);
+            
+            if (!isClickInsideSidebar && !isClickOnToggle && document.body.classList.contains('sidebar-open')) {
+              document.body.classList.remove('sidebar-open');
+            }
+          });
         })();
 
         // =========================

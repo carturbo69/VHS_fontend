@@ -1469,6 +1469,10 @@
             <button class="btn" type="button" onclick="closeVoucherModal()">✕</button>
         </div>
         <div id="voucherModalBody">
+            <div class="voucher-toolbar" style="margin-bottom: 16px; display: flex; gap: 8px;">
+                <input id="voucherInputTyped" class="input" placeholder="Nhập mã voucher..." style="flex: 1;" />
+                <button id="btnApplyTypedVoucher" class="btn" type="button">Áp dụng</button>
+            </div>
             <div id="voucherModalList" class="voucher-list"></div>
             <div class="tiny muted" style="margin-top: var(--s-4);">* Chỉ voucher còn hiệu lực và còn lượt dùng mới có thể áp dụng.</div>
         </div>
@@ -2856,6 +2860,61 @@
           btnOpen?.addEventListener('click', (e) => { e.stopPropagation(); openPanel(); });
           btnClose?.addEventListener('click', closePanel);
           panel?.addEventListener('click', (e)=>{ if(e.target === panel) closePanel(); });
+          
+          // ✅ Nhập tay mã voucher
+          const voucherInputTyped = document.getElementById('voucherInputTyped');
+          const btnApplyTypedVoucher = document.getElementById('btnApplyTypedVoucher');
+          
+          if(btnApplyTypedVoucher && voucherInputTyped){
+            btnApplyTypedVoucher.addEventListener('click', async ()=>{
+              const code = (voucherInputTyped?.value || '').trim();
+              if(!code) {
+                alert('Vui lòng nhập mã voucher');
+                return;
+              }
+              
+              // Disable button và hiển thị loading
+              btnApplyTypedVoucher.disabled = true;
+              const originalText = btnApplyTypedVoucher.textContent;
+              btnApplyTypedVoucher.textContent = 'Đang kiểm tra...';
+              
+              try {
+                // Fetch danh sách voucher từ API
+                const res = await fetch('@Url.Action("GetCartVouchers", "BookingService", new { area = "Customer" })', { credentials:'same-origin' });
+                if(!res.ok) throw new Error('HTTP '+res.status);
+                const list = await res.json() || [];
+                
+                // Tìm voucher theo code (case-insensitive)
+                const found = list.find(v => {
+                  const vCode = pick(v,'Code','code') || '';
+                  return vCode.toLowerCase() === code.toLowerCase();
+                });
+                
+                if(found) {
+                  // Tìm thấy voucher → áp dụng
+                  applyVoucher(found);
+                  if (voucherInputTyped) voucherInputTyped.value = '';
+                } else {
+                  // Không tìm thấy voucher
+                  alert('❌ Mã voucher không tồn tại hoặc không hợp lệ. Vui lòng kiểm tra lại.');
+                }
+              } catch(e) {
+                console.error('Lỗi khi kiểm tra voucher:', e);
+                alert('❌ Không thể kiểm tra voucher. Vui lòng thử lại.');
+              } finally {
+                // Restore button
+                btnApplyTypedVoucher.disabled = false;
+                btnApplyTypedVoucher.textContent = originalText;
+              }
+            });
+            
+            // Cho phép nhấn Enter để áp dụng
+            voucherInputTyped.addEventListener('keypress', (e) => {
+              if(e.key === 'Enter') {
+                btnApplyTypedVoucher.click();
+              }
+            });
+          }
 
           // Khởi tạo từ server (nếu đã có VoucherId trong model)
           (async function initFromServer(){

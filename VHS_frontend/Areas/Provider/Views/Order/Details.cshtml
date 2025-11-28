@@ -235,9 +235,11 @@
                 var isCompletedOrCancelled = string.Equals(currentStatus, "Completed", StringComparison.OrdinalIgnoreCase) || 
                                             string.Equals(currentStatus, "Cancelled", StringComparison.OrdinalIgnoreCase) ||
                                             string.Equals(currentStatus, "Canceled", StringComparison.OrdinalIgnoreCase);
+                var isServiceCompletedCheck = string.Equals(currentStatus, "Service Completed", StringComparison.OrdinalIgnoreCase) ||
+                                             string.Equals(currentStatus, "Service-Completed", StringComparison.OrdinalIgnoreCase);
             }
             
-            @* Chỉ hiển thị phần phân công nhân viên nếu đơn hàng chưa hoàn thành hoặc hủy *@
+            @* Chỉ hiển thị phần phân công nhân viên nếu đơn hàng chưa hoàn thành hoặc hủy (Service Completed vẫn hiển thị nhưng disable) *@
             @if (!isCompletedOrCancelled)
             {
                 <!-- Staff Assignment Card -->
@@ -254,14 +256,23 @@
                             var isConfirmedOrAbove = string.Equals((Model.Status ?? string.Empty).Trim(), "Confirmed", StringComparison.OrdinalIgnoreCase) ||
                                                     string.Equals((Model.Status ?? string.Empty).Trim(), "InProgress", StringComparison.OrdinalIgnoreCase) ||
                                                     string.Equals((Model.Status ?? string.Empty).Trim(), "Completed", StringComparison.OrdinalIgnoreCase);
+                            var isServiceCompletedForStaff = string.Equals((Model.Status ?? string.Empty).Trim(), "Service Completed", StringComparison.OrdinalIgnoreCase) ||
+                                                             string.Equals((Model.Status ?? string.Empty).Trim(), "Service-Completed", StringComparison.OrdinalIgnoreCase);
                         }
                         
-                        @* Chỉ hiển thị "Đã phân công" khi status là Confirmed trở lên *@
-                        @if (isConfirmedOrAbove && Model.StaffId.HasValue)
+                        @* Hiển thị "Đã phân công" khi status là Confirmed trở lên (bao gồm Service Completed) *@
+                        @if ((isConfirmedOrAbove || isServiceCompletedForStaff) && Model.StaffId.HasValue)
                         {
                             <div class="alert alert-success">
                                 <i class="bi bi-person-check-fill"></i>
                                 Đã phân công cho: <strong>@Model.StaffName</strong>
+                                @if (isServiceCompletedForStaff)
+                                {
+                                    <p class="mb-0 mt-2 small">
+                                        Đơn hàng đã được nhân viên hoàn thành và đang chờ khách hàng xác nhận. 
+                                        Không thể thay đổi phân công nhân viên lúc này.
+                                    </p>
+                                }
                             </div>
                         }
                         else if (isPendingStatus)
@@ -275,7 +286,18 @@
                                 </p>
                             </div>
                         }
-                        else
+                        else if (isServiceCompletedForStaff && !Model.StaffId.HasValue)
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-hourglass-split"></i>
+                                <strong>Đang chờ khách hàng xác nhận</strong>
+                                <p class="mb-0 mt-2 small">
+                                    Đơn hàng đã được hoàn thành và đang chờ khách hàng xác nhận. 
+                                    Không thể thay đổi phân công nhân viên lúc này.
+                                </p>
+                            </div>
+                        }
+                        else if (!isServiceCompletedForStaff)
                         {
                             <div class="alert alert-warning">
                                 <i class="bi bi-exclamation-triangle"></i>
@@ -283,7 +305,8 @@
                             </div>
                         }
 
-                        @if (ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
+                        @* Chỉ hiển thị phần chọn nhân viên khi chưa Service Completed *@
+                        @if (!isServiceCompletedForStaff && ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
                         {
                             <div class="mt-3">
                                 <!-- Thông báo lỗi/thành công -->
@@ -332,51 +355,7 @@
                 </div>
             }
 
-            <!-- Checker Records -->
-            @if (Model.CheckerRecords.Any())
-            {
-                <div class="card detail-card mb-4">
-                    <div class="card-header detail-card-header">
-                        <h5 class="mb-0">
-                            <i class="bi bi-camera me-2"></i>
-                            Check-in/Check-out
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        @foreach (var record in Model.CheckerRecords)
-                        {
-                            <div class="checker-record">
-                                <div class="checker-record-header">
-                                    <span class="checker-status">@record.ForStatus</span>
-                                    <span class="checker-time">@record.UploadedAt.ToString("dd/MM/yyyy HH:mm")</span>
-                                </div>
-                                @if (!string.IsNullOrEmpty(record.StaffName))
-                                {
-                                    <p class="checker-staff"><i class="bi bi-person me-1"></i>Bởi: @record.StaffName</p>
-                                }
-                                @if (record.MediaType.Contains("image"))
-                                {
-                                    <div class="checker-media-wrapper">
-                                        <img src="@record.FileUrl" alt="Checker media" class="checker-media" />
-                                    </div>
-                                }
-                                else if (record.MediaType.Contains("video"))
-                                {
-                                    <div class="checker-media-wrapper">
-                                        <video controls class="checker-media">
-                                        <source src="@record.FileUrl" type="video/mp4" />
-                                    </video>
-                                    </div>
-                                }
-                                @if (!string.IsNullOrEmpty(record.Description))
-                                {
-                                    <p class="checker-description"><em>@record.Description</em></p>
-                                }
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
+            @* ✅ Checker Records đã được hiển thị trong Timeline, không cần section riêng nữa *@
         </div>
 
         <!-- Right Column -->
@@ -401,10 +380,12 @@
                         bool isPending = string.Equals(statusNorm, "Pending", StringComparison.OrdinalIgnoreCase);
                         bool isConfirmed = string.Equals(statusNorm, "Confirmed", StringComparison.OrdinalIgnoreCase);
                         bool isCompleted = string.Equals(statusNorm, "Completed", StringComparison.OrdinalIgnoreCase);
+                        bool isServiceCompleted = string.Equals(statusNorm, "Service Completed", StringComparison.OrdinalIgnoreCase) ||
+                                                 string.Equals(statusNorm, "Service-Completed", StringComparison.OrdinalIgnoreCase);
                         bool isCanceled  = string.Equals(statusNorm, "Canceled", StringComparison.OrdinalIgnoreCase) ||
                                           string.Equals(statusNorm, "Cancelled", StringComparison.OrdinalIgnoreCase);
-                        // Hiển thị nút nếu đơn chưa ở các trạng thái cuối cùng
-                        bool canAct = !(isConfirmed || isCompleted || isCanceled);
+                        // Hiển thị nút nếu đơn chưa ở các trạng thái cuối cùng (bao gồm Service Completed)
+                        bool canAct = !(isConfirmed || isCompleted || isServiceCompleted || isCanceled);
                         
                         // Kiểm tra xem có nhân viên nào không bị xóa không
                         var staffList = ViewBag.StaffList as List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>;
@@ -501,6 +482,17 @@
                             <i class="bi bi-x-circle"></i> Hủy đơn hàng (khẩn cấp)
                         </button> *@
                     }
+                    else if (isServiceCompleted)
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-hourglass-split"></i>
+                            <strong>Đang chờ khách hàng xác nhận</strong>
+                            <p class="mb-0 mt-2">
+                                Đơn hàng đã được nhân viên hoàn thành và đang chờ khách hàng xác nhận. 
+                                Bạn không thể thực hiện thêm thao tác nào cho đến khi khách hàng xác nhận hoàn thành.
+                            </p>
+                        </div>
+                    }
                     else if (isCompleted)
                     {
                         <div class="alert alert-success">
@@ -509,11 +501,11 @@
                             <p class="mb-0 mt-2">
                                 @if (!string.IsNullOrEmpty(Model.StaffName))
                                 {
-                                    <text>Đơn hàng đã được nhân viên <strong>@Model.StaffName</strong> hoàn thành.</text>
+                                    <text>Đơn hàng đã được nhân viên <strong>@Model.StaffName</strong> hoàn thành và đã được khách hàng xác nhận.</text>
                                 }
                                 else
                                 {
-                                    <text>Công việc đã được nhân viên hoàn thành.</text>
+                                    <text>Công việc đã được nhân viên hoàn thành và đã được khách hàng xác nhận.</text>
                                 }
                             </p>
                         </div>
@@ -695,31 +687,7 @@
                             || code == "CHECK OUT";
 
                             var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
-                            
-                            // Lấy ảnh staff: ưu tiên từ Model.StaffImage, nếu không có thì lấy từ StaffList
-                            string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
-                            
-                            var staffImage = "/images/staff-placeholder.png";
-                            if (!string.IsNullOrWhiteSpace(Model?.StaffImage))
-                            {
-                                staffImage = ToUrl(Model.StaffImage);
-                            }
-                            else if (Model?.StaffId.HasValue == true && ViewBag.StaffList != null)
-                            {
-                                var staffListForImage = ViewBag.StaffList as List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>;
-                                var assignedStaff = staffListForImage?.FirstOrDefault(s => 
-                                    Guid.TryParse(s.StaffId, out var staffGuid) && staffGuid == Model.StaffId.Value);
-                                if (assignedStaff != null && !string.IsNullOrWhiteSpace(assignedStaff.FaceImage))
-                                {
-                                    staffImage = ToUrl(assignedStaff.FaceImage);
-                                }
-                            }
-                            
-                            // Fallback về placeholder nếu vẫn rỗng
-                            if (string.IsNullOrWhiteSpace(staffImage) || staffImage == string.Empty)
-                            {
-                                staffImage = "/images/staff-placeholder.png";
-                            }
+                            var staffImage = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
 
                             <div class="tl-item">
                                 <div class="fw-semibold">@e.Title</div>
@@ -1423,6 +1391,12 @@
                         '<i class="bi bi-info-circle me-2"></i><strong>Đơn hàng đang ở trạng thái chờ xử lý.</strong><br>' +
                         'Vui lòng xác nhận đơn hàng trước khi phân công nhân viên.<br>' +
                         '<small>Bạn có thể: 1) Chọn nhân viên, sau đó nhấn "Xác nhận đơn hàng" - hệ thống sẽ gán nhân viên bạn chọn. 2) Nhấn "Xác nhận đơn hàng" trực tiếp - hệ thống sẽ tự động gán nhân viên rảnh có ít công việc nhất.</small>',
+                        'info'
+                    );
+                } else if (bookingStatus === 'service completed' || bookingStatus === 'service-completed') {
+                    showStaffMessage(
+                        '<i class="bi bi-hourglass-split me-2"></i><strong>Đơn hàng đang chờ khách hàng xác nhận.</strong><br>' +
+                        'Không thể phân công nhân viên cho đơn hàng đã hoàn thành và đang chờ khách hàng xác nhận.',
                         'info'
                     );
                 } else if (bookingStatus === 'completed' || bookingStatus === 'cancelled' || bookingStatus === 'canceled') {

@@ -683,21 +683,60 @@
             }
 
             /* ===== Nhập tay mã voucher ===== */
-            if(btnApplyTyped){
-              btnApplyTyped.addEventListener('click', ()=>{
+            if(btnApplyTyped && voucherInputEl){
+              const applyVoucherByCode = async () => {
                 const code = (voucherInputEl?.value || '').trim();
-                if(!code) return;
-                // ⚠️ Khi nhập tay, chưa có VoucherId → chỉ set code, để server validate sau
-                // Không dùng setVoucher() vì nó sẽ normalize và ghi VoucherId = ''
-                CURRENT_VOUCHER = { Code: code, DiscountPercent: 0, DiscountMaxAmount: 0 };
-                if (voucherCodeHid) voucherCodeHid.value = code;
-                // KHÔNG set voucherId vì chưa biết (để trống cho server tự tìm)
-                const voucherIdHid = document.querySelector('#checkoutForm #voucherId');
-                if (voucherIdHid) voucherIdHid.value = '';
+                if(!code) {
+                  alert('Vui lòng nhập mã voucher');
+                  return;
+                }
                 
-                const closer = document.querySelector('[data-close="#opt_voucher"]');
-                if(closer) closer.click();
-                recalc(); // cập nhật UI
+                // Disable button và hiển thị loading
+                btnApplyTyped.disabled = true;
+                const originalText = btnApplyTyped.textContent;
+                btnApplyTyped.textContent = 'Đang kiểm tra...';
+                
+                try {
+                  // Fetch danh sách voucher từ API
+                  const res = await fetch('@Url.Action("GetCartVouchers", "Cart", new { area = "Customer" })', { credentials:'same-origin' });
+                  if(!res.ok) throw new Error('HTTP '+res.status);
+                  const list = await res.json() || [];
+                  
+                  // Tìm voucher theo code (case-insensitive)
+                  const found = list.find(v => {
+                    const vCode = pick(v,'Code','code') || '';
+                    return vCode.toLowerCase() === code.toLowerCase();
+                  });
+                  
+                  if(found) {
+                    // Tìm thấy voucher → áp dụng
+                    setVoucher(found);
+                    if (voucherInputEl) voucherInputEl.value = '';
+                    
+                    const closer = document.querySelector('[data-close="#opt_voucher"]');
+                    if(closer) closer.click();
+                  } else {
+                    // Không tìm thấy voucher
+                    alert('❌ Mã voucher không tồn tại hoặc không hợp lệ. Vui lòng kiểm tra lại.');
+                  }
+                } catch(e) {
+                  console.error('Lỗi khi kiểm tra voucher:', e);
+                  alert('❌ Không thể kiểm tra voucher. Vui lòng thử lại.');
+                } finally {
+                  // Restore button
+                  btnApplyTyped.disabled = false;
+                  btnApplyTyped.textContent = originalText;
+                }
+              };
+              
+              btnApplyTyped.addEventListener('click', applyVoucherByCode);
+              
+              // Cho phép nhấn Enter để áp dụng
+              voucherInputEl.addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') {
+                  e.preventDefault();
+                  applyVoucherByCode();
+                }
               });
             }
 

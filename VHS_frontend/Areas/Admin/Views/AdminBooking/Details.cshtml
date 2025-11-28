@@ -231,47 +231,7 @@
                 </div>
             </div>
 
-            <!-- Checker Records -->
-            @if (Model.CheckerRecords.Any())
-            {
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="bi bi-camera me-2"></i>
-                            Check-in/Check-out
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        @foreach (var record in Model.CheckerRecords)
-                        {
-                            <div class="checker-record mb-3 p-3 border rounded">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <strong>@record.ForStatus</strong>
-                                    <small class="text-muted">@record.UploadedAt.ToString("dd/MM/yyyy HH:mm")</small>
-                                </div>
-                                @if (!string.IsNullOrEmpty(record.StaffName))
-                                {
-                                    <p class="mb-2"><small>Bởi: @record.StaffName</small></p>
-                                }
-                                @if (record.MediaType.Contains("image"))
-                                {
-                                    <img src="@record.FileUrl" alt="Checker media" class="img-fluid rounded" />
-                                }
-                                else if (record.MediaType.Contains("video"))
-                                {
-                                    <video controls class="w-100 rounded">
-                                        <source src="@record.FileUrl" type="video/mp4" />
-                                    </video>
-                                }
-                                @if (!string.IsNullOrEmpty(record.Description))
-                                {
-                                    <p class="mt-2 mb-0"><em>@record.Description</em></p>
-                                }
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
+            @* ✅ Checker Records đã được hiển thị trong Timeline, không cần section riêng nữa *@
         </div>
 
         <!-- Right Column -->
@@ -562,31 +522,7 @@
                         || code == "CHECK OUT";
 
                         var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
-                        
-                        // Lấy ảnh staff: ưu tiên từ Model.StaffImage, nếu không có thì lấy từ StaffList
-                        string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
-                        
-                        var staffImage = "/images/staff-placeholder.png";
-                        if (!string.IsNullOrWhiteSpace(Model?.StaffImage))
-                        {
-                            staffImage = ToUrl(Model.StaffImage);
-                        }
-                        else if (Model?.StaffId.HasValue == true && ViewBag.StaffList != null)
-                        {
-                            var staffListForImage = ViewBag.StaffList as List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>;
-                            var assignedStaff = staffListForImage?.FirstOrDefault(s => 
-                                Guid.TryParse(s.StaffId, out var staffGuid) && staffGuid == Model.StaffId.Value);
-                            if (assignedStaff != null && !string.IsNullOrWhiteSpace(assignedStaff.FaceImage))
-                            {
-                                staffImage = ToUrl(assignedStaff.FaceImage);
-                            }
-                        }
-                        
-                        // Fallback về placeholder nếu vẫn rỗng
-                        if (string.IsNullOrWhiteSpace(staffImage) || staffImage == string.Empty)
-                        {
-                            staffImage = "/images/staff-placeholder.png";
-                        }
+                        var staffImage = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
 
                         <div class="tl-item">
                             <div class="fw-semibold">@e.Title</div>
@@ -699,9 +635,7 @@
 </div>
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/booking-management.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/provider-timeline.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-booking.css" asp-append-version="true" />
     <style>
         /* Status Pending Badge - Vàng (Chờ xử lý) */
         .status-badge-lg.status-pending {

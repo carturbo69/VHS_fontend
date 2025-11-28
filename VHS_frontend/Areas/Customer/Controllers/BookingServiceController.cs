@@ -1324,6 +1324,16 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     TempData["ToastError"] = "Không tìm thấy thông tin đơn hàng.";
                     return RedirectToAction(nameof(ListHistoryBooking));
                 }
+                
+                // Debug: Log số lượng events trong Timeline
+                System.Diagnostics.Debug.WriteLine($"[HistoryBookingDetail] Timeline count: {vm.Timeline?.Count ?? 0}");
+                if (vm.Timeline != null && vm.Timeline.Any())
+                {
+                    foreach (var evt in vm.Timeline)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[HistoryBookingDetail] Event: Code={evt.Code}, Title={evt.Title}, Time={evt.Time}");
+                    }
+                }
             }
             catch (HttpRequestException ex)
             {

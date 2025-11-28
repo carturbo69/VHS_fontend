@@ -110,8 +110,15 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
-                // ✨ Populate Timeline nếu rỗng (giống Provider)
-                if (booking.Timeline == null || !booking.Timeline.Any())
+                // ✅ Timeline đã được backend tạo sẵn trong AdminBookingService.GetBookingDetailAsync
+                // Không cần tạo lại ở đây nữa
+                if (booking.Timeline == null)
+                {
+                    booking.Timeline = new List<TrackingEventDTO>();
+                }
+                
+                // ✨ Fallback: Nếu timeline rỗng (không nên xảy ra), tạo timeline cơ bản
+                if (!booking.Timeline.Any())
                 {
                     booking.Timeline = new List<TrackingEventDTO>();
 

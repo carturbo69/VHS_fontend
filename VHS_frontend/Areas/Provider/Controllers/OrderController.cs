@@ -336,8 +336,15 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 Console.WriteLine($"[DEBUG] Timeline count from API: {booking.Timeline?.Count ?? 0}");
                 Console.WriteLine($"[DEBUG] CheckerRecords count: {booking.CheckerRecords?.Count ?? 0}");
 
-                // ✨ Nếu Timeline rỗng, populate Timeline từ các thông tin có sẵn
-                if (booking.Timeline == null || !booking.Timeline.Any())
+                // ✅ Timeline đã được backend tạo sẵn trong ProviderBookingService.GetBookingDetailAsync
+                // Không cần tạo lại ở đây nữa
+                if (booking.Timeline == null)
+                {
+                    booking.Timeline = new List<TrackingEventDTO>();
+                }
+                
+                // ✨ Fallback: Nếu timeline rỗng (không nên xảy ra), tạo timeline cơ bản
+                if (!booking.Timeline.Any())
                 {
                     Console.WriteLine($"[DEBUG] Populating Timeline from booking data");
                     booking.Timeline = new List<TrackingEventDTO>();

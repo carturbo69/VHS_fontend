@@ -256,6 +256,18 @@
 
                         <a asp-area="" asp-controller="Services" asp-action="Details" asp-route-id="@service.ServiceId" class="service-card">
 
+                            @* Provider name ở đầu card, trước ảnh *@
+                            @if (!string.IsNullOrWhiteSpace(service.ProviderName))
+                            {
+                                <div class="provider-section provider-section-top">
+                                    <svg class="provider-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke-width="2" stroke-linecap="round"/>
+                                        <circle cx="12" cy="7" r="4" stroke-width="2"/>
+                                    </svg>
+                                    <span class="provider-name">@service.ProviderName</span>
+                                </div>
+                            }
+
                         <div class="card-image-container">
                             <div class="image-wrapper">
                                 <img src="@img"
@@ -400,17 +412,6 @@
                                     </div>
                                     <span class="rating-text">@avg.ToString("0.#") <span class="reviews-count">(@service.TotalReviews)</span></span>
                                 </div>
-                                
-                                @if (!string.IsNullOrWhiteSpace(service.ProviderName))
-                                {
-                                    <div class="provider-section">
-                                        <svg class="provider-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke-width="2" stroke-linecap="round"/>
-                                            <circle cx="12" cy="7" r="4" stroke-width="2"/>
-                                        </svg>
-                                        <span class="provider-name">@service.ProviderName</span>
-                                    </div>
-                                }
                             </div>
                         </div>
                     </a>
@@ -483,6 +484,55 @@ document.addEventListener('DOMContentLoaded', function() {
     const categorySelect = document.getElementById('categorySelect');
     const tagSelect = document.getElementById('tagSelect');
     const tagFilterGroup = document.getElementById('tagFilterGroup');
+    
+    // Hàm để đảm bảo tất cả provider section trong cùng hàng có cùng chiều cao
+    function equalizeProviderHeights() {
+        const providerSections = document.querySelectorAll('.provider-section-top');
+        if (providerSections.length === 0) return;
+        
+        // Reset height để tính toán lại
+        providerSections.forEach(section => {
+            section.style.height = 'auto';
+        });
+        
+        // Nhóm các section theo hàng dựa trên vị trí top
+        const rows = new Map();
+        providerSections.forEach(section => {
+            const rect = section.getBoundingClientRect();
+            const top = Math.round(rect.top);
+            
+            if (!rows.has(top)) {
+                rows.set(top, []);
+            }
+            rows.get(top).push(section);
+        });
+        
+        // Đặt chiều cao bằng nhau cho mỗi hàng
+        rows.forEach(sections => {
+            let maxHeight = 0;
+            sections.forEach(section => {
+                const height = section.getBoundingClientRect().height;
+                if (height > maxHeight) {
+                    maxHeight = height;
+                }
+            });
+            
+            // Áp dụng chiều cao cho tất cả section trong hàng
+            sections.forEach(section => {
+                section.style.height = maxHeight + 'px';
+            });
+        });
+    }
+    
+    // Gọi hàm khi DOM ready và sau khi load services
+    equalizeProviderHeights();
+    
+    // Gọi lại khi window resize
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(equalizeProviderHeights, 100);
+    });
     
     // Load tags khi category thay đổi
     if (categorySelect) {
@@ -593,6 +643,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (newResults) {
                 servicesResults.innerHTML = newResults.innerHTML;
                 servicesResults.classList.remove('loading');
+                
+                // Đảm bảo provider sections có cùng chiều cao sau khi load
+                setTimeout(equalizeProviderHeights, 50);
                 
                 // Update URL without reload
                 const newUrl = `/Services/Index?${params.toString()}`;
