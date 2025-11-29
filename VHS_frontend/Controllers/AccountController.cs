@@ -110,10 +110,10 @@ namespace VHS_frontend.Controllers
             HttpContext.Session.SetString("JWTToken", result.Token); // Thêm key này cho consistent
             HttpContext.Session.SetString("Role", result.Role ?? string.Empty);
             HttpContext.Session.SetString("AccountID", result.AccountID.ToString());
-            // 🔥 Lưu thêm Username
+            // Lưu thêm Username
             HttpContext.Session.SetString("Username", model.Username);
 
-            // ✨ Nếu là Provider, lấy ProviderId từ API
+            // Nếu là Provider, lấy ProviderId từ API
             if (result.Role?.Trim().Equals("Provider", StringComparison.OrdinalIgnoreCase) == true)
             {
                 try
@@ -134,7 +134,7 @@ namespace VHS_frontend.Controllers
             TempData["ToastType"] = "success";
             TempData["ToastMessage"] = $"Đăng nhập thành công! Xin chào {(result.DisplayName ?? model.Username)} 👋";
 
-            // ✅ Nếu có returnUrl, redirect về đó thay vì redirect theo role
+            // Nếu có returnUrl, redirect về đó thay vì redirect theo role
             if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
@@ -249,10 +249,10 @@ namespace VHS_frontend.Controllers
 
             var displayName = account.AccountName;
 
-            // 🔥 Lưu thêm Username
+            // Lưu thêm Username
             HttpContext.Session.SetString("Username", account.AccountName);
 
-            // ✨ Nếu là Provider, lấy ProviderId từ API
+            // Nếu là Provider, lấy ProviderId từ API
             if (result.Role?.Trim().Equals("Provider", StringComparison.OrdinalIgnoreCase) == true)
             {
                 try

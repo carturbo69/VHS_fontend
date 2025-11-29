@@ -201,7 +201,7 @@ namespace VHS_frontend.Services.Customer
 
             foreach (var it in (vm.Items ?? new List<BookItem>()))
             {
-                // ✅ chỉ dùng OptionIds do trang này post về
+                // chỉ dùng OptionIds do trang này post về
                 var pickedOptionIds = (it.OptionIds ?? new List<Guid>())
                                         .Where(id => id != Guid.Empty)
                                         .Distinct()
@@ -265,11 +265,11 @@ namespace VHS_frontend.Services.Customer
                 AccountId = accountId,
                 Address = vm.AddressText ?? string.Empty,
                 VoucherId = vm.VoucherId,
-                AddressId = vm.SelectedAddressId, // ✅ Lấy AddressId từ ViewModel
-                Latitude = vm.Address?.Latitude,   // ✅ Lấy Latitude từ Address
-                Longitude = vm.Address?.Longitude, // ✅ Lấy Longitude từ Address
-                RecipientName = vm.Address?.RecipientName ?? vm.RecipientFullName, // ✅ Lấy tên từ Address hoặc ViewModel
-                RecipientPhone = vm.Address?.RecipientPhone ?? vm.RecipientPhone, // ✅ Lấy số điện thoại từ Address hoặc ViewModel
+                AddressId = vm.SelectedAddressId, // Lấy AddressId từ ViewModel
+                Latitude = vm.Address?.Latitude,   // Lấy Latitude từ Address
+                Longitude = vm.Address?.Longitude, // Lấy Longitude từ Address
+                RecipientName = vm.Address?.RecipientName ?? vm.RecipientFullName, // Lấy tên từ Address hoặc ViewModel
+                RecipientPhone = vm.Address?.RecipientPhone ?? vm.RecipientPhone, // Lấy số điện thoại từ Address hoặc ViewModel
                 Items = items
             };
         }
@@ -315,7 +315,7 @@ namespace VHS_frontend.Services.Customer
         }
 
         /// <summary>
-        /// ✅ NEW: Lấy chi tiết lịch sử của 1 booking theo AccountId và BookingId.
+        /// NEW: Lấy chi tiết lịch sử của 1 booking theo AccountId và BookingId.
         /// </summary>
         public async Task<HistoryBookingDetailDTO?> GetHistoryDetailAsync(
         Guid accountId,
@@ -436,7 +436,7 @@ namespace VHS_frontend.Services.Customer
 
 
         /// <summary>
-        /// ✅ Lấy thông tin yêu cầu huỷ/hoàn tiền cho màn hình CanceledDetail từ endpoint mới.
+        /// Lấy thông tin yêu cầu huỷ/hoàn tiền cho màn hình CanceledDetail từ endpoint mới.
         /// Sử dụng endpoint: api/Bookings/by-account/{accountId}/bookings/{bookingId}/refund-info
         /// </summary>
         public async Task<CancelBookingRequestDTO?> GetCancelInfoDemoAsync(

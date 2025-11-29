@@ -60,7 +60,7 @@ namespace VHS_frontend.Services.Admin
             var res = await _http.GetAsync(url, ct);
             await HandleErrorAsync(res, ct);
 
-            // ✅ đọc toàn bộ nội dung trước, không đọc stream trực tiếp 2 lần
+            // đọc toàn bộ nội dung trước, không đọc stream trực tiếp 2 lần
             var json = await res.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
 

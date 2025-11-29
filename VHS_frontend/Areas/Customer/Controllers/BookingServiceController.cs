@@ -269,7 +269,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     TagId      = o.TagId,
                     Type       = o.Type,
                     Family     = o.Family,
-                    // ✅ Ưu tiên Value từ direct.OptionValues (user đã nhập), fallback về o.Value (ServiceOption.Value)
+                    // Ưu tiên Value từ direct.OptionValues (user đã nhập), fallback về o.Value (ServiceOption.Value)
                     Value      = direct.OptionValues != null && direct.OptionValues.TryGetValue(o.OptionId, out var userValue) 
                                  ? userValue 
                                  : o.Value
@@ -315,7 +315,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 vm.VoucherPercent = (int)Math.Round(pctDec);
                 vm.VoucherMaxAmount = maxCap;
 
-                // ✅ CHỈ lưu voucher vào session nếu có voucher từ query parameter (từ Cart)
+                // CHỈ lưu voucher vào session nếu có voucher từ query parameter (từ Cart)
                 // Nếu không có voucher từ query, xóa session để tránh tự áp dụng
                 if (voucherId.HasValue && chosen != null)
                 {
@@ -335,7 +335,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             // NHÁNH 2: CHECKOUT TỪ GIỎ (giữ nguyên luồng cũ)
             // ----------------------------------------------------------------
 
-            // ✅ Nếu thiếu query -> lấy lại từ Session
+            // Nếu thiếu query -> lấy lại từ Session
             if (string.IsNullOrWhiteSpace(selectedKeysCsv))
             {
                 selectedKeysCsv = HttpContext.Session.GetString(SS_SELECTED_IDS);
@@ -410,7 +410,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                 // Lưu session cho flow (CHỈ NHÁNH GIỎ)
                 HttpContext.Session.SetString(SS_SELECTED_IDS, string.Join(',', ids));
-                // ✅ CHỈ lưu voucher vào session nếu có voucher từ query parameter (từ Cart)
+                // CHỈ lưu voucher vào session nếu có voucher từ query parameter (từ Cart)
                 // Nếu không có voucher từ query, xóa session để tránh tự áp dụng
                 if (voucherId.HasValue && chosen != null)
                 {
@@ -486,7 +486,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         //[HttpGet]
         //public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId)
         //{
-        //    // ✅ Nếu thiếu query -> lấy lại từ Session
+        //    // Nếu thiếu query -> lấy lại từ Session
         //    if (string.IsNullOrWhiteSpace(selectedKeysCsv))
         //    {
         //        selectedKeysCsv = HttpContext.Session.GetString(SS_SELECTED_IDS);
@@ -538,7 +538,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         //    var (addresses, defaultAddrId) = await LoadUserAddressesAsync(accountId, jwt);
         //    var (fullName, phone) = await LoadUserProfileAsync(accountId, jwt);
 
-        //    // Build VM cơ bản (⚠️ nếu hàm của bạn yêu cầu tham số voucherCode, truyền null)
+        //    // Build VM cơ bản ( nếu hàm của bạn yêu cầu tham số voucherCode, truyền null)
         //    var vm = BuildBookingVmFromCart(cartItems, /*voucherCode:*/ null, fullName, phone, addresses, defaultAddrId);
 
         //    // ===== TÍNH TIỀN SERVER-SIDE =====
@@ -618,7 +618,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             try
             {
-                // ✅ Deserialize OptionValuesJson từ form và set vào BookItem.OptionValues
+                // Deserialize OptionValuesJson từ form và set vào BookItem.OptionValues
                 if (model.Items != null)
                 {
                     for (int i = 0; i < model.Items.Count; i++)
@@ -661,7 +661,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
-                // ✅ XÓA CÁC CART ITEMS ĐÃ ĐƯỢC ĐẶT KHỎI GIỎ HÀNG
+                // XÓA CÁC CART ITEMS ĐÃ ĐƯỢC ĐẶT KHỎI GIỎ HÀNG
                 if (model.Items != null && model.Items.Any())
                 {
                     var cartItemIds = model.Items
@@ -685,7 +685,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     }
                 }
 
-                // ✅ LƯU BOOKING ĐANG CHỜ THANH TOÁN (để hủy nếu user quay lại / hủy thanh toán)
+                // LƯU BOOKING ĐANG CHỜ THANH TOÁN (để hủy nếu user quay lại / hủy thanh toán)
                 HttpContext.Session.SetString(
                     SS_PENDING_BOOKING_IDS,
                     string.Join(",", result.BookingIds)
@@ -702,7 +702,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     System.Text.Json.JsonSerializer.Serialize(result.Breakdown)
                 );
 
-                // ✨ Lưu tên dịch vụ vào session để hiển thị ở trang Success
+                // Lưu tên dịch vụ vào session để hiển thị ở trang Success
                 var serviceNamesDict = new Dictionary<string, string>();
                 if (model.Items != null && result.BookingIds != null)
                 {
@@ -721,16 +721,16 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     System.Text.Json.JsonSerializer.Serialize(serviceNamesDict)
                 );
 
-                // ✨ Lưu phương thức thanh toán đã chọn để dùng sau khi xác nhận
-                // ❗ CHỈ HỖ TRỢ VNPAY - Mặc định là VNPAY
+                // Lưu phương thức thanh toán đã chọn để dùng sau khi xác nhận
+                // CHỈ HỖ TRỢ VNPAY - Mặc định là VNPAY
                 HttpContext.Session.SetString("PENDING_PAYMENT_METHOD", model.SelectedPaymentCode ?? "VNPAY");
                 
-                // ❗ QUAN TRỌNG: Xóa SS_PENDING_BOOKING_IDS vì booking đã được tạo thành công
+                // QUAN TRỌNG: Xóa SS_PENDING_BOOKING_IDS vì booking đã được tạo thành công
                 // và đang chờ xác nhận, KHÔNG phải chờ thanh toán nữa
                 // Nếu giữ lại, khi user quay lại Index, CancelPendingIfAnyAsync sẽ xóa booking này
                 HttpContext.Session.Remove(SS_PENDING_BOOKING_IDS);
                 
-                // ✨ Redirect đến trang chờ xác nhận thay vì thanh toán ngay
+                // Redirect đến trang chờ xác nhận thay vì thanh toán ngay
                 return RedirectToAction("PendingConfirmation", "BookingService", new { area = "Customer", bookingIds = string.Join(",", result.BookingIds) });
             }
             catch (HttpRequestException ex)
@@ -1535,7 +1535,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return RedirectToAction(nameof(ListHistoryBooking));
             }
 
-            // ❗ CHỈ HỖ TRỢ VNPAY - KHÔNG CÓ COD
+            // CHỈ HỖ TRỢ VNPAY - KHÔNG CÓ COD
             // Lấy phương thức thanh toán đã chọn từ session, mặc định là VNPAY
             var paymentMethod = HttpContext.Session.GetString("PENDING_PAYMENT_METHOD") ?? "VNPAY";
             
@@ -1566,7 +1566,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             var amountStr = total.ToString(CultureInfo.InvariantCulture);
 
-            // ❗ CHỈ HỖ TRỢ VNPAY - LUÔN REDIRECT ĐẾN VNPAY
+            // CHỈ HỖ TRỢ VNPAY - LUÔN REDIRECT ĐẾN VNPAY
             // Bỏ COD và MoMo, chỉ giữ VNPAY
             // Luôn redirect đến VNPay bất kể payment method là gì
             return RedirectToAction(
@@ -1778,7 +1778,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 // Giữ object Address để hiển thị phần “Địa chỉ nhận hàng”
                 Address = addr ?? new UserAddressDto(),
 
-                // ✅ Chỉ dùng chuỗi snapshot để post về server khi PlaceOrder
+                //  Chỉ dùng chuỗi snapshot để post về server khi PlaceOrder
                 AddressText = addr?.ToDisplayString() ?? string.Empty,
 
                 SelectedPaymentCode = null
@@ -1788,7 +1788,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 foreach (var it in items)
                 {
-                    // ✅ Tạo OptionValues dictionary từ Options có Value (textarea/text)
+                    // Tạo OptionValues dictionary từ Options có Value (textarea/text)
                     Dictionary<Guid, string>? optionValues = null;
                     if (it.Options != null && it.Options.Any())
                     {
@@ -1822,7 +1822,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                             Family = o.Family,
                             Value = o.Value
                         }).ToList(),
-                        OptionValues = optionValues // ✅ Set OptionValues từ cart item options
+                        OptionValues = optionValues //  Set OptionValues từ cart item options
                     });
                 }
             }

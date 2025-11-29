@@ -33,7 +33,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             {
                 var statusLower = mine.Status?.ToLower() ?? "";
                 
-                // ✅ Chuẩn hóa: Check cả tiếng Anh (standard) và tiếng Việt (data cũ)
+                // Chuẩn hóa: Check cả tiếng Anh (standard) và tiếng Việt (data cũ)
                 bool isRejected = statusLower == "rejected" || statusLower == "đã từ chối" || statusLower == "bị từ chối";
                 
                 if (!isRejected)
@@ -141,7 +141,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                 Console.WriteLine($"Registration successful - ProviderId: {id}, Status: {stat}");
                 
-                // ✅ KHÔNG DÙNG refresh: true - để JavaScript redirect đến Success page
+                // KHÔNG DÙNG refresh: true - để JavaScript redirect đến Success page
                 if (isAjax) return Ok(new { ok = true, providerId = id, status = stat });
 
                 return RedirectToAction(nameof(Success), new { id, stat });
@@ -165,7 +165,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
             _svc.SetBearerToken(token);
 
-            // ✅ LẤY STATUS MỚI NHẤT TỪ DATABASE (đồng bộ với admin)
+            // LẤY STATUS MỚI NHẤT TỪ DATABASE (đồng bộ với admin)
             try
             {
                 var provider = await _svc.GetMyProviderAsync(ct);

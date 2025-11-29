@@ -63,15 +63,15 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 };
             }
 
-            // ✨ THỐNG KÊ THÁNG NÀY - Lấy từng loại riêng biệt
-            // ✅ Sử dụng GetStatisticsAsync để filter theo CreatedAt (đúng cho thống kê)
+            // THỐNG KÊ THÁNG NÀY - Lấy từng loại riêng biệt
+            // Sử dụng GetStatisticsAsync để filter theo CreatedAt (đúng cho thống kê)
             var thisMonthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             var thisMonthEnd = thisMonthStart.AddMonths(1).AddTicks(-1); // Cuối tháng
             
             // Lấy thống kê tổng thể (filter theo CreatedAt)
             var statistics = await _bookingService.GetStatisticsAsync(thisMonthStart, thisMonthEnd);
             
-            // ✅ Lấy trực tiếp từ statistics (đã filter theo CreatedAt)
+            // Lấy trực tiếp từ statistics (đã filter theo CreatedAt)
             ViewBag.MonthPending = statistics?.PendingBookings ?? 0;
             ViewBag.MonthConfirmed = statistics?.ConfirmedBookings ?? 0;
             ViewBag.MonthCompleted = statistics?.CompletedBookings ?? 0;
@@ -110,7 +110,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
-                // ✅ Timeline đã được backend tạo sẵn trong AdminBookingService.GetBookingDetailAsync
+                // Timeline đã được backend tạo sẵn trong AdminBookingService.GetBookingDetailAsync
                 // Không cần tạo lại ở đây nữa
                 if (booking.Timeline == null)
                 {
@@ -420,7 +420,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
             try
             {
-                // ✨ QUAN TRỌNG: Parse createdAt từ string (có thể là CreatedAt hoặc ConfirmedAt)
+                // QUAN TRỌNG: Parse createdAt từ string (có thể là CreatedAt hoặc ConfirmedAt)
                 // Format: yyyy-MM-ddTHH:mm:ss hoặc yyyy-MM-ddTHH:mm:ss+07:00
                 DateTime createdAtDateTime;
                 
@@ -438,7 +438,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     }
                 }
 
-                // ✨ QUAN TRỌNG: Tính toán AutoCancelMinutes mới
+                // QUAN TRỌNG: Tính toán AutoCancelMinutes mới
                 // Với Confirmed booking: createdAtDateTime thực ra là ConfirmedAt (đã được frontend truyền đúng)
                 // Với Pending booking: createdAtDateTime là CreatedAt
                 // Thời gian hủy mới = Now + remainingMinutes

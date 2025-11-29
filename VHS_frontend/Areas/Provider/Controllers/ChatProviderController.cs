@@ -141,7 +141,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             await _chatService.ClearForMeAsync(
                 conversationId: id,
                 accountId: myId,
-                hide: hide,              // <— giờ luôn nhận true từ form
+                hide: hide,              // giờ luôn nhận true từ form
                 jwtToken: jwt,
                 ct: ct
             );

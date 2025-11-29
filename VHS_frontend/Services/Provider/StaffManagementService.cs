@@ -99,7 +99,7 @@ namespace VHS_frontend.Services.Provider
             return await _httpClient.PostAsync($"/api/staff/{staffId}/unlock", null, ct);
         }
 
-        // ✨ MỚI: Lấy lịch làm việc tuần của staff
+        // MỚI: Lấy lịch làm việc tuần của staff
         public async Task<HttpResponseMessage> GetWeeklyScheduleAsync(
             string staffId, 
             DateTime weekStart, 
@@ -113,7 +113,7 @@ namespace VHS_frontend.Services.Provider
                 ct);
         }
 
-        // 🔑 Cập nhật mật khẩu cho Staff
+        // Cập nhật mật khẩu cho Staff
         public async Task<HttpResponseMessage> UpdateStaffPasswordAsync(
             string staffId, 
             StaffUpdatePasswordDTO dto, 
