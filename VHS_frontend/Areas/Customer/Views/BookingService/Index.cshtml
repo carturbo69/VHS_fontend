@@ -2615,20 +2615,65 @@
             };
           }
           function inDateRange(v) {
-            const now = new Date();
-            const s = v.StartDate ? new Date(v.StartDate) : null;
-            const e = v.EndDate ? new Date(v.EndDate) : null;
-            const okStart = !s || now >= s;
-            const okEnd   = !e || now <= e;
-            return okStart && okEnd;
+            if (!v.StartDate || !v.EndDate) return true;
+            
+            try {
+              // So sánh chỉ phần date (ngày, tháng, năm) để tránh vấn đề timezone
+              const now = new Date();
+              const todayYear = now.getFullYear();
+              const todayMonth = now.getMonth() + 1; // getMonth() trả về 0-11
+              const todayDay = now.getDate();
+              
+              // Parse StartDate
+              let startStr = String(v.StartDate);
+              if (startStr.indexOf('T') !== -1) startStr = startStr.split('T')[0];
+              if (startStr.indexOf(' ') !== -1) startStr = startStr.split(' ')[0];
+              
+              // Parse EndDate
+              let endStr = String(v.EndDate);
+              if (endStr.indexOf('T') !== -1) endStr = endStr.split('T')[0];
+              if (endStr.indexOf(' ') !== -1) endStr = endStr.split(' ')[0];
+              
+              const [startYear, startMonth, startDay] = startStr.split('-').map(Number);
+              const [endYear, endMonth, endDay] = endStr.split('-').map(Number);
+              
+              // Validate
+              if (isNaN(startYear) || isNaN(startMonth) || isNaN(startDay) ||
+                  isNaN(endYear) || isNaN(endMonth) || isNaN(endDay)) {
+                return true; // Nếu không parse được, cho phép dùng
+              }
+              
+              // Kiểm tra: hôm nay >= ngày bắt đầu VÀ hôm nay <= ngày kết thúc
+              const isAfterStart = todayYear > startYear ||
+                                   (todayYear === startYear && todayMonth > startMonth) ||
+                                   (todayYear === startYear && todayMonth === startMonth && todayDay >= startDay);
+              
+              const isBeforeEnd = todayYear < endYear ||
+                                  (todayYear === endYear && todayMonth < endMonth) ||
+                                  (todayYear === endYear && todayMonth === endMonth && todayDay <= endDay);
+              
+              return isAfterStart && isBeforeEnd;
+            } catch (e) {
+              return true; // Nếu có lỗi, cho phép dùng
+            }
           }
           function canUse(v) {
             const active = !!v.IsActive;
             const unlimited = !!v.IsUnlimited;
             const remaining = Number(v.RemainingUses ?? ((v.UsageLimit ?? null) && isFinite(v.UsageLimit) ? (v.UsageLimit - (v.UsedCount||0)) : NaN));
             const usesOk = unlimited || (isFinite(remaining) ? remaining > 0 : true);
-            const daterangeOk = inDateRange(v) && !v.IsExpired && !v.IsUpcoming;
-            return (active && usesOk && daterangeOk) || v.CanUseNow;
+            
+            // Kiểm tra date range bằng logic client-side (chính xác hơn)
+            const daterangeOk = inDateRange(v);
+            
+            // Nếu server nói IsExpired = true, thì không cho dùng (ưu tiên server)
+            // Nhưng nếu server nói IsUpcoming = true nhưng client tính ra đã đến ngày, thì vẫn cho dùng
+            const expired = !!v.IsExpired;
+            
+            // Chỉ kiểm tra IsUpcoming nếu date range OK (để tránh conflict)
+            const upcoming = !daterangeOk && !!v.IsUpcoming;
+            
+            return (active && usesOk && daterangeOk && !expired) || v.CanUseNow;
           }
 
           function updateVoucherUI() {
@@ -2707,7 +2752,14 @@
           function renderListToElement(vouchers, targetEl){
             if (!targetEl) return;
             targetEl.innerHTML = '';
-            const arr = (vouchers||[]).map(normalizeVoucher);
+            
+            // Lọc bỏ voucher hết hạn
+            const validVouchers = (vouchers || []).filter(v => {
+              const isExp = !!pick(v,'IsExpired','isExpired');
+              return !isExp; // Chỉ giữ lại voucher chưa hết hạn
+            });
+            
+            const arr = validVouchers.map(normalizeVoucher);
             if(arr.length === 0){
               targetEl.innerHTML = `<div class="muted">Bạn chưa có voucher nào phù hợp.</div>`;
               return;
@@ -2758,7 +2810,14 @@
 
           function renderList(vouchers){
             listEl.innerHTML = '';
-            const arr = (vouchers||[]).map(normalizeVoucher);
+            
+            // Lọc bỏ voucher hết hạn
+            const validVouchers = (vouchers || []).filter(v => {
+              const isExp = !!pick(v,'IsExpired','isExpired');
+              return !isExp; // Chỉ giữ lại voucher chưa hết hạn
+            });
+            
+            const arr = validVouchers.map(normalizeVoucher);
             if(arr.length === 0){
               listEl.innerHTML = `<div class="muted">Bạn chưa có voucher nào phù hợp.</div>`;
               return;
@@ -2884,19 +2943,29 @@
                 if(!res.ok) throw new Error('HTTP '+res.status);
                 const list = await res.json() || [];
                 
-                // Tìm voucher theo code (case-insensitive)
+                // Tìm voucher theo code (case-insensitive) và lọc bỏ voucher hết hạn
                 const found = list.find(v => {
                   const vCode = pick(v,'Code','code') || '';
-                  return vCode.toLowerCase() === code.toLowerCase();
+                  const isExp = !!pick(v,'IsExpired','isExpired');
+                  return vCode.toLowerCase() === code.toLowerCase() && !isExp;
                 });
                 
                 if(found) {
-                  // Tìm thấy voucher → áp dụng
+                  // Tìm thấy voucher chưa hết hạn → áp dụng
                   applyVoucher(found);
                   if (voucherInputTyped) voucherInputTyped.value = '';
                 } else {
-                  // Không tìm thấy voucher
-                  alert('❌ Mã voucher không tồn tại hoặc không hợp lệ. Vui lòng kiểm tra lại.');
+                  // Kiểm tra xem có phải voucher hết hạn không
+                  const expiredVoucher = list.find(v => {
+                    const vCode = pick(v,'Code','code') || '';
+                    return vCode.toLowerCase() === code.toLowerCase();
+                  });
+                  
+                  if(expiredVoucher) {
+                    alert('❌ Voucher này đã hết hạn. Vui lòng chọn voucher khác.');
+                  } else {
+                    alert('❌ Mã voucher không tồn tại hoặc không hợp lệ. Vui lòng kiểm tra lại.');
+                  }
                 }
               } catch(e) {
                 console.error('Lỗi khi kiểm tra voucher:', e);
@@ -2928,12 +2997,32 @@
                 const vouchers = await fetchVouchers();
                 const found = vouchers.find(v => {
                   const vid = pick(v, 'VoucherId', 'voucherId', 'Id', 'id');
-                  return vid && vid.toString().toLowerCase() === firstId.toLowerCase();
+                  const isExp = !!pick(v,'IsExpired','isExpired');
+                  return vid && vid.toString().toLowerCase() === firstId.toLowerCase() && !isExp;
                 });
                 
                 if (found) {
                   CURRENT_VOUCHER = normalizeVoucher(found);
                 } else {
+                  // Kiểm tra xem có phải voucher hết hạn không
+                  const expiredVoucher = vouchers.find(v => {
+                    const vid = pick(v, 'VoucherId', 'voucherId', 'Id', 'id');
+                    return vid && vid.toString().toLowerCase() === firstId.toLowerCase();
+                  });
+                  
+                  if (expiredVoucher) {
+                    // Voucher hết hạn, xóa khỏi input
+                    voucherIdInput.value = '';
+                    CURRENT_VOUCHER = null;
+                  } else {
+                    // Fallback nếu không tìm thấy trong danh sách
+                    CURRENT_VOUCHER = { 
+                      VoucherId: firstId, 
+                      DiscountPercent: percent||0, 
+                      DiscountMaxAmount: maxAmount||0,
+                      Code: '' // để updateVoucherUI không bị lỗi
+                    };
+                  }
                   // Fallback nếu không tìm thấy trong danh sách
                   CURRENT_VOUCHER = { 
                     VoucherId: firstId, 
