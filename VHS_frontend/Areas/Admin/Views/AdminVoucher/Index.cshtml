@@ -432,19 +432,51 @@
         function getTimeState(startDate, endDate) {
           if (!startDate || !endDate) return 'started';
           try {
-            const now = new Date();
             // Xử lý date string có thể chứa time (ISO format)
-            let startStr = startDate;
-            let endStr = endDate;
+            let startStr = String(startDate);
+            let endStr = String(endDate);
             if (startStr.indexOf('T') !== -1) startStr = startStr.split('T')[0];
             if (endStr.indexOf('T') !== -1) endStr = endStr.split('T')[0];
             if (startStr.indexOf(' ') !== -1) startStr = startStr.split(' ')[0];
             if (endStr.indexOf(' ') !== -1) endStr = endStr.split(' ')[0];
             
-            const start = new Date(startStr + 'T00:00:00');
-            const end = new Date(endStr + 'T23:59:59');
-            if (now < start) return 'upcoming';
-            if (now > end) return 'expired';
+            // Kiểm tra format YYYY-MM-DD
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(startStr) || !dateRegex.test(endStr)) {
+              return 'started';
+            }
+            
+            // So sánh trực tiếp năm, tháng, ngày để tránh vấn đề timezone
+            const now = new Date();
+            const todayYear = now.getFullYear();
+            const todayMonth = now.getMonth() + 1; // getMonth() trả về 0-11
+            const todayDay = now.getDate();
+            
+            const [startYear, startMonth, startDay] = startStr.split('-').map(Number);
+            const [endYear, endMonth, endDay] = endStr.split('-').map(Number);
+            
+            // Validate các giá trị
+            if (isNaN(startYear) || isNaN(startMonth) || isNaN(startDay) ||
+                isNaN(endYear) || isNaN(endMonth) || isNaN(endDay)) {
+              return 'started';
+            }
+            
+            // So sánh trực tiếp: năm -> tháng -> ngày
+            // Nếu hôm nay < ngày bắt đầu → upcoming
+            if (todayYear < startYear || 
+                (todayYear === startYear && todayMonth < startMonth) ||
+                (todayYear === startYear && todayMonth === startMonth && todayDay < startDay)) {
+              return 'upcoming';
+            }
+            
+            // Nếu hôm nay > ngày kết thúc → expired
+            if (todayYear > endYear ||
+                (todayYear === endYear && todayMonth > endMonth) ||
+                (todayYear === endYear && todayMonth === endMonth && todayDay > endDay)) {
+              return 'expired';
+            }
+            
+            // Ngược lại (hôm nay trong khoảng start-end, bao gồm cả ngày bắt đầu và kết thúc) → started
             return 'started';
           } catch (e) {
             return 'started';
@@ -455,6 +487,62 @@
           if (tState === 'upcoming') return '<span class="badge upcoming">Chưa bắt đầu</span>';
           if (tState === 'expired') return '<span class="badge expired">Hết hạn</span>';
           return '<span class="badge started">Đang diễn ra</span>';
+        }
+
+        // Hàm refresh lại trạng thái thời gian của tất cả voucher trong bảng
+        function refreshAllTimeStates() {
+          try {
+            const rows = document.querySelectorAll('#tblVouchers tbody tr');
+            if (!rows || rows.length === 0) {
+              console.log('Không tìm thấy voucher nào để refresh');
+              return;
+            }
+            
+            let updatedCount = 0;
+            const now = new Date();
+            const todayYear = now.getFullYear();
+            const todayMonth = now.getMonth() + 1;
+            const todayDay = now.getDate();
+            
+            rows.forEach(tr => {
+              const startStr = tr.dataset.start || '';
+              const endStr = tr.dataset.end || '';
+              if (!startStr || !endStr) {
+                console.log('Voucher thiếu start hoặc end date:', tr);
+                return;
+              }
+              
+              const oldState = tr.dataset.tstate || '';
+              const tState = getTimeState(startStr, endStr);
+              
+              // Luôn cập nhật để đảm bảo trạng thái đúng
+              tr.setAttribute('data-tstate', tState);
+              
+              if (oldState !== tState) {
+                updatedCount++;
+              }
+              
+              // Cập nhật badge trong cột thời gian
+              const timeCell = tr.querySelector('td.time-cell');
+              if (timeCell) {
+                const substate = timeCell.querySelector('.substate');
+                if (substate) {
+                  substate.innerHTML = getTimeStateBadge(tState);
+                } else {
+                  console.log('Không tìm thấy substate cho voucher:', tr);
+                }
+              } else {
+                console.log('Không tìm thấy time-cell cho voucher:', tr);
+              }
+            });
+            
+            // Debug: log thông tin
+            if (updatedCount > 0) {
+              console.log(`Đã cập nhật trạng thái cho ${updatedCount} voucher (Hôm nay: ${todayDay}/${todayMonth}/${todayYear})`);
+            }
+          } catch (error) {
+            console.error('Lỗi khi refresh trạng thái voucher:', error);
+          }
         }
 
         function formatNumber(num) {
@@ -1037,8 +1125,7 @@
                 vLimit.value = '';
                 vUsed.value = '0';
                 vActive.value = 'true';
-                vCode.classList.remove('is-invalid');
-                clearError();
+                [vCode, vDesc, vPercent, vMax, vLimit, vStart, vEnd].forEach(f => clearFieldError(f));
                 return;
               }
             } else {
@@ -1063,8 +1150,7 @@
                 vLimit.value = '';
                 vUsed.value = '0';
                 vActive.value = 'true';
-                vCode.classList.remove('is-invalid');
-                clearError();
+                [vCode, vDesc, vPercent, vMax, vLimit, vStart, vEnd].forEach(f => clearFieldError(f));
                 return;
               }
             }
@@ -1073,8 +1159,11 @@
             const msg = await readJsonMessage(res);
             if (res.status === 409) {
               showNotice(msg || 'Mã voucher đã tồn tại, vui lòng nhập mã khác.', 'error', 3000);
-            } else if (res.status === 400) {
-              showNotice(msg || 'Dữ liệu không hợp lệ.', 'error', 3000);
+              vCode.classList.add('is-invalid');
+            } else if (res.status === 400 || res.status === 422) {
+              showNotice(msg || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường.', 'error', 3000);
+            } else if (res.status === 404) {
+              showNotice(msg || 'Không tìm thấy voucher để cập nhật.', 'error', 3000);
             } else {
               showNotice(msg || 'Có lỗi xảy ra. Vui lòng thử lại.', 'error', 3000);
             }
@@ -1084,6 +1173,37 @@
             showNotice(errorMsg, 'error', 3000);
           }
         });
+
+        // Refresh trạng thái thời gian khi trang load xong
+        // Sử dụng nhiều cách để đảm bảo chạy
+        function initTimeStateRefresh() {
+          function runRefresh() {
+            setTimeout(function() {
+              refreshAllTimeStates();
+            }, 200); // Đợi 200ms để đảm bảo DOM đã render xong
+          }
+          
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runRefresh);
+          } else {
+            // DOM đã sẵn sàng, chạy ngay
+            runRefresh();
+          }
+          
+          window.addEventListener('load', function() {
+            setTimeout(refreshAllTimeStates, 300);
+          });
+        }
+        
+        initTimeStateRefresh();
+
+        // Refresh lại trạng thái sau mỗi phút để cập nhật real-time
+        setInterval(function() {
+          refreshAllTimeStates();
+        }, 60000); // Mỗi 60 giây
+        
+        // Expose function để có thể gọi từ console để test
+        window.refreshVoucherStates = refreshAllTimeStates;
     </script>
 }
 
