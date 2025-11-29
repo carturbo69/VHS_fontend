@@ -66,7 +66,7 @@
 
         decimal PriceOf(ReadCartItemDTOs it) => it?.ServicePrice ?? 0m;
 
-        // 👉 TÍNH THÀNH TIỀN: Giá dịch vụ + tổng giá tuỳ chọn
+        // TÍNH THÀNH TIỀN: Giá dịch vụ + tổng giá tuỳ chọn
         decimal LineTotalOf(ReadCartItemDTOs it)
         {
             var basePrice = it?.ServicePrice ?? 0m;
@@ -74,7 +74,7 @@
             return basePrice + optTotal;
         }
 
-        // 👉 TÓM TẮT TUỲ CHỌN TỪ DTO
+        // TÓM TẮT TUỲ CHỌN TỪ DTO
         string AddonSummary(List<CartItemOptionReadDto>? options)
         {
             if (options == null || options.Count == 0) return "Chọn tuỳ chọn";
@@ -89,7 +89,7 @@
             return parts.Count == 0 ? "Chọn tuỳ chọn" : string.Join(", ", parts);
         }
 
-        // ✅ GỢI Ý THÊM: TẤT CẢ OPTION CỦA SERVICE (trừ option đã chọn)
+        // GỢI Ý THÊM: TẤT CẢ OPTION CỦA SERVICE (trừ option đã chọn)
         IEnumerable<ReadServiceOptionDTOs> SuggestOptions(ReadCartItemDTOs it)
         {
             // ViewBag từ Controller: Dictionary<Guid, List<ReadServiceOptionDTOs>>
@@ -557,7 +557,7 @@
             function setVoucher(v){
               CURRENT_VOUCHER = normalizeVoucher(v);
               
-              // ✅ Lưu cả VoucherId và Code vào hidden inputs
+              // Lưu cả VoucherId và Code vào hidden inputs
               const voucherIdHid = document.querySelector('#checkoutForm #voucherId');
               if (voucherCodeHid) {
                 voucherCodeHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.Code || '') : '';
@@ -566,7 +566,7 @@
                 voucherIdHid.value = CURRENT_VOUCHER ? (CURRENT_VOUCHER.VoucherId || '') : '';
               }
 
-              // ❌ KHÔNG lưu voucher vào localStorage - user phải chọn lại mỗi lần vào trang
+              // kHÔNG lưu voucher vào localStorage - user phải chọn lại mỗi lần vào trang
 
               // reset input gõ tay nếu bỏ voucher
               if(!CURRENT_VOUCHER && voucherInputEl) voucherInputEl.value = '';
@@ -589,7 +589,7 @@
             function removeVoucher(){
               setVoucher(null);
               
-              // ✅ Dọn sạch cả voucherId và voucherCode
+              // Dọn sạch cả voucherId và voucherCode
               const voucherIdHid = document.querySelector('#checkoutForm #voucherId');
               if (voucherCodeHid) voucherCodeHid.value = '';
               if (voucherIdHid) voucherIdHid.value = '';
@@ -683,21 +683,60 @@
             }
 
             /* ===== Nhập tay mã voucher ===== */
-            if(btnApplyTyped){
-              btnApplyTyped.addEventListener('click', ()=>{
+            if(btnApplyTyped && voucherInputEl){
+              const applyVoucherByCode = async () => {
                 const code = (voucherInputEl?.value || '').trim();
-                if(!code) return;
-                // ⚠️ Khi nhập tay, chưa có VoucherId → chỉ set code, để server validate sau
-                // Không dùng setVoucher() vì nó sẽ normalize và ghi VoucherId = ''
-                CURRENT_VOUCHER = { Code: code, DiscountPercent: 0, DiscountMaxAmount: 0 };
-                if (voucherCodeHid) voucherCodeHid.value = code;
-                // KHÔNG set voucherId vì chưa biết (để trống cho server tự tìm)
-                const voucherIdHid = document.querySelector('#checkoutForm #voucherId');
-                if (voucherIdHid) voucherIdHid.value = '';
+                if(!code) {
+                  alert('Vui lòng nhập mã voucher');
+                  return;
+                }
                 
-                const closer = document.querySelector('[data-close="#opt_voucher"]');
-                if(closer) closer.click();
-                recalc(); // cập nhật UI
+                // Disable button và hiển thị loading
+                btnApplyTyped.disabled = true;
+                const originalText = btnApplyTyped.textContent;
+                btnApplyTyped.textContent = 'Đang kiểm tra...';
+                
+                try {
+                  // Fetch danh sách voucher từ API
+                  const res = await fetch('@Url.Action("GetCartVouchers", "Cart", new { area = "Customer" })', { credentials:'same-origin' });
+                  if(!res.ok) throw new Error('HTTP '+res.status);
+                  const list = await res.json() || [];
+                  
+                  // Tìm voucher theo code (case-insensitive)
+                  const found = list.find(v => {
+                    const vCode = pick(v,'Code','code') || '';
+                    return vCode.toLowerCase() === code.toLowerCase();
+                  });
+                  
+                  if(found) {
+                    // Tìm thấy voucher → áp dụng
+                    setVoucher(found);
+                    if (voucherInputEl) voucherInputEl.value = '';
+                    
+                    const closer = document.querySelector('[data-close="#opt_voucher"]');
+                    if(closer) closer.click();
+                  } else {
+                    // Không tìm thấy voucher
+                    alert('❌ Mã voucher không tồn tại hoặc không hợp lệ. Vui lòng kiểm tra lại.');
+                  }
+                } catch(e) {
+                  console.error('Lỗi khi kiểm tra voucher:', e);
+                  alert('❌ Không thể kiểm tra voucher. Vui lòng thử lại.');
+                } finally {
+                  // Restore button
+                  btnApplyTyped.disabled = false;
+                  btnApplyTyped.textContent = originalText;
+                }
+              };
+              
+              btnApplyTyped.addEventListener('click', applyVoucherByCode);
+              
+              // Cho phép nhấn Enter để áp dụng
+              voucherInputEl.addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') {
+                  e.preventDefault();
+                  applyVoucherByCode();
+                }
               });
             }
 
@@ -770,7 +809,7 @@
               // Gán vào input của form Checkout
               document.getElementById('selectedKeysCsv').value = keys.join(',');
 
-              // ✅ Debug: Log giá trị voucher trước khi submit
+              //  Debug: Log giá trị voucher trước khi submit
               const voucherIdInput = document.getElementById('voucherId');
               const voucherCodeInput = document.getElementById('voucherCode');
               console.log('🎫 Submitting to BookingService:');
@@ -917,7 +956,7 @@
             window.addEventListener('keydown', e=>{ if(e.key==='Escape') closePanel(); });
             window.addEventListener('resize', scheduleReposition);
 
-            // ❌ KHÔNG khôi phục voucher từ localStorage - user phải chọn lại mỗi lần vào trang
+            // KHÔNG khôi phục voucher từ localStorage - user phải chọn lại mỗi lần vào trang
 
             // init
             recalc();

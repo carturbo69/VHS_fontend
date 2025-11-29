@@ -278,6 +278,15 @@
                       data-selected-conv="@Model.SelectedConversationId">
                     <!-- Header -->
                     <div class="border-bottom p-3 d-flex align-items-center position-relative">
+                        <!-- Nút Quay lại - chỉ hiển thị trên mobile -->
+                        <button type="button" 
+                                class="chat-back-btn" 
+                                onclick="window.showConversationList(); return false;"
+                                title="Quay lại danh sách"
+                                aria-label="Quay lại danh sách">
+                            <i class="bi bi-arrow-left"></i>
+                        </button>
+                        
                         <img class="avatar me-2"
                              src="@(otherInSelected?.AvatarUrl ?? fallbackImg)"
                              alt=""
@@ -621,8 +630,40 @@
     }
 
     <script>
+        // Hàm hiển thị danh sách conversations (mobile)
+        window.showConversationList = function() {
+            var chatWrapper = document.querySelector('.chat-wrapper');
+            if (chatWrapper) {
+                chatWrapper.classList.remove('show-chat');
+                // Cập nhật URL về trang chủ chat (không có conversation được chọn)
+                var baseUrl = '@Url.Action("Index", "ChatCustomer", new { area = "Customer" })';
+                if (window.history && window.history.pushState) {
+                    window.history.pushState({ view: 'list' }, '', baseUrl);
+                }
+            }
+        };
+
+        // Hàm hiển thị chat view (mobile)
+        window.showChatView = function() {
+            var chatWrapper = document.querySelector('.chat-wrapper');
+            if (chatWrapper) {
+                chatWrapper.classList.add('show-chat');
+            }
+        };
+
         (function() {
             var isLoading = false;
+
+            // Khởi tạo: Nếu có conversation được chọn, hiển thị chat view trên mobile
+            (function initMobileView() {
+                var main = document.querySelector('main.chat-col[data-selected-conv]');
+                if (main) {
+                    var chatWrapper = document.querySelector('.chat-wrapper');
+                    if (chatWrapper && window.innerWidth <= 767.98) {
+                        chatWrapper.classList.add('show-chat');
+                    }
+                }
+            })();
 
             // Lắng nghe khi có conversation được click
             document.addEventListener('click', function(e) {
@@ -713,6 +754,11 @@
                         // Update URL (không reload)
                         if (window.history && window.history.pushState) {
                             window.history.pushState({ conversationId: convId }, '', convUrl);
+                        }
+
+                        // Trên mobile: chuyển sang chat view
+                        if (window.innerWidth <= 767.98) {
+                            window.showChatView();
                         }
 
                                // Re-init form gửi chat (nút gửi + nút file)

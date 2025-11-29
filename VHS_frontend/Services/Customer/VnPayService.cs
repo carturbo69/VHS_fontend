@@ -38,7 +38,7 @@ namespace VHS_frontend.Services.Customer
             pay.AddRequestData("vnp_CurrCode", _configuration["Vnpay:CurrCode"] ?? "VND");
             pay.AddRequestData("vnp_IpAddr", pay.GetIpAddress(context));
             pay.AddRequestData("vnp_Locale", _configuration["Vnpay:Locale"] ?? "vn");
-            // 🔑 Chỉ gửi OrderDescription (đã chứa "BOOKINGS:guid1,guid2"), không thêm name và amount
+            // Chỉ gửi OrderDescription (đã chứa "BOOKINGS:guid1,guid2"), không thêm name và amount
             pay.AddRequestData("vnp_OrderInfo", model.OrderDescription);
             pay.AddRequestData("vnp_OrderType", model.OrderType);
             pay.AddRequestData("vnp_ReturnUrl", urlCallBack ?? "");

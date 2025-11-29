@@ -26,7 +26,7 @@
             
             public string? ProviderName { get; set; }
             
-            // ✅ Thêm Options để hiển thị trong card
+            // Thêm Options để hiển thị trong card
             public List<ReadServiceOptionDTOs> ServiceOptions { get; set; } = new();
     }
     }

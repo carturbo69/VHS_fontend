@@ -5,9 +5,17 @@
 
 .v-page {
     color: var(--fg);
-    overflow-x: hidden;
+    overflow-x: visible; /* Cho phép scroll ngang nếu cần */
     width: 100%;
     max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Chỉ ẩn overflow-x trên desktop lớn */
+@media (min-width: 1200px) {
+    .v-page {
+        overflow-x: hidden;
+    }
 }
 
 /* Ẩn horizontal scrollbar toàn trang */
@@ -37,12 +45,21 @@ body:has(.v-page) #page {
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    overflow: hidden;
-    overflow-x: hidden;
+    overflow: visible; /* Cho phép hiển thị đầy đủ */
+    overflow-x: visible; /* Cho phép scroll ngang nếu cần */
     max-width: 100%;
     width: 100%;
+    box-sizing: border-box;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+}
+
+/* Chỉ ẩn overflow trên desktop lớn */
+@media (min-width: 1200px) {
+    .card-x {
+        overflow: hidden;
+        overflow-x: hidden;
+    }
 }
 
 .card-x::before {
@@ -552,10 +569,13 @@ body:has(.v-page) #page {
 }
 
 .search-form .input-group {
+    display: flex;
+    align-items: stretch;
     border-radius: var(--radius-inner);
-    overflow: hidden;
+    overflow: visible; /* Cho phép hiển thị đầy đủ */
     box-shadow: var(--shadow-2);
     transition: all 0.3s ease;
+    gap: 0; /* Không có gap giữa input và button */
 }
 
 .search-form .input-group:focus-within {
@@ -563,6 +583,7 @@ body:has(.v-page) #page {
 }
 
 .search-form .form-control {
+    flex: 1;
     border: 1px solid color-mix(in oklab, var(--fg) 15%, var(--border) 85%);
     background: var(--card);
     color: var(--fg);
@@ -570,6 +591,8 @@ body:has(.v-page) #page {
     font-weight: 500;
     font-size: 0.9rem;
     border-radius: 14px 0 0 14px;
+    border-right: none; /* Xóa border-right để nối với button */
+    min-width: 0; /* Cho phép shrink */
 }
 
 .search-form .form-control:focus {
@@ -577,22 +600,34 @@ body:has(.v-page) #page {
     box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18), 0 4px 12px rgba(16, 185, 129, 0.15);
     outline: none;
     transform: translateY(-1px);
+    z-index: 1; /* Đảm bảo input ở trên button */
 }
 
 .search-form .btn {
     background: var(--muted);
     border: 1px solid color-mix(in oklab, var(--fg) 15%, var(--border) 85%);
-    border-left: none;
+    border-left: none; /* Xóa border-left để nối với input */
     color: var(--muted-fg);
     padding: 12px 16px;
     transition: all 0.3s ease;
     border-radius: 0 14px 14px 0;
+    flex-shrink: 0; /* Không cho phép button shrink */
+    min-width: 48px; /* Đảm bảo button có kích thước tối thiểu */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-form .btn i {
+    font-size: 1rem;
+    display: block; /* Đảm bảo icon hiển thị */
 }
 
 .search-form .btn:hover {
     background: var(--success);
     color: #ffffff;
     border-color: var(--success);
+    z-index: 1; /* Đảm bảo button ở trên khi hover */
 }
 
 /* Filter */
@@ -727,9 +762,17 @@ body:has(.v-page) #page {
     margin-bottom: 1.5rem;
     position: relative;
     overflow: visible;
-    overflow-x: hidden;
+    overflow-x: visible; /* Cho phép scroll ngang */
     max-width: 100%;
     width: 100%;
+    box-sizing: border-box;
+}
+
+/* Chỉ ẩn overflow-x trên desktop lớn */
+@media (min-width: 1200px) {
+    .table-card {
+        overflow-x: hidden;
+    }
 }
 
 .table-card::before {
@@ -749,11 +792,19 @@ body:has(.v-page) #page {
     border: 1px solid var(--border);
     border-radius: 20px;
     overflow: hidden;
-    overflow-x: hidden;
+    overflow-x: auto; /* Cho phép scroll ngang */
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
     position: relative;
     max-width: 100%;
     width: 100%;
+    -webkit-overflow-scrolling: touch; /* Smooth scroll trên iOS */
+}
+
+/* Ẩn scrollbar trên desktop */
+@media (min-width: 769px) {
+    .table-wrap {
+        overflow-x: hidden;
+    }
 }
 
 .table-card .table-wrap {
@@ -827,12 +878,27 @@ body:has(.v-page) #page {
 }
 
 .table-scroll {
-    overflow-x: hidden !important;
+    overflow-x: auto; /* Cho phép scroll ngang trên mobile */
     overflow-y: auto;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    -ms-overflow-style: auto; /* Hiện scrollbar trên IE/Edge khi cần */
+    scrollbar-width: thin; /* Thin scrollbar trên Firefox */
     max-width: 100%;
     width: 100%;
+}
+
+/* Ẩn scrollbar trên desktop nhưng vẫn cho phép scroll */
+@media (min-width: 769px) {
+    .table-scroll {
+        overflow-x: hidden;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    
+    .table-scroll::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
+    }
 }
 
 .table-scroll::-webkit-scrollbar {
@@ -3127,5 +3193,961 @@ body:has(.v-page) #page {
 @media (max-width: 768px) {
     .actions-grid {
         grid-template-columns: 1fr !important;
+    }
+}
+
+/* ===== Additional Mobile Responsive Styles ===== */
+@media (max-width: 992px) {
+    .v-page.container-fluid {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+    
+    .v-head {
+        padding: 1.25rem 1.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .v-head .ico {
+        width: 48px;
+        height: 48px;
+        font-size: 1.25rem;
+    }
+    
+    .v-head h3 {
+        font-size: clamp(1.125rem, 4vw, 1.5rem);
+    }
+    
+    .v-head .sub {
+        font-size: clamp(0.875rem, 3vw, 0.9375rem);
+    }
+    
+    .v-head .right {
+        width: 100%;
+        margin-top: 12px;
+        justify-content: space-between;
+    }
+    
+    .pill {
+        padding: 5px 10px;
+        font-size: clamp(0.75rem, 3vw, 0.8125rem);
+    }
+    
+    .pill .lbl {
+        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+    }
+    
+    .pill .val {
+        font-size: clamp(0.9rem, 3.5vw, 1rem);
+    }
+    
+    .badge-notify {
+        font-size: clamp(0.65rem, 2.5vw, 0.7rem);
+        padding: 2px 6px;
+    }
+    
+    .v-toolbar {
+        padding: 1.25rem 1.5rem;
+    }
+    
+    .toolbar-card .search-card,
+    .toolbar-card .filter-card {
+        padding: 1rem;
+    }
+    
+    .section-header h6 {
+        font-size: clamp(0.875rem, 3.5vw, 0.9375rem);
+    }
+    
+    .action-btn {
+        padding: 8px 12px;
+        font-size: clamp(0.8rem, 3vw, 0.875rem);
+    }
+    
+    .search-form .form-control {
+        padding: 10px 14px;
+        font-size: clamp(0.85rem, 3vw, 0.9rem);
+    }
+    
+    .filter-header h6 {
+        font-size: clamp(0.875rem, 3.5vw, 0.9375rem);
+    }
+    
+    .fb-label {
+        font-size: clamp(0.8rem, 3vw, 0.875rem);
+    }
+    
+    .table-header {
+        padding: 12px 16px;
+    }
+    
+    .table-header h6 {
+        font-size: clamp(0.875rem, 3.5vw, 0.9375rem);
+    }
+    
+    .table thead th {
+        padding: 0.75rem 1rem;
+        font-size: clamp(0.75rem, 3vw, 0.8125rem);
+    }
+    
+    .table tbody td {
+        padding: 12px 8px;
+        font-size: clamp(0.8rem, 3vw, 0.875rem);
+    }
+    
+    .content-text {
+        max-width: 200px;
+        font-size: clamp(0.8rem, 3vw, 0.875rem);
+    }
+    
+    .time-cell {
+        font-size: clamp(0.75rem, 2.5vw, 0.8125rem);
+    }
+    
+    .btn-sm {
+        padding: 0.4rem 0.75rem;
+        font-size: clamp(0.75rem, 3vw, 0.8125rem);
+        min-height: 34px;
+    }
+    
+    .btn-group {
+        gap: 0.375rem;
+    }
+    
+    .w-actions {
+        min-width: 160px;
+    }
+    
+    .notification-tabs {
+        margin: 16px 0;
+    }
+    
+    .notification-tabs .nav-link {
+        padding: 10px 16px;
+        font-size: clamp(0.85rem, 3vw, 0.9rem);
+    }
+    
+    .notification-tabs .nav-link .badge {
+        font-size: clamp(0.65rem, 2.5vw, 0.7rem);
+        padding: 2px 6px;
+    }
+}
+
+@media (max-width: 768px) {
+    .v-page.container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    
+    .v-head {
+        padding: 1rem 1.25rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .v-head .left {
+        width: 100%;
+    }
+    
+    .v-head .ico {
+        width: 44px;
+        height: 44px;
+        font-size: 1.1rem;
+    }
+    
+    .v-head h3 {
+        font-size: clamp(1rem, 4vw, 1.25rem);
+    }
+    
+    .v-head .sub {
+        font-size: clamp(0.8125rem, 3vw, 0.875rem);
+    }
+    
+    .v-head .right {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 8px;
+        overflow: visible; /* Cho phép hiển thị đầy đủ */
+    }
+    
+    .pill {
+        flex: 1 1 auto;
+        min-width: 80px;
+        padding: 4px 8px;
+        justify-content: center;
+        overflow: visible; /* Cho phép hiển thị đầy đủ */
+        white-space: nowrap; /* Không wrap text trong pill */
+    }
+    
+    .pill-total {
+        flex: 0 0 auto;
+    }
+    
+    .v-toolbar {
+        padding: 1rem 1.25rem;
+    }
+    
+    .v-toolbar .row {
+        flex-direction: column;
+    }
+    
+    .v-toolbar .col-md-5,
+    .v-toolbar .col-md-7 {
+        width: 100%;
+        padding: 0;
+        margin-bottom: 16px;
+    }
+    
+    .v-toolbar .col-md-7:last-child {
+        margin-bottom: 0;
+    }
+    
+    .toolbar-card .search-card,
+    .toolbar-card .filter-card {
+        padding: 0.875rem;
+    }
+    
+    .actions-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .search-form .input-group {
+        flex-direction: row; /* Giữ nguyên row layout trên mobile */
+        gap: 0;
+        overflow: visible;
+    }
+    
+    .search-form .form-control {
+        border-radius: 14px 0 0 14px; /* Giữ border-radius bên trái */
+        border-right: none; /* Xóa border-right để nối với button */
+        margin-bottom: 0; /* Không có margin-bottom */
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .search-form .btn {
+        border-radius: 0 14px 14px 0; /* Giữ border-radius bên phải */
+        border-left: none; /* Xóa border-left để nối với input */
+        width: auto; /* Không full width, chỉ đủ cho icon */
+        min-width: 48px;
+        flex-shrink: 0;
+        padding: 12px 14px; /* Giảm padding một chút trên mobile */
+    }
+    
+    .search-form .btn i {
+        font-size: 1rem;
+        display: block;
+    }
+    
+    .filter-header h6 {
+        font-size: clamp(0.8125rem, 3.5vw, 0.875rem);
+        margin-bottom: 10px;
+    }
+    
+    .filter-card .row {
+        flex-direction: column;
+    }
+    
+    .filter-card .col-md-4,
+    .filter-card .col-12 {
+        width: 100%;
+        margin-bottom: 12px;
+    }
+    
+    .filter-card .col-12:last-child {
+        margin-bottom: 0;
+    }
+    
+    .filter-actions {
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+    }
+    
+    .filter-actions .btn {
+        width: 100%;
+        flex: none;
+    }
+    
+    .table-wrap {
+        overflow-x: auto !important; /* Force scroll trên mobile */
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+    
+    .table-wrap::-webkit-scrollbar {
+        display: block !important;
+        height: 6px;
+    }
+    
+    .table-wrap::-webkit-scrollbar-track {
+        background: var(--muted);
+        border-radius: 3px;
+    }
+    
+    .table-wrap::-webkit-scrollbar-thumb {
+        background: var(--success);
+        border-radius: 3px;
+    }
+    
+    .table-wrap::-webkit-scrollbar-thumb:hover {
+        background: #34d399;
+    }
+    
+    .table {
+        min-width: 700px; /* Tăng min-width để hiển thị đầy đủ các cột */
+        width: 100%;
+        table-layout: auto; /* Cho phép table tự điều chỉnh */
+    }
+    
+    /* Table cho inbox (5 cột) */
+    #tblInboxNotifications {
+        min-width: 650px;
+    }
+    
+    /* Table cho sent (6 cột) */
+    #tblSentNotifications {
+        min-width: 800px;
+    }
+    
+    /* Đảm bảo table-scroll cũng có scroll trên mobile */
+    .table-scroll {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+    
+    .table-scroll::-webkit-scrollbar {
+        display: block !important;
+        height: 6px;
+    }
+    
+    .table-scroll::-webkit-scrollbar-track {
+        background: var(--muted);
+        border-radius: 3px;
+    }
+    
+    .table-scroll::-webkit-scrollbar-thumb {
+        background: var(--success);
+        border-radius: 3px;
+    }
+    
+    .table-scroll::-webkit-scrollbar-thumb:hover {
+        background: #34d399;
+    }
+    
+    .table thead th {
+        padding: 0.625rem 0.75rem;
+        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+        white-space: nowrap;
+    }
+    
+    .table tbody td {
+        padding: 10px 6px;
+        font-size: clamp(0.75rem, 2.5vw, 0.8125rem);
+    }
+    
+    .content-text {
+        max-width: 200px; /* Tăng max-width để hiển thị nhiều hơn */
+        white-space: normal; /* Cho phép wrap text */
+        word-break: break-word; /* Break long words */
+        line-height: 1.4;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .w-actions {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .notification-tabs .nav-tabs {
+        flex-direction: column;
+        border-bottom: none;
+        gap: 8px;
+    }
+    
+    .notification-tabs .nav-link {
+        width: 100%;
+        justify-content: center;
+        border-radius: 12px;
+        margin-bottom: 0;
+    }
+    
+    .notification-tabs .nav-link.active {
+        border: 1px solid var(--success);
+        margin-bottom: 0;
+    }
+    
+    .notification-tabs .nav-link.active::after {
+        display: none;
+    }
+    
+    /* Notification Dropdown - Mobile */
+    .notif-menu {
+        width: calc(100vw - 32px) !important;
+        max-width: 380px !important;
+        right: -16px !important;
+        top: 48px !important;
+    }
+    
+    .notif-header {
+        padding: 12px 16px !important;
+    }
+    
+    .notif-header .fw-bold {
+        font-size: clamp(0.875rem, 3.5vw, 0.9375rem);
+    }
+    
+    .notification-link {
+        padding: 12px 16px !important;
+    }
+    
+    .notification-text {
+        font-size: clamp(0.8rem, 3vw, 0.875rem);
+    }
+    
+    .notification-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    
+    .notification-time {
+        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+    }
+    
+    .type-badge {
+        font-size: clamp(0.65rem, 2.5vw, 0.7rem);
+        padding: 3px 8px;
+    }
+    
+    .notif-action-link {
+        padding: 12px 16px !important;
+        font-size: clamp(0.8rem, 3vw, 0.875rem);
+    }
+    
+    .empty-notification-icon {
+        width: 56px;
+        height: 56px;
+    }
+    
+    .empty-notification-icon i {
+        font-size: 1.75rem;
+    }
+    
+    .empty-notification-text {
+        font-size: clamp(0.875rem, 3.5vw, 0.9375rem);
+    }
+    
+    .empty-notification-subtext {
+        font-size: clamp(0.75rem, 3vw, 0.8125rem);
+    }
+    
+    /* Modal - Mobile */
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    .modal-content {
+        border-radius: 16px;
+    }
+    
+    .modal-header {
+        padding: 1rem 1.25rem;
+    }
+    
+    .modal-title {
+        font-size: clamp(1rem, 4vw, 1.125rem);
+    }
+    
+    .modal-title i {
+        font-size: clamp(1.125rem, 4vw, 1.25rem);
+    }
+    
+    .notification-create-body {
+        padding: 1.25rem 1rem;
+    }
+    
+    .form-label-modern {
+        font-size: clamp(0.85rem, 3.5vw, 0.9rem);
+        margin-bottom: 0.625rem;
+    }
+    
+    .form-label-modern i {
+        font-size: clamp(1rem, 4vw, 1.1rem);
+    }
+    
+    .form-input-wrapper .form-select-modern,
+    .form-control-modern {
+        padding: 12px 14px;
+        font-size: clamp(0.85rem, 3vw, 0.9rem);
+    }
+    
+    .form-char-count {
+        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+        bottom: 10px;
+        right: 12px;
+        padding: 3px 8px;
+    }
+    
+    .modal-footer {
+        padding: 1rem 1.25rem;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .modal-footer .btn {
+        width: 100%;
+    }
+    
+    .detail-field {
+        padding: 0.875rem;
+    }
+    
+    .detail-field-full {
+        padding: 1rem;
+    }
+    
+    .detail-label {
+        font-size: clamp(0.75rem, 3vw, 0.8125rem);
+        margin-bottom: 0.5rem;
+    }
+    
+    .detail-value {
+        font-size: clamp(0.875rem, 3.5vw, 0.9375rem);
+    }
+    
+    .detail-value-content {
+        padding: 1rem;
+        font-size: clamp(0.875rem, 3.5vw, 0.9375rem);
+        min-height: 100px;
+    }
+    
+    /* Toast - Mobile */
+    .center-toast .toast-box {
+        min-width: 280px;
+        max-width: calc(100vw - 32px);
+        padding: 12px 16px;
+    }
+    
+    .center-toast .toast-box .msg {
+        font-size: clamp(0.85rem, 3vw, 0.9rem);
+    }
+    
+    .notification-toast {
+        min-width: 280px;
+        max-width: calc(100vw - 32px);
+        right: 16px;
+        top: 16px;
+    }
+    
+    .notification-toast .toast-content {
+        padding: 12px;
+    }
+    
+    .notification-toast .toast-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
+    }
+    
+    .notification-toast .toast-title {
+        font-size: clamp(0.85rem, 3vw, 0.9rem);
+    }
+    
+    .notification-toast .toast-message {
+        font-size: clamp(0.8rem, 2.5vw, 0.85rem);
+    }
+}
+
+@media (max-width: 480px) {
+    .v-page.container-fluid {
+        padding-left: 0.375rem;
+        padding-right: 0.375rem;
+    }
+    
+    .v-head {
+        padding: 0.875rem 1rem;
+        border-radius: 16px;
+    }
+    
+    .v-head .ico {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+    
+    .v-head h3 {
+        font-size: clamp(0.9375rem, 4vw, 1.125rem);
+    }
+    
+    .v-head .sub {
+        font-size: clamp(0.75rem, 3vw, 0.8125rem);
+    }
+    
+    .pill {
+        padding: 3px 6px;
+        min-width: 70px;
+    }
+    
+    .pill .lbl {
+        display: none;
+    }
+    
+    .pill .val {
+        font-size: clamp(0.875rem, 3.5vw, 0.9375rem);
+    }
+    
+    .badge-notify {
+        font-size: clamp(0.6rem, 2.5vw, 0.65rem);
+        padding: 1px 5px;
+        margin-left: 4px;
+    }
+    
+    .v-toolbar {
+        padding: 0.875rem 1rem;
+    }
+    
+    .toolbar-card .search-card,
+    .toolbar-card .filter-card {
+        padding: 0.75rem;
+    }
+    
+    .section-header h6 {
+        font-size: clamp(0.8rem, 3.5vw, 0.875rem);
+    }
+    
+    .action-btn {
+        padding: 8px 10px;
+        font-size: clamp(0.75rem, 3vw, 0.8rem);
+    }
+    
+    .search-form .form-control {
+        padding: 8px 12px;
+        font-size: clamp(0.8rem, 3vw, 0.85rem);
+        border-radius: 14px 0 0 14px;
+        border-right: none;
+    }
+    
+    .search-form .btn {
+        padding: 8px 12px;
+        min-width: 44px;
+        border-radius: 0 14px 14px 0;
+        border-left: none;
+    }
+    
+    .search-form .btn i {
+        font-size: 0.9rem;
+    }
+    
+    .filter-header h6 {
+        font-size: clamp(0.8rem, 3.5vw, 0.875rem);
+    }
+    
+    .fb-label {
+        font-size: clamp(0.75rem, 3vw, 0.8rem);
+    }
+    
+    .table-header {
+        padding: 10px 12px;
+    }
+    
+    .table-header h6 {
+        font-size: clamp(0.8rem, 3.5vw, 0.875rem);
+    }
+    
+    .table thead th {
+        padding: 0.5rem 0.625rem;
+        font-size: clamp(0.65rem, 2.5vw, 0.7rem);
+    }
+    
+    .table tbody td {
+        padding: 8px 4px;
+        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+    }
+    
+    .content-text {
+        max-width: 180px; /* Tăng max-width để hiển thị nhiều hơn */
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.4;
+    }
+    
+    .btn-sm {
+        padding: 0.35rem 0.625rem;
+        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+        min-height: 32px;
+    }
+    
+    .notification-tabs .nav-link {
+        padding: 8px 12px;
+        font-size: clamp(0.8rem, 3vw, 0.85rem);
+    }
+    
+    .notification-tabs .nav-link i {
+        font-size: clamp(0.9rem, 3.5vw, 0.95rem);
+    }
+    
+    .search-form .form-control {
+        padding: 8px 10px;
+        font-size: clamp(0.75rem, 3vw, 0.8rem);
+        border-radius: 14px 0 0 14px;
+        border-right: none;
+    }
+    
+    .search-form .btn {
+        padding: 8px 10px;
+        min-width: 40px;
+        border-radius: 0 14px 14px 0;
+        border-left: none;
+    }
+    
+    .search-form .btn i {
+        font-size: 0.85rem;
+    }
+    
+    /* Notification Dropdown - Small Mobile */
+    .notif-menu {
+        width: calc(100vw - 16px) !important;
+        right: -8px !important;
+    }
+    
+    .notif-header {
+        padding: 10px 12px !important;
+    }
+    
+    .notification-link {
+        padding: 10px 12px !important;
+    }
+    
+    .notification-text {
+        font-size: clamp(0.75rem, 3vw, 0.8rem);
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+    }
+    
+    .notification-time {
+        font-size: clamp(0.65rem, 2.5vw, 0.7rem);
+    }
+    
+    .type-badge {
+        font-size: clamp(0.6rem, 2.5vw, 0.65rem);
+        padding: 2px 6px;
+    }
+    
+    .notif-action-link {
+        padding: 10px 12px !important;
+        font-size: clamp(0.75rem, 3vw, 0.8rem);
+    }
+    
+    .empty-notification-icon {
+        width: 48px;
+        height: 48px;
+    }
+    
+    .empty-notification-icon i {
+        font-size: 1.5rem;
+    }
+    
+    /* Modal - Small Mobile */
+    .modal-dialog {
+        margin: 0.25rem;
+    }
+    
+    .modal-content {
+        border-radius: 12px;
+    }
+    
+    .modal-header {
+        padding: 0.875rem 1rem;
+    }
+    
+    .modal-title {
+        font-size: clamp(0.9375rem, 4vw, 1rem);
+    }
+    
+    .notification-create-body {
+        padding: 1rem 0.875rem;
+    }
+    
+    .form-label-modern {
+        font-size: clamp(0.8rem, 3.5vw, 0.85rem);
+    }
+    
+    .form-input-wrapper .form-select-modern,
+    .form-control-modern {
+        padding: 10px 12px;
+        font-size: clamp(0.8rem, 3vw, 0.85rem);
+    }
+    
+    .form-char-count {
+        font-size: clamp(0.65rem, 2.5vw, 0.7rem);
+        bottom: 8px;
+        right: 10px;
+        padding: 2px 6px;
+    }
+    
+    .modal-footer {
+        padding: 0.875rem 1rem;
+    }
+    
+    .detail-field {
+        padding: 0.75rem;
+    }
+    
+    .detail-field-full {
+        padding: 0.875rem;
+    }
+    
+    .detail-value-content {
+        padding: 0.875rem;
+        font-size: clamp(0.8rem, 3vw, 0.85rem);
+        min-height: 80px;
+    }
+    
+    /* Toast - Small Mobile */
+    .center-toast .toast-box {
+        min-width: 260px;
+        max-width: calc(100vw - 16px);
+        padding: 10px 14px;
+    }
+    
+    .notification-toast {
+        min-width: 260px;
+        max-width: calc(100vw - 16px);
+        right: 8px;
+        top: 8px;
+    }
+    
+    .notification-toast .toast-content {
+        padding: 10px;
+    }
+    
+    .notification-toast .toast-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .v-head {
+        padding: 0.75rem 0.875rem;
+    }
+    
+    .v-head .ico {
+        width: 36px;
+        height: 36px;
+        font-size: 0.95rem;
+    }
+    
+    .pill {
+        min-width: 60px;
+        padding: 2px 5px;
+    }
+    
+    .v-toolbar {
+        padding: 0.75rem 0.875rem;
+    }
+    
+    .toolbar-card .search-card,
+    .toolbar-card .filter-card {
+        padding: 0.625rem;
+    }
+    
+    .table thead th {
+        padding: 0.4rem 0.5rem;
+        font-size: clamp(0.6rem, 2.5vw, 0.65rem);
+    }
+    
+    .table tbody td {
+        padding: 6px 3px;
+        font-size: clamp(0.65rem, 2.5vw, 0.7rem);
+    }
+    
+    .content-text {
+        max-width: 150px; /* Tăng max-width để hiển thị nhiều hơn */
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.4;
+    }
+    
+    .btn-sm {
+        padding: 0.3rem 0.5rem;
+        font-size: clamp(0.65rem, 2.5vw, 0.7rem);
+        min-height: 30px;
+    }
+    
+    .notification-tabs .nav-link {
+        padding: 6px 10px;
+        font-size: clamp(0.75rem, 3vw, 0.8rem);
+    }
+    
+    /* Notification Dropdown - Very Small Mobile */
+    .notif-menu {
+        width: calc(100vw - 8px) !important;
+        right: -4px !important;
+    }
+    
+    .notif-header {
+        padding: 8px 10px !important;
+    }
+    
+    .notification-link {
+        padding: 8px 10px !important;
+    }
+    
+    .notif-action-link {
+        padding: 8px 10px !important;
+        font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+    }
+    
+    /* Modal - Very Small Mobile */
+    .modal-dialog {
+        margin: 0.125rem;
+    }
+    
+    .modal-header {
+        padding: 0.75rem 0.875rem;
+    }
+    
+    .notification-create-body {
+        padding: 0.875rem 0.75rem;
+    }
+    
+    .form-input-wrapper .form-select-modern,
+    .form-control-modern {
+        padding: 8px 10px;
+        font-size: clamp(0.75rem, 3vw, 0.8rem);
+    }
+    
+    .modal-footer {
+        padding: 0.75rem 0.875rem;
+    }
+    
+    .detail-field {
+        padding: 0.625rem;
+    }
+    
+    .detail-value-content {
+        padding: 0.75rem;
+        min-height: 70px;
     }
 }

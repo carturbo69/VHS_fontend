@@ -199,7 +199,7 @@ namespace VHS_frontend.Services.Admin
 
         //      using var form = new MultipartFormDataContent();
 
-        //      // ⚠️ Phải trùng tên field với [FromForm] bên backend
+        //      // Phải trùng tên field với [FromForm] bên backend
         //      form.Add(new StringContent(conversationId.ToString()), "conversationId");
         //      form.Add(new StringContent(accountId.ToString()), "accountId");
 

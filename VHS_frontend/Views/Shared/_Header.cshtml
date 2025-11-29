@@ -29,8 +29,15 @@
                 <a class="brand-text" asp-area="" asp-controller="Home" asp-action="Index">Viet Home Service</a>
             </div>
 
+            <!-- Mobile menu toggle button -->
+            <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu" aria-expanded="false">
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+            </button>
+
             <!-- Desktop nav -->
-            <nav class="nav-links">
+            <nav class="nav-links" id="navLinks">
                 <a asp-area="" asp-controller="Home" asp-action="Index" 
                    class="nav-link @(currentController == "Home" && currentAction == "Index" && string.IsNullOrEmpty(currentArea) ? "active" : "")">
                     Trang chủ
@@ -76,62 +83,99 @@
 
                 @if (isLoggedIn)
                 {
-                    <!-- Notifications -->
-                    <a asp-area="Customer" asp-controller="Notification" asp-action="Index"
-                       id="notificationBtn" class="icon-btn" aria-label="Thông báo">
-                        <i class="bi bi-bell"></i>
-                        <span id="notificationBadge"
-                              class="notification-badge"
-                              style="display:none">0</span>
-                        <ul id="notificationMenu"
-                            class="notification-menu list-unstyled bg-white border shadow p-2"
-                            style="display:none">
-                            <li class="text-center text-muted py-2">Loading…</li>
-                        </ul>
-                    </a>
+                    <!-- Desktop: Individual icons -->
+                    <div class="nav-actions-desktop">
+                        <!-- Notifications -->
+                        <a asp-area="Customer" asp-controller="Notification" asp-action="Index"
+                           id="notificationBtn" class="icon-btn" aria-label="Thông báo">
+                            <i class="bi bi-bell"></i>
+                            <span id="notificationBadge"
+                                  class="notification-badge"
+                                  style="display:none">0</span>
+                            <ul id="notificationMenu"
+                                class="notification-menu list-unstyled bg-white border shadow p-2"
+                                style="display:none">
+                                <li class="text-center text-muted py-2">Loading…</li>
+                            </ul>
+                        </a>
 
-                    <!-- Chat -->
-                    <a asp-area="Customer" asp-controller="ChatCustomer" asp-action="Index"
-                       class="icon-btn chat-btn" aria-label="Chat">
-                        <i id="chatIcon" class="bi bi-chat-dots-fill"></i>
+                        <!-- Chat -->
+                        <a asp-area="Customer" asp-controller="ChatCustomer" asp-action="Index"
+                           class="icon-btn chat-btn" aria-label="Chat">
+                            <i id="chatIcon" class="bi bi-chat-dots-fill"></i>
+                            <span id="chatUnreadBadge"
+                                  class="chat-badge"
+                                  data-chat-count
+                                  style="display:none">
+                                0
+                            </span>
+                        </a>
 
-                        <!-- Badge tin nhắn chưa đọc (layout sẽ cập nhật) -->
-                        <span id="chatUnreadBadge"
-                              class="chat-badge"
-                              data-chat-count
-                              style="display:none">
-                            0
-                        </span>
-                    </a>
+                        <!-- Cart -->
+                        <a asp-area="Customer" asp-controller="Cart" asp-action="Index"
+                           class="icon-btn cart-btn" aria-label="Giỏ hàng">
+                            <svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 6h15l-1.5 9h-12z" />
+                                <circle cx="9" cy="20" r="1.5" />
+                                <circle cx="18" cy="20" r="1.5" />
+                            </svg>
+                            <span class="cart-badge" data-cart-count>0</span>
+                        </a>
 
-                    <!-- Cart -->
-                    <a asp-area="Customer" asp-controller="Cart" asp-action="Index"
-                       class="icon-btn cart-btn" aria-label="Giỏ hàng">
-                        <svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M6 6h15l-1.5 9h-12z" />
-                            <circle cx="9" cy="20" r="1.5" />
-                            <circle cx="18" cy="20" r="1.5" />
-                        </svg>
-                        <span class="cart-badge" data-cart-count>0</span>
-                    </a>
-
-
-                    <!-- Settings dropdown (Theme + Translate) -->
-                    <div class="settings-dropdown">
-                        <button type="button" class="icon-btn settings-btn" id="settingsBtn" aria-label="Cài đặt">
-                            <i class="bi bi-gear-fill"></i>
-                        </button>
-                        <div class="settings-menu" id="settingsMenu" style="display: none;">
-                            <!-- Theme toggle -->
-                            <button type="button" class="settings-item" onclick="window.__toggleTheme()" aria-label="Đổi giao diện">
-                                <span class="theme-icon"></span>
-                                <span class="settings-text">Chế độ sáng tối</span>
+                        <!-- Settings dropdown (Theme + Translate) -->
+                        <div class="settings-dropdown">
+                            <button type="button" class="icon-btn settings-btn" id="settingsBtn" aria-label="Cài đặt">
+                                <i class="bi bi-gear-fill"></i>
                             </button>
-                            <!-- Translate toggle -->
-                            <button type="button" class="settings-item" id="translateToggleBtn" aria-label="Dịch">
-                                <i class="bi bi-translate"></i>
-                                <span class="settings-text">Tiếng Anh / Tiếng Việt</span>
+                            <div class="settings-menu" id="settingsMenu" style="display: none;">
+                                <!-- Theme toggle -->
+                                <button type="button" class="settings-item" onclick="window.__toggleTheme()" aria-label="Đổi giao diện">
+                                    <span class="theme-icon"></span>
+                                    <span class="settings-text">Chế độ sáng tối</span>
+                                </button>
+                                <!-- Translate toggle -->
+                                <button type="button" class="settings-item" id="translateToggleBtn" aria-label="Dịch">
+                                    <i class="bi bi-translate"></i>
+                                    <span class="settings-text">Tiếng Anh / Tiếng Việt</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mobile: More menu (gom các icons) -->
+                    <div class="nav-actions-mobile">
+                        <div class="more-menu-dropdown">
+                            <button type="button" class="icon-btn more-menu-btn" id="moreMenuBtn" aria-label="Thêm">
+                                <i class="bi bi-three-dots-vertical"></i>
+                                <!-- Badge tổng hợp -->
+                                <span class="more-menu-badge" id="moreMenuBadge" style="display:none">0</span>
                             </button>
+                            <div class="more-menu" id="moreMenu" style="display: none;">
+                                <a asp-area="Customer" asp-controller="Notification" asp-action="Index" class="more-menu-item">
+                                    <i class="bi bi-bell"></i>
+                                    <span>Thông báo</span>
+                                    <span id="mobileNotificationBadge" class="more-menu-badge-item" style="display:none">0</span>
+                                </a>
+                                <a asp-area="Customer" asp-controller="ChatCustomer" asp-action="Index" class="more-menu-item">
+                                    <i class="bi bi-chat-dots-fill"></i>
+                                    <span>Tin nhắn</span>
+                                    <span id="mobileChatBadge" class="more-menu-badge-item" style="display:none">0</span>
+                                </a>
+                                <a asp-area="Customer" asp-controller="Cart" asp-action="Index" class="more-menu-item">
+                                    <i class="bi bi-cart"></i>
+                                    <span>Giỏ hàng</span>
+                                    <span id="mobileCartBadge" class="more-menu-badge-item" style="display:none">0</span>
+                                </a>
+                                <div class="more-menu-divider"></div>
+                                <button type="button" class="more-menu-item" onclick="window.__toggleTheme()">
+                                    <i class="bi bi-moon-stars"></i>
+                                    <span>Chế độ sáng tối</span>
+                                </button>
+                                <button type="button" class="more-menu-item" id="mobileTranslateToggleBtn">
+                                    <i class="bi bi-translate"></i>
+                                    <span>Tiếng Anh / Tiếng Việt</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -157,33 +201,61 @@
                 }
                 else
                 {
-                    <!-- Nếu chưa đăng nhập -->
-                    <a asp-area="Customer" asp-controller="Cart" asp-action="Index"
-                       class="icon-btn cart-btn" aria-label="Giỏ hàng">
-                        <svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M6 6h15l-1.5 9h-12z" />
-                            <circle cx="9" cy="20" r="1.5" />
-                            <circle cx="18" cy="20" r="1.5" />
-                        </svg>
-                        <span class="cart-badge" data-cart-count>0</span>
-                    </a>
+                    <!-- Desktop: Individual icons -->
+                    <div class="nav-actions-desktop">
+                        <!-- Nếu chưa đăng nhập -->
+                        <a asp-area="Customer" asp-controller="Cart" asp-action="Index"
+                           class="icon-btn cart-btn" aria-label="Giỏ hàng">
+                            <svg class="cart-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 6h15l-1.5 9h-12z" />
+                                <circle cx="9" cy="20" r="1.5" />
+                                <circle cx="18" cy="20" r="1.5" />
+                            </svg>
+                            <span class="cart-badge" data-cart-count>0</span>
+                        </a>
 
-                    <!-- Settings dropdown (Theme + Translate) -->
-                    <div class="settings-dropdown">
-                        <button type="button" class="icon-btn settings-btn" id="settingsBtn" aria-label="Cài đặt">
-                            <i class="bi bi-gear-fill"></i>
-                        </button>
-                        <div class="settings-menu" id="settingsMenu" style="display: none;">
-                            <!-- Theme toggle -->
-                            <button type="button" class="settings-item" onclick="window.__toggleTheme()" aria-label="Đổi giao diện">
-                                <span class="theme-icon"></span>
-                                <span class="settings-text">Chế độ sáng tối</span>
+                        <!-- Settings dropdown (Theme + Translate) -->
+                        <div class="settings-dropdown">
+                            <button type="button" class="icon-btn settings-btn" id="settingsBtn" aria-label="Cài đặt">
+                                <i class="bi bi-gear-fill"></i>
                             </button>
-                            <!-- Translate toggle -->
-                            <button type="button" class="settings-item" id="translateToggleBtn" aria-label="Dịch">
-                                <i class="bi bi-translate"></i>
-                                <span class="settings-text">Tiếng Anh / Tiếng Việt</span>
+                            <div class="settings-menu" id="settingsMenu" style="display: none;">
+                                <!-- Theme toggle -->
+                                <button type="button" class="settings-item" onclick="window.__toggleTheme()" aria-label="Đổi giao diện">
+                                    <span class="theme-icon"></span>
+                                    <span class="settings-text">Chế độ sáng tối</span>
+                                </button>
+                                <!-- Translate toggle -->
+                                <button type="button" class="settings-item" id="translateToggleBtn" aria-label="Dịch">
+                                    <i class="bi bi-translate"></i>
+                                    <span class="settings-text">Tiếng Anh / Tiếng Việt</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mobile: More menu -->
+                    <div class="nav-actions-mobile">
+                        <div class="more-menu-dropdown">
+                            <button type="button" class="icon-btn more-menu-btn" id="moreMenuBtn" aria-label="Thêm">
+                                <i class="bi bi-three-dots-vertical"></i>
                             </button>
+                            <div class="more-menu" id="moreMenu" style="display: none;">
+                                <a asp-area="Customer" asp-controller="Cart" asp-action="Index" class="more-menu-item">
+                                    <i class="bi bi-cart"></i>
+                                    <span>Giỏ hàng</span>
+                                    <span id="mobileCartBadge" class="more-menu-badge-item" style="display:none">0</span>
+                                </a>
+                                <div class="more-menu-divider"></div>
+                                <button type="button" class="more-menu-item" onclick="window.__toggleTheme()">
+                                    <i class="bi bi-moon-stars"></i>
+                                    <span>Chế độ sáng tối</span>
+                                </button>
+                                <button type="button" class="more-menu-item" id="mobileTranslateToggleBtn">
+                                    <i class="bi bi-translate"></i>
+                                    <span>Tiếng Anh / Tiếng Việt</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -247,17 +319,17 @@
         // 👉 Tự động refresh mỗi 30 giây (30000 ms)
         setInterval(updateCartCount, 30000);
 
-        // 👉 FIX: Force chat icon visibility and color
+        // 👉 FIX: Force chat icon visibility and color - LUÔN MÀU TRẮNG
         const chatIcon = document.getElementById('chatIcon');
         const chatBtn = document.querySelector('.chat-btn');
         
         if (chatIcon) {
-            // Function to apply chat icon styles
+            // Function to apply chat icon styles - LUÔN MÀU TRẮNG
             function applyChatIconStyles() {
-                const isDark = document.documentElement.classList.contains('dark');
-                const color = isDark ? '#ffffff' : '#2f2f2f';
+                // Luôn dùng màu trắng vì nền header là xanh
+                const color = '#ffffff';
                 
-                // Fix icon itself
+                // Fix icon itself - LUÔN MÀU TRẮNG
                 chatIcon.style.setProperty('color', color, 'important');
                 chatIcon.style.setProperty('opacity', '1', 'important');
                 chatIcon.style.setProperty('visibility', 'visible', 'important');
@@ -266,6 +338,7 @@
                 chatIcon.style.setProperty('font-size', '1rem', 'important');
                 chatIcon.style.setProperty('width', 'auto', 'important');
                 chatIcon.style.setProperty('height', 'auto', 'important');
+                chatIcon.style.setProperty('text-shadow', '0 1px 3px rgba(0, 0, 0, 0.3)', 'important');
                 
                 // Fix chat button container
                 if (chatBtn) {
@@ -296,6 +369,11 @@
             setTimeout(() => {
                 applyChatIconStyles();
             }, 100);
+            
+            // Re-apply multiple times to ensure it sticks
+            setTimeout(() => {
+                applyChatIconStyles();
+            }, 500);
         }
     });
 
@@ -327,6 +405,172 @@
                         settingsMenu.style.display = 'none';
                     }, 200);
                 }
+            });
+        }
+    })();
+
+    // Mobile menu toggle
+    (function() {
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const navLinks = document.getElementById('navLinks');
+        
+        if (mobileMenuToggle && navLinks) {
+            console.log('Mobile menu toggle initialized');
+            
+            mobileMenuToggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                const isOpen = navLinks.classList.contains('mobile-open');
+                console.log('Menu toggle clicked, isOpen:', isOpen);
+                
+                if (isOpen) {
+                    navLinks.classList.remove('mobile-open');
+                    mobileMenuToggle.classList.remove('active');
+                    mobileMenuToggle.setAttribute('aria-expanded', 'false');
+                    navLinks.style.display = 'none';
+                } else {
+                    navLinks.style.display = 'block';
+                    // Force reflow
+                    navLinks.offsetHeight;
+                    navLinks.classList.add('mobile-open');
+                    mobileMenuToggle.classList.add('active');
+                    mobileMenuToggle.setAttribute('aria-expanded', 'true');
+                }
+            });
+            
+            // Đóng menu khi click bên ngoài
+            document.addEventListener('click', function(e) {
+                if (navLinks && mobileMenuToggle && 
+                    !mobileMenuToggle.contains(e.target) && 
+                    !navLinks.contains(e.target)) {
+                    navLinks.classList.remove('mobile-open');
+                    mobileMenuToggle.classList.remove('active');
+                    mobileMenuToggle.setAttribute('aria-expanded', 'false');
+                    if (window.innerWidth <= 767) {
+                        navLinks.style.display = 'none';
+                    }
+                }
+            });
+            
+            // Đóng menu khi click vào nav link
+            if (navLinks) {
+                navLinks.addEventListener('click', function(e) {
+                    if (e.target.closest('.nav-link')) {
+                        setTimeout(() => {
+                            navLinks.classList.remove('mobile-open');
+                            mobileMenuToggle.classList.remove('active');
+                            mobileMenuToggle.setAttribute('aria-expanded', 'false');
+                            if (window.innerWidth <= 767) {
+                                navLinks.style.display = 'none';
+                            }
+                        }, 200);
+                    }
+                });
+            }
+        } else {
+            console.warn('Mobile menu elements not found:', { mobileMenuToggle, navLinks });
+        }
+    })();
+
+    // More menu toggle (mobile)
+    (function() {
+        const moreMenuBtn = document.getElementById('moreMenuBtn');
+        const moreMenu = document.getElementById('moreMenu');
+        
+        if (moreMenuBtn && moreMenu) {
+            moreMenuBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const isOpen = moreMenu.style.display !== 'none';
+                moreMenu.style.display = isOpen ? 'none' : 'block';
+            });
+            
+            // Đóng menu khi click bên ngoài
+            document.addEventListener('click', function(e) {
+                if (!moreMenuBtn.contains(e.target) && !moreMenu.contains(e.target)) {
+                    moreMenu.style.display = 'none';
+                }
+            });
+            
+            // Đóng menu khi click vào item
+            moreMenu.addEventListener('click', function(e) {
+                if (e.target.closest('.more-menu-item')) {
+                    setTimeout(() => {
+                        moreMenu.style.display = 'none';
+                    }, 200);
+                }
+            });
+        }
+
+        // Đồng bộ badges giữa desktop và mobile
+        function syncBadges() {
+            // Notification badge
+            const desktopNotifBadge = document.getElementById('notificationBadge');
+            const mobileNotifBadge = document.getElementById('mobileNotificationBadge');
+            if (desktopNotifBadge && mobileNotifBadge) {
+                const count = desktopNotifBadge.textContent || '0';
+                mobileNotifBadge.textContent = count;
+                mobileNotifBadge.style.display = count > 0 && desktopNotifBadge.style.display !== 'none' ? 'inline-flex' : 'none';
+            }
+
+            // Chat badge
+            const desktopChatBadge = document.getElementById('chatUnreadBadge');
+            const mobileChatBadge = document.getElementById('mobileChatBadge');
+            if (desktopChatBadge && mobileChatBadge) {
+                const count = desktopChatBadge.textContent || '0';
+                mobileChatBadge.textContent = count;
+                mobileChatBadge.style.display = count > 0 && desktopChatBadge.style.display !== 'none' ? 'inline-flex' : 'none';
+            }
+
+            // Cart badge
+            const desktopCartBadge = document.querySelector('.cart-badge[data-cart-count]');
+            const mobileCartBadge = document.getElementById('mobileCartBadge');
+            if (desktopCartBadge && mobileCartBadge) {
+                const count = desktopCartBadge.textContent || '0';
+                mobileCartBadge.textContent = count;
+                mobileCartBadge.style.display = count > 0 ? 'inline-flex' : 'none';
+            }
+
+            // More menu badge tổng hợp
+            const moreMenuBadge = document.getElementById('moreMenuBadge');
+            if (moreMenuBadge) {
+                const notifCount = parseInt(desktopNotifBadge?.textContent || '0');
+                const chatCount = parseInt(desktopChatBadge?.textContent || '0');
+                const cartCount = parseInt(desktopCartBadge?.textContent || '0');
+                const total = notifCount + chatCount + cartCount;
+                if (total > 0) {
+                    moreMenuBadge.textContent = total > 9 ? '9+' : total;
+                    moreMenuBadge.style.display = 'inline-flex';
+                } else {
+                    moreMenuBadge.style.display = 'none';
+                }
+            }
+        }
+
+        // Sync badges khi load và mỗi 2 giây
+        document.addEventListener('DOMContentLoaded', () => {
+            syncBadges();
+            setInterval(syncBadges, 2000);
+        });
+
+        // Sync khi badges thay đổi
+        const observer = new MutationObserver(syncBadges);
+        const badgeElements = [
+            document.getElementById('notificationBadge'),
+            document.getElementById('chatUnreadBadge'),
+            document.querySelector('.cart-badge[data-cart-count]')
+        ].filter(Boolean);
+        badgeElements.forEach(el => observer.observe(el, { childList: true, attributes: true, attributeFilter: ['style'] }));
+    })();
+
+    // Mobile translate toggle
+    (function() {
+        const mobileTranslateBtn = document.getElementById('mobileTranslateToggleBtn');
+        const desktopTranslateBtn = document.getElementById('translateToggleBtn');
+        
+        if (mobileTranslateBtn && desktopTranslateBtn) {
+            mobileTranslateBtn.addEventListener('click', function() {
+                desktopTranslateBtn.click();
             });
         }
     })();

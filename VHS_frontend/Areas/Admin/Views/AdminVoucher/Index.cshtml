@@ -219,8 +219,10 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Mã (Code)</label>
-                        <input type="text" id="vCode" class="form-control mono" maxlength="64" required />
-                        <div class="invalid-feedback">Vui lòng nhập mã hợp lệ.</div>
+                        <div class="form-input-wrapper">
+                            <input type="text" id="vCode" class="form-control mono" maxlength="64" required />
+                            <div class="invalid-feedback">Vui lòng nhập mã hợp lệ.</div>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Trạng thái</label>
@@ -231,39 +233,55 @@
                     </div>
 
                     <div class="col-12">
-                        <label class="form-label">Mô tả</label>
-                        <textarea id="vDesc" class="form-control" rows="2" maxlength="512"></textarea>
+                        <label class="form-label">Mô tả <span class="text-danger">*</span></label>
+                        <div class="form-input-wrapper">
+                            <textarea id="vDesc" class="form-control" rows="2" maxlength="512" required></textarea>
+                            <div class="invalid-feedback">Vui lòng nhập mô tả.</div>
+                        </div>
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">Giảm (%)</label>
-                        <input type="number" id="vPercent" step="0.01" min="0" max="100" class="form-control" />
+                        <label class="form-label">Giảm (%) <span class="text-danger">*</span></label>
+                        <div class="form-input-wrapper">
+                            <input type="number" id="vPercent" step="0.01" min="0" max="100" class="form-control" required />
+                            <div class="invalid-feedback">Phần trăm giảm phải trong khoảng 0–100.</div>
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Giảm tối đa</label>
-                        <input type="number" id="vMax" step="0.01" min="0" class="form-control" />
-                    </div>
-
-                    <div class="col-md-6">
-                        <label class="form-label">Bắt đầu</label>
-                        <input type="date" id="vStart" class="form-control" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Kết thúc</label>
-                        <input type="date" id="vEnd" class="form-control" />
+                        <label class="form-label">Giảm tối đa <span class="text-danger">*</span></label>
+                        <div class="form-input-wrapper">
+                            <input type="number" id="vMax" step="0.01" min="10000" max="100000000" class="form-control" required />
+                            <div class="invalid-feedback">Số tiền giảm tối đa phải từ 10.000 đến 100.000.000 VNĐ.</div>
+                        </div>
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">Giới hạn dùng</label>
-                        <input type="number" id="vLimit" class="form-control" min="0" />
+                        <label class="form-label">Bắt đầu <span class="text-danger">*</span></label>
+                        <div class="form-input-wrapper">
+                            <input type="date" id="vStart" class="form-control" required />
+                            <div class="invalid-feedback">Vui lòng chọn ngày bắt đầu. Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Kết thúc <span class="text-danger">*</span></label>
+                        <div class="form-input-wrapper">
+                            <input type="date" id="vEnd" class="form-control" required />
+                            <div class="invalid-feedback">Vui lòng chọn ngày kết thúc. Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.</div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Giới hạn dùng <span class="text-danger">*</span></label>
+                        <div class="form-input-wrapper">
+                            <input type="number" id="vLimit" class="form-control" min="0" required />
+                            <div class="invalid-feedback">Giới hạn sử dụng phải lớn hơn hoặc bằng 0.</div>
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Đã dùng</label>
                         <input type="number" id="vUsed" class="form-control" min="0" disabled value="0" />
                     </div>
                 </div>
-
-                <div id="vError" class="text-danger small mt-2"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Đóng</button>
@@ -548,21 +566,36 @@
         const vLimit   = document.getElementById('vLimit');
         const vUsed    = document.getElementById('vUsed');
         const vActive  = document.getElementById('vActive');
-        const vError   = document.getElementById('vError');
 
         // ===== Helpers =====
-        function clearError(){
-          if (!vError) return;
-          vError.textContent = '';
-          vError.hidden = true;
+        function validateField(field, min, max, errorMsg) {
+          const value = field.value.trim();
+          if (value === '') {
+            // Nếu field có required, để submit handler xử lý
+            if (field.hasAttribute('required')) {
+              return false;
+            }
+            field.classList.remove('is-invalid');
+            return true;
+          }
+          const num = Number(value);
+          if (isNaN(num)) {
+            field.classList.add('is-invalid');
+            return false;
+          }
+          if (min !== null && num < min) {
+            field.classList.add('is-invalid');
+            return false;
+          }
+          if (max !== null && num > max) {
+            field.classList.add('is-invalid');
+            return false;
+          }
+          field.classList.remove('is-invalid');
+          return true;
         }
-        function showError(msg){
-          if (!vError) { alert(msg); return; }
-          vError.textContent = msg || 'Có lỗi xảy ra.';
-          vError.hidden = false;
-          vError.classList.remove('shake');
-          void vError.offsetWidth; // reflow to retrigger animation
-          vError.classList.add('shake');
+        function clearFieldError(field) {
+          field.classList.remove('is-invalid');
         }
         async function readJsonMessage(res){
           let msg = '';
@@ -583,11 +616,144 @@
           vStart.value=''; vEnd.value='';
           vLimit.value=''; vUsed.value='0';
           vActive.value='true';
-          vCode.classList.remove('is-invalid');
-          clearError();
+          // Clear all invalid states
+          [vCode, vDesc, vPercent, vMax, vLimit, vStart, vEnd].forEach(f => clearFieldError(f));
           vModal.show();
         });
-        vCode.addEventListener('input', ()=> { if (vCode.value.trim()) vCode.classList.remove('is-invalid'); });
+        vCode.addEventListener('input', ()=> { if (vCode.value.trim()) clearFieldError(vCode); });
+        
+        // ===== Real-time validation for date fields =====
+        vStart.addEventListener('change', () => {
+          if (vStart.value && vEnd.value) {
+            if (vStart.value > vEnd.value) {
+              vStart.classList.add('is-invalid');
+              vEnd.classList.add('is-invalid');
+            } else {
+              vStart.classList.remove('is-invalid');
+              vEnd.classList.remove('is-invalid');
+            }
+          } else {
+            vStart.classList.remove('is-invalid');
+          }
+        });
+        
+        vEnd.addEventListener('change', () => {
+          if (vStart.value && vEnd.value) {
+            if (vStart.value > vEnd.value) {
+              vStart.classList.add('is-invalid');
+              vEnd.classList.add('is-invalid');
+            } else {
+              vStart.classList.remove('is-invalid');
+              vEnd.classList.remove('is-invalid');
+            }
+          } else {
+            vEnd.classList.remove('is-invalid');
+          }
+        });
+
+        // ===== Real-time validation for number fields =====
+        // Prevent negative values and values outside range
+        vPercent.addEventListener('keydown', (e) => {
+          // Allow: backspace, delete, tab, escape, enter, decimal point
+          if ([46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
+            // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+            (e.keyCode === 65 && e.ctrlKey === true) ||
+            (e.keyCode === 67 && e.ctrlKey === true) ||
+            (e.keyCode === 86 && e.ctrlKey === true) ||
+            (e.keyCode === 88 && e.ctrlKey === true) ||
+            // Allow: home, end, left, right
+            (e.keyCode >= 35 && e.keyCode <= 39)) {
+            return;
+          }
+          // Ensure that it is a number and stop the keypress
+          if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+            e.preventDefault();
+          }
+        });
+        vPercent.addEventListener('input', () => {
+          // Chỉ tự động sửa số âm, không sửa số > 100 (để báo lỗi)
+          let val = vPercent.value;
+          if (val !== '') {
+            const num = Number(val);
+            if (!isNaN(num) && num < 0) {
+              vPercent.value = '0';
+              val = '0';
+            }
+          }
+          validateField(vPercent, 0, 100);
+        });
+        vPercent.addEventListener('blur', () => {
+          // Chỉ tự động sửa số âm, không sửa số > 100 (để báo lỗi)
+          if (vPercent.value !== '') {
+            const val = Number(vPercent.value);
+            if (!isNaN(val) && val < 0) {
+              vPercent.value = '0';
+            }
+          }
+          validateField(vPercent, 0, 100);
+        });
+        
+        vMax.addEventListener('keydown', (e) => {
+          // Allow: backspace, delete, tab, escape, enter, decimal point
+          if ([46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
+            (e.keyCode === 65 && e.ctrlKey === true) ||
+            (e.keyCode === 67 && e.ctrlKey === true) ||
+            (e.keyCode === 86 && e.ctrlKey === true) ||
+            (e.keyCode === 88 && e.ctrlKey === true) ||
+            (e.keyCode >= 35 && e.keyCode <= 39)) {
+            return;
+          }
+          // Prevent minus sign and ensure it is a number
+          if (e.keyCode === 189 || e.keyCode === 109 || // minus key
+            ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105))) {
+            e.preventDefault();
+          }
+        });
+        vMax.addEventListener('input', () => {
+          // Chỉ báo lỗi, không tự động sửa
+          validateField(vMax, 10000, 100000000);
+        });
+        vMax.addEventListener('blur', () => {
+          // Chỉ báo lỗi, không tự động sửa
+          validateField(vMax, 10000, 100000000);
+        });
+        
+        vLimit.addEventListener('keydown', (e) => {
+          // Allow: backspace, delete, tab, escape, enter
+          if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+            (e.keyCode === 65 && e.ctrlKey === true) ||
+            (e.keyCode === 67 && e.ctrlKey === true) ||
+            (e.keyCode === 86 && e.ctrlKey === true) ||
+            (e.keyCode === 88 && e.ctrlKey === true) ||
+            (e.keyCode >= 35 && e.keyCode <= 39)) {
+            return;
+          }
+          // Prevent minus sign and ensure it is a number
+          if (e.keyCode === 189 || e.keyCode === 109 || // minus key
+            ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105))) {
+            e.preventDefault();
+          }
+        });
+        vLimit.addEventListener('input', () => {
+          let val = vLimit.value;
+          if (val !== '' && val !== '-') {
+            const num = Number(val);
+            if (!isNaN(num) && num < 0) {
+              vLimit.value = '0';
+              val = '0';
+            }
+          }
+          validateField(vLimit, 0, null);
+        });
+        vLimit.addEventListener('blur', () => {
+          if (vLimit.value !== '' && vLimit.value !== '-') {
+            const val = Number(vLimit.value);
+            if (!isNaN(val) && val < 0) {
+              vLimit.value = '0';
+            }
+          }
+          validateField(vLimit, 0, null);
+        });
 
         // ===== Bảng: edit/delete =====
         document.getElementById('tblVouchers').addEventListener('click', async (e)=>{
@@ -615,8 +781,8 @@
               vLimit.value = v.usageLimit ?? '';
               vUsed.value = v.usedCount ?? 0;
               vActive.value = (v.isActive === true) ? 'true' : 'false';
-              vCode.classList.remove('is-invalid');
-              clearError();
+              // Clear all invalid states
+              [vCode, vPercent, vMax, vLimit, vStart, vEnd].forEach(f => clearFieldError(f));
               vModal.show();
             }catch(_){
               showNotice('Không thể tải voucher để sửa.', 'error', 3000);
@@ -708,39 +874,136 @@
           });
         }
 
+        // ===== HTML5 Validation Handling - Tắt popup, chỉ dùng invalid-feedback =====
+        vForm.addEventListener('invalid', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const field = e.target;
+          if (field && field.tagName && (field.tagName === 'INPUT' || field.tagName === 'SELECT' || field.tagName === 'TEXTAREA')) {
+            field.classList.add('is-invalid');
+            // Scroll to first invalid field
+            setTimeout(() => {
+              field.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+          }
+        }, true);
+
+        // Prevent HTML5 validation popup - chỉ dùng invalid-feedback
+        vForm.setAttribute('novalidate', 'novalidate');
+        
+        // Handle HTML5 validation on input - real-time validation
+        vCode.addEventListener('invalid', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.classList.add('is-invalid');
+        });
+
+        vCode.addEventListener('input', function() {
+          if (this.value.trim()) {
+            this.classList.remove('is-invalid');
+          }
+        });
+        
+        // Validation cho mô tả
+        vDesc.addEventListener('input', function() {
+          if (this.value.trim()) {
+            this.classList.remove('is-invalid');
+          }
+        });
+
         // ===== Validate & Submit (Create/Update) =====
         document.getElementById('vForm').addEventListener('submit', async (e)=>{
           e.preventDefault();
-          clearError();
+          
+          // Clear all field errors first
+          [vCode, vDesc, vPercent, vMax, vLimit, vStart, vEnd].forEach(f => clearFieldError(f));
 
+          // Khởi tạo isValid = true
+          let isValid = true;
+
+          // Validate code - REQUIRED
           const code = vCode.value.trim();
-          if (!code){ vCode.classList.add('is-invalid'); return; }
-
-          if (vPercent.value !== '') {
-            const p = Number(vPercent.value);
-            if (isNaN(p) || p < 0 || p > 100) { showError('Phần trăm giảm phải trong khoảng 0–100.'); return; }
+          if (!code){ 
+            vCode.classList.add('is-invalid'); 
+            isValid = false;
           }
+
+          // Validate description - REQUIRED
+          const desc = vDesc.value.trim();
+          if (!desc) {
+            vDesc.classList.add('is-invalid');
+            isValid = false;
+          }
+
+          // Validate percentage - REQUIRED
+          if (!vPercent.value || vPercent.value.trim() === '') {
+            vPercent.classList.add('is-invalid');
+            isValid = false;
+          } else if (!validateField(vPercent, 0, 100)) {
+            isValid = false;
+          }
+          
+          // Validate max amount - REQUIRED, từ 10,000 đến 100 triệu
+          if (!vMax.value || vMax.value.trim() === '') {
+            vMax.classList.add('is-invalid');
+            isValid = false;
+          } else if (!validateField(vMax, 10000, 100000000)) {
+            isValid = false;
+          }
+          
+          // Validate start date - REQUIRED
+          if (!vStart.value || vStart.value.trim() === '') {
+            vStart.classList.add('is-invalid');
+            isValid = false;
+          }
+          
+          // Validate end date - REQUIRED
+          if (!vEnd.value || vEnd.value.trim() === '') {
+            vEnd.classList.add('is-invalid');
+            isValid = false;
+          }
+          
+          // Validate limit - REQUIRED
+          if (!vLimit.value || vLimit.value.trim() === '') {
+            vLimit.classList.add('is-invalid');
+            isValid = false;
+          } else if (!validateField(vLimit, 0, null)) {
+            isValid = false;
+          }
+          
+          // Validate date range - chỉ check nếu cả 2 đã có giá trị
           if (vStart.value && vEnd.value && vStart.value > vEnd.value) {
-            showError('Ngày bắt đầu phải trước ngày kết thúc.'); return;
+            vStart.classList.add('is-invalid');
+            vEnd.classList.add('is-invalid');
+            isValid = false;
           }
-          if (vLimit.value !== '') {
+          
+          // Validate limit vs used
+          if (vLimit.value) {
             const lim = Number(vLimit.value);
-            if (isNaN(lim) || lim < 0) { showError('Giới hạn sử dụng phải ≥ 0.'); return; }
             const used = vUsed.value === '' ? 0 : Number(vUsed.value);
-            if (used > lim) { showError('Đã dùng vượt quá giới hạn sử dụng.'); return; }
+            if (!isNaN(lim) && !isNaN(used) && used > lim) {
+              vLimit.classList.add('is-invalid');
+              isValid = false;
+            }
           }
-
-          // Ít nhất 1 trong 2: % hoặc MaxAmount > 0
-          const dp = vPercent.value ? Number(vPercent.value) : 0;
-          const dm = vMax.value ? Number(vMax.value) : 0;
-          if ((isNaN(dp) ? 0 : dp) <= 0 && (isNaN(dm) ? 0 : dm) <= 0) {
-            showError('Cần nhập Giảm % hoặc Số tiền tối đa (> 0).');
+          
+          if (!isValid) {
+            // Focus vào trường lỗi đầu tiên
+            const firstInvalid = document.querySelector('#vForm .is-invalid');
+            if (firstInvalid) {
+              setTimeout(() => {
+                firstInvalid.focus();
+                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }, 100);
+            }
             return;
           }
-
+          
+          // Nếu tất cả đều hợp lệ, cho phép submit
           const payload = {
-            code,
-            description: vDesc.value || null,
+            code: code,
+            description: desc || null,
             discountPercent: vPercent.value ? Number(vPercent.value) : null,
             discountMaxAmount: vMax.value ? Number(vMax.value) : null,
             startDate: vStart.value || null,
@@ -806,22 +1069,18 @@
               }
             }
 
-            // Lỗi → phân loại 409 / 400 / khác
+            // Lỗi → chỉ hiển thị toast, không dùng showError nữa
             const msg = await readJsonMessage(res);
             if (res.status === 409) {
-              showError(msg || 'Mã voucher đã tồn tại, vui lòng nhập mã khác.');
               showNotice(msg || 'Mã voucher đã tồn tại, vui lòng nhập mã khác.', 'error', 3000);
             } else if (res.status === 400) {
-              showError(msg || 'Dữ liệu không hợp lệ.');
               showNotice(msg || 'Dữ liệu không hợp lệ.', 'error', 3000);
             } else {
-              showError(msg);
-              showNotice(msg, 'error', 3000);
+              showNotice(msg || 'Có lỗi xảy ra. Vui lòng thử lại.', 'error', 3000);
             }
 
           } catch (err) {
             const errorMsg = 'Không thể gửi yêu cầu. Vui lòng thử lại.';
-            showError(errorMsg);
             showNotice(errorMsg, 'error', 3000);
           }
         });

@@ -75,7 +75,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
             Console.WriteLine($"[DEBUG] Calling API with ProviderId: {providerId}, Status: {status ?? "NULL"}");
             
-            // ✨ LẤY TẤT CẢ ĐƠN HÀNG ACTIVE (không filter) để đếm Pending và Confirmed
+            // LẤY TẤT CẢ ĐƠN HÀNG ACTIVE (không filter) để đếm Pending và Confirmed
             var allBookingsFilter = new BookingFilterDTO
             {
                 ProviderId = providerId,
@@ -89,7 +89,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             var allBookingsData = await _bookingService.GetBookingListAsync(allBookingsFilter);
             var allBookings = allBookingsData?.Items ?? new List<BookingListItemDTO>();
             
-            // ✨ ĐẾM PENDING VÀ CONFIRMED từ danh sách active
+            // ĐẾM PENDING VÀ CONFIRMED từ danh sách active
             ViewBag.MonthPending = allBookings.Count(b => 
                 b.Status?.Equals("Pending", StringComparison.OrdinalIgnoreCase) == true ||
                 b.Status?.Contains("chờ", StringComparison.OrdinalIgnoreCase) == true ||
@@ -98,8 +98,8 @@ namespace VHS_frontend.Areas.Provider.Controllers
             ViewBag.MonthConfirmed = allBookings.Count(b => 
                 b.Status?.Equals("Confirmed", StringComparison.OrdinalIgnoreCase) == true ||
                 b.Status?.Contains("xác nhận", StringComparison.OrdinalIgnoreCase) == true);
-            
-            // ✨ ĐẾM COMPLETED VÀ CANCELED - gọi API riêng vì có thể có IsDeleted=true
+           
+            // ĐẾM COMPLETED VÀ CANCELED - gọi API riêng vì có thể có IsDeleted=true
             var thisMonthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             var thisMonthEnd = thisMonthStart.AddMonths(1);
             
@@ -133,7 +133,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             
             Console.WriteLine($"[DEBUG] Statistics - Pending: {ViewBag.MonthPending}, Confirmed: {ViewBag.MonthConfirmed}, Completed: {ViewBag.MonthCompleted}, Canceled: {ViewBag.MonthCanceled}");
 
-            // ✨ LẤY DANH SÁCH ĐƠN HÀNG - với filter từ user
+            // LẤY DANH SÁCH ĐƠN HÀNG - với filter từ user
             var result = await _bookingService.GetBookingListAsync(filter);
             Console.WriteLine($"[DEBUG] API returned {result?.Items?.Count ?? 0} bookings, Total: {result?.TotalCount ?? 0}");
 
@@ -148,7 +148,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 };
             }
             
-            // ✨ NẾU KHÔNG CÓ FILTER STATUS, THÊM ĐƠN CANCELED VÀO DANH SÁCH (nếu có)
+            // NẾU KHÔNG CÓ FILTER STATUS, THÊM ĐƠN CANCELED VÀO DANH SÁCH (nếu có)
             // Vì đơn Canceled có thể có IsDeleted=true nên không hiện trong danh sách chính
             if (string.IsNullOrEmpty(status))
             {
@@ -214,7 +214,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 return RedirectToAction("Login", "Account", new { area = "" });
             }
 
-            // ✅ GỌI API ĐÚNG: Lấy riêng Completed và Canceled
+            // GỌI API ĐÚNG: Lấy riêng Completed và Canceled
             Console.WriteLine($"[History] Calling API with ProviderId: {providerId}, Status filter: {status ?? "ALL"}");
 
             List<BookingListItemDTO> allItems = new List<BookingListItemDTO>();
@@ -274,7 +274,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 PageSize = pageSize
             };
 
-            // ✨ THỐNG KÊ THÁNG NÀY CHO LỊCH SỬ - Gọi API riêng cho từng status
+            // THỐNG KÊ THÁNG NÀY CHO LỊCH SỬ - Gọi API riêng cho từng status
             var thisMonthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
             var thisMonthEnd = thisMonthStart.AddMonths(1);
             
@@ -336,8 +336,15 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 Console.WriteLine($"[DEBUG] Timeline count from API: {booking.Timeline?.Count ?? 0}");
                 Console.WriteLine($"[DEBUG] CheckerRecords count: {booking.CheckerRecords?.Count ?? 0}");
 
-                // ✨ Nếu Timeline rỗng, populate Timeline từ các thông tin có sẵn
-                if (booking.Timeline == null || !booking.Timeline.Any())
+                // Timeline đã được backend tạo sẵn trong ProviderBookingService.GetBookingDetailAsync
+                // Không cần tạo lại ở đây nữa
+                if (booking.Timeline == null)
+                {
+                    booking.Timeline = new List<TrackingEventDTO>();
+                }
+                
+                // ✨ Fallback: Nếu timeline rỗng (không nên xảy ra), tạo timeline cơ bản
+                if (!booking.Timeline.Any())
                 {
                     Console.WriteLine($"[DEBUG] Populating Timeline from booking data");
                     booking.Timeline = new List<TrackingEventDTO>();
@@ -377,7 +384,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                             // Normalize: thay thế underscore và các ký tự đặc biệt
                             var normalized = forStatus.Replace("_", " ").Replace("-", " ").Trim();
                             
-                            // ✅ CHECK OUT phải được check TRƯỚC CHECK IN để tránh match nhầm
+                            // CHECK OUT phải được check TRƯỚC CHECK IN để tránh match nhầm
                             // Vì "CHECKOUT" chứa cả "CHECK" và "OUT", nếu check CHECK IN trước sẽ match nhầm
                             if (normalized == "CHECKOUT" || normalized == "CHECK OUT" ||
                                 normalized.StartsWith("CHECKOUT") || normalized.StartsWith("CHECK OUT") ||
@@ -386,7 +393,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                                 code = "CHECK OUT";
                                 title = "Check Out";
                             }
-                            // ✅ CHECK IN: check sau CHECK OUT
+                            // CHECK IN: check sau CHECK OUT
                             else if (normalized == "CHECKIN" || normalized == "CHECK IN" ||
                                      normalized.StartsWith("CHECKIN") || normalized.StartsWith("CHECK IN") ||
                                      (normalized.Contains("CHECK") && normalized.Contains("IN") && !normalized.Contains("OUT")))
@@ -679,8 +686,8 @@ namespace VHS_frontend.Areas.Provider.Controllers
     {
         public Guid BookingId { get; set; }
         public string NewStatus { get; set; } = string.Empty;
-        public string? Reason { get; set; }  // ✨ LÝ DO HỦY ĐƠN
-        public Guid? SelectedStaffId { get; set; }  // ✨ StaffId đã chọn trước khi xác nhận
+        public string? Reason { get; set; }  //  LÝ DO HỦY ĐƠN
+        public Guid? SelectedStaffId { get; set; }  //  StaffId đã chọn trước khi xác nhận
     }
 
     public class AssignStaffRequest

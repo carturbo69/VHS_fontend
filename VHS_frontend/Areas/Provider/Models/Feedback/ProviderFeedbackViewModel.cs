@@ -8,9 +8,9 @@ namespace VHS_frontend.Areas.Provider.Models.Feedback
 
     public class ServiceFeedbackGroup
     {
-        public Guid ServiceId { get; set; }               // Guid ?? kh?p BE
+        public Guid ServiceId { get; set; }            
         public string ServiceName { get; set; } = string.Empty;
-        public string ServiceIcon { get; set; } = string.Empty; // URL tuy?t ??i t? API
+        public string ServiceIcon { get; set; } = string.Empty; 
         public double AverageRating { get; set; }
         public int TotalFeedbacks { get; set; }
         public List<CustomerFeedback> Feedbacks { get; set; } = new();
@@ -18,18 +18,14 @@ namespace VHS_frontend.Areas.Provider.Models.Feedback
 
     public class CustomerFeedback
     {
-        public Guid ReviewId { get; set; }                // Guid ?? kh?p BE
+        public Guid ReviewId { get; set; }       
         public string CustomerName { get; set; } = string.Empty;
-        public string CustomerAvatar { get; set; } = string.Empty; // URL tuy?t ??i t? API
+        public string CustomerAvatar { get; set; } = string.Empty;
         public int Rating { get; set; }
         public string Comment { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public bool IsVerified { get; set; }
-
-        // BE tr? List<string> url ?nh => gi? nguyên ?? kh?i ph?i map
         public List<string> Images { get; set; } = new();
-
-        // BE tr? reply là string? => gi? nguyên ?? kh?i ph?i map
         public string? Reply { get; set; }
     }
 

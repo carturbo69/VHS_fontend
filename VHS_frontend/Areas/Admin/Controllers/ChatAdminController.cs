@@ -138,7 +138,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
             await _chatService.ClearForMeAsync(
                 conversationId: id,
                 accountId: myId,
-                hide: hide,              // <— giờ luôn nhận true từ form
+                hide: hide,              //  giờ luôn nhận true từ form
                 jwtToken: jwt,
                 ct: ct
             );
@@ -155,7 +155,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         //Guid conversationId,
         //string? body,
         //IFormFile? image,
-        //Guid? replyToMessageId,            // 👈 thêm tham số này để nhận từ form
+        //Guid? replyToMessageId,            //  thêm tham số này để nhận từ form
         //CancellationToken ct)
         //   {
         //       if (RedirectIfNoAccountId(out var myId) is IActionResult goLogin) return goLogin;
@@ -164,10 +164,10 @@ namespace VHS_frontend.Areas.Admin.Controllers
 
         //       await _chatService.SendMessageAsync(
         //           conversationId: conversationId,
-        //           accountId: myId,               // 👈 đổi tên tham số cho khớp service mới
+        //           accountId: myId,               // đổi tên tham số cho khớp service mới
         //           body: body,
         //           image: image,
-        //           replyToMessageId: replyToMessageId, // 👈 truyền xuống backend
+        //           replyToMessageId: replyToMessageId, // truyền xuống backend
         //           jwtToken: jwt,
         //           ct: ct
         //       );

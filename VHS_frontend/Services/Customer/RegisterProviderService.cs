@@ -71,7 +71,7 @@ namespace VHS_frontend.Services.Customer
             var phoneNumber = Get("PhoneNumber").Trim();
             var description = Get("Description");
 
-            // ✅ Send PascalCase to match Backend expectations
+            // Send PascalCase to match Backend expectations
             content.Add(new StringContent(providerName), "ProviderName");
             if (!string.IsNullOrWhiteSpace(phoneNumber))
                 content.Add(new StringContent(phoneNumber), "PhoneNumber");
@@ -110,7 +110,7 @@ namespace VHS_frontend.Services.Customer
                 if (!string.IsNullOrEmpty(cat))
                     content.Add(new StringContent(cat), $"Certificates[{i}].CategoryId");
 
-                // ✅ TagIds - send multiple values with SAME KEY (no index) for ASP.NET Core to bind as List
+                // TagIds - send multiple values with SAME KEY (no index) for ASP.NET Core to bind as List
                 var tagIdsKey = $"Certificates[{i}].TagIds";
                 var tagIds = request.Form[tagIdsKey].Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
                 foreach (var tagId in tagIds)
@@ -118,10 +118,10 @@ namespace VHS_frontend.Services.Customer
                     content.Add(new StringContent(tagId), $"Certificates[{i}].TagIds");
                 }
 
-                // ✅ KHÔNG GỬI Description - field này không dùng nữa
+                // KHÔNG GỬI Description - field này không dùng nữa
                 // Backend sẽ set Description = null hoặc empty
 
-                // ✅ BusinessLicenses files
+                // BusinessLicenses files
                 var files = request.Form.Files.GetFiles($"Certificates[{i}].BusinessLicenses");
                 foreach (var f in files)
                 {

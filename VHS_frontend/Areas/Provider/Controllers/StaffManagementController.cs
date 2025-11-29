@@ -474,7 +474,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
         }
 
-        // 🔒 Khóa tài khoản Staff
+        // Khóa tài khoản Staff
         [HttpPost("{id}/lock")]
         [Route("Provider/StaffManagement/{id}/lock")]
         public async Task<IActionResult> LockStaff(string id)
@@ -555,7 +555,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
         }
 
-        // 🔓 Mở khóa tài khoản Staff
+        // Mở khóa tài khoản Staff
         [HttpPost("{id}/unlock")]
         [Route("Provider/StaffManagement/{id}/unlock")]
         public async Task<IActionResult> UnlockStaff(string id)
@@ -636,7 +636,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
         }
 
-        // ✨ MỚI: Xem chi tiết nhân viên và lịch làm việc tuần
+        // MỚI: Xem chi tiết nhân viên và lịch làm việc tuần
         [HttpGet]
         [Route("Provider/StaffManagement/Details/{id}")]
         public async Task<IActionResult> Details(string id, [FromQuery] DateTime? weekStart)
@@ -688,7 +688,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
         }
 
-        // 🔑 Cập nhật mật khẩu cho Staff
+        // Cập nhật mật khẩu cho Staff
         [HttpPost("{id}/update-password")]
         [Route("Provider/StaffManagement/{id}/update-password")]
         public async Task<IActionResult> UpdatePassword(string id, [FromBody] StaffUpdatePasswordDTO model)

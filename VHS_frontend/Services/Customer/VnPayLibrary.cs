@@ -30,7 +30,7 @@ namespace VHS_frontend.Services.Customer
                 collection.FirstOrDefault(k => k.Key == "vnp_SecureHash").Value; //hash của dữ liệu trả về
             var orderInfo = vnPay.GetResponseData("vnp_OrderInfo");
             
-            // ✅ Lấy vnp_Amount từ response (VNPay trả về theo xu, cần chia cho 100)
+            // Lấy vnp_Amount từ response (VNPay trả về theo xu, cần chia cho 100)
             var vnpAmountStr = vnPay.GetResponseData("vnp_Amount");
             decimal amount = 0m;
             if (!string.IsNullOrWhiteSpace(vnpAmountStr) && long.TryParse(vnpAmountStr, out var amountInXu))
@@ -50,10 +50,10 @@ namespace VHS_frontend.Services.Customer
                     Amount = amount
                 };
 
-            // ✅ Kiểm tra response code: chỉ "00" mới là thành công
+            // Kiểm tra response code: chỉ "00" mới là thành công
             bool isSuccess = vnpResponseCode == "00";
 
-            // 🐛 Debug log
+            // Debug log
             System.Diagnostics.Debug.WriteLine($"[VNPay] Response Code: {vnpResponseCode}, Success: {isSuccess}, Amount: {amount:N0} VND");
 
             return new PaymentResponseModel()

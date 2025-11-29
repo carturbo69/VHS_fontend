@@ -80,13 +80,13 @@
 
                     <div class="field">
                         <label class="label" for="Username">Tên đăng nhập</label>
-                        <input asp-for="Username" class="input" placeholder="Chọn tên đăng nhập của bạn" autocomplete="username" id="Username" />
+                        <input asp-for="Username" class="input" placeholder="Tối thiểu 8 ký tự, chữ và số, không dấu" autocomplete="username" id="Username" />
                         <span asp-validation-for="Username" class="text-danger"></span>
                     </div>
 
                     <div class="field">
                         <label class="label" for="Email">Địa chỉ Email</label>
-                        <input asp-for="Email" class="input" type="email" placeholder="yourname@example.com" autocomplete="email" id="Email" />
+                        <input asp-for="Email" class="input" type="email" placeholder="yourname@gmail.com" autocomplete="email" id="Email" />
                         <span asp-validation-for="Email" class="text-danger"></span>
                     </div>
 
@@ -547,15 +547,28 @@
             function clearValidationMessages(form) {
                 const summary = form.querySelector('.validation-summary');
                 if (summary) {
-                    summary.innerHTML = '';
-                    summary.style.display = 'none';
-                    summary.classList.remove('validation-summary-errors');
+                    // Chỉ xóa nếu không có nội dung
+                    if (!summary.textContent || summary.textContent.trim().length === 0) {
+                        summary.innerHTML = '';
+                        summary.style.display = 'none';
+                        summary.classList.remove('validation-summary-errors');
+                    }
                 }
 
                 form.querySelectorAll('[data-valmsg-for], .field-error').forEach(msg => {
-                    msg.textContent = '';
-                    if (msg.style) msg.style.display = 'none';
-                    msg.classList.remove('field-validation-error', 'text-danger');
+                    // Chỉ xóa nếu không có nội dung
+                    if (!msg.textContent || msg.textContent.trim().length === 0) {
+                        msg.textContent = '';
+                        if (msg.style) msg.style.display = 'none';
+                        msg.classList.remove('field-validation-error', 'text-danger');
+                    } else {
+                        // Giữ lại và đảm bảo hiển thị
+                        if (msg.style) {
+                            msg.style.display = 'block';
+                            msg.style.opacity = '1';
+                            msg.style.visibility = 'visible';
+                        }
+                    }
                 });
             }
 
@@ -601,9 +614,14 @@
             }
 
             function handleResetIfNeeded() {
-                // Kiểm tra xem có lỗi validation từ POST không
-                const hasValidationErrors = document.querySelector('.validation-summary-errors')?.textContent.trim().length > 0 ||
-                                           Array.from(document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess)')).some(el => el.textContent.trim().length > 0);
+                // Kiểm tra xem có lỗi validation từ POST không - kiểm tra kỹ hơn
+                const validationSummary = document.querySelector('.validation-summary-errors');
+                const hasSummaryErrors = validationSummary && validationSummary.textContent && validationSummary.textContent.trim().length > 0;
+                
+                const fieldErrors = document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess), span[data-valmsg-for]:not(#otpError):not(#otpSuccess)');
+                const hasFieldErrors = Array.from(fieldErrors).some(el => el.textContent && el.textContent.trim().length > 0);
+                
+                const hasValidationErrors = hasSummaryErrors || hasFieldErrors;
                 
                 // Kiểm tra xem có cần hiển thị OTP modal không
                 const hasOtpModalToShow = document.getElementById('hiddenOtpEmail') !== null;
@@ -613,7 +631,7 @@
                 if (!hasValidationErrors && !hasOtpModalToShow) {
                     resetForms();
                 } else if (!hasValidationErrors && hasOtpModalToShow) {
-                    // Chỉ clear form fields, không reset OTP modal
+                    // Chỉ clear form fields, không reset OTP modal và không xóa validation messages
                     const forms = document.querySelectorAll('form[data-reset-on-reload="true"]');
                     forms.forEach(form => {
                         form.reset();
@@ -628,7 +646,22 @@
                             }
                             field.classList.remove('is-invalid', 'is-valid');
                         });
-                        clearValidationMessages(form);
+                        // KHÔNG gọi clearValidationMessages ở đây để giữ lại messages
+                    });
+                } else if (hasValidationErrors) {
+                    // CÓ LỖI - đảm bảo tất cả messages hiển thị
+                    if (hasSummaryErrors && validationSummary) {
+                        validationSummary.style.display = 'block';
+                        validationSummary.style.opacity = '1';
+                        validationSummary.style.visibility = 'visible';
+                    }
+                    
+                    fieldErrors.forEach(function(error) {
+                        if (error.textContent && error.textContent.trim().length > 0) {
+                            error.style.display = 'block';
+                            error.style.opacity = '1';
+                            error.style.visibility = 'visible';
+                        }
                     });
                 }
             }
@@ -657,14 +690,22 @@
             window.addEventListener('pageshow', function (event) {
                 // Clear form khi back/forward hoặc reload từ cache
                 if (event.persisted || event.type === 'pageshow') {
-                    // Luôn clear form khi reload để tránh thông báo "Resubmit the form?"
+                    // Kiểm tra xem có validation errors không
+                    const validationSummary = document.querySelector('.validation-summary-errors');
+                    const hasSummaryErrors = validationSummary && validationSummary.textContent && validationSummary.textContent.trim().length > 0;
+                    
+                    const fieldErrors = document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess), span[data-valmsg-for]:not(#otpError):not(#otpSuccess)');
+                    const hasFieldErrors = Array.from(fieldErrors).some(el => el.textContent && el.textContent.trim().length > 0);
+                    
+                    const hasValidationErrors = hasSummaryErrors || hasFieldErrors;
                     const hasOtpModalToShow = document.getElementById('hiddenOtpEmail') !== null;
                     
-                    if (!hasOtpModalToShow) {
-                        // Clear form hoàn toàn nếu không có OTP modal
+                    // CHỈ clear form nếu KHÔNG có validation errors
+                    if (!hasValidationErrors && !hasOtpModalToShow) {
+                        // Clear form hoàn toàn nếu không có OTP modal và không có lỗi
                         resetForms();
-                    } else {
-                        // Chỉ clear form fields, không reset OTP modal
+                    } else if (!hasValidationErrors && hasOtpModalToShow) {
+                        // Chỉ clear form fields, không reset OTP modal và không xóa validation messages
                         const forms = document.querySelectorAll('form[data-reset-on-reload="true"]');
                         forms.forEach(form => {
                             form.reset();
@@ -680,7 +721,41 @@
                                 }
                                 field.classList.remove('is-invalid', 'is-valid');
                             });
-                            clearValidationMessages(form);
+                            // KHÔNG gọi clearValidationMessages để giữ lại messages
+                        });
+                    } else if (hasValidationErrors) {
+                        // CÓ LỖI - đảm bảo tất cả messages hiển thị, chỉ clear form fields
+                        const forms = document.querySelectorAll('form[data-reset-on-reload="true"]');
+                        forms.forEach(form => {
+                            form.reset();
+                            form.removeAttribute('data-submitted');
+                            form.querySelectorAll('input, textarea, select').forEach(field => {
+                                if (field.type === 'hidden' || field.getAttribute('data-preserve') === 'true' || field.id === 'hiddenOtpEmail') {
+                                    return;
+                                }
+                                if (field.type === 'checkbox' || field.type === 'radio') {
+                                    field.checked = field.defaultChecked;
+                                } else {
+                                    field.value = '';
+                                }
+                                field.classList.remove('is-invalid', 'is-valid');
+                            });
+                            // KHÔNG xóa validation messages
+                        });
+                        
+                        // Đảm bảo messages hiển thị
+                        if (hasSummaryErrors && validationSummary) {
+                            validationSummary.style.display = 'block';
+                            validationSummary.style.opacity = '1';
+                            validationSummary.style.visibility = 'visible';
+                        }
+                        
+                        fieldErrors.forEach(function(error) {
+                            if (error.textContent && error.textContent.trim().length > 0) {
+                                error.style.display = 'block';
+                                error.style.opacity = '1';
+                                error.style.visibility = 'visible';
+                            }
                         });
                     }
                     
@@ -693,15 +768,40 @@
                 }
             });
             
-            // Clear form ngay khi page load nếu là GET request (reload)
+            // Clear form ngay khi page load nếu là GET request (reload) và không có lỗi
             (function() {
                 const isPostRequest = '@requestMethod' === 'POST';
                 if (!isPostRequest) {
-                    // Nếu là GET request, clear form ngay lập tức
+                    // Nếu là GET request, kiểm tra validation errors trước khi clear
                     setTimeout(function() {
+                        // Kiểm tra xem có validation errors không
+                        const validationSummary = document.querySelector('.validation-summary-errors');
+                        const hasSummaryErrors = validationSummary && validationSummary.textContent && validationSummary.textContent.trim().length > 0;
+                        
+                        const fieldErrors = document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess), span[data-valmsg-for]:not(#otpError):not(#otpSuccess)');
+                        const hasFieldErrors = Array.from(fieldErrors).some(el => el.textContent && el.textContent.trim().length > 0);
+                        
+                        const hasValidationErrors = hasSummaryErrors || hasFieldErrors;
                         const hasOtpModalToShow = document.getElementById('hiddenOtpEmail') !== null;
-                        if (!hasOtpModalToShow) {
+                        
+                        // CHỈ clear form nếu KHÔNG có validation errors
+                        if (!hasValidationErrors && !hasOtpModalToShow) {
                             resetForms();
+                        } else if (hasValidationErrors) {
+                            // CÓ LỖI - đảm bảo messages hiển thị
+                            if (hasSummaryErrors && validationSummary) {
+                                validationSummary.style.display = 'block';
+                                validationSummary.style.opacity = '1';
+                                validationSummary.style.visibility = 'visible';
+                            }
+                            
+                            fieldErrors.forEach(function(error) {
+                                if (error.textContent && error.textContent.trim().length > 0) {
+                                    error.style.display = 'block';
+                                    error.style.opacity = '1';
+                                    error.style.visibility = 'visible';
+                                }
+                            });
                         }
                     }, 100);
                 }
@@ -740,61 +840,87 @@
           
           // Xử lý khi DOM sẵn sàng
           function handlePageLoad() {
-            // Kiểm tra xem có validation errors thực sự không
+            // Kiểm tra xem có validation errors thực sự không (từ server-side)
             const validationSummary = document.querySelector('.validation-summary-errors');
             const hasSummaryErrors = validationSummary && validationSummary.textContent.trim().length > 0;
             
-            // Kiểm tra field errors
-            const fieldErrors = document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess)');
+            // Kiểm tra field errors - kiểm tra cả span có class validation và có nội dung
+            const fieldErrors = document.querySelectorAll('.field span.text-danger:not(#otpError):not(#otpSuccess), span[data-valmsg-for]:not(#otpError):not(#otpSuccess)');
             let hasFieldErrors = false;
             fieldErrors.forEach(function(error) {
-              if (error.textContent.trim().length > 0) {
+              if (error.textContent && error.textContent.trim().length > 0) {
                 hasFieldErrors = true;
+                // Đảm bảo error message hiển thị
+                error.style.display = 'block';
+                error.style.opacity = '1';
+                error.style.visibility = 'visible';
               }
             });
             
             const hasAnyErrors = hasSummaryErrors || hasFieldErrors;
             
-            // Nếu là GET request (reload) hoặc không có lỗi thực sự, xóa validation messages
-            if (!isPostRequest || !hasAnyErrors) {
-              // Xóa validation summary
+            // CHỈ xóa validation messages nếu THỰC SỰ không có lỗi từ server
+            // Giữ lại messages nếu có nội dung, kể cả khi reload
+            if (!hasAnyErrors) {
+              // Chỉ xóa khi thực sự không có lỗi
               if (validationSummary) {
                 validationSummary.innerHTML = '';
                 validationSummary.style.display = 'none';
               }
               
-              // Xóa tất cả field validation messages
+              // Xóa các validation messages rỗng
               fieldErrors.forEach(function(error) {
-                error.textContent = '';
-                error.style.display = 'none';
-                error.className = error.className.replace('field-validation-error', '').replace('text-danger', '').trim();
-              });
-              
-              // Xóa các validation messages khác
-              const allValidationSpans = document.querySelectorAll('span[data-valmsg-for], span.field-validation-error');
-              allValidationSpans.forEach(function(span) {
-                if (span.id !== 'otpError' && span.id !== 'otpSuccess') {
-                  span.textContent = '';
-                  span.style.display = 'none';
+                if (!error.textContent || error.textContent.trim().length === 0) {
+                  error.textContent = '';
+                  error.style.display = 'none';
+                  error.className = error.className.replace('field-validation-error', '').replace('text-danger', '').trim();
                 }
               });
               
-              // Ẩn thông báo lỗi terms
+              // Xóa các validation messages khác nếu rỗng
+              const allValidationSpans = document.querySelectorAll('span[data-valmsg-for], span.field-validation-error');
+              allValidationSpans.forEach(function(span) {
+                if (span.id !== 'otpError' && span.id !== 'otpSuccess') {
+                  if (!span.textContent || span.textContent.trim().length === 0) {
+                    span.textContent = '';
+                    span.style.display = 'none';
+                  } else {
+                    // Giữ lại và đảm bảo hiển thị
+                    span.style.display = 'block';
+                    span.style.opacity = '1';
+                    span.style.visibility = 'visible';
+                  }
+                }
+              });
+              
+              // Ẩn thông báo lỗi terms nếu không có lỗi
               const termsError = document.getElementById('termsError');
-              if (termsError) {
+              if (termsError && (!termsError.textContent || termsError.textContent.trim().length === 0)) {
                 termsError.style.display = 'none';
               }
               
-              // Nếu là GET request (reload), clear form và validation messages
-              if (!isPostRequest) {
+              // Nếu là GET request (reload) và không có lỗi, clear form
+              if (!isPostRequest && !hasAnyErrors) {
                 resetForms();
               }
             } else {
-              // Có lỗi từ POST request - giữ lại và thêm animation
-              if (hasSummaryErrors) {
+              // CÓ LỖI - giữ lại tất cả messages và đảm bảo chúng hiển thị
+              if (validationSummary && hasSummaryErrors) {
+                validationSummary.style.display = 'block';
+                validationSummary.style.opacity = '1';
+                validationSummary.style.visibility = 'visible';
                 document.querySelector('.auth-card')?.classList.add('has-error');
                 setTimeout(()=>document.querySelector('.auth-card')?.classList.remove('has-error'), 400);
               }
+              
+              // Đảm bảo tất cả field errors hiển thị
+              fieldErrors.forEach(function(error) {
+                if (error.textContent && error.textContent.trim().length > 0) {
+                  error.style.display = 'block';
+                  error.style.opacity = '1';
+                  error.style.visibility = 'visible';
+                }
+              });
             }
             
             // Focus vào input đầu tiên nếu không có lỗi
@@ -993,6 +1119,156 @@
         // Wire buttons after DOM ready
         document.addEventListener('DOMContentLoaded', function(){
           try {
+            // Cấu hình delay ẩn validation messages (15 giây = 15000ms) - đủ lâu để người dùng đọc
+            const VALIDATION_MESSAGE_DELAY = 15000;
+            
+            // Hàm để delay ẩn validation messages với jQuery Validation
+            function setupDelayedHideValidationMessages() {
+              if (typeof jQuery === 'undefined' || !jQuery.validator) {
+                // Fallback nếu không có jQuery Validation
+                setTimeout(setupDelayedHideValidationMessages, 200);
+                return;
+              }
+              
+              const form = document.querySelector('form[method="post"]');
+              if (!form) return;
+              
+              const $form = jQuery(form);
+              const validator = $form.data('validator');
+              
+              if (!validator) {
+                // Đợi validator khởi tạo
+                setTimeout(setupDelayedHideValidationMessages, 200);
+                return;
+              }
+              
+              // Lưu trữ các timeout để có thể clear
+              const hideTimeouts = new Map();
+              
+              // Override success callback để delay ẩn messages - KHÔNG ẩn ngay
+              const originalSuccess = validator.settings.success;
+              validator.settings.success = function(label) {
+                // KHÔNG gọi originalSuccess ngay - giữ message hiển thị
+                const input = label.prev('input, textarea, select');
+                if (input.length) {
+                  const fieldName = input.attr('name') || input.attr('id');
+                  
+                  // Clear timeout cũ nếu có
+                  if (hideTimeouts.has(fieldName)) {
+                    clearTimeout(hideTimeouts.get(fieldName));
+                    hideTimeouts.delete(fieldName);
+                  }
+                  
+                  // Đảm bảo label vẫn hiển thị rõ ràng
+                  label.css({
+                    'display': 'block !important',
+                    'opacity': '1 !important',
+                    'visibility': 'visible !important'
+                  });
+                  
+                  // Delay ẩn message - đợi đủ lâu
+                  const timeoutId = setTimeout(function() {
+                    // Fade out với animation mượt và chậm hơn
+                    label.css({
+                      'transition': 'opacity 1s ease-out, transform 0.5s ease-out',
+                      'opacity': '0',
+                      'transform': 'translateY(-5px)'
+                    });
+                    
+                    setTimeout(function() {
+                      if (originalSuccess) {
+                        originalSuccess.call(this, label);
+                      } else {
+                        label.remove();
+                      }
+                      hideTimeouts.delete(fieldName);
+                    }, 1000); // Animation fade out 1 giây
+                  }, VALIDATION_MESSAGE_DELAY);
+                  
+                  hideTimeouts.set(fieldName, timeoutId);
+                } else if (originalSuccess) {
+                  // Nếu không tìm thấy input, vẫn delay
+                  setTimeout(function() {
+                    originalSuccess.call(this, label);
+                  }, VALIDATION_MESSAGE_DELAY);
+                }
+              };
+              
+              // Override showErrors để đảm bảo messages không bị ẩn sớm
+              const originalShowErrors = validator.settings.showErrors;
+              validator.settings.showErrors = function() {
+                // Gọi original để hiển thị errors
+                if (originalShowErrors) {
+                  originalShowErrors.apply(this, arguments);
+                }
+                
+                // Đảm bảo tất cả error messages đều hiển thị và không bị ẩn
+                setTimeout(function() {
+                  jQuery('span.text-danger, span[data-valmsg-for]').each(function() {
+                    const $msg = jQuery(this);
+                    if ($msg.text().trim().length > 0) {
+                      $msg.css({
+                        'display': 'block !important',
+                        'opacity': '1 !important',
+                        'visibility': 'visible !important'
+                      });
+                    }
+                  });
+                }, 100);
+              };
+              
+              // Đảm bảo messages hiển thị đầy đủ khi có lỗi
+              const originalErrorPlacement = validator.settings.errorPlacement;
+              validator.settings.errorPlacement = function(error, element) {
+                // Clear timeout nếu có khi hiển thị lỗi mới
+                const fieldName = element.attr('name') || element.attr('id');
+                if (hideTimeouts.has(fieldName)) {
+                  clearTimeout(hideTimeouts.get(fieldName));
+                  hideTimeouts.delete(fieldName);
+                }
+                
+                // Hiển thị error với animation và đảm bảo không bị ẩn
+                error.css({
+                  'display': 'block !important',
+                  'opacity': '1 !important',
+                  'visibility': 'visible !important',
+                  'transition': 'opacity 0.3s ease-in, transform 0.3s ease-in',
+                  'transform': 'translateY(0)'
+                });
+                
+                if (originalErrorPlacement) {
+                  originalErrorPlacement.call(this, error, element);
+                } else {
+                  error.insertAfter(element);
+                }
+              };
+              
+              // Override invalidHandler để đảm bảo messages hiển thị đủ lâu
+              const originalInvalidHandler = validator.settings.invalidHandler;
+              validator.settings.invalidHandler = function(event, validator) {
+                // Đảm bảo tất cả error messages hiển thị
+                setTimeout(function() {
+                  jQuery('span.text-danger, span[data-valmsg-for]').each(function() {
+                    const $msg = jQuery(this);
+                    if ($msg.text().trim().length > 0) {
+                      $msg.css({
+                        'display': 'block !important',
+                        'opacity': '1 !important',
+                        'visibility': 'visible !important'
+                      });
+                    }
+                  });
+                }, 100);
+                
+                if (originalInvalidHandler) {
+                  originalInvalidHandler.call(this, event, validator);
+                }
+              };
+            }
+            
+            // Khởi tạo delayed hide cho validation messages
+            setupDelayedHideValidationMessages();
+            
             document.getElementById('btnTerms')?.addEventListener('click', function(e){ e.preventDefault(); openModal('termsModal'); });
             document.getElementById('btnPrivacy')?.addEventListener('click', function(e){ e.preventDefault(); openModal('privacyModal'); });
             

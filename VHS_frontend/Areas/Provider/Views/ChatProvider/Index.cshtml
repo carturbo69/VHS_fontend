@@ -201,7 +201,7 @@
                     }
 
                     <a class="d-flex align-items-start gap-2 p-2 rounded conv-item @(isActive ? "bg-light" : "")"
-                       href="@Url.Action("Index", "ChatAdmin", new { area = "Admin", id = c.ConversationId })"
+                       href="@Url.Action("Index", "ChatProvider", new { area = "Provider", id = c.ConversationId })"
                        data-search-title="@(c.Title?.ToLower() ?? "")"
                        data-search-snippet="@(c.LastMessageSnippet?.ToLower() ?? "")"
                        data-conversation-id="@c.ConversationId"
@@ -249,6 +249,11 @@
             <main class="chat-main" data-selected-conv="@Model.SelectedConversationId">
                 <!-- Header -->
                 <div class="chat-header">
+                    <!-- Nút Quay lại (chỉ hiện trên mobile) -->
+                    <button type="button" class="chat-back-btn" id="chatBackBtn" title="Quay lại danh sách">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    
                     <img class="avatar"
                          src="@(otherInSelected?.AvatarUrl ?? fallbackImg)"
                          alt=""
@@ -546,6 +551,44 @@
         </script>
     }
 
+    @* Mobile toggle functions *@
+    <script>
+        // Functions để toggle giữa conversation list và chat view trên mobile
+        window.showConversationList = function() {
+            var sidebar = document.querySelector('.chat-sidebar');
+            var chatMain = document.querySelector('.chat-main');
+            var chatWrapper = document.querySelector('.chat-wrapper');
+            
+            if (sidebar && chatMain && chatWrapper) {
+                sidebar.classList.add('show');
+                chatMain.style.display = 'none';
+                chatWrapper.classList.remove('show-chat');
+            }
+        };
+        
+        window.showChatView = function() {
+            var sidebar = document.querySelector('.chat-sidebar');
+            var chatMain = document.querySelector('.chat-main');
+            var chatWrapper = document.querySelector('.chat-wrapper');
+            
+            if (sidebar && chatMain && chatWrapper) {
+                sidebar.classList.remove('show');
+                chatMain.style.display = 'flex';
+                chatWrapper.classList.add('show-chat');
+            }
+        };
+        
+        // Event listener cho nút Quay lại - sử dụng event delegation để hoạt động với dynamic content
+        document.addEventListener('click', function(e) {
+            var backBtn = e.target.closest('#chatBackBtn');
+            if (backBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.showConversationList();
+            }
+        });
+    </script>
+
     @* Ngăn reload khi click vào conversation và load qua AJAX *@
     <script>
         (function() {
@@ -631,6 +674,11 @@
                         // Update URL với History API (không reload)
                         if (window.history && window.history.pushState) {
                             window.history.pushState({ conversationId: convId }, '', convUrl);
+                        }
+                        
+                        // Trên mobile: hiển thị chat view và ẩn sidebar
+                        if (window.innerWidth <= 767.98) {
+                            window.showChatView();
                         }
 
                         // Re-init SignalR sau khi scripts đã execute

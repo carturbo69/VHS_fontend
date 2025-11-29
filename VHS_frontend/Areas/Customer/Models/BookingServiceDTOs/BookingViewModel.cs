@@ -28,7 +28,7 @@ namespace VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
         public Guid? VoucherId { get; set; }
         public decimal VoucherDiscount { get; set; }
 
-        // 👉 Thêm để client hiển thị breakdown ngay khi vào trang
+        // Thêm để client hiển thị breakdown ngay khi vào trang
         public decimal VoucherPercent { get; set; }                 // % giảm (nếu có)
         public decimal VoucherMaxAmount { get; set; }           // trần giảm (nếu có)
 
@@ -82,10 +82,10 @@ namespace VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
 
         public List<BookItemOption> Options { get; set; } = new();
 
-        // ✅ thêm: chỉ những OptionIds hiển thị trên trang này sẽ được post về
+        // thêm: chỉ những OptionIds hiển thị trên trang này sẽ được post về
         public List<Guid> OptionIds { get; set; } = new();
 
-        // ✅ thêm: OptionValues để lưu giá trị textarea user đã nhập
+        // thêm: OptionValues để lưu giá trị textarea user đã nhập
         public Dictionary<Guid, string>? OptionValues { get; set; }
 
         public decimal OptionsTotal => 0m; // Options no longer have Price

@@ -74,12 +74,12 @@
                 if (s.Equals("Pending", StringComparison.OrdinalIgnoreCase)) return "Pending";
                 if (s.Equals("Confirmed", StringComparison.OrdinalIgnoreCase)) return "Confirmed";
                 if (s.Equals("InProgress", StringComparison.OrdinalIgnoreCase)) return "InProgress";
-                if (s.Equals("In Progress", StringComparison.OrdinalIgnoreCase)) return "InProgress"; // ✅ Xử lý "In Progress" (có khoảng trắng)
+                if (s.Equals("In Progress", StringComparison.OrdinalIgnoreCase)) return "InProgress"; // Xử lý "In Progress" (có khoảng trắng)
                 if (s.Equals("Completed", StringComparison.OrdinalIgnoreCase)) return "Completed";
                 if (s.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)) return "Cancelled";
                 if (s.Equals("All", StringComparison.OrdinalIgnoreCase)) return "All";
                 if (s.Equals("ServiceCompleted", StringComparison.OrdinalIgnoreCase)) return "Completed";
-                if (s.Equals("Service Completed", StringComparison.OrdinalIgnoreCase)) return "Completed"; // ✅ Xử lý "Service Completed" (có khoảng trắng)
+                if (s.Equals("Service Completed", StringComparison.OrdinalIgnoreCase)) return "Completed"; // Xử lý "Service Completed" (có khoảng trắng)
                 // Tiếng Việt -> chuẩn hóa sang tiếng Anh
                 if (s.Equals("Chờ xác nhận", StringComparison.OrdinalIgnoreCase)) return "Pending";
                 if (s.Equals("Đang chờ xử lý", StringComparison.OrdinalIgnoreCase)) return "Pending";
