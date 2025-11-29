@@ -462,21 +462,33 @@
             }
             
             // So sánh trực tiếp: năm -> tháng -> ngày
-            // Nếu hôm nay < ngày bắt đầu → upcoming
-            if (todayYear < startYear || 
-                (todayYear === startYear && todayMonth < startMonth) ||
-                (todayYear === startYear && todayMonth === startMonth && todayDay < startDay)) {
+            // Logic: 
+            // - Nếu hôm nay < ngày bắt đầu → upcoming (chưa bắt đầu)
+            // - Nếu hôm nay > ngày kết thúc → expired (hết hạn)
+            // - Nếu hôm nay >= ngày bắt đầu VÀ hôm nay <= ngày kết thúc → started (đang diễn ra)
+            //   (Bao gồm cả trường hợp hôm nay = ngày bắt đầu hoặc hôm nay = ngày kết thúc)
+            
+            // Kiểm tra upcoming: hôm nay < ngày bắt đầu
+            const isBeforeStart = todayYear < startYear || 
+                                  (todayYear === startYear && todayMonth < startMonth) ||
+                                  (todayYear === startYear && todayMonth === startMonth && todayDay < startDay);
+            if (isBeforeStart) {
               return 'upcoming';
             }
             
-            // Nếu hôm nay > ngày kết thúc → expired
-            if (todayYear > endYear ||
-                (todayYear === endYear && todayMonth > endMonth) ||
-                (todayYear === endYear && todayMonth === endMonth && todayDay > endDay)) {
+            // Kiểm tra expired: hôm nay > ngày kết thúc
+            const isAfterEnd = todayYear > endYear ||
+                               (todayYear === endYear && todayMonth > endMonth) ||
+                               (todayYear === endYear && todayMonth === endMonth && todayDay > endDay);
+            if (isAfterEnd) {
               return 'expired';
             }
             
-            // Ngược lại (hôm nay trong khoảng start-end, bao gồm cả ngày bắt đầu và kết thúc) → started
+            // Ngược lại: hôm nay >= ngày bắt đầu VÀ hôm nay <= ngày kết thúc
+            // Bao gồm các trường hợp:
+            // - Hôm nay = ngày bắt đầu → started (đã bắt đầu)
+            // - Hôm nay = ngày kết thúc → started (vẫn còn hiệu lực trong ngày)
+            // - Hôm nay trong khoảng giữa → started
             return 'started';
           } catch (e) {
             return 'started';
@@ -505,21 +517,23 @@
             const todayDay = now.getDate();
             
             rows.forEach(tr => {
-              const startStr = tr.dataset.start || '';
-              const endStr = tr.dataset.end || '';
+              const startStr = tr.dataset.start || tr.getAttribute('data-start') || '';
+              const endStr = tr.dataset.end || tr.getAttribute('data-end') || '';
               if (!startStr || !endStr) {
                 console.log('Voucher thiếu start hoặc end date:', tr);
                 return;
               }
               
-              const oldState = tr.dataset.tstate || '';
+              const oldState = tr.dataset.tstate || tr.getAttribute('data-tstate') || '';
               const tState = getTimeState(startStr, endStr);
               
-              // Luôn cập nhật để đảm bảo trạng thái đúng
+              // Cập nhật vào data attribute (cả dataset và setAttribute để đảm bảo)
               tr.setAttribute('data-tstate', tState);
+              tr.dataset.tstate = tState;
               
               if (oldState !== tState) {
                 updatedCount++;
+                console.log(`Voucher ${tr.dataset.id || 'unknown'}: ${oldState} → ${tState}`);
               }
               
               // Cập nhật badge trong cột thời gian
@@ -539,6 +553,15 @@
             // Debug: log thông tin
             if (updatedCount > 0) {
               console.log(`Đã cập nhật trạng thái cho ${updatedCount} voucher (Hôm nay: ${todayDay}/${todayMonth}/${todayYear})`);
+            }
+            
+            // Tự động áp dụng lại filter nếu đang có filter active để hiển thị đúng
+            const timeStateSelect = document.getElementById('timeState');
+            if (timeStateSelect && timeStateSelect.value !== 'all') {
+              // Có filter active, chạy lại filter để áp dụng trạng thái mới
+              setTimeout(() => {
+                applyAllFilters();
+              }, 100);
             }
           } catch (error) {
             console.error('Lỗi khi refresh trạng thái voucher:', error);
@@ -944,7 +967,8 @@
             if (min != null && (pctVal == null || pctVal < min)) show = false;
             if (max != null && (pctVal == null || pctVal > max)) show = false;
 
-            const tstate = tr.dataset.tstate; // upcoming|started|expired
+            // Đọc tstate từ data attribute (ưu tiên dataset, fallback về getAttribute)
+            const tstate = tr.dataset.tstate || tr.getAttribute('data-tstate') || '';
             if (want !== 'all' && tstate !== want) show = false;
 
             if (dmin || dmax){

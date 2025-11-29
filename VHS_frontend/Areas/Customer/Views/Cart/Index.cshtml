@@ -141,7 +141,6 @@
                             <span>Dịch vụ</span>
                         </label>
                     </div>
-                    <div class="col col-price">Đơn giá</div>
                     <div class="col col-addons">Tuỳ chọn</div>
                     <div class="col col-total">Số tiền</div>
                     <div class="col col-act">Thao tác</div>
@@ -214,34 +213,37 @@
                                             </div>
                                         </div>
 
-                                        <!-- Cột 2: Đơn giá -->
-                                        <div class="cell-price">@unitPrice.ToString("n0")₫</div>
-
-                                        <!-- Cột 3: Tuỳ chọn -->
+                                        <!-- Cột 2: Tuỳ chọn -->
                                         <div class="cell-addons">
-                                            <button type="button"
-                                                    class="opt-btn"
-                                                    data-opt="@key"
-                                                    aria-haspopup="dialog"
-                                                    aria-controls="@($"opt_{key}")"
-                                                    aria-expanded="false">
-                                                <span class="opt-label">Tuỳ chọn:</span>
-                                                <span class="opt-value" title="@AddonSummary(options)">@AddonSummary(options)</span>
-                                                <span class="opt-caret">▾</span>
-                                            </button>
+                                            @if (options.Any())
+                                            {
+                                                <button type="button"
+                                                        class="opt-btn"
+                                                        data-opt="@key"
+                                                        aria-haspopup="dialog"
+                                                        aria-controls="@($"opt_{key}")"
+                                                        aria-expanded="false">
+                                                    <span class="opt-label">Tuỳ chọn:</span>
+                                                    <span class="opt-value" title="@AddonSummary(options)">@AddonSummary(options)</span>
+                                                    <span class="opt-caret">▾</span>
+                                                </button>
 
-                                            <div class="opt-panel" id="@($"opt_{key}")" role="dialog" aria-modal="false" hidden>
-                                                <div class="opt-panel-header">
-                                                    <h3>Tuỳ chọn dịch vụ</h3>
-                                                    <button type="button" class="opt-panel-close" data-close="#@($"opt_{key}")" aria-label="Đóng">✕</button>
-                                                </div>
-                                                <div class="opt-section">
-                                                    @if (options.Any())
-                                                    {
-                                                        foreach (var a in options)
+                                                <div class="opt-panel" id="@($"opt_{key}")" role="dialog" aria-modal="false" hidden>
+                                                    <div class="opt-panel-header">
+                                                        <h3>Tuỳ chọn dịch vụ</h3>
+                                                        <button type="button" class="opt-panel-close" data-close="#@($"opt_{key}")" aria-label="Đóng">✕</button>
+                                                    </div>
+                                                    <div class="opt-section">
+                                                        @{
+                                                            // Sắp xếp: textarea ở cuối
+                                                            var regularOptions = options.Where(a => a.Type?.ToLower() != "textarea" && a.Type?.ToLower() != "text").ToList();
+                                                            var textareaOptions = options.Where(a => a.Type?.ToLower() == "textarea" || a.Type?.ToLower() == "text").ToList();
+                                                            var sortedOptions = regularOptions.Concat(textareaOptions).ToList();
+                                                        }
+                                                        @foreach (var a in sortedOptions)
                                                         {
                                                             var isTextarea = a.Type?.ToLower() == "textarea" || a.Type?.ToLower() == "text";
-                                                            <div class="opt-row">
+                                                            <div class="opt-row @(isTextarea ? "opt-row-textarea" : "")">
                                                                 <div class="opt-name" style="flex: 1; min-width: 0;">
                                                                     <div style="font-weight: 500; margin-bottom: 8px;">
                                                                         <span>✓</span>
@@ -250,7 +252,6 @@
                                                                     @if (!string.IsNullOrWhiteSpace(a.Value))
                                                                     {
                                                                         <div style="margin-top: 8px;">
-                                                                       
                                                                             @if (isTextarea)
                                                                             {
                                                                                 <div class="textarea-value-display" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px !important; padding: 8px !important; border-radius: 4px !important; font-size: 0.9em; line-height: 1.5; border: none !important; outline: none !important;">@a.Value</div>
@@ -270,13 +271,13 @@
                                                                 </div>
                                                             </div>
                                                         }
-                                                    }
-                                                    else
-                                                    {
-                                                        <div class="opt-empty muted">Chưa chọn tuỳ chọn</div>
-                                                    }
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Không có tuỳ chọn</span>
+                                            }
                                         </div>
 
 
@@ -622,9 +623,19 @@
 
             function renderVouchers(list){
               if(!voucherListEl) return;
-              if(!list.length){ voucherListEl.innerHTML = '<div class="muted">Bạn chưa có voucher nào.</div>'; return; }
+              
+              // Lọc bỏ voucher hết hạn
+              const validVouchers = (list || []).filter(v => {
+                const isExp = !!pick(v,'IsExpired','isExpired');
+                return !isExp; // Chỉ giữ lại voucher chưa hết hạn
+              });
+              
+              if(!validVouchers.length){ 
+                voucherListEl.innerHTML = '<div class="muted">Bạn chưa có voucher nào.</div>'; 
+                return; 
+              }
 
-              voucherListEl.innerHTML = list.map(v=>{
+              voucherListEl.innerHTML = validVouchers.map(v=>{
                 const code   = pick(v,'Code','code') || '';
                 const desc   = pick(v,'Description','description') ?? '';
                 const pct    = Number(pick(v,'DiscountPercent','discountPercent') || 0);
@@ -638,15 +649,50 @@
                 const rem    = pick(v,'RemainingUses','remainingUses');
                 const used   = Number(pick(v,'UsedCount','usedCount') || 0);
                 const limit  = pick(v,'UsageLimit','usageLimit');
+                
+                // Kiểm tra date range bằng client-side để chính xác hơn
+                const isInDateRange = (() => {
+                  if (!start || !end) return true;
+                  try {
+                    const now = new Date();
+                    const todayYear = now.getFullYear();
+                    const todayMonth = now.getMonth() + 1;
+                    const todayDay = now.getDate();
+                    
+                    let startStr = String(start);
+                    let endStr = String(end);
+                    if (startStr.indexOf('T') !== -1) startStr = startStr.split('T')[0];
+                    if (endStr.indexOf('T') !== -1) endStr = endStr.split('T')[0];
+                    if (startStr.indexOf(' ') !== -1) startStr = startStr.split(' ')[0];
+                    if (endStr.indexOf(' ') !== -1) endStr = endStr.split(' ')[0];
+                    
+                    const [startYear, startMonth, startDay] = startStr.split('-').map(Number);
+                    const [endYear, endMonth, endDay] = endStr.split('-').map(Number);
+                    
+                    if (isNaN(startYear) || isNaN(startMonth) || isNaN(startDay) ||
+                        isNaN(endYear) || isNaN(endMonth) || isNaN(endDay)) {
+                      return true;
+                    }
+                    
+                    const isAfterStart = todayYear > startYear ||
+                                         (todayYear === startYear && todayMonth > startMonth) ||
+                                         (todayYear === startYear && todayMonth === startMonth && todayDay >= startDay);
+                    
+                    const isBeforeEnd = todayYear < endYear ||
+                                        (todayYear === endYear && todayMonth < endMonth) ||
+                                        (todayYear === endYear && todayMonth === endMonth && todayDay <= endDay);
+                    
+                    return isAfterStart && isBeforeEnd;
+                  } catch (e) {
+                    return true;
+                  }
+                })();
 
-                const usable = canUse && !isExp && (isUnl || (rem ?? 0) > 0);
+                const usable = !isExp && isInDateRange && (isUnl || (rem ?? 0) > 0);
                 const benefit = `${pct}%` + (maxAmt ? ` • tối đa ${VND(maxAmt)}` : '');
                 const limitTxt = isUnl ? 'Không giới hạn'
                   : `Còn ${rem ?? Math.max(0, (limit||0) - used)} lượt`;
-                const dateTxt = [
-                  start ? `Từ ${new Date(start).toLocaleDateString('vi-VN')}` : '',
-                  end   ? `đến ${new Date(end).toLocaleDateString('vi-VN')}`   : ''
-                ].filter(Boolean).join(' ');
+                const dateTxt = end ? `Hết hạn: ${new Date(end).toLocaleDateString('vi-VN')}` : '';
 
                 const isUsing = !!CURRENT_VOUCHER && CURRENT_VOUCHER.Code === code;
 
@@ -668,11 +714,11 @@
                   </div>`;
               }).join('');
 
-              // bind “Sử dụng”
+              // bind "Sử dụng"
               voucherListEl.querySelectorAll('button[data-code]').forEach(btn=>{
                 btn.addEventListener('click', ()=>{
                   const code = btn.getAttribute('data-code');
-                  const raw = list.find(x => pick(x,'Code','code') === code);
+                  const raw = validVouchers.find(x => pick(x,'Code','code') === code);
                   if(!raw) return;
                   setVoucher(raw); // lưu tạm + recalc
                   // đóng panel
@@ -702,22 +748,32 @@
                   if(!res.ok) throw new Error('HTTP '+res.status);
                   const list = await res.json() || [];
                   
-                  // Tìm voucher theo code (case-insensitive)
+                  // Tìm voucher theo code (case-insensitive) và lọc bỏ voucher hết hạn
                   const found = list.find(v => {
                     const vCode = pick(v,'Code','code') || '';
-                    return vCode.toLowerCase() === code.toLowerCase();
+                    const isExp = !!pick(v,'IsExpired','isExpired');
+                    return vCode.toLowerCase() === code.toLowerCase() && !isExp;
                   });
                   
                   if(found) {
-                    // Tìm thấy voucher → áp dụng
+                    // Tìm thấy voucher chưa hết hạn → áp dụng
                     setVoucher(found);
                     if (voucherInputEl) voucherInputEl.value = '';
                     
                     const closer = document.querySelector('[data-close="#opt_voucher"]');
                     if(closer) closer.click();
                   } else {
-                    // Không tìm thấy voucher
-                    alert('❌ Mã voucher không tồn tại hoặc không hợp lệ. Vui lòng kiểm tra lại.');
+                    // Kiểm tra xem có phải voucher hết hạn không
+                    const expiredVoucher = list.find(v => {
+                      const vCode = pick(v,'Code','code') || '';
+                      return vCode.toLowerCase() === code.toLowerCase();
+                    });
+                    
+                    if(expiredVoucher) {
+                      alert('❌ Voucher này đã hết hạn. Vui lòng chọn voucher khác.');
+                    } else {
+                      alert('❌ Mã voucher không tồn tại hoặc không hợp lệ. Vui lòng kiểm tra lại.');
+                    }
                   }
                 } catch(e) {
                   console.error('Lỗi khi kiểm tra voucher:', e);
