@@ -15,6 +15,9 @@
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
     
     var tags = ViewBag.Tags as List<VHS_frontend.Models.ServiceShop.TagDTO> ?? new List<VHS_frontend.Models.ServiceShop.TagDTO>();
+    
+    // Helper function để xử lý URL ảnh (thêm domain prefix nếu cần)
+    string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
 }
 
 @functions {
@@ -250,7 +253,8 @@
             <div class="services-grid">
                 @foreach (var service in Model)
                 {
-                    var img = FirstImageOrDefault(service.Images) ?? fallbackImg;
+                    var imgRaw = FirstImageOrDefault(service.Images) ?? fallbackImg;
+                    var img = ToUrl(imgRaw);
                     var priceDisplay = PriceToDisplay(service.Price);
                     var avg = service.AverageRating;
 
@@ -487,41 +491,71 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Hàm để đảm bảo tất cả provider section trong cùng hàng có cùng chiều cao
     function equalizeProviderHeights() {
-        const providerSections = document.querySelectorAll('.provider-section-top');
-        if (providerSections.length === 0) return;
-        
-        // Reset height để tính toán lại
-        providerSections.forEach(section => {
-            section.style.height = 'auto';
-        });
-        
-        // Nhóm các section theo hàng dựa trên vị trí top
-        const rows = new Map();
-        providerSections.forEach(section => {
-            const rect = section.getBoundingClientRect();
-            const top = Math.round(rect.top);
+        try {
+            const providerSections = document.querySelectorAll('.provider-section-top');
+            if (providerSections.length === 0) return;
             
-            if (!rows.has(top)) {
-                rows.set(top, []);
-            }
-            rows.get(top).push(section);
-        });
-        
-        // Đặt chiều cao bằng nhau cho mỗi hàng
-        rows.forEach(sections => {
-            let maxHeight = 0;
-            sections.forEach(section => {
-                const height = section.getBoundingClientRect().height;
-                if (height > maxHeight) {
-                    maxHeight = height;
+            // Reset height để tính toán lại
+            providerSections.forEach(section => {
+                if (section && section.style) {
+                    section.style.height = 'auto';
                 }
             });
             
-            // Áp dụng chiều cao cho tất cả section trong hàng
-            sections.forEach(section => {
-                section.style.height = maxHeight + 'px';
+            // Đợi một chút để DOM render xong
+            requestAnimationFrame(() => {
+                try {
+                    // Nhóm các section theo hàng dựa trên vị trí top
+                    const rows = new Map();
+                    providerSections.forEach(section => {
+                        if (!section) return;
+                        try {
+                            const rect = section.getBoundingClientRect();
+                            if (!rect) return;
+                            const top = Math.round(rect.top);
+                            
+                            if (!rows.has(top)) {
+                                rows.set(top, []);
+                            }
+                            rows.get(top).push(section);
+                        } catch (e) {
+                            console.warn('Error processing section:', e);
+                        }
+                    });
+                    
+                    // Đặt chiều cao bằng nhau cho mỗi hàng
+                    rows.forEach(sections => {
+                        if (!sections || sections.length === 0) return;
+                        
+                        let maxHeight = 0;
+                        sections.forEach(section => {
+                            if (!section) return;
+                            try {
+                                const rect = section.getBoundingClientRect();
+                                if (rect && rect.height > maxHeight) {
+                                    maxHeight = rect.height;
+                                }
+                            } catch (e) {
+                                console.warn('Error calculating height:', e);
+                            }
+                        });
+                        
+                        // Áp dụng chiều cao cho tất cả section trong hàng
+                        if (maxHeight > 0) {
+                            sections.forEach(section => {
+                                if (section && section.style) {
+                                    section.style.height = maxHeight + 'px';
+                                }
+                            });
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error in equalizeProviderHeights:', e);
+                }
             });
-        });
+        } catch (e) {
+            console.error('Error in equalizeProviderHeights:', e);
+        }
     }
     
     // Gọi hàm khi DOM ready và sau khi load services
@@ -634,34 +668,87 @@ document.addEventListener('DOMContentLoaded', function() {
                 'X-Requested-With': 'XMLHttpRequest'
             }
         })
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text();
+        })
         .then(html => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const newResults = doc.getElementById('servicesResults');
-            
-            if (newResults) {
-                servicesResults.innerHTML = newResults.innerHTML;
-                servicesResults.classList.remove('loading');
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
                 
-                // Đảm bảo provider sections có cùng chiều cao sau khi load
-                setTimeout(equalizeProviderHeights, 50);
-                
-                // Update URL without reload
-                const newUrl = `/Services/Index?${params.toString()}`;
-                window.history.pushState({}, '', newUrl);
-                
-                // Smooth scroll to results only if not from form submit (from pagination)
-                if (page > 1) {
-                    servicesResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Kiểm tra lỗi parse
+                const parseError = doc.querySelector('parsererror');
+                if (parseError) {
+                    throw new Error('Failed to parse HTML response');
                 }
+                
+                const newResults = doc.getElementById('servicesResults');
+                
+                if (newResults && servicesResults) {
+                    servicesResults.innerHTML = newResults.innerHTML;
+                    servicesResults.classList.remove('loading');
+                    
+                    // Đảm bảo provider sections có cùng chiều cao sau khi load
+                    // Tăng delay để đảm bảo images đã load xong
+                    setTimeout(() => {
+                        try {
+                            equalizeProviderHeights();
+                        } catch (e) {
+                            console.warn('Error equalizing heights after load:', e);
+                        }
+                    }, 200);
+                    
+                    // Update URL without reload
+                    try {
+                        const newUrl = `/Services/Index?${params.toString()}`;
+                        window.history.pushState({}, '', newUrl);
+                    } catch (e) {
+                        console.warn('Error updating URL:', e);
+                    }
+                    
+                    // Smooth scroll to results only if not from form submit (from pagination)
+                    if (page > 1) {
+                        try {
+                            servicesResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        } catch (e) {
+                            console.warn('Error scrolling:', e);
+                        }
+                    }
+                } else {
+                    throw new Error('Could not find servicesResults in response');
+                }
+            } catch (e) {
+                console.error('Error processing response:', e);
+                throw e;
             }
         })
         .catch(error => {
             console.error('Error loading services:', error);
-            const loadingOverlay = servicesResults.querySelector('.loading-overlay');
-            if (loadingOverlay) loadingOverlay.remove();
-            servicesResults.classList.remove('loading');
+            try {
+                const loadingOverlay = servicesResults?.querySelector('.loading-overlay');
+                if (loadingOverlay) loadingOverlay.remove();
+                if (servicesResults) {
+                    servicesResults.classList.remove('loading');
+                    
+                    // Hiển thị thông báo lỗi cho user
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'alert alert-danger mt-3';
+                    errorMsg.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Có lỗi xảy ra khi tải dịch vụ. Vui lòng thử lại.';
+                    servicesResults.appendChild(errorMsg);
+                    
+                    // Tự động ẩn sau 5 giây
+                    setTimeout(() => {
+                        if (errorMsg.parentNode) {
+                            errorMsg.remove();
+                        }
+                    }, 5000);
+                }
+            } catch (e) {
+                console.error('Error handling error state:', e);
+            }
         });
     }
 });

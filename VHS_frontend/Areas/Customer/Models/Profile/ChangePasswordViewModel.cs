@@ -12,9 +12,7 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
         public string CurrentPassword { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Mật khẩu mới không được để trống")]
-        [StringLength(100, MinimumLength = 8, ErrorMessage = "Mật khẩu phải có ít nhất 8 ký tự")]
-        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$", 
-            ErrorMessage = "Mật khẩu phải bao gồm chữ hoa, chữ thường và số")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu phải có ít nhất 6 ký tự")]
         [Display(Name = "Mật khẩu mới")]
         public string NewPassword { get; set; } = string.Empty;
 

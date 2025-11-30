@@ -328,6 +328,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 // GIỮ SS_CHECKOUT_DIRECT để PlaceOrder biết đang đi nhánh direct (không set SS_SELECTED_IDS)
                 HttpContext.Session.SetString(SS_CHECKOUT_DIRECT, directJson);
 
+                ViewBag.AccountId = accountId;
                 return View("Index", vm);
             }
 
@@ -424,6 +425,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 // Dọn cờ direct nếu lỡ còn (đề phòng người dùng quay lại từ giỏ)
                 HttpContext.Session.Remove(SS_CHECKOUT_DIRECT);
 
+                ViewBag.AccountId = accountId;
                 return View("Index", vm);
             }
         }
