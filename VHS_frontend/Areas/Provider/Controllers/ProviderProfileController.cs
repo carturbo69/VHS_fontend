@@ -331,6 +331,78 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
         }
 
+        // POST: Provider/ProviderProfile/RequestPasswordChangeOTP
+        [HttpPost]
+        public async Task<IActionResult> RequestPasswordChangeOTP()
+        {
+            try
+            {
+                Console.WriteLine("[RequestPasswordChangeOTP] Starting...");
+                var accountId = HttpContext.Session.GetString("AccountID");
+                Console.WriteLine($"[RequestPasswordChangeOTP] AccountID: {accountId}");
+                
+                if (string.IsNullOrEmpty(accountId))
+                {
+                    Console.WriteLine("[RequestPasswordChangeOTP] AccountID is null or empty");
+                    return Json(new { success = false, message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
+                }
+
+                var token = HttpContext.Session.GetString("JWToken");
+                Console.WriteLine($"[RequestPasswordChangeOTP] Token exists: {!string.IsNullOrEmpty(token)}");
+                
+                if (string.IsNullOrEmpty(token))
+                {
+                    Console.WriteLine("[RequestPasswordChangeOTP] Token is null or empty");
+                    return Json(new { success = false, message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
+                }
+
+                // Lấy email từ profile
+                Console.WriteLine("[RequestPasswordChangeOTP] Getting profile...");
+                var profile = await _providerProfileService.GetProfileAsync(accountId, token);
+                Console.WriteLine($"[RequestPasswordChangeOTP] Profile: {(profile != null ? "Found" : "Null")}, Email: {profile?.Email}");
+                
+                if (profile == null || string.IsNullOrEmpty(profile.Email))
+                {
+                    Console.WriteLine("[RequestPasswordChangeOTP] Profile or Email is null");
+                    return Json(new { success = false, message = "Không thể lấy thông tin email. Vui lòng thử lại sau." });
+                }
+
+                // Gọi API để gửi OTP
+                Console.WriteLine($"[RequestPasswordChangeOTP] Sending OTP to email: {profile.Email}");
+                var request = new SendOTPRequestDTO { Email = profile.Email };
+                var response = await _providerProfileService.SendOTPForChangePasswordAsync(accountId, request, token);
+                Console.WriteLine($"[RequestPasswordChangeOTP] Response status: {response.StatusCode}");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                    Console.WriteLine("[RequestPasswordChangeOTP] OTP sent successfully");
+                    return Json(new { success = true, message = result?["message"]?.ToString() ?? "Mã OTP đã được gửi đến email của bạn." });
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[RequestPasswordChangeOTP] Error response: {errorContent}");
+                    try
+                    {
+                        var errorJson = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(errorContent);
+                        var errorMessage = errorJson?["message"]?.ToString() ?? "Không thể gửi mã OTP. Vui lòng thử lại sau.";
+                        return Json(new { success = false, message = errorMessage });
+                    }
+                    catch
+                    {
+                        return Json(new { success = false, message = "Không thể gửi mã OTP. Vui lòng thử lại sau." });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RequestPasswordChangeOTP] Exception: {ex.Message}");
+                Console.WriteLine($"[RequestPasswordChangeOTP] StackTrace: {ex.StackTrace}");
+                return Json(new { success = false, message = "Có lỗi xảy ra: " + ex.Message });
+            }
+        }
+
         // POST: Provider/ProviderProfile/SendOTP
         [HttpPost]
         public async Task<IActionResult> SendOTP([FromBody] SendOTPRequestDTO request)
