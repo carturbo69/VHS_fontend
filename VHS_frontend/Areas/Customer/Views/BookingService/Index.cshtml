@@ -338,6 +338,7 @@
                                    value="@it.BookingTime.ToString("yyyy-MM-ddTHH:mm")"
                                    class="booking-input"
                                    data-provider-id="@it.ProviderId"
+                                   data-service-id="@it.ServiceId"
                                    onchange="validateBookingDateTime(this, @i)" />
                             <div id="booking-time-error-@i" class="booking-time-error" style="display: none;"></div>
                         </div>
@@ -3102,6 +3103,218 @@
         /* ========= Validate Booking Time với Provider Schedule ========= */
         const API_BASE_URL = 'http://localhost:5154/api';
         const bookingTimeValidations = new Map(); // Track validation state for each input
+        
+        // Lưu booking history để check duplicate
+        let userBookingHistory = [];
+        const accountId = '@(ViewBag.AccountId?.ToString() ?? "")';
+        
+        // Log accountId để debug
+        console.log('[Duplicate Check] AccountId from ViewBag:', accountId);
+        console.log('[Duplicate Check] AccountId type:', typeof accountId);
+        console.log('[Duplicate Check] AccountId empty?', !accountId || accountId === '' || accountId === 'Guid.Empty');
+        
+        // Fetch booking history khi page load
+        async function loadBookingHistory() {
+            if (!accountId || accountId === '' || accountId === 'Guid.Empty') {
+                console.warn('[Duplicate Check] No accountId, skipping history load. AccountId:', accountId);
+                return;
+            }
+            
+            console.log('[Duplicate Check] Loading booking history for accountId:', accountId);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/bookings/by-account/${accountId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                });
+                
+                console.log('[Duplicate Check] API Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('[Duplicate Check] API Response data:', data);
+                    
+                    // API có thể trả về Items (PascalCase) hoặc items (camelCase)
+                    const items = data?.Items || data?.items;
+                    
+                    console.log('[Duplicate Check] Extracted items:', items);
+                    console.log('[Duplicate Check] Items type:', typeof items);
+                    console.log('[Duplicate Check] Is array:', Array.isArray(items));
+                    console.log('[Duplicate Check] Items length:', items?.length);
+                    
+                    if (data && items && Array.isArray(items)) {
+                        userBookingHistory = items;
+                        console.log('[Duplicate Check] ✅ Loaded booking history:', userBookingHistory.length, 'bookings');
+                        
+                        // Log một vài booking đầu tiên để debug
+                        if (userBookingHistory.length > 0) {
+                            console.log('[Duplicate Check] First booking sample:', {
+                                BookingId: userBookingHistory[0].BookingId || userBookingHistory[0].bookingId,
+                                ServiceId: userBookingHistory[0].ServiceId || userBookingHistory[0].serviceId,
+                                BookingTime: userBookingHistory[0].BookingTime || userBookingHistory[0].bookingTime,
+                                Status: userBookingHistory[0].Status || userBookingHistory[0].status
+                            });
+                        }
+                    } else {
+                        console.error('[Duplicate Check] ❌ Failed to parse booking history!');
+                        console.error('[Duplicate Check] Data:', JSON.stringify(data, null, 2));
+                        console.error('[Duplicate Check] Items:', items);
+                        console.error('[Duplicate Check] Items type:', typeof items, 'Is array:', Array.isArray(items));
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('[Duplicate Check] ❌ Failed to load booking history:', response.status, errorText);
+                }
+            } catch (error) {
+                console.error('[Duplicate Check] ❌ Error loading booking history:', error);
+            }
+        }
+        
+        // Load history khi page load và retry nếu cần
+        let historyLoadAttempts = 0;
+        const MAX_HISTORY_LOAD_ATTEMPTS = 3;
+        
+        async function loadBookingHistoryWithRetry() {
+            historyLoadAttempts++;
+            console.log(`[Duplicate Check] Attempt ${historyLoadAttempts} to load booking history`);
+            
+            await loadBookingHistory();
+            
+            // Nếu chưa load được và chưa quá số lần thử, thử lại sau 1 giây
+            if (userBookingHistory.length === 0 && historyLoadAttempts < MAX_HISTORY_LOAD_ATTEMPTS) {
+                console.log(`[Duplicate Check] History not loaded, retrying in 1 second...`);
+                setTimeout(() => {
+                    loadBookingHistoryWithRetry();
+                }, 1000);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadBookingHistoryWithRetry();
+        });
+        
+        // Hàm kiểm tra duplicate booking
+        function checkDuplicateBooking(serviceId, bookingTimeStr, currentItemIndex) {
+            console.log('[Duplicate Check] Checking duplicate:', {
+                serviceId,
+                bookingTimeStr,
+                historyLength: userBookingHistory.length
+            });
+            
+            if (!serviceId || !bookingTimeStr) {
+                console.log('[Duplicate Check] Missing serviceId or bookingTimeStr');
+                return null;
+            }
+            
+            if (userBookingHistory.length === 0) {
+                console.log('[Duplicate Check] ⚠️ Booking history is empty - cannot check duplicate. History may still be loading.');
+                return null; // Không có dữ liệu để check
+            }
+            
+            try {
+                // Parse booking time từ datetime-local format: "yyyy-MM-ddTHH:mm"
+                const [datePart, timePart] = bookingTimeStr.split('T');
+                if (!datePart || !timePart) return null;
+                
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hours, minutes] = timePart.split(':').map(Number);
+                
+                if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) {
+                    return null;
+                }
+                
+                const selectedDateTime = new Date(year, month - 1, day, hours, minutes);
+                const selectedDateOnly = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                
+                // Kiểm tra với các booking đã có
+                console.log('[Duplicate Check] Checking against', userBookingHistory.length, 'bookings');
+                
+                for (const booking of userBookingHistory) {
+                    // Bỏ qua booking đã bị hủy (hỗ trợ cả PascalCase và camelCase)
+                    const bookingStatus = ((booking.Status || booking.status) || '').trim().toLowerCase();
+                    if (bookingStatus === 'cancelled' || bookingStatus === 'canceled' || bookingStatus === 'đã hủy') {
+                        console.log('[Duplicate Check] Skipping cancelled booking:', booking.BookingId || booking.bookingId);
+                        continue;
+                    }
+                    
+                    // Chỉ check với booking cùng ServiceId (hỗ trợ cả PascalCase và camelCase)
+                    const bookingServiceId = (booking.ServiceId || booking.serviceId) ? 
+                        (booking.ServiceId || booking.serviceId).toString().toLowerCase() : '';
+                    const selectedServiceId = serviceId.toString().toLowerCase();
+                    
+                    console.log('[Duplicate Check] Comparing ServiceIds:', {
+                        booking: bookingServiceId,
+                        selected: selectedServiceId,
+                        match: bookingServiceId === selectedServiceId
+                    });
+                    
+                    if (!bookingServiceId || bookingServiceId !== selectedServiceId) {
+                        continue;
+                    }
+                    
+                    // Parse BookingTime từ booking (hỗ trợ cả PascalCase và camelCase)
+                    const bookingTime = booking.BookingTime || booking.bookingTime;
+                    if (!bookingTime) continue;
+                    
+                    let bookingDateTime;
+                    try {
+                        bookingDateTime = new Date(bookingTime);
+                        if (isNaN(bookingDateTime.getTime())) continue;
+                    } catch (e) {
+                        console.warn('[Duplicate Check] Error parsing booking time:', bookingTime, e);
+                        continue;
+                    }
+                    
+                    const bookingDateOnly = `${bookingDateTime.getFullYear()}-${String(bookingDateTime.getMonth() + 1).padStart(2, '0')}-${String(bookingDateTime.getDate()).padStart(2, '0')}`;
+                    
+                    // Kiểm tra cùng ngày
+                    if (bookingDateOnly !== selectedDateOnly) {
+                        continue;
+                    }
+                    
+                    // Tính khoảng cách thời gian (tính bằng phút)
+                    const timeDiffMs = Math.abs(selectedDateTime - bookingDateTime);
+                    const timeDiffMinutes = timeDiffMs / (1000 * 60);
+                    
+                    console.log('[Duplicate Check] Time comparison:', {
+                        selected: selectedDateTime.toISOString(),
+                        booking: bookingDateTime.toISOString(),
+                        diffMinutes: timeDiffMinutes,
+                        isDuplicate: timeDiffMinutes < 60
+                    });
+                    
+                    // Nếu cách nhau < 60 phút (1 giờ), thì là duplicate
+                    if (timeDiffMinutes < 60) {
+                        const bookingTimeStr = bookingDateTime.toLocaleString('vi-VN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        
+                        console.log('[Duplicate Check] ❌ DUPLICATE FOUND!', {
+                            bookingTime: bookingTimeStr,
+                            diffMinutes: timeDiffMinutes
+                        });
+                        
+                        return {
+                            isDuplicate: true,
+                            message: `⚠️ Bạn đã đặt dịch vụ này vào ${bookingTimeStr}. Vui lòng chọn thời gian khác (cách nhau ít nhất 1 giờ).`
+                        };
+                    }
+                }
+                
+                console.log('[Duplicate Check] ✅ No duplicate found');
+                return { isDuplicate: false };
+            } catch (error) {
+                console.error('[Duplicate Check] ❌ Error checking duplicate:', error);
+                return null;
+            }
+        }
 
         // Cập nhật khi trang load
         document.addEventListener('DOMContentLoaded', function() {
@@ -3205,6 +3418,43 @@
             if (!dateTimeValue || !providerId) {
                 hideBookingTimeError(index);
                 return true;
+            }
+            
+            // Lấy ServiceId từ data attribute hoặc hidden input
+            let serviceId = input.dataset.serviceId;
+            if (!serviceId) {
+                // Fallback: tìm từ hidden input
+                const serviceIdInput = document.querySelector(`input[form="@placeOrderFormId"][name="Items[${index}].ServiceId"]`);
+                if (serviceIdInput) {
+                    serviceId = serviceIdInput.value;
+                }
+            }
+            
+            // Kiểm tra duplicate booking TRƯỚC khi check provider availability
+            if (serviceId) {
+                console.log('[Duplicate Check] Validating booking time with serviceId:', serviceId);
+                const duplicateCheck = checkDuplicateBooking(serviceId, dateTimeValue, index);
+                
+                if (duplicateCheck && duplicateCheck.isDuplicate) {
+                    console.log('[Duplicate Check] ❌ Duplicate detected, blocking booking');
+                    const errorDiv = document.getElementById(`booking-time-error-${index}`);
+                    if (errorDiv) {
+                        errorDiv.style.display = 'block';
+                        errorDiv.textContent = duplicateCheck.message;
+                        errorDiv.style.borderLeftColor = '';
+                        errorDiv.style.background = '';
+                        errorDiv.style.color = '';
+                    }
+                    input.classList.add('booking-input-error');
+                    bookingTimeValidations.set(index, false);
+                    return false;
+                } else if (duplicateCheck === null) {
+                    console.warn('[Duplicate Check] ⚠️ Cannot check duplicate - history may still be loading');
+                } else {
+                    console.log('[Duplicate Check] ✅ No duplicate, continuing validation');
+                }
+            } else {
+                console.warn('[Duplicate Check] ⚠️ No serviceId found for validation');
             }
 
             // Parse datetime-local value
@@ -3603,6 +3853,30 @@
                                 });
                                 if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
                             } else {
+                                // Kiểm tra duplicate TRƯỚC khi validate với API
+                                const serviceId = input.dataset.serviceId || 
+                                                 (document.querySelector(`input[form="@placeOrderFormId"][name="Items[${index}].ServiceId"]`)?.value);
+                                
+                                if (serviceId) {
+                                    // Đảm bảo booking history đã được load
+                                    if (userBookingHistory.length === 0) {
+                                        console.warn('[Duplicate Check] ⚠️ Booking history not loaded yet, attempting to load...');
+                                        await loadBookingHistory();
+                                    }
+                                    
+                                    const duplicateCheck = checkDuplicateBooking(serviceId, dateTimeValue, index);
+                                    if (duplicateCheck && duplicateCheck.isDuplicate) {
+                                        errors.push({
+                                            type: 'bookingTime',
+                                            element: input.closest('.booking-time') || input,
+                                            errorId: `booking-time-error-${index}`,
+                                            message: duplicateCheck.message
+                                        });
+                                        if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
+                                        continue; // Skip API validation nếu đã có duplicate
+                                    }
+                                }
+                                
                                 // Validate thời gian đã chọn với API
                                 const promiseIndex = validationPromises.length;
                                 inputIndexMap.set(promiseIndex, { input, index });

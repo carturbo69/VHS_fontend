@@ -3,6 +3,9 @@
     Layout = "~/Areas/Provider/Views/_ProviderLayout.cshtml";
     ViewData["Title"] = "Chi tiết đơn hàng";
     var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+    
+    // Helper function để xử lý URL ảnh (thêm domain prefix nếu cần)
+    string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
 }
 
 <div class="order-detail-container">
@@ -81,7 +84,6 @@
                     <div class="service-detail-wrapper">
                         @if (!string.IsNullOrEmpty(Model.ServiceImages))
                         {
-                            string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
                             var firstImage = Model.ServiceImages.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
                             var firstUrl = ToUrl(firstImage);
                             if (!string.IsNullOrEmpty(firstUrl))
@@ -687,7 +689,8 @@
                             || code == "CHECK OUT";
 
                             var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
-                            var staffImage = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
+                            var staffImageRaw = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
+                            var staffImage = ToUrl(staffImageRaw);
 
                             <div class="tl-item">
                                 <div class="fw-semibold">@e.Title</div>
@@ -726,7 +729,7 @@
                                         {
                                             if ((p.MediaType ?? "image").ToLower() == "image")
                                             {
-                                                var src = !string.IsNullOrWhiteSpace(p.Url) ? p.Url : fallbackImg;
+                                                var src = !string.IsNullOrWhiteSpace(p.Url) ? ToUrl(p.Url) : fallbackImg;
                                                 <img src="@src"
                                                      alt="@p.Caption"
                                                      class="zoomable"
@@ -736,7 +739,8 @@
                                             }
                                             else
                                             {
-                                                <a class="btn btn-sm btn-outline-secondary" href="@p.Url" target="_blank" rel="noopener">
+                                                var videoUrl = !string.IsNullOrWhiteSpace(p.Url) ? ToUrl(p.Url) : p.Url;
+                                                <a class="btn btn-sm btn-outline-secondary" href="@videoUrl" target="_blank" rel="noopener">
                                                     <i class="bi bi-play-circle"></i> Xem video
                                                 </a>
                                             }
