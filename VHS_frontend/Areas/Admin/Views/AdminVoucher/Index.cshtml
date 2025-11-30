@@ -148,10 +148,14 @@
                         var sShow = v.StartDate?.ToString("dd/MM/yyyy") ?? "—";
                         var eShow = v.EndDate?.ToString("dd/MM/yyyy") ?? "—";
                         var tState = v.IsUpcoming ? "upcoming" : (v.IsExpired ? "expired" : "started");
+                        // Tự động tính toán IsActive dựa trên trạng thái thời gian (đồng bộ với backend)
+                        // Nếu đang trong thời gian (started) → IsActive = true, ngược lại = false
+                        var computedIsActive = (tState == "started");
                         <tr data-id="@v.VoucherId"
                             data-start="@sStr"
                             data-end="@eStr"
-                            data-tstate="@tState">
+                            data-tstate="@tState"
+                            data-isactive="@(computedIsActive ? "true" : "false")">
                             <td class="fw-semibold mono">@v.Code</td>
                             <td class="description-text" title="@v.Description">@v.Description</td>
                             <td>@(v.DiscountPercent?.ToString("0.##") ?? "—")</td>
@@ -175,7 +179,11 @@
                             </td>
                             <td>@(v.UsedCount ?? 0) / @(v.UsageLimit?.ToString() ?? "∞")</td>
                             <td>
-                                @if (v.IsActive == true)
+                                @if (v.IsExpired)
+                                {
+                                    <span class="state expired">Hết hạn</span>
+                                }
+                                else if (computedIsActive)
                                 {
                                     <span class="state ok">Hoạt động</span>
                                 }
@@ -501,6 +509,20 @@
           return '<span class="badge started">Đang diễn ra</span>';
         }
 
+        // Helper function để tạo stateHtml dựa trên cả isActive và trạng thái thời gian
+        function getStateHtml(isActive, tState) {
+          // Nếu đã hết hạn, luôn hiển thị "Hết hạn" bất kể IsActive
+          if (tState === 'expired') {
+            return '<span class="state expired">Hết hạn</span>';
+          }
+          // Nếu chưa hết hạn, mới xét IsActive
+          if (isActive === true) {
+            return '<span class="state ok">Hoạt động</span>';
+          } else {
+            return '<span class="state off">Tạm dừng</span>';
+          }
+        }
+
         // Hàm refresh lại trạng thái thời gian của tất cả voucher trong bảng
         function refreshAllTimeStates() {
           try {
@@ -548,6 +570,29 @@
               } else {
                 console.log('Không tìm thấy time-cell cho voucher:', tr);
               }
+              
+              // Tự động cập nhật IsActive dựa trên trạng thái thời gian (đồng bộ với backend)
+              // Logic: nếu đang trong thời gian (started) → IsActive = true, ngược lại = false
+              let isActive = false;
+              if (tState === 'started') {
+                isActive = true;
+              } else {
+                isActive = false; // expired hoặc upcoming
+              }
+              
+              // Cập nhật data-isactive để đồng bộ
+              tr.setAttribute('data-isactive', isActive ? 'true' : 'false');
+              if (tr.dataset) {
+                tr.dataset.isactive = isActive ? 'true' : 'false';
+              }
+              
+              // Cập nhật cột trạng thái (cột thứ 7, index 6) dựa trên cả isActive và tState
+              const tds = tr.querySelectorAll('td');
+              if (tds.length >= 7) {
+                // Cập nhật stateHtml dựa trên cả isActive và tState mới
+                const stateCell = tds[6];
+                stateCell.innerHTML = getStateHtml(isActive, tState);
+              }
             });
             
             // Debug: log thông tin
@@ -577,13 +622,40 @@
           const tbody = document.querySelector('#tblVouchers tbody');
           if (!tbody) return;
 
-          // Lấy date string và loại bỏ phần time nếu có
+          // Lấy date string và loại bỏ phần time nếu có - xử lý giống như khi edit
           let sStr = v.startDate || '';
           let eStr = v.endDate || '';
-          if (sStr.indexOf('T') !== -1) sStr = sStr.split('T')[0];
-          if (eStr.indexOf('T') !== -1) eStr = eStr.split('T')[0];
-          if (sStr.indexOf(' ') !== -1) sStr = sStr.split(' ')[0];
-          if (eStr.indexOf(' ') !== -1) eStr = eStr.split(' ')[0];
+          
+          // Xử lý date string: loại bỏ timezone, time, chỉ lấy YYYY-MM-DD
+          if (sStr) {
+            // Nếu có 'T' (ISO format), chỉ lấy phần date
+            if (sStr.indexOf('T') !== -1) {
+              sStr = sStr.split('T')[0];
+            }
+            // Nếu có space, chỉ lấy phần date
+            if (sStr.indexOf(' ') !== -1) {
+              sStr = sStr.split(' ')[0];
+            }
+            // Đảm bảo chỉ lấy 10 ký tự đầu (YYYY-MM-DD)
+            if (sStr.length > 10) {
+              sStr = sStr.substring(0, 10);
+            }
+          }
+          
+          if (eStr) {
+            // Nếu có 'T' (ISO format), chỉ lấy phần date
+            if (eStr.indexOf('T') !== -1) {
+              eStr = eStr.split('T')[0];
+            }
+            // Nếu có space, chỉ lấy phần date
+            if (eStr.indexOf(' ') !== -1) {
+              eStr = eStr.split(' ')[0];
+            }
+            // Đảm bảo chỉ lấy 10 ký tự đầu (YYYY-MM-DD)
+            if (eStr.length > 10) {
+              eStr = eStr.substring(0, 10);
+            }
+          }
           
           const sShow = formatDateYMDToDDMMYYYY(sStr);
           const eShow = formatDateYMDToDDMMYYYY(eStr);
@@ -592,13 +664,21 @@
           const maxAmount = v.discountMaxAmount ? formatNumber(v.discountMaxAmount) + 'đ' : '—';
           const used = v.usedCount || 0;
           const limit = v.usageLimit ? formatNumber(v.usageLimit) : '∞';
-          const stateHtml = v.isActive ? '<span class="state ok">Hoạt động</span>' : '<span class="state off">Tạm dừng</span>';
+          const stateHtml = getStateHtml(v.isActive, tState);
 
           const tr = document.createElement('tr');
           tr.setAttribute('data-id', v.voucherId);
           tr.setAttribute('data-start', sStr);
           tr.setAttribute('data-end', eStr);
           tr.setAttribute('data-tstate', tState);
+          tr.setAttribute('data-isactive', v.isActive === true ? 'true' : 'false');
+          // Cập nhật dataset (nếu có property tương ứng)
+          if (tr.dataset) {
+            tr.dataset.start = sStr;
+            tr.dataset.end = eStr;
+            tr.dataset.tstate = tState;
+            tr.dataset.isactive = v.isActive === true ? 'true' : 'false';
+          }
 
           tr.innerHTML = 
             '<td class="fw-semibold mono">' + (v.code || '') + '</td>' +
@@ -629,13 +709,40 @@
           const tr = document.querySelector('tr[data-id="' + v.voucherId + '"]');
           if (!tr) return;
 
-          // Lấy date string và loại bỏ phần time nếu có
+          // Lấy date string và loại bỏ phần time nếu có - xử lý giống như khi edit
           let sStr = v.startDate || '';
           let eStr = v.endDate || '';
-          if (sStr.indexOf('T') !== -1) sStr = sStr.split('T')[0];
-          if (eStr.indexOf('T') !== -1) eStr = eStr.split('T')[0];
-          if (sStr.indexOf(' ') !== -1) sStr = sStr.split(' ')[0];
-          if (eStr.indexOf(' ') !== -1) eStr = eStr.split(' ')[0];
+          
+          // Xử lý date string: loại bỏ timezone, time, chỉ lấy YYYY-MM-DD
+          if (sStr) {
+            // Nếu có 'T' (ISO format), chỉ lấy phần date
+            if (sStr.indexOf('T') !== -1) {
+              sStr = sStr.split('T')[0];
+            }
+            // Nếu có space, chỉ lấy phần date
+            if (sStr.indexOf(' ') !== -1) {
+              sStr = sStr.split(' ')[0];
+            }
+            // Đảm bảo chỉ lấy 10 ký tự đầu (YYYY-MM-DD)
+            if (sStr.length > 10) {
+              sStr = sStr.substring(0, 10);
+            }
+          }
+          
+          if (eStr) {
+            // Nếu có 'T' (ISO format), chỉ lấy phần date
+            if (eStr.indexOf('T') !== -1) {
+              eStr = eStr.split('T')[0];
+            }
+            // Nếu có space, chỉ lấy phần date
+            if (eStr.indexOf(' ') !== -1) {
+              eStr = eStr.split(' ')[0];
+            }
+            // Đảm bảo chỉ lấy 10 ký tự đầu (YYYY-MM-DD)
+            if (eStr.length > 10) {
+              eStr = eStr.substring(0, 10);
+            }
+          }
           
           const sShow = formatDateYMDToDDMMYYYY(sStr);
           const eShow = formatDateYMDToDDMMYYYY(eStr);
@@ -644,11 +751,20 @@
           const maxAmount = v.discountMaxAmount ? formatNumber(v.discountMaxAmount) + 'đ' : '—';
           const used = v.usedCount || 0;
           const limit = v.usageLimit ? formatNumber(v.usageLimit) : '∞';
-          const stateHtml = v.isActive ? '<span class="state ok">Hoạt động</span>' : '<span class="state off">Tạm dừng</span>';
+          const stateHtml = getStateHtml(v.isActive, tState);
 
+          // Cập nhật cả setAttribute và dataset để đảm bảo đồng bộ
           tr.setAttribute('data-start', sStr);
           tr.setAttribute('data-end', eStr);
           tr.setAttribute('data-tstate', tState);
+          tr.setAttribute('data-isactive', v.isActive === true ? 'true' : 'false');
+          // Cập nhật dataset (nếu có property tương ứng)
+          if (tr.dataset) {
+            tr.dataset.start = sStr;
+            tr.dataset.end = eStr;
+            tr.dataset.tstate = tState;
+            tr.dataset.isactive = v.isActive === true ? 'true' : 'false';
+          }
 
           const tds = tr.querySelectorAll('td');
           if (tds.length >= 7) {
@@ -1162,6 +1278,10 @@
                 const dto = await res.json();
                 vModal.hide();
                 updateVoucherRow(dto);
+                // Refresh lại trạng thái thời gian sau khi cập nhật để đảm bảo đúng
+                setTimeout(() => {
+                  refreshAllTimeStates();
+                }, 100);
                 showNotice('Cập nhật voucher thành công!', 'success', 2800);
                 // Reset form
                 vId.value = '';

@@ -615,8 +615,11 @@
                 const res = await fetch('@Url.Action("GetCartVouchers", "Cart", new { area = "Customer" })', { credentials:'same-origin' });
                 if(!res.ok) throw new Error('HTTP '+res.status);
                 const list = await res.json(); // []ReadVoucherByCustomerDTOs (camelCase từ server)
+                console.log('📋 Vouchers từ server:', list);
+                console.log('📋 Số lượng voucher:', list?.length || 0);
                 renderVouchers(list || []);
               }catch(e){
+                console.error('❌ Lỗi khi tải voucher:', e);
                 voucherListEl.innerHTML = '<div class="error">Không thể tải voucher.</div>';
               }
             }
@@ -624,11 +627,28 @@
             function renderVouchers(list){
               if(!voucherListEl) return;
               
-              // Lọc bỏ voucher hết hạn
+              console.log('🎫 Render vouchers, tổng số:', list?.length || 0);
+              
+              // Backend đã filter IsActive == true rồi, chỉ cần lọc bỏ voucher hết hạn ở frontend
+              // (và kiểm tra lại IsActive để đảm bảo an toàn)
               const validVouchers = (list || []).filter(v => {
                 const isExp = !!pick(v,'IsExpired','isExpired');
-                return !isExp; // Chỉ giữ lại voucher chưa hết hạn
+                const isActive = pick(v,'IsActive','isActive');
+                const code = pick(v,'Code','code') || '';
+                
+                // Debug từng voucher
+                console.log(`🎫 Voucher ${code}: isExpired=${isExp}, isActive=${isActive} (type: ${typeof isActive})`);
+                
+                // Chỉ giữ lại voucher chưa hết hạn và đang hoạt động
+                // Backend đã filter IsActive == true, nhưng kiểm tra lại để đảm bảo
+                const isValid = !isExp && (isActive === true || isActive === 'true' || isActive === 1);
+                if (!isValid) {
+                  console.log(`❌ Voucher ${code} bị loại: isExpired=${isExp}, isActive=${isActive}`);
+                }
+                return isValid;
               });
+              
+              console.log('✅ Vouchers hợp lệ sau khi filter:', validVouchers.length);
               
               if(!validVouchers.length){ 
                 voucherListEl.innerHTML = '<div class="muted">Bạn chưa có voucher nào.</div>'; 
@@ -644,6 +664,7 @@
                 const end    = pick(v,'EndDate','endDate');
 
                 const isExp  = !!pick(v,'IsExpired','isExpired');
+                const isActive = !!pick(v,'IsActive','isActive');
                 const canUse = !!pick(v,'CanUseNow','canUseNow');
                 const isUnl  = !!pick(v,'IsUnlimited','isUnlimited');
                 const rem    = pick(v,'RemainingUses','remainingUses');
@@ -688,7 +709,8 @@
                   }
                 })();
 
-                const usable = !isExp && isInDateRange && (isUnl || (rem ?? 0) > 0);
+                // Kiểm tra cả IsActive để đồng bộ với admin (backend đã tự động cập nhật IsActive)
+                const usable = isActive && !isExp && isInDateRange && (isUnl || (rem ?? 0) > 0);
                 const benefit = `${pct}%` + (maxAmt ? ` • tối đa ${VND(maxAmt)}` : '');
                 const limitTxt = isUnl ? 'Không giới hạn'
                   : `Còn ${rem ?? Math.max(0, (limit||0) - used)} lượt`;
@@ -748,11 +770,12 @@
                   if(!res.ok) throw new Error('HTTP '+res.status);
                   const list = await res.json() || [];
                   
-                  // Tìm voucher theo code (case-insensitive) và lọc bỏ voucher hết hạn
+                  // Tìm voucher theo code (case-insensitive) và lọc bỏ voucher hết hạn và không hoạt động
                   const found = list.find(v => {
                     const vCode = pick(v,'Code','code') || '';
                     const isExp = !!pick(v,'IsExpired','isExpired');
-                    return vCode.toLowerCase() === code.toLowerCase() && !isExp;
+                    const isActive = !!pick(v,'IsActive','isActive');
+                    return vCode.toLowerCase() === code.toLowerCase() && !isExp && isActive;
                   });
                   
                   if(found) {
