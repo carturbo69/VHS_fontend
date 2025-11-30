@@ -49,6 +49,58 @@ namespace VHS_frontend.Services.Customer
 
             return paymentUrl;
         }
+        public string CreatePaymentUrl(PaymentInformationModel model, HttpContext context, string overrideReturnUrl)
+        {
+            var timeZoneById = TimeZoneInfo.FindSystemTimeZoneById(
+                _configuration["TimeZoneId"] ?? "SE Asia Standard Time"
+            );
+
+            var tick = DateTime.Now.Ticks.ToString();
+
+            // Amount
+            var amountVnd = Math.Round(model.Amount, 0, MidpointRounding.AwayFromZero);
+            var amountInXu = (long)amountVnd * 100;
+
+            // Time & IP
+            var timeNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZoneById);
+
+            var pay = new VnPayLibrary();
+            var ip = pay.GetIpAddress(context);
+
+            //Request Data
+
+            pay.AddRequestData("vnp_Version", _configuration["Vnpay:Version"] ?? "2.1.0");
+            pay.AddRequestData("vnp_Command", _configuration["Vnpay:Command"] ?? "pay");
+            pay.AddRequestData("vnp_TmnCode", _configuration["Vnpay:TmnCode"] ?? "");
+
+            pay.AddRequestData("vnp_Amount", amountInXu.ToString());
+            pay.AddRequestData("vnp_CreateDate", timeNow.ToString("yyyyMMddHHmmss"));
+            pay.AddRequestData("vnp_CurrCode", _configuration["Vnpay:CurrCode"] ?? "VND");
+
+            pay.AddRequestData("vnp_IpAddr", ip);
+            pay.AddRequestData("vnp_Locale", _configuration["Vnpay:Locale"] ?? "vn");
+
+            // OrderInfo 
+            pay.AddRequestData("vnp_OrderInfo", model.OrderDescription);
+
+            pay.AddRequestData("vnp_OrderType", model.OrderType);
+
+            
+            pay.AddRequestData("vnp_ReturnUrl", overrideReturnUrl);
+
+            // Unique ref 
+            pay.AddRequestData("vnp_TxnRef", tick);
+
+            // ===== Tạo URL =====
+            var paymentUrl = pay.CreateRequestUrl(
+                _configuration["Vnpay:BaseUrl"] ?? "",
+                _configuration["Vnpay:HashSecret"] ?? ""
+            );
+
+            return paymentUrl;
+        }
+
+
 
         public PaymentResponseModel PaymentExecute(IQueryCollection collections)
         {
