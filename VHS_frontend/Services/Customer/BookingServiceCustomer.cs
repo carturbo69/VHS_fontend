@@ -210,7 +210,7 @@ namespace VHS_frontend.Services.Customer
 
             foreach (var it in (vm.Items ?? new List<BookItem>()))
             {
-                // ✅ chỉ dùng OptionIds do trang này post về
+                // chỉ dùng OptionIds do trang này post về
                 var pickedOptionIds = (it.OptionIds ?? new List<Guid>())
                                         .Where(id => id != Guid.Empty)
                                         .Distinct()
@@ -274,11 +274,11 @@ namespace VHS_frontend.Services.Customer
                 AccountId = accountId,
                 Address = vm.AddressText ?? string.Empty,
                 VoucherId = vm.VoucherId,
-                AddressId = vm.SelectedAddressId, // ✅ Lấy AddressId từ ViewModel
-                Latitude = vm.Address?.Latitude,   // ✅ Lấy Latitude từ Address
-                Longitude = vm.Address?.Longitude, // ✅ Lấy Longitude từ Address
-                RecipientName = vm.Address?.RecipientName ?? vm.RecipientFullName, // ✅ Lấy tên từ Address hoặc ViewModel
-                RecipientPhone = vm.Address?.RecipientPhone ?? vm.RecipientPhone, // ✅ Lấy số điện thoại từ Address hoặc ViewModel
+                AddressId = vm.SelectedAddressId, // Lấy AddressId từ ViewModel
+                Latitude = vm.Address?.Latitude,   // Lấy Latitude từ Address
+                Longitude = vm.Address?.Longitude, // Lấy Longitude từ Address
+                RecipientName = vm.Address?.RecipientName ?? vm.RecipientFullName, // Lấy tên từ Address hoặc ViewModel
+                RecipientPhone = vm.Address?.RecipientPhone ?? vm.RecipientPhone, // Lấy số điện thoại từ Address hoặc ViewModel
                 Items = items
             };
         }
@@ -324,7 +324,7 @@ namespace VHS_frontend.Services.Customer
         }
 
         /// <summary>
-        /// ✅ NEW: Lấy chi tiết lịch sử của 1 booking theo AccountId và BookingId.
+        /// NEW: Lấy chi tiết lịch sử của 1 booking theo AccountId và BookingId.
         /// </summary>
         public async Task<HistoryBookingDetailDTO?> GetHistoryDetailAsync(
         Guid accountId,
@@ -376,12 +376,76 @@ namespace VHS_frontend.Services.Customer
                 throw new HttpRequestException(errorMessage);
             }
 
-            return await resp.Content.ReadFromJsonAsync<HistoryBookingDetailDTO>(cancellationToken: cancellationToken);
+            // Debug: Đọc raw JSON để kiểm tra timeline
+            var rawJson = await resp.Content.ReadAsStringAsync(cancellationToken);
+            System.Diagnostics.Debug.WriteLine($"[GetHistoryDetailAsync] Raw JSON response length: {rawJson?.Length ?? 0}");
+            
+            // Parse JSON để kiểm tra timeline array
+            try
+            {
+                using var jsonDoc = System.Text.Json.JsonDocument.Parse(rawJson);
+                if (jsonDoc.RootElement.TryGetProperty("timeline", out var timelineProp) || 
+                    jsonDoc.RootElement.TryGetProperty("Timeline", out timelineProp))
+                {
+                    var timelineCount = timelineProp.GetArrayLength();
+                    System.Diagnostics.Debug.WriteLine($"[GetHistoryDetailAsync] Timeline count in JSON: {timelineCount}");
+                    foreach (var item in timelineProp.EnumerateArray())
+                    {
+                        var code = item.TryGetProperty("code", out var codeProp) ? codeProp.GetString() 
+                                 : item.TryGetProperty("Code", out codeProp) ? codeProp.GetString() : "";
+                        var title = item.TryGetProperty("title", out var titleProp) ? titleProp.GetString()
+                                  : item.TryGetProperty("Title", out titleProp) ? titleProp.GetString() : "";
+                        System.Diagnostics.Debug.WriteLine($"[GetHistoryDetailAsync]   - Code: {code}, Title: {title}");
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[GetHistoryDetailAsync] WARNING: No 'timeline' or 'Timeline' property found in JSON!");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GetHistoryDetailAsync] Error parsing JSON for debug: {ex.Message}");
+            }
+
+            // Sử dụng JsonSerializerOptions với PropertyNameCaseInsensitive để đảm bảo map đúng properties
+            // (Backend có thể trả về camelCase như "timeline" nhưng DTO là PascalCase "Timeline")
+            // KHÔNG set PropertyNamingPolicy vì sẽ override case-insensitive matching
+            var jsonOptions = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            // Deserialize từ raw JSON string (đã đọc ở trên)
+            var result = System.Text.Json.JsonSerializer.Deserialize<HistoryBookingDetailDTO>(rawJson, jsonOptions);
+            
+            // Debug: Kiểm tra sau khi deserialize
+            if (result != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GetHistoryDetailAsync] After deserialize - Timeline count: {result.Timeline?.Count ?? 0}");
+                if (result.Timeline != null && result.Timeline.Any())
+                {
+                    foreach (var evt in result.Timeline)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[GetHistoryDetailAsync]   Deserialized Event: Code={evt.Code}, Title={evt.Title}, Time={evt.Time}");
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[GetHistoryDetailAsync] WARNING: Timeline is null or empty after deserialize!");
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("[GetHistoryDetailAsync] ERROR: Deserialize returned null!");
+            }
+            
+            return result;
         }
 
 
         /// <summary>
-        /// ✅ Lấy thông tin yêu cầu huỷ/hoàn tiền cho màn hình CanceledDetail từ endpoint mới.
+        /// Lấy thông tin yêu cầu huỷ/hoàn tiền cho màn hình CanceledDetail từ endpoint mới.
         /// Sử dụng endpoint: api/Bookings/by-account/{accountId}/bookings/{bookingId}/refund-info
         /// </summary>
         public async Task<CancelBookingRequestDTO?> GetCancelInfoDemoAsync(

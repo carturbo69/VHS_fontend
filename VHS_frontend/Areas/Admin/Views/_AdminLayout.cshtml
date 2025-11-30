@@ -218,15 +218,30 @@
 
     <script>
         // =========================
-        // Sidebar: giữ trạng thái + chống giật khi load
+        // Sidebar: giữ trạng thái + chống giật khi load + mobile support
         // =========================
         (function () {
           const SIDEBAR_KEY = 'vhs-sidebar';
           const btn = document.getElementById('btnSidebarToggle');
+          const isMobile = () => window.innerWidth <= 992;
 
           function applySidebarState(state) {
             const collapsed = state === 'collapsed';
-            document.body.classList.toggle('sidebar-collapsed', collapsed);
+            
+            if (isMobile()) {
+              // Mobile: toggle class mobile-open thay vì collapsed
+              if (collapsed) {
+                document.body.classList.remove('sidebar-mobile-open');
+              } else {
+                document.body.classList.add('sidebar-mobile-open');
+              }
+              document.body.classList.remove('sidebar-collapsed');
+            } else {
+              // Desktop: dùng collapsed như cũ
+              document.body.classList.toggle('sidebar-collapsed', collapsed);
+              document.body.classList.remove('sidebar-mobile-open');
+            }
+            
             if (btn) {
               btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
               btn.classList.toggle('is-active', collapsed);
@@ -234,7 +249,11 @@
           }
 
           function currentState() {
-            return document.body.classList.contains('sidebar-collapsed') ? 'collapsed' : 'expanded';
+            if (isMobile()) {
+              return document.body.classList.contains('sidebar-mobile-open') ? 'expanded' : 'collapsed';
+            } else {
+              return document.body.classList.contains('sidebar-collapsed') ? 'collapsed' : 'expanded';
+            }
           }
 
           // Khởi tạo theo localStorage (fallback expanded)
@@ -258,6 +277,29 @@
               applySidebarState(next);
             });
           }
+
+          // Đóng sidebar khi click vào overlay trên mobile
+          document.addEventListener('click', (e) => {
+            if (isMobile() && document.body.classList.contains('sidebar-mobile-open')) {
+              const sidebar = document.getElementById('sidebar');
+              const overlay = e.target;
+              
+              // Nếu click vào overlay (body::before) hoặc bên ngoài sidebar
+              if (sidebar && !sidebar.contains(e.target) && !btn.contains(e.target)) {
+                document.body.classList.remove('sidebar-mobile-open');
+                localStorage.setItem(SIDEBAR_KEY, 'collapsed');
+              }
+            }
+          });
+
+          // Đóng sidebar khi resize từ mobile sang desktop
+          window.addEventListener('resize', () => {
+            if (!isMobile() && document.body.classList.contains('sidebar-mobile-open')) {
+              document.body.classList.remove('sidebar-mobile-open');
+              const saved = localStorage.getItem(SIDEBAR_KEY) || 'expanded';
+              applySidebarState(saved);
+            }
+          });
         })();
 
                   async function updateAdminChatUnreadCount() {

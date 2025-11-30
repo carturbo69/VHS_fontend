@@ -18,7 +18,7 @@
 
     var rawStatus = (Model?.Status ?? "").Trim();
 
-    // ✅ Fallback: Nếu NormalizedStatus không được set đúng, normalize từ rawStatus
+    // Fallback: Nếu NormalizedStatus không được set đúng, normalize từ rawStatus
     if (string.IsNullOrWhiteSpace(statusCode) || statusCode == rawStatus)
     {
         // Normalize rawStatus thủ công
@@ -45,7 +45,7 @@
     // Sử dụng IsPendingStatus property để check cả tiếng Anh và tiếng Việt
     var IsPending = Model?.IsPendingStatus ?? statusCode.Equals("Pending", StringComparison.OrdinalIgnoreCase);
     var IsConfirmed = statusCode.Equals("Confirmed", StringComparison.OrdinalIgnoreCase);
-    // ✅ Xử lý cả "InProgress" và "In Progress" (có khoảng trắng)
+    // Xử lý cả "InProgress" và "In Progress" (có khoảng trắng)
     var IsWorking = statusCode.Equals("InProgress", StringComparison.OrdinalIgnoreCase)
                  || rawStatus.Equals("In Progress", StringComparison.OrdinalIgnoreCase);
     var IsCompleted = statusCode.Equals("Completed", StringComparison.OrdinalIgnoreCase)
@@ -54,14 +54,14 @@
 
     var IsReviewed = Model?.HasReview == true;
 
-    // ✅ Chỉ đơn Hoàn thành thật sự (không phải ServiceCompleted) mới được phép đánh giá
+    // Chỉ đơn Hoàn thành thật sự (không phải ServiceCompleted) mới được phép đánh giá
     var canReview = IsCompleted && !IsServiceCompleted;
 
     // Steps chỉ áp dụng cho 4 trạng thái chính
     var IsFourStates = IsPending || IsConfirmed || IsWorking || IsCompleted;
 
     Func<decimal, string> currency = v => v.ToString("N0") + "đ";
-    var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+    var fallbackImg = Url.Content("~/images/vhs_logo.png");
 
     // Helper để lấy ảnh đầu tiên từ ServiceImages (có thể là JSON array hoặc comma-separated string)
     string? FirstImageOrDefault(string? images)
@@ -113,7 +113,7 @@
 
     string StatusHeadline(string code) => (code ?? "").Trim() switch
     {
-        // ✅ Nếu rawStatus là ServiceCompleted → câu riêng
+        // Nếu rawStatus là ServiceCompleted → câu riêng
         _ when rawStatus.Equals("ServiceCompleted", StringComparison.OrdinalIgnoreCase)
             => "Đang chờ bạn xác nhận hoàn thành",
 
@@ -147,7 +147,7 @@
     };
     var currentIndex = order.TryGetValue(statusCode, out var idx) ? idx : -1;
 
-    // ✅ Nếu là ServiceCompleted thì ép currentIndex về bước Completed
+    // Nếu là ServiceCompleted thì ép currentIndex về bước Completed
     if (IsServiceCompleted)
     {
         currentIndex = order["Completed"];
@@ -238,7 +238,7 @@
                 var reportId = ViewBag.ReportId as Guid?;
                 var isServiceCompleted = IsServiceCompleted; // dùng flag phía trên
 
-                @* ✅ Nếu là ServiceCompleted: hiện nút "Xác nhận hoàn thành" *@
+                @* Nếu là ServiceCompleted: hiện nút "Xác nhận hoàn thành" *@
                 @if (isServiceCompleted)
                 {
                     <form asp-area="Customer"
@@ -580,7 +580,7 @@
     <div class="card-block p-3 section-spacing">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
             <div class="d-flex align-items-center gap-2">
-                <img src="@GetProviderLogo(Model?.ProviderImages)" width="24" height="24" alt="@Model?.ProviderName" class="shop-logo" style="object-fit:cover;border-radius:4px;" onerror="this.src='/images/VeSinh.jpg';" />
+                <img src="@GetProviderLogo(Model?.ProviderImages)" width="24" height="24" alt="@Model?.ProviderName" class="shop-logo" style="object-fit:cover;border-radius:4px;" onerror="this.src='/images/vhs_logo.png';" />
                 <div class="fw-semibold">
                     @(!string.IsNullOrWhiteSpace(Model?.ProviderName) ? Model.ProviderName : "—")
                 </div>
@@ -976,6 +976,27 @@
 
 @section Scripts {
     <script>
+        // Debug: Log số lượng timeline events
+        console.log('[Timeline Debug] Total events in Model.Timeline:', @(Model?.Timeline?.Count ?? 0));
+        @if (Model?.Timeline != null && Model.Timeline.Any())
+        {
+            <text>
+            console.log('[Timeline Debug] Events:');
+            @foreach (var e in Model.Timeline)
+            {
+                <text>
+                console.log('  - Code: "@(e.Code ?? "")", Title: "@(e.Title ?? "")", Time: "@(e.Time.ToString("dd-MM-yyyy HH:mm"))"');
+                </text>
+            }
+            </text>
+        }
+        else
+        {
+            <text>
+            console.warn('[Timeline Debug] Model.Timeline is null or empty!');
+            </text>
+        }
+        
         document.addEventListener('DOMContentLoaded', function () {
             // Rating
             document.querySelectorAll('.rating').forEach(group => {

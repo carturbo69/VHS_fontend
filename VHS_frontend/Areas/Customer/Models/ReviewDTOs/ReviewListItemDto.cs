@@ -23,7 +23,7 @@
         public bool CanDelete { get; set; }              // <- server set
 
 
-        // 👇 MỚI: danh sách ảnh của đánh giá (tối đa 5 ảnh sẽ hiển thị)
+        // MỚI: danh sách ảnh của đánh giá (tối đa 5 ảnh sẽ hiển thị)
         public List<string> ReviewImageUrls { get; set; } = new();
     }
 }

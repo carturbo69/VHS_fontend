@@ -54,7 +54,7 @@ namespace VHS_frontend.Services.Customer
                             ProvinceName = item.TryGetProperty("provinceName", out var province) ? province.GetString() ?? "" : "",
                             RecipientName = item.TryGetProperty("recipientName", out var recName) && recName.ValueKind != JsonValueKind.Null ? recName.GetString() : null,
                             RecipientPhone = item.TryGetProperty("recipientPhone", out var recPhone) && recPhone.ValueKind != JsonValueKind.Null ? recPhone.GetString() : null,
-                            // ✅ Lấy tọa độ từ API
+                            // Lấy tọa độ từ API
                             Latitude = item.TryGetProperty("latitude", out var lat) && lat.ValueKind != JsonValueKind.Null ? lat.GetDouble() : null,
                             Longitude = item.TryGetProperty("longitude", out var lng) && lng.ValueKind != JsonValueKind.Null ? lng.GetDouble() : null
                         };
@@ -103,7 +103,7 @@ namespace VHS_frontend.Services.Customer
                         ProvinceName = data.TryGetProperty("provinceName", out var province) ? province.GetString() ?? "" : "",
                         RecipientName = data.TryGetProperty("recipientName", out var recName) && recName.ValueKind != JsonValueKind.Null ? recName.GetString() : null,
                         RecipientPhone = data.TryGetProperty("recipientPhone", out var recPhone) && recPhone.ValueKind != JsonValueKind.Null ? recPhone.GetString() : null,
-                        // ✅ Lấy tọa độ từ API
+                        // Lấy tọa độ từ API
                         Latitude = data.TryGetProperty("latitude", out var lat) && lat.ValueKind != JsonValueKind.Null ? lat.GetDouble() : null,
                         Longitude = data.TryGetProperty("longitude", out var lng) && lng.ValueKind != JsonValueKind.Null ? lng.GetDouble() : null
                     };

@@ -27,50 +27,52 @@
     }
 }
 
-<style>
-/* CRITICAL FIX - Force chat icon on notification page */
-/* Let Bootstrap Icons CSS handle content, just ensure visibility */
-body .site-header a.icon-btn.chat-btn i#chatIcon.bi.bi-chat-dots-fill.fs-4::before,
-body .site-header .nav-actions .chat-btn i#chatIcon.bi.bi-chat-dots-fill::before,
-html body #chatIcon.bi.bi-chat-dots-fill::before,
-i#chatIcon.bi-chat-dots-fill::before,
-i#chatIcon.bi::before,
-#chatIcon::before {
-    font-family: "bootstrap-icons" !important;
-    font-style: normal !important;
-    font-weight: normal !important;
-    font-variant: normal !important;
-    text-transform: none !important;
-    line-height: 1 !important;
-    -webkit-font-smoothing: antialiased !important;
-    -moz-osx-font-smoothing: grayscale !important;
-    display: inline-block !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    width: auto !important;
-    height: auto !important;
-    position: static !important;
-    left: auto !important;
-    top: auto !important;
-    z-index: auto !important;
+@section Styles {
+    <!-- Load sau tất cả CSS khác để có priority cao nhất -->
+    <link rel="stylesheet" href="~/css/notification-page-fix.css" asp-append-version="true" />
+    <style>
+        /* Inline style để đảm bảo priority cao nhất */
+        body .notification-page .site-header .more-menu-btn,
+        body .notification-page .site-header .nav-actions-mobile .more-menu-btn {
+            display: grid !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+        
+        body .notification-page .site-header .more-menu-btn i,
+        body .notification-page .site-header .more-menu-btn .bi-three-dots-vertical {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            color: #ffffff !important;
+        }
+        
+        body .notification-page .site-header .chat-btn,
+        body .notification-page .site-header .chat-btn i#chatIcon {
+            display: grid !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        
+        body .notification-page .site-header #chatIcon {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            color: #ffffff !important;
+        }
+        
+        @@media (max-width: 767px) {
+            body .notification-page .site-header .nav-actions-mobile {
+                display: block !important;
+            }
+            
+            body .notification-page .site-header .more-menu-btn {
+                display: grid !important;
+            }
+        }
+    </style>
 }
-
-/* Ensure chat icon element itself is visible */
-#chatIcon,
-i#chatIcon,
-.bi-chat-dots-fill#chatIcon,
-a.chat-btn > #chatIcon {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: static !important;
-    left: auto !important;
-    top: auto !important;
-    width: auto !important;
-    height: auto !important;
-}
-
-</style>
 
 @Html.AntiForgeryToken()
 
@@ -195,6 +197,70 @@ a.chat-btn > #chatIcon {
 
 @section Scripts {
     <script>
+        // Force fix icons visibility on notification page
+        (function() {
+            function forceIconsVisible() {
+                // Fix more menu button (icon 3 chấm)
+                const moreMenuBtn = document.querySelector('.more-menu-btn');
+                if (moreMenuBtn) {
+                    moreMenuBtn.style.setProperty('display', 'grid', 'important');
+                    moreMenuBtn.style.setProperty('visibility', 'visible', 'important');
+                    moreMenuBtn.style.setProperty('opacity', '1', 'important');
+                    moreMenuBtn.style.setProperty('pointer-events', 'auto', 'important');
+                    
+                    const moreMenuIcon = moreMenuBtn.querySelector('i, .bi-three-dots-vertical');
+                    if (moreMenuIcon) {
+                        moreMenuIcon.style.setProperty('display', 'inline-block', 'important');
+                        moreMenuIcon.style.setProperty('visibility', 'visible', 'important');
+                        moreMenuIcon.style.setProperty('opacity', '1', 'important');
+                        moreMenuIcon.style.setProperty('color', '#ffffff', 'important');
+                    }
+                }
+                
+                // Fix nav-actions-mobile
+                const navActionsMobile = document.querySelector('.nav-actions-mobile');
+                if (navActionsMobile && window.innerWidth <= 767) {
+                    navActionsMobile.style.setProperty('display', 'block', 'important');
+                    navActionsMobile.style.setProperty('visibility', 'visible', 'important');
+                    navActionsMobile.style.setProperty('opacity', '1', 'important');
+                }
+                
+                // Fix chat icon
+                const chatIcon = document.getElementById('chatIcon');
+                const chatBtn = document.querySelector('.chat-btn');
+                if (chatIcon) {
+                    chatIcon.style.setProperty('display', 'inline-block', 'important');
+                    chatIcon.style.setProperty('visibility', 'visible', 'important');
+                    chatIcon.style.setProperty('opacity', '1', 'important');
+                    chatIcon.style.setProperty('color', '#ffffff', 'important');
+                }
+                if (chatBtn && window.innerWidth > 767) {
+                    chatBtn.style.setProperty('display', 'grid', 'important');
+                    chatBtn.style.setProperty('visibility', 'visible', 'important');
+                    chatBtn.style.setProperty('opacity', '1', 'important');
+                }
+            }
+            
+            // Apply immediately
+            forceIconsVisible();
+            
+            // Apply after DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', forceIconsVisible);
+            } else {
+                forceIconsVisible();
+            }
+            
+            // Apply multiple times to ensure it sticks
+            setTimeout(forceIconsVisible, 100);
+            setTimeout(forceIconsVisible, 500);
+            setTimeout(forceIconsVisible, 1000);
+            
+            // Apply on window resize
+            window.addEventListener('resize', forceIconsVisible);
+        })();
+        
+        // Original script continues...
         // XÓA BỎ HOÀN TOÀN đóm xanh ngay khi load (nhưng giữ lại số thông báo)
         function forceRemoveGreenDots() {
             // Remove tất cả unread indicators (nhưng không xóa notification badge chính)

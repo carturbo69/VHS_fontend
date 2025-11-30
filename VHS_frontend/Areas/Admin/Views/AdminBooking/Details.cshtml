@@ -184,7 +184,7 @@
                 <div class="card-body">
                     <p><strong>Thời gian thực hiện:</strong> @Model.BookingTime.ToString("dd/MM/yyyy HH:mm")</p>
                     
-                    @* ✅ Hiển thị địa chỉ từ Booking.Address (không dùng UserAddress nữa) *@
+                    @* Hiển thị địa chỉ từ Booking.Address (không dùng UserAddress nữa) *@
                     <p><strong>Địa chỉ:</strong> @Model.Address</p>
                     @if (!string.IsNullOrEmpty(Model.RecipientName))
                     {
@@ -231,47 +231,7 @@
                 </div>
             </div>
 
-            <!-- Checker Records -->
-            @if (Model.CheckerRecords.Any())
-            {
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="bi bi-camera me-2"></i>
-                            Check-in/Check-out
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        @foreach (var record in Model.CheckerRecords)
-                        {
-                            <div class="checker-record mb-3 p-3 border rounded">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <strong>@record.ForStatus</strong>
-                                    <small class="text-muted">@record.UploadedAt.ToString("dd/MM/yyyy HH:mm")</small>
-                                </div>
-                                @if (!string.IsNullOrEmpty(record.StaffName))
-                                {
-                                    <p class="mb-2"><small>Bởi: @record.StaffName</small></p>
-                                }
-                                @if (record.MediaType.Contains("image"))
-                                {
-                                    <img src="@record.FileUrl" alt="Checker media" class="img-fluid rounded" />
-                                }
-                                else if (record.MediaType.Contains("video"))
-                                {
-                                    <video controls class="w-100 rounded">
-                                        <source src="@record.FileUrl" type="video/mp4" />
-                                    </video>
-                                }
-                                @if (!string.IsNullOrEmpty(record.Description))
-                                {
-                                    <p class="mt-2 mb-0"><em>@record.Description</em></p>
-                                }
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
+            @* Checker Records đã được hiển thị trong Timeline, không cần section riêng nữa *@
         </div>
 
         <!-- Right Column -->
@@ -457,7 +417,7 @@
                     }
                     @if (isConfirmedPayment)
                     {
-                        // ✨ ĐỒNG BỘ: Kiểm tra chưa thanh toán - logic giống Provider
+                        // ĐỒNG BỘ: Kiểm tra chưa thanh toán - logic giống Provider
                         var paymentStatusLowerCheck = (Model.PaymentStatus ?? string.Empty).ToLower().Trim();
                         var isUnpaid = string.IsNullOrEmpty(Model.PaymentStatus) || 
                                      paymentStatusLowerCheck == "chưa xác định" ||
@@ -470,12 +430,12 @@
                         
                         if (isUnpaid)
                         {
-                            // ✨ QUAN TRỌNG: Timer PHẢI bắt đầu từ ConfirmedAt (thời gian provider xác nhận)
+                            // QUAN TRỌNG: Timer PHẢI bắt đầu từ ConfirmedAt (thời gian provider xác nhận)
                             // Không dùng CreatedAt cho Confirmed booking - timer chỉ bắt đầu từ khi xác nhận
                             var cancelMinutes = Model.AutoCancelMinutes ?? 30; // Sử dụng AutoCancelMinutes từ model, mặc định 30 phút
                             DateTime validConfirmedAt;
                             
-                            // ✨ PHẢI dùng ConfirmedAt từ database (để đồng bộ với provider)
+                            // PHẢI dùng ConfirmedAt từ database (để đồng bộ với provider)
                             // Khi provider xác nhận đơn, ConfirmedAt được lưu vào database ngay lập tức
                             if (Model.ConfirmedAt.HasValue && 
                                 Model.ConfirmedAt.Value != default(DateTime) && 
@@ -499,9 +459,9 @@
                                 validConfirmedAt = DateTime.Now;
                             }
                             
-                            // ✨ QUAN TRỌNG: Tính cancelTime từ ConfirmedAt + cancelMinutes (KHÔNG phải CreatedAt)
+                            // QUAN TRỌNG: Tính cancelTime từ ConfirmedAt + cancelMinutes (KHÔNG phải CreatedAt)
                             // cancelTime = ConfirmedAt (thời gian xác nhận) + autoCancelMinutes
-                            // ✨ ĐỒNG BỘ: Dùng cùng format với Provider để đảm bảo timezone nhất quán
+                            // ĐỒNG BỘ: Dùng cùng format với Provider để đảm bảo timezone nhất quán
                             var cancelTime = validConfirmedAt.AddMinutes(cancelMinutes);
                             var confirmedAtStr = Model.ConfirmedAt.HasValue && 
                                                 Model.ConfirmedAt.Value != default(DateTime) && 
@@ -562,31 +522,7 @@
                         || code == "CHECK OUT";
 
                         var staffName = string.IsNullOrWhiteSpace(Model?.StaffName) ? null : Model!.StaffName;
-                        
-                        // Lấy ảnh staff: ưu tiên từ Model.StaffImage, nếu không có thì lấy từ StaffList
-                        string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
-                        
-                        var staffImage = "/images/staff-placeholder.png";
-                        if (!string.IsNullOrWhiteSpace(Model?.StaffImage))
-                        {
-                            staffImage = ToUrl(Model.StaffImage);
-                        }
-                        else if (Model?.StaffId.HasValue == true && ViewBag.StaffList != null)
-                        {
-                            var staffListForImage = ViewBag.StaffList as List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>;
-                            var assignedStaff = staffListForImage?.FirstOrDefault(s => 
-                                Guid.TryParse(s.StaffId, out var staffGuid) && staffGuid == Model.StaffId.Value);
-                            if (assignedStaff != null && !string.IsNullOrWhiteSpace(assignedStaff.FaceImage))
-                            {
-                                staffImage = ToUrl(assignedStaff.FaceImage);
-                            }
-                        }
-                        
-                        // Fallback về placeholder nếu vẫn rỗng
-                        if (string.IsNullOrWhiteSpace(staffImage) || staffImage == string.Empty)
-                        {
-                            staffImage = "/images/staff-placeholder.png";
-                        }
+                        var staffImage = string.IsNullOrWhiteSpace(Model?.StaffImage) ? "/images/staff-placeholder.png" : Model!.StaffImage!;
 
                         <div class="tl-item">
                             <div class="fw-semibold">@e.Title</div>
@@ -699,9 +635,7 @@
 </div>
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/booking-management.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/order-management.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/provider-timeline.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-booking.css" asp-append-version="true" />
     <style>
         /* Status Pending Badge - Vàng (Chờ xử lý) */
         .status-badge-lg.status-pending {
@@ -827,7 +761,7 @@
 
 @section Scripts {
     <script>
-        // ✨ QUAN TRỌNG: Khai báo bookingId để dùng trong AutoCancelManager (giống Provider)
+        // QUAN TRỌNG: Khai báo bookingId để dùng trong AutoCancelManager (giống Provider)
         const bookingId = '@Model.BookingId';
         
         // Get backend URL
@@ -867,7 +801,7 @@
                         })
                     });
                     
-                    // ✨ QUAN TRỌNG: Kiểm tra cả HTTP status VÀ response body
+                    // QUAN TRỌNG: Kiểm tra cả HTTP status VÀ response body
                     const responseText = await response.text();
                     
                     if (!response.ok) {
@@ -885,7 +819,7 @@
                         return;
                     }
                     
-                    // ✨ KIỂM TRA success flag trong response body
+                    // KIỂM TRA success flag trong response body
                     if (result && result.success === true) {
                         // API thành công và database đã được cập nhật
                         // Reload để lấy dữ liệu mới từ database
@@ -902,7 +836,7 @@
                 }
             };
             
-            // ✨ Function countdown đơn giản - đồng bộ với Provider và Index
+            // Function countdown đơn giản - đồng bộ với Provider và Index
             function updateCountdown(timerSelector) {
                 const timer = document.querySelector(timerSelector);
                 if (!timer) return;
@@ -920,7 +854,7 @@
                 // Parse cancelTime - đơn giản, nhất quán
                 let cancelTime;
                 try {
-                    // ✨ ĐỒNG BỘ: Parse trực tiếp - JavaScript tự động xử lý timezone
+                    // ĐỒNG BỘ: Parse trực tiếp - JavaScript tự động xử lý timezone
                     // Đảm bảo format "yyyy-MM-ddTHH:mm:ss" được parse đúng
                     cancelTime = new Date(cancelTimeStr);
                     
@@ -965,7 +899,7 @@
                         return;
                     }
                     
-                    // ✨ QUAN TRỌNG: GỌI API TRƯỚC, KHÔNG CẬP NHẬT UI TRƯỚC
+                    // QUAN TRỌNG: GỌI API TRƯỚC, KHÔNG CẬP NHẬT UI TRƯỚC
                     // Hiển thị "Đang xử lý" trong khi gọi API
                     timer.innerHTML = '<span class="text-warning fw-bold">Đang hủy đơn...</span>';
                     timer.classList.add('text-warning');
@@ -997,7 +931,7 @@
                         timeStr = `${seconds} giây`;
                     }
                     
-                    // ✨ Tối ưu: Chỉ cập nhật text, không thay đổi structure để tránh nhấp nháy
+                    // Tối ưu: Chỉ cập nhật text, không thay đổi structure để tránh nhấp nháy
                     const timeText = `Còn ${timeStr}`;
                     const currentText = timer.textContent.trim();
                     
@@ -1014,7 +948,7 @@
                         }
                     }
                     
-                    // ✨ Cập nhật class màu một lần, không mỗi giây
+                    // Cập nhật class màu một lần, không mỗi giây
                     const shouldBeDanger = diff < 5 * 60 * 1000;
                     const shouldBeWarning = diff >= 5 * 60 * 1000 && diff < 15 * 60 * 1000;
                     const innerSpan = timer.querySelector('span');
@@ -1030,7 +964,7 @@
                 }
             }
             
-            // ✨ ĐỒNG BỘ: Debug - Log giá trị khi page load
+            // ĐỒNG BỘ: Debug - Log giá trị khi page load
             const confirmedTimer = document.querySelector('.countdown-timer-confirmed-unpaid');
             if (confirmedTimer) {
                 const cancelTime = confirmedTimer.getAttribute('data-cancel-time');
@@ -1060,18 +994,18 @@
                 });
             }
             
-            // ✨ ĐỒNG BỘ: Cập nhật countdown cho Pending và Confirmed chưa thanh toán
+            //  ĐỒNG BỘ: Cập nhật countdown cho Pending và Confirmed chưa thanh toán
             updateCountdown('.countdown-timer-detail');
             updateCountdown('.countdown-timer-confirmed-unpaid');
             
-            // ✨ ĐỒNG BỘ: Cập nhật timer mỗi giây (đồng bộ với Provider)
+            // ĐỒNG BỘ: Cập nhật timer mỗi giây (đồng bộ với Provider)
             // Sử dụng setInterval để đảm bảo cả hai trang đều cập nhật cùng lúc
             setInterval(function() {
                 updateCountdown('.countdown-timer-detail');
                 updateCountdown('.countdown-timer-confirmed-unpaid');
             }, 1000);
             
-            // ✨ ĐỒNG BỘ: Đảm bảo timer được cập nhật ngay khi page load
+            // ĐỒNG BỘ: Đảm bảo timer được cập nhật ngay khi page load
             // Điều này giúp đồng bộ với Provider khi cả hai trang cùng mở
             setTimeout(function() {
                 updateCountdown('.countdown-timer-detail');
@@ -1081,7 +1015,7 @@
             // ========== Auto-refresh để đồng bộ với Provider ==========
             let refreshInterval = null;
             
-            // ✨ Function đơn giản: Admin refresh để lấy data-cancel-time mới nhất từ server
+            // Function đơn giản: Admin refresh để lấy data-cancel-time mới nhất từ server
             let isRefreshing = false;
             async function refreshBookingDetail() {
                 if (isRefreshing) return;
@@ -1110,7 +1044,7 @@
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
                     
-                    // ✨ QUAN TRỌNG: Cập nhật status badge ngay lập tức nếu có thay đổi
+                    // QUAN TRỌNG: Cập nhật status badge ngay lập tức nếu có thay đổi
                     const newStatusBadge = doc.querySelector('.status-badge-lg');
                     const currentStatusBadge = document.querySelector('.status-badge-lg');
                     if (newStatusBadge && currentStatusBadge) {
@@ -1124,7 +1058,7 @@
                                 currentStatusBadge.textContent = newStatusText;
                                 currentStatusBadge.className = newStatusClass;
                                 
-                                // ✨ Cập nhật các phần tử liên quan đến status (chỉ khi cần)
+                                // Cập nhật các phần tử liên quan đến status (chỉ khi cần)
                                 const newCancelReasonSection = doc.querySelector('.cancel-reason-section');
                                 const currentCancelReasonSection = document.querySelector('.cancel-reason-section');
                                 if (newCancelReasonSection && currentCancelReasonSection) {
@@ -1135,7 +1069,7 @@
                                     }
                                 }
                                 
-                                // ✨ Cập nhật alert warning nếu có thay đổi
+                                // Cập nhật alert warning nếu có thay đổi
                                 const newAlertWarning = doc.querySelector('.alert-warning');
                                 const currentAlertWarning = document.querySelector('.alert-warning');
                                 if (newAlertWarning && currentAlertWarning) {
@@ -1153,7 +1087,7 @@
                         }
                     }
                     
-                    // ✨ Cập nhật Payment Status nếu có thay đổi (chỉ khi thực sự thay đổi)
+                    // Cập nhật Payment Status nếu có thay đổi (chỉ khi thực sự thay đổi)
                     const newPaymentStatus = doc.querySelector('.payment-status-badge');
                     const currentPaymentStatus = document.querySelector('.payment-status-badge');
                     if (newPaymentStatus && currentPaymentStatus) {
@@ -1170,7 +1104,7 @@
                         }
                     }
                     
-                    // ✨ Cập nhật Payment Method nếu có thay đổi (chỉ khi thực sự thay đổi)
+                    // Cập nhật Payment Method nếu có thay đổi (chỉ khi thực sự thay đổi)
                     const paymentMethodRows = doc.querySelectorAll('.payment-summary .d-flex');
                     const currentPaymentMethodRows = document.querySelectorAll('.payment-summary .d-flex');
                     if (paymentMethodRows.length === currentPaymentMethodRows.length) {
@@ -1188,7 +1122,7 @@
                         });
                     }
                     
-                    // ✨ Cập nhật Staff Assignment Card nếu có thay đổi (chỉ khi thực sự thay đổi)
+                    // Cập nhật Staff Assignment Card nếu có thay đổi (chỉ khi thực sự thay đổi)
                     const allNewCards = doc.querySelectorAll('.card');
                     const allCurrentCards = document.querySelectorAll('.card');
                     allNewCards.forEach((newCard, index) => {
@@ -1226,7 +1160,7 @@
                         }
                     });
                     
-                    // ✨ Cập nhật data-cancel-time từ server (đã tính từ ConfirmedAt hoặc CreatedAt)
+                    // Cập nhật data-cancel-time từ server (đã tính từ ConfirmedAt hoặc CreatedAt)
                     const newPendingTimer = doc.querySelector('.countdown-timer-detail');
                     const currentPendingTimer = document.querySelector('.countdown-timer-detail');
                     const newConfirmedTimer = doc.querySelector('.countdown-timer-confirmed-unpaid');
@@ -1248,14 +1182,14 @@
                         }
                     }
                     
-                    // ✨ Cập nhật Confirmed timer (tính từ ConfirmedAt) - ĐỒNG BỘ với Provider
+                    // Cập nhật Confirmed timer (tính từ ConfirmedAt) - ĐỒNG BỘ với Provider
                     if (newConfirmedTimer && currentConfirmedTimer) {
                         const newCancelTime = newConfirmedTimer.getAttribute('data-cancel-time');
                         const newConfirmedAt = newConfirmedTimer.getAttribute('data-confirmed-at');
                         const newAutoCancelMinutes = newConfirmedTimer.getAttribute('data-auto-cancel-minutes');
                         const oldCancelTime = currentConfirmedTimer.getAttribute('data-cancel-time');
                         
-                        // ✨ QUAN TRỌNG: Cập nhật data-cancel-time (đã được server tính từ ConfirmedAt)
+                        // QUAN TRỌNG: Cập nhật data-cancel-time (đã được server tính từ ConfirmedAt)
                         if (newCancelTime && newCancelTime !== oldCancelTime) {
                             // Debug: So sánh chi tiết trước khi cập nhật
                             const oldCancelTimeDate = oldCancelTime ? new Date(oldCancelTime) : null;
@@ -1274,7 +1208,7 @@
                             currentConfirmedTimer.setAttribute('data-cancel-time', newCancelTime);
                         }
                         
-                        // ✨ QUAN TRỌNG: Cập nhật data-confirmed-at (giống Provider)
+                        // QUAN TRỌNG: Cập nhật data-confirmed-at (giống Provider)
                         if (newConfirmedAt) {
                             const oldConfirmedAt = currentConfirmedTimer.getAttribute('data-confirmed-at');
                             if (newConfirmedAt !== oldConfirmedAt) {
@@ -1300,13 +1234,13 @@
                             currentConfirmedTimer.setAttribute('data-auto-cancel-minutes', newAutoCancelMinutes);
                         }
                         
-                        // ✨ Cập nhật countdown timer ngay lập tức nếu có thay đổi
+                        // Cập nhật countdown timer ngay lập tức nếu có thay đổi
                         if (newCancelTime && newCancelTime !== oldCancelTime) {
                             updateCountdown('.countdown-timer-confirmed-unpaid');
                         }
                     }
                     
-                    // ✨ Cập nhật Pending timer display nếu có
+                    // Cập nhật Pending timer display nếu có
                     if (newPendingTimer && currentPendingTimer) {
                         updateCountdown('.countdown-timer-detail');
                     }
@@ -1316,15 +1250,15 @@
                     isRefreshing = false;
                 }
             }
-            
-            // ✨ Tắt auto-refresh liên tục để tránh nhấp nháy
+           
+            // Tắt auto-refresh liên tục để tránh nhấp nháy
             // Chỉ refresh khi có thay đổi thực sự hoặc khi user thực hiện action
             // Refresh một lần sau khi page load để đảm bảo data đúng
             setTimeout(() => {
                 refreshBookingDetail();
             }, 1000); // Refresh một lần sau 1 giây khi page load
             
-            // ✨ KHÔNG auto-refresh liên tục để tránh nhấp nháy UI
+            // KHÔNG auto-refresh liên tục để tránh nhấp nháy UI
             // Chỉ refresh khi cần thiết (khi có action từ user hoặc khi countdown hết)
             
             // Tắt auto-refresh khi page unload
@@ -1363,13 +1297,13 @@
                     const timer = document.querySelector('.countdown-timer-confirmed-unpaid');
                     if (timer) {
                         const bookingId = timer.getAttribute('data-booking-id');
-                        // ✨ QUAN TRỌNG: Ưu tiên dùng data-confirmed-at cho Confirmed booking
+                        // QUAN TRỌNG: Ưu tiên dùng data-confirmed-at cho Confirmed booking
                         // Nếu không có data-confirmed-at, mới dùng data-created-at (backward compatibility)
                         const confirmedAt = timer.getAttribute('data-confirmed-at') || timer.getAttribute('data-created-at');
                         const cancelTimeStr = timer.getAttribute('data-cancel-time');
                         
                         // Lưu vào hidden inputs
-                        // ✨ QUAN TRỌNG: Lưu confirmedAt (không phải createdAt) để dùng trong UpdateCancelTime
+                        // QUAN TRỌNG: Lưu confirmedAt (không phải createdAt) để dùng trong UpdateCancelTime
                         const editBookingIdEl = document.getElementById('editBookingId');
                         const editCreatedAtEl = document.getElementById('editCreatedAt');
                         if (editBookingIdEl) {
@@ -1438,7 +1372,7 @@
             if (saveBtn) {
                 saveBtn.addEventListener('click', async function() {
                 const bookingId = document.getElementById('editBookingId').value;
-                // ✨ QUAN TRỌNG: createdAtStr thực ra là confirmedAt cho Confirmed booking
+                // QUAN TRỌNG: createdAtStr thực ra là confirmedAt cho Confirmed booking
                 // Đổi tên biến để rõ ràng hơn (nhưng vẫn dùng editCreatedAt vì đã lưu confirmedAt vào đó)
                 const createdAtStr = document.getElementById('editCreatedAt').value; // Thực ra là confirmedAt
                 const newRemainingMinutes = parseInt(newRemainingMinutesInput.value);

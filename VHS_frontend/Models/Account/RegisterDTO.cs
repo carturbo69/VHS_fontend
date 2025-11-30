@@ -9,7 +9,8 @@ namespace VHS_frontend.Models.Account
     public class RegisterDTO
     {
         [Required(ErrorMessage = "Vui lòng nhập tên đăng nhập")]
-        [MinLength(3, ErrorMessage = "Tên đăng nhập tối thiểu 3 ký tự")]
+        [MinLength(8, ErrorMessage = "Tên đăng nhập tối thiểu 8 ký tự")]
+        [RegularExpression(@"^[a-zA-Z0-9]+$", ErrorMessage = "Tên đăng nhập chỉ được chứa chữ cái và số, không có dấu và khoảng trắng")]
         public string Username { get; set; }
 
         [Required(ErrorMessage = "Vui lòng nhập email")]

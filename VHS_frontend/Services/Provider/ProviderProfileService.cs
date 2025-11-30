@@ -37,7 +37,7 @@ namespace VHS_frontend.Services.Provider
         {
             SetAuthHeader(token);
             
-            // ✅ Tạo MultipartFormDataContent để gửi file và form data
+            // Tạo MultipartFormDataContent để gửi file và form data
             var formData = new MultipartFormDataContent();
             
             // Thêm các field text
@@ -48,7 +48,7 @@ namespace VHS_frontend.Services.Provider
                 formData.Add(new StringContent(updateModel.Description), "Description");
             }
             
-            // ✅ Thêm file ảnh nếu có
+            // Thêm file ảnh nếu có
             if (updateModel.ImageFile != null && updateModel.ImageFile.Length > 0)
             {
                 var imageContent = new StreamContent(updateModel.ImageFile.OpenReadStream());

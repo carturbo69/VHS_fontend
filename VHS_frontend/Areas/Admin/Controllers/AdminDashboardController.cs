@@ -167,7 +167,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
             // Lấy dữ liệu booking/payment
             try
             {
-                // ✅ SỬA: Dùng giờ Việt Nam (UTC+7)
+                // SỬA: Dùng giờ Việt Nam (UTC+7)
                 var utcNow = DateTime.UtcNow;
                 var vietnamTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
                 var todayVN = vietnamTime.Date;

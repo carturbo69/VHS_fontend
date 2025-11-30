@@ -424,7 +424,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         PaymentMethod = "VNPAY",
                         GatewayTxnId = $"VNPAY:{transactionId ?? "UNKNOWN"}",
                         CartItemIdsForCleanup = null, // Không cleanup cart vì đã mất session
-                        PaymentTime = paymentTime // ✅ Gửi thời gian chính xác
+                        PaymentTime = paymentTime // Gửi thời gian chính xác
                     },
                     jwt,
                     ct);
@@ -441,7 +441,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     System.Diagnostics.Debug.WriteLine("[VNPay Warning] Không lấy được amount từ session trong ConfirmVnPayAfterLogin.");
                 }
                 
-                // ✅ Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API
+                // Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API
                 var serviceNamesAfterLogin = GetServiceNamesFromSession();
                 if (!serviceNamesAfterLogin.Any())
                 {
@@ -451,7 +451,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                 TempData["ToastSuccess"] = $"Thanh toán VNPay thành công! Mã giao dịch: {transactionId}";
                 
-                // 🎉 Hiển thị trang success đẹp
+                // Hiển thị trang success đẹp
                 ViewBag.TransactionId = transactionId;
                 ViewBag.BookingIds = bookingIdList;
                 ViewBag.ServiceNames = serviceNamesAfterLogin;
@@ -500,7 +500,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                     TempData["ToastError"] = errorMessage;
                     
-                    // 🔑 LẤY BOOKING IDS ĐỂ HỦY (từ OrderDescription hoặc session)
+                    // LẤY BOOKING IDS ĐỂ HỦY (từ OrderDescription hoặc session)
                     List<Guid>? bookingIdsToCancel = null;
                     var orderInfoCancel = response.OrderDescription ?? "";
                     
@@ -529,7 +529,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         }
                     }
                     
-                    // ✅ HỦY BOOKING ĐANG CHỜ (truyền bookingIds cụ thể nếu có)
+                    // HỦY BOOKING ĐANG CHỜ (truyền bookingIds cụ thể nếu có)
                     await CancelPendingFromIdsOrSessionAsync(bookingIdsToCancel, ct);
                     
                     // Nếu chưa login, hiển thị thông báo nhưng vẫn đã hủy booking
@@ -544,11 +544,11 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 // LẤY BOOKING IDS TỪ VNPAY RESPONSE TRƯỚC (không cần login)
                 var jwt = HttpContext.Session.GetString("JWToken");
                 
-                // 🔑 Parse booking IDs từ OrderDescription (format: "BOOKINGS:guid1,guid2,guid3")
+                // Parse booking IDs từ OrderDescription (format: "BOOKINGS:guid1,guid2,guid3")
                 var orderInfo = response.OrderDescription ?? "";
                 List<Guid> bookingIds;
                 
-                // 🐛 DEBUG: Log để xem VNPay trả về gì
+                // DEBUG: Log để xem VNPay trả về gì
                 System.Diagnostics.Debug.WriteLine($"[VNPay Debug] OrderDescription: '{orderInfo}'");
                 System.Diagnostics.Debug.WriteLine($"[VNPay Debug] TransactionId: {response.TransactionId}");
                 
@@ -575,7 +575,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     
                     if (string.IsNullOrWhiteSpace(pendingBookingsCsv))
                     {
-                        // ❌ Không tìm thấy ở cả 2 nơi → Hiển thị debug info
+                        // Không tìm thấy ở cả 2 nơi → Hiển thị debug info
                         var debugInfo = $@"
                         <h2>Debug Info - VNPay Callback</h2>
                         <p><strong>Thanh toán thành công!</strong></p>
@@ -609,10 +609,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     return RedirectToAction("Index", "Cart", new { area = "Customer" });
                 }
 
-                // ✅ Lấy tên dịch vụ - khai báo ở scope ngoài để dùng chung cho cả 2 trường hợp
+                //  Lấy tên dịch vụ - khai báo ở scope ngoài để dùng chung cho cả 2 trường hợp
                 Dictionary<Guid, string> serviceNames;
 
-                // ✅ Kiểm tra đăng nhập NGAY TẠI ĐÂY (sau khi đã parse được booking IDs)
+                //  Kiểm tra đăng nhập NGAY TẠI ĐÂY (sau khi đã parse được booking IDs)
                 if (NotLoggedIn())
                 {
                     // Tính total cho trường hợp chưa đăng nhập
@@ -623,14 +623,14 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     }
                     catch
                     {
-                        // ✅ Nếu không lấy được từ session, lấy từ VNPay response Amount (đã chia cho 100 rồi)
+                        // Nếu không lấy được từ session, lấy từ VNPay response Amount (đã chia cho 100 rồi)
                         if (response.Amount > 0)
                         {
                             totalBeforeLogin = response.Amount;
                         }
                     }
                     
-                    // ✅ Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API (nếu đã đăng nhập sau thanh toán)
+                    //  Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API (nếu đã đăng nhập sau thanh toán)
                     serviceNames = GetServiceNamesFromSession();
                     if (!serviceNames.Any() && !NotLoggedIn())
                     {
@@ -638,7 +638,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                         serviceNames = await GetServiceNamesFromApiAsync(bookingIds, ct);
                     }
                     
-                    // 🎉 Hiển thị trang success đẹp thay vì redirect login
+                    // Hiển thị trang success đẹp thay vì redirect login
                     ViewBag.TransactionId = response.TransactionId;
                     ViewBag.BookingIds = bookingIds;
                     ViewBag.ServiceNames = serviceNames;
@@ -688,7 +688,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 }
                 catch
                 {
-                    // ✅ Nếu không lấy được từ session, lấy từ VNPay response Amount (đã chia cho 100 rồi)
+                    // Nếu không lấy được từ session, lấy từ VNPay response Amount (đã chia cho 100 rồi)
                     if (response.Amount > 0)
                     {
                         total = response.Amount;
@@ -708,7 +708,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
 
                 TempData["ToastSuccess"] = "Thanh toán VNPay thành công!";
                 
-                // ✅ Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API
+                // Lấy tên dịch vụ - ưu tiên session, nếu không có thì lấy từ API
                 serviceNames = GetServiceNamesFromSession();
                 if (!serviceNames.Any())
                 {
@@ -716,7 +716,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     serviceNames = await GetServiceNamesFromApiAsync(bookingIds, ct);
                 }
                 
-                // 🎉 Hiển thị trang success đẹp
+                // Hiển thị trang success đẹp
                 ViewBag.TransactionId = response.TransactionId;
                 ViewBag.BookingIds = bookingIds;
                 ViewBag.ServiceNames = serviceNames;
