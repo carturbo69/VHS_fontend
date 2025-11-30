@@ -3,38 +3,45 @@
     ViewData["Title"] = "Quản lý đánh giá";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
 
-    // Group feedbacks theo ServiceId
+    // Lọc chỉ các feedback đang hiển thị (không bị xóa và đang visible) để tính thống kê
+    var visibleFeedbacks = Model.Where(f => !f.IsDeleted && f.IsVisible).ToList();
+
+    // Group feedbacks theo ServiceId (group tất cả feedback để hiển thị, nhưng chỉ tính thống kê cho feedback đang hiển thị)
     var serviceGroups = Model
         .GroupBy(f => new { f.ServiceId, f.ServiceName, f.ServiceImage, f.ProviderId, f.ProviderName })
-        .Select(g => new
-        {
-            ServiceId = g.Key.ServiceId ?? Guid.Empty,
-            ServiceName = g.Key.ServiceName ?? "Không xác định",
-            ServiceImage = g.Key.ServiceImage, // Lấy ServiceImage từ feedback đầu tiên
-            ProviderId = g.Key.ProviderId,
-            ProviderName = g.Key.ProviderName ?? "N/A",
-            Feedbacks = g.ToList(),
-            TotalFeedbacks = g.Count(),
-            AverageRating = g.Any() ? Math.Round(g.Average(f => f.Rating), 1) : 0.0,
-            FiveStarCount = g.Count(f => f.Rating == 5),
-            FourStarCount = g.Count(f => f.Rating == 4),
-            ThreeStarCount = g.Count(f => f.Rating == 3),
-            TwoStarCount = g.Count(f => f.Rating == 2),
-            OneStarCount = g.Count(f => f.Rating == 1)
+        .Select(g => {
+            // Lọc feedback đang hiển thị trong group này để tính thống kê
+            var visibleInGroup = g.Where(f => !f.IsDeleted && f.IsVisible).ToList();
+            return new
+            {
+                ServiceId = g.Key.ServiceId ?? Guid.Empty,
+                ServiceName = g.Key.ServiceName ?? "Không xác định",
+                ServiceImage = g.Key.ServiceImage, // Lấy ServiceImage từ feedback đầu tiên
+                ProviderId = g.Key.ProviderId,
+                ProviderName = g.Key.ProviderName ?? "N/A",
+                Feedbacks = g.ToList(), // Tất cả feedback để hiển thị (kể cả bị ẩn)
+                TotalFeedbacks = visibleInGroup.Count, // Chỉ đếm feedback đang hiển thị
+                AverageRating = visibleInGroup.Any() ? Math.Round(visibleInGroup.Average(f => f.Rating), 1) : 0.0, // Chỉ tính feedback đang hiển thị
+                FiveStarCount = visibleInGroup.Count(f => f.Rating == 5),
+                FourStarCount = visibleInGroup.Count(f => f.Rating == 4),
+                ThreeStarCount = visibleInGroup.Count(f => f.Rating == 3),
+                TwoStarCount = visibleInGroup.Count(f => f.Rating == 2),
+                OneStarCount = visibleInGroup.Count(f => f.Rating == 1)
+            };
         })
         .OrderByDescending(g => g.TotalFeedbacks)
         .ToList();
 
-    // Tính thống kê tổng thể
-    var totalFeedbacks = Model.Count;
-    var visibleCount = Model.Count(f => !f.IsDeleted && f.IsVisible);
+    // Tính thống kê tổng thể (chỉ tính các feedback đang hiển thị)
+    var totalFeedbacks = Model.Count; // Tổng tất cả feedback (kể cả ẩn)
+    var visibleCount = visibleFeedbacks.Count; // Số feedback đang hiển thị
     var deletedCount = Model.Count(f => f.IsDeleted);
-    var avgRating = Model.Any() ? Math.Round(Model.Average(f => f.Rating), 1) : 0.0;
-    var fiveStarCount = Model.Count(f => f.Rating == 5);
-    var fourStarCount = Model.Count(f => f.Rating == 4);
-    var threeStarCount = Model.Count(f => f.Rating == 3);
-    var twoStarCount = Model.Count(f => f.Rating == 2);
-    var oneStarCount = Model.Count(f => f.Rating == 1);
+    var avgRating = visibleFeedbacks.Any() ? Math.Round(visibleFeedbacks.Average(f => f.Rating), 1) : 0.0; // Chỉ tính feedback đang hiển thị
+    var fiveStarCount = visibleFeedbacks.Count(f => f.Rating == 5);
+    var fourStarCount = visibleFeedbacks.Count(f => f.Rating == 4);
+    var threeStarCount = visibleFeedbacks.Count(f => f.Rating == 3);
+    var twoStarCount = visibleFeedbacks.Count(f => f.Rating == 2);
+    var oneStarCount = visibleFeedbacks.Count(f => f.Rating == 1);
 }
 
 @section Styles {
@@ -165,7 +172,8 @@
     <div class="service-feedbacks">
         @foreach (var serviceGroup in serviceGroups)
         {
-            var hasFeedback = serviceGroup.TotalFeedbacks > 0 && serviceGroup.Feedbacks.Any();
+            // Kiểm tra có feedback nào (kể cả bị ẩn) để hiển thị danh sách
+            var hasFeedback = serviceGroup.Feedbacks.Any();
             var serviceIdStr = serviceGroup.ServiceId != Guid.Empty ? serviceGroup.ServiceId.ToString() : $"unknown-{serviceGroup.ServiceName.GetHashCode()}";
 
             <div class="service-feedback-group mb-4">
