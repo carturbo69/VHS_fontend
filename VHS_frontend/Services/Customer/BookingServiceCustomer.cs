@@ -189,6 +189,15 @@ namespace VHS_frontend.Services.Customer
             using var resp = await _httpClient.PostAsJsonAsync(url, dto, cancellationToken);
             resp.EnsureSuccessStatusCode();
         }
+        public async Task ConfirmPaymentsAsync(
+            ConfirmPaymentsDto dto,
+            CancellationToken cancellationToken = default)
+        {
+
+            const string url = "api/Bookings/confirm"; // CHUẨN route ở backend
+            using var resp = await _httpClient.PostAsJsonAsync(url, dto, cancellationToken);
+            resp.EnsureSuccessStatusCode();
+        }
 
         /// <summary>
         /// Map từ BookingViewModel (FE) sang CreateManyBookingsDto (API).
