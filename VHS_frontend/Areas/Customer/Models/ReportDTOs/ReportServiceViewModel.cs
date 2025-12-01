@@ -11,7 +11,7 @@ namespace VHS_frontend.Areas.Customer.Models.ReportDTOs
         public string ServiceTitle { get; set; } = string.Empty;
         public string ProviderName { get; set; } = string.Empty;
         public string? ProviderImages { get; set; } // Logo/ảnh của provider
-        public string ServiceImage { get; set; } = "/images/VeSinh.jpg";
+        public string ServiceImage { get; set; } = "/images/vhs_logo.png";
         public string? ServiceImages { get; set; } // giữ dạng string (JSON/comma) như DB
         
         // Pricing information (giống ListHistoryBooking)

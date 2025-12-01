@@ -50,7 +50,7 @@ namespace VHS_frontend.Services.Admin
             {
                 if (string.IsNullOrWhiteSpace(u)) return string.Empty;
                 if (Uri.TryCreate(u, UriKind.Absolute, out _)) return u;        // đã absolute
-                var baseUri = _http.BaseAddress ?? new Uri("http://localhost:5154/");
+                var baseUri = _http.BaseAddress ?? new Uri("http://apivhs.cuahangkinhdoanh.com/");
                 // chuẩn hóa slash để tránh // hoặc \\
                 var rel = u.Replace('\\', '/').TrimStart('/');
                 return new Uri(baseUri, rel).ToString();

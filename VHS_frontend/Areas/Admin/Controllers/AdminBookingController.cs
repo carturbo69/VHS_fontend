@@ -339,7 +339,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 using var httpClient = new HttpClient();
                 httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
                 
-                var backendUrl = "http://localhost:5154"; // Có thể lấy từ config
+                var backendUrl = "http://apivhs.cuahangkinhdoanh.com"; // Có thể lấy từ config
                 httpClient.BaseAddress = new Uri(backendUrl);
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
@@ -455,7 +455,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // Gọi API backend để cập nhật
                 using var httpClient = new HttpClient();
                 httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-                httpClient.BaseAddress = new Uri("http://localhost:5154");
+                httpClient.BaseAddress = new Uri("http://apivhs.cuahangkinhdoanh.com");
                 httpClient.Timeout = TimeSpan.FromSeconds(30);
 
                 var requestBody = new { minutes = newAutoCancelMinutes };

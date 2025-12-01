@@ -1087,7 +1087,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
                     ServiceTitle = bookingDetail.Service?.Title ?? "Dịch vụ",
                     ProviderName = bookingDetail.ProviderName ?? "Provider",
                     ProviderImages = bookingDetail.ProviderImages,
-                    ServiceImage = bookingDetail.Service?.Image ?? "/images/VeSinh.jpg",
+                    ServiceImage = bookingDetail.Service?.Image ?? "/images/vhs_logo.png",
                     ServiceImages = bookingDetail.ServiceImages,
                     ServicePrice = servicePrice,
                     OptionTotal = optionTotal,

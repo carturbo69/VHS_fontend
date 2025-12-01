@@ -19,7 +19,7 @@ console.log('=== chatbox.js LOADED ===');
         if (isProduction) {
             return '/api/ChatboxAI'; // Relative path cho production
         }
-        return 'http://localhost:5154/api/ChatboxAI'; // Development
+        return 'http://apivhs.cuahangkinhdoanh.com/api/ChatboxAI'; // Development
     };
     
     const getSignalRUrl = () => {
@@ -33,7 +33,7 @@ console.log('=== chatbox.js LOADED ===');
             // Dùng cùng origin với frontend
             return `${window.location.origin}/hubs/chat`;
         }
-        return 'http://localhost:5154/hubs/chat'; // Development
+        return 'http://apivhs.cuahangkinhdoanh.com/hubs/chat'; // Development
     };
 
     const CONFIG = {

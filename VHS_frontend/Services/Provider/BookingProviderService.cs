@@ -21,7 +21,7 @@ namespace VHS_frontend.Services.Provider
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
 
-            var baseUrl = _configuration["Apis:Backend"] ?? "http://localhost:5154";
+            var baseUrl = _configuration["Apis:Backend"] ?? "http://apivhs.cuahangkinhdoanh.com";
             _httpClient.BaseAddress = new Uri(baseUrl);
             Console.WriteLine($"[BookingProviderService] BaseAddress set to: {_httpClient.BaseAddress}");
         }

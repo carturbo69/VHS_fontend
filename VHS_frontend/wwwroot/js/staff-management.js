@@ -27,7 +27,7 @@ class StaffManagementService {
     async getStaffByProvider(providerId) {
         try {
             // Use backend API directly instead of frontend route
-            const url = `http://localhost:5154/api/staff/provider/${providerId}`;
+            const url = `http://apivhs.cuahangkinhdoanh.com/api/staff/provider/${providerId}`;
             console.log('Fetching staff from URL:', url);
             console.log('Provider ID:', providerId);
             
@@ -54,7 +54,7 @@ class StaffManagementService {
      */
     async getStaffById(staffId) {
         try {
-            const response = await fetch(`http://localhost:5154/api/staff/${staffId}`, {
+            const response = await fetch(`http://apivhs.cuahangkinhdoanh.com/api/staff/${staffId}`, {
                 method: 'GET',
                 headers: this.setAuthHeader()
             });
@@ -105,7 +105,7 @@ class StaffManagementService {
                 console.log(key, value);
             }
 
-            const response = await fetch(`http://localhost:5154/api/staff/provider/${providerId}`, {
+            const response = await fetch(`http://apivhs.cuahangkinhdoanh.com/api/staff/provider/${providerId}`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.token}`
@@ -162,7 +162,7 @@ class StaffManagementService {
 
             console.log('Update data:', updateData);
 
-            const response = await fetch(`http://localhost:5154/api/staff/${staffId}`, {
+            const response = await fetch(`http://apivhs.cuahangkinhdoanh.com/api/staff/${staffId}`, {
                 method: 'PUT',
                 headers: this.setAuthHeader(),
                 body: JSON.stringify(updateData)
@@ -194,7 +194,7 @@ class StaffManagementService {
         try {
             console.log('Deleting staff ID:', staffId);
             
-            const response = await fetch(`http://localhost:5154/api/staff/${staffId}`, {
+            const response = await fetch(`http://apivhs.cuahangkinhdoanh.com/api/staff/${staffId}`, {
                 method: 'DELETE',
                 headers: this.setAuthHeader()
             });

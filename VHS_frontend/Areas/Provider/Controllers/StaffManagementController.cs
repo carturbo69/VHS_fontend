@@ -261,7 +261,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
                 // Process current images to ensure proper URLs
                 var currentFaceImage = !string.IsNullOrEmpty(staff.FaceImage) 
-                    ? (staff.FaceImage.StartsWith("http") ? staff.FaceImage : $"http://localhost:5154{staff.FaceImage}")
+                    ? (staff.FaceImage.StartsWith("http") ? staff.FaceImage : $"http://apivhs.cuahangkinhdoanh.com{staff.FaceImage}")
                     : null;
 
                 var editModel = new StaffUpdateDTO
@@ -275,10 +275,10 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     PhoneNumber = staff.PhoneNumber,
                     CurrentFaceImage = currentFaceImage,
                     CurrentCitizenIDFrontImage = !string.IsNullOrEmpty(staff.CitizenIDFrontImage) 
-                        ? (staff.CitizenIDFrontImage.StartsWith("http") ? staff.CitizenIDFrontImage : $"http://localhost:5154{staff.CitizenIDFrontImage}")
+                        ? (staff.CitizenIDFrontImage.StartsWith("http") ? staff.CitizenIDFrontImage : $"http://apivhs.cuahangkinhdoanh.com{staff.CitizenIDFrontImage}")
                         : null,
                     CurrentCitizenIDBackImage = !string.IsNullOrEmpty(staff.CitizenIDBackImage) 
-                        ? (staff.CitizenIDBackImage.StartsWith("http") ? staff.CitizenIDBackImage : $"http://localhost:5154{staff.CitizenIDBackImage}")
+                        ? (staff.CitizenIDBackImage.StartsWith("http") ? staff.CitizenIDBackImage : $"http://apivhs.cuahangkinhdoanh.com{staff.CitizenIDBackImage}")
                         : null
                 };
 
@@ -419,7 +419,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             }
             
             // If it's a relative path, convert to full URL
-            return $"http://localhost:5154{currentImage}";
+            return $"http://apivhs.cuahangkinhdoanh.com{currentImage}";
         }
 
         /// <summary>

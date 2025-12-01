@@ -344,7 +344,7 @@ namespace VHS_frontend.Services
                         }
 
                         // Lấy logo từ images
-                        var logo = "/images/VeSinh.jpg";
+                        var logo = "/images/vhs_logo.png";
                         if (provider != null && !string.IsNullOrEmpty(provider.Images))
                         {
                             var images = provider.Images.Split(',', StringSplitOptions.RemoveEmptyEntries);
@@ -840,8 +840,8 @@ namespace VHS_frontend.Services
                 ServiceId = dto.ServiceId,
                 Name = dto.Title,
                 Description = dto.Description ?? "",
-                Image = images ?? "/images/VeSinh.jpg",
-                ImageUrl = images ?? "/images/VeSinh.jpg",
+                Image = images ?? "/images/vhs_logo.png",
+                ImageUrl = images ?? "/images/vhs_logo.png",
                 Unit = dto.UnitType ?? "/giờ", // Map UnitType từ DTO sang Unit
                 Price = dto.Price,
                 Rating = rating,
@@ -1026,7 +1026,7 @@ namespace VHS_frontend.Services
             {
                 Id = providerId.GetHashCode(),
                 Name = "Đối tác VHS",
-                Logo = "/images/VeSinh.jpg",
+                Logo = "/images/vhs_logo.png",
                 Status = "Online",
                 LastOnline = "Gần đây",
                 TotalServices = serviceCount,

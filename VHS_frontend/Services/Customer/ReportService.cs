@@ -22,7 +22,7 @@ namespace VHS_frontend.Services.Customer
         {
             try
             {
-                var baseUrl = _configuration["Apis:Backend"] ?? "http://localhost:5154";
+                var baseUrl = _configuration["Apis:Backend"] ?? "http://apivhs.cuahangkinhdoanh.com";
                 var url = $"{baseUrl}/api/Reports";
 
                 using var content = new MultipartFormDataContent();
@@ -101,7 +101,7 @@ namespace VHS_frontend.Services.Customer
         /// </summary>
         public async Task<PaginatedReportDTO?> GetReportHistoryAsync(ReportFilterDTO filter, string jwtToken, CancellationToken ct = default)
         {
-            var baseUrl = _configuration["Apis:Backend"] ?? "http://localhost:5154";
+            var baseUrl = _configuration["Apis:Backend"] ?? "http://apivhs.cuahangkinhdoanh.com";
             var queryParams = new List<string>
             {
                 $"Page={filter.Page}",
@@ -152,7 +152,7 @@ namespace VHS_frontend.Services.Customer
         /// </summary>
         public async Task<ReadReportDTO?> GetReportByIdAsync(Guid reportId, string jwtToken, CancellationToken ct = default)
         {
-            var baseUrl = _configuration["Apis:Backend"] ?? "http://localhost:5154";
+            var baseUrl = _configuration["Apis:Backend"] ?? "http://apivhs.cuahangkinhdoanh.com";
             var url = $"{baseUrl}/api/Reports/{reportId}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -187,7 +187,7 @@ namespace VHS_frontend.Services.Customer
         {
             try
             {
-                var baseUrl = _configuration["Apis:Backend"] ?? "http://localhost:5154";
+                var baseUrl = _configuration["Apis:Backend"] ?? "http://apivhs.cuahangkinhdoanh.com";
                 var url = $"{baseUrl}/api/Reports/by-booking/{bookingId}";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);

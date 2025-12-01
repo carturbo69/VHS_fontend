@@ -55,7 +55,7 @@ namespace VHS_frontend.Controllers
                         {
                             Id = providerId.Value.GetHashCode(),
                             Name = "Đối tác VHS",
-                            Logo = "/images/VeSinh.jpg",
+                            Logo = "/images/vhs_logo.png",
                             Status = "Online",
                             LastOnline = "Gần đây",
                             TotalServices = 0,
@@ -106,7 +106,7 @@ namespace VHS_frontend.Controllers
                     {
                         Id = providerId.Value.GetHashCode(),
                         Name = "Đối tác VHS",
-                        Logo = "/images/VeSinh.jpg",
+                        Logo = "/images/vhs_logo.png",
                         Status = "Online",
                         LastOnline = "Gần đây",
                         TotalServices = 0,
