@@ -1,6 +1,6 @@
 /**
  * Image Helper - Hàm helper để lấy URL ảnh đầy đủ từ path tương đối
- * Không cần hardcode URL như http://apivhs.cuahangkinhdoanh.com
+ * Không cần hardcode URL như https://apivhs.cuahangkinhdoanh.com
  */
 
 (function() {
@@ -22,7 +22,7 @@
         }
         
         // Development: mặc định apivhs.cuahangkinhdoanh.com
-        return 'http://apivhs.cuahangkinhdoanh.com';
+        return 'https://apivhs.cuahangkinhdoanh.com';
     }
 
     /**
@@ -33,7 +33,7 @@
      * 
      * @example
      * getImageUrl('/uploads/staff/abc.jpg')
-     * // Returns: 'http://apivhs.cuahangkinhdoanh.com/uploads/staff/abc.jpg'
+     * // Returns: 'https://apivhs.cuahangkinhdoanh.com/uploads/staff/abc.jpg'
      * 
      * getImageUrl('/uploads/staff/abc.jpg', 'https://api.example.com')
      * // Returns: 'https://api.example.com/uploads/staff/abc.jpg'

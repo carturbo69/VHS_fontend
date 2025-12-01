@@ -20,7 +20,7 @@ namespace VHS_frontend.Helpers
             }
 
             // Lấy base URL từ configuration
-            string baseUrl = "http://apivhs.cuahangkinhdoanh.com"; // Fallback mặc định
+            string baseUrl = "https://apivhs.cuahangkinhdoanh.com"; // Fallback mặc định
             
             if (configuration != null)
             {
@@ -31,7 +31,7 @@ namespace VHS_frontend.Helpers
             string normalizedPath = imagePath.StartsWith("/") ? imagePath : "/" + imagePath;
             return $"{baseUrl.TrimEnd('/')}{normalizedPath}";
         }
-        public static string GetImageUrl(string? imagePath, string baseUrl = "http://apivhs.cuahangkinhdoanh.com")
+        public static string GetImageUrl(string? imagePath, string baseUrl = "https://apivhs.cuahangkinhdoanh.com")
         {
             if (string.IsNullOrWhiteSpace(imagePath))
             {

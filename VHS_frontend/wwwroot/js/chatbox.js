@@ -16,10 +16,8 @@ console.log('=== chatbox.js LOADED ===');
         // Fallback: dùng relative path (nếu cùng domain) hoặc localhost cho development
         // Trong production, nên dùng relative path: '/api/ChatboxAI'
         const isProduction = window.location.hostname !== 'localhost';
-        if (isProduction) {
-            return '/api/ChatboxAI'; // Relative path cho production
-        }
-        return 'http://apivhs.cuahangkinhdoanh.com/api/ChatboxAI'; // Development
+        
+        return 'https://apivhs.cuahangkinhdoanh.com/api/ChatboxAI'; // Development
     };
     
     const getSignalRUrl = () => {
@@ -29,11 +27,8 @@ console.log('=== chatbox.js LOADED ===');
         
         // Fallback
         const isProduction = window.location.hostname !== 'localhost';
-        if (isProduction) {
-            // Dùng cùng origin với frontend
-            return `${window.location.origin}/hubs/chat`;
-        }
-        return 'http://apivhs.cuahangkinhdoanh.com/hubs/chat'; // Development
+        
+        return 'https://apivhs.cuahangkinhdoanh.com/hubs/chat'; // Development
     };
 
     const CONFIG = {

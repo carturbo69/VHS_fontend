@@ -111,7 +111,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
             ViewBag.ReturnUrl = Request.Query["returnUrl"].ToString();
             // Truyền backend base URL để view sử dụng (lấy từ HttpContext.RequestServices)
             var configuration = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-            ViewBag.BackendBase = configuration["Apis:Backend"] ?? "http://apivhs.cuahangkinhdoanh.com";
+            ViewBag.BackendBase = configuration["Apis:Backend"] ?? "https://apivhs.cuahangkinhdoanh.com";
             return View(item);
         }
     }

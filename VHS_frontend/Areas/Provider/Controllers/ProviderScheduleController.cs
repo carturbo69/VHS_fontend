@@ -18,7 +18,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
         private string GetApiBaseUrl()
         {
-            return _configuration["ApiSettings:BaseUrl"] ?? "http://apivhs.cuahangkinhdoanh.com";
+            return _configuration["ApiSettings:BaseUrl"] ?? "https://apivhs.cuahangkinhdoanh.com";
         }
 
         private string? GetJwtToken()

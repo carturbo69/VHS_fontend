@@ -64,10 +64,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (!imageUrl.startsWith('http')) {
                             // Nếu là path cũ từ wwwroot, vẫn hỗ trợ
                             if (imageUrl.startsWith('/wwwroot/')) {
-                                imageUrl = 'http://apivhs.cuahangkinhdoanh.com' + imageUrl;
+                                imageUrl = 'https://apivhs.cuahangkinhdoanh.com' + imageUrl;
                             } else {
                                 // Nếu là relative path, thêm base URL
-                                imageUrl = 'http://apivhs.cuahangkinhdoanh.com' + (imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl);
+                                imageUrl = 'https://apivhs.cuahangkinhdoanh.com' + (imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl);
                             }
                         }
                         

@@ -6,9 +6,9 @@
 const API_CONFIG = {
     // Base URLs for different environments
     baseURLs: {
-        development: 'https://localhost:7154',
+        development: 'https://apivhs.cuahangkinhdoanh.com',
         staging: 'https://staging-api.vhs.com',
-        production: 'https://api.vhs.com'
+        production: 'https://apivhs.cuahangkinhdoanh.com'
     },
     
     // Current environment
