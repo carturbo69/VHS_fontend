@@ -62,10 +62,28 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 return RedirectToAction("Login", "Account", new { area = "" });
             }
 
+            // Normalize status để đảm bảo backend nhận diện đúng
+            string? normalizedStatus = null;
+            if (!string.IsNullOrEmpty(status))
+            {
+                var statusLower = status.Trim().ToLower();
+                // Map "InProgress" thành các format có thể backend nhận diện
+                // Backend có thể dùng "InProgress", "In Progress", hoặc "In-Progress"
+                if (statusLower == "inprogress" || statusLower == "in-progress" || statusLower == "in progress")
+                {
+                    // Thử format "In Progress" (có khoảng trắng) vì nhiều backend dùng format này
+                    normalizedStatus = "In Progress";
+                }
+                else
+                {
+                    normalizedStatus = status;
+                }
+            }
+            
             var filter = new BookingFilterDTO
             {
                 ProviderId = providerId,
-                Status = status,
+                Status = normalizedStatus,
                 FromDate = fromDate,
                 ToDate = toDate,
                 SearchTerm = searchTerm,
@@ -73,7 +91,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 PageSize = pageSize
             };
 
-            Console.WriteLine($"[DEBUG] Calling API with ProviderId: {providerId}, Status: {status ?? "NULL"}");
+            Console.WriteLine($"[DEBUG] Calling API with ProviderId: {providerId}, Status: {normalizedStatus ?? "NULL"} (original: {status ?? "NULL"})");
             
             // LẤY TẤT CẢ ĐƠN HÀNG ACTIVE (không filter) để đếm Pending và Confirmed
             var allBookingsFilter = new BookingFilterDTO

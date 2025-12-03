@@ -21,6 +21,7 @@
         public Guid BookingId { get; set; }
         public DateTime BookingTime { get; set; }
         public DateTime? CreatedAt { get; set; } // Thời gian tạo booking
+        public DateTimeOffset? CompletedAt { get; set; } // Thời gian hoàn thành (CHECK OUT hoặc COMPLETED)
         public string Status { get; set; } = null!;
         public string Address { get; set; } = null!;
 

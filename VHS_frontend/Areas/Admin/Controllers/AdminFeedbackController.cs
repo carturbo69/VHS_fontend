@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Admin.Models.Feedback;
 using VHS_frontend.Services.Admin;
+using VHS_frontend.Services.Provider;
 
 namespace VHS_frontend.Areas.Admin.Controllers
 {
@@ -8,10 +9,20 @@ namespace VHS_frontend.Areas.Admin.Controllers
     public class AdminFeedbackController : Controller
     {
         private readonly AdminFeedbackService _feedbackService;
+        private readonly ProviderAdminService _providerAdminService;
+        private readonly ServiceManagementService _serviceManagementService;
+        private readonly ProviderProfileService _providerProfileService;
 
-        public AdminFeedbackController(AdminFeedbackService feedbackService)
+        public AdminFeedbackController(
+            AdminFeedbackService feedbackService,
+            ProviderAdminService providerAdminService,
+            ServiceManagementService serviceManagementService,
+            ProviderProfileService providerProfileService)
         {
             _feedbackService = feedbackService;
+            _providerAdminService = providerAdminService;
+            _serviceManagementService = serviceManagementService;
+            _providerProfileService = providerProfileService;
         }
 
         // Helper: kiểm tra quyền admin + gắn bearer nếu có
@@ -61,6 +72,66 @@ namespace VHS_frontend.Areas.Admin.Controllers
             try
             {
                 var feedbacks = await _feedbackService.GetAllAsync();
+                
+                // Lọc feedback chỉ hiển thị các dịch vụ có status "Active"
+                // Lấy danh sách tất cả services Active từ tất cả providers
+                var token = HttpContext.Session.GetString("JWToken");
+                var activeServiceIds = new HashSet<Guid>();
+                
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    try
+                    {
+                        _providerAdminService.SetBearerToken(token);
+                        var providers = await _providerAdminService.GetAllAsync(includeDeleted: false);
+                        
+                        foreach (var provider in providers)
+                        {
+                            try
+                            {
+                                // Lấy ProviderId từ AccountId
+                                var providerId = await _providerProfileService.GetProviderIdByAccountAsync(provider.Id.ToString(), token);
+                                if (!string.IsNullOrEmpty(providerId))
+                                {
+                                    // Lấy tất cả dịch vụ của provider
+                                    var services = await _serviceManagementService.GetServicesByProviderAsync(providerId, token);
+                                    if (services != null)
+                                    {
+                                        // Chỉ lấy các dịch vụ có Status = "Active"
+                                        foreach (var service in services.Where(s => string.Equals(s.Status, "Active", StringComparison.OrdinalIgnoreCase)))
+                                        {
+                                            if (service.ServiceId != Guid.Empty)
+                                            {
+                                                activeServiceIds.Add(service.ServiceId);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Bỏ qua lỗi khi lấy services của một provider
+                                continue;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Nếu có lỗi khi lấy danh sách providers/services, vẫn hiển thị feedback nhưng không lọc
+                    }
+                }
+                
+                // Lọc feedback: chỉ giữ lại feedback của các dịch vụ Active
+                // Nếu ServiceId là null hoặc không có trong danh sách Active, loại bỏ
+                if (activeServiceIds.Any())
+                {
+                    feedbacks = feedbacks.Where(f => 
+                        f.ServiceId.HasValue && activeServiceIds.Contains(f.ServiceId.Value)
+                    ).ToList();
+                }
+                // Nếu không lấy được danh sách Active services (do lỗi), vẫn hiển thị tất cả feedback
+                // để tránh mất dữ liệu khi có lỗi tạm thời
+                
                 return View(feedbacks);
             }
             catch (Exception ex)

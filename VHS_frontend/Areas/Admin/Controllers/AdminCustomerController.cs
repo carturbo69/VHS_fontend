@@ -65,10 +65,11 @@ namespace VHS_frontend.Areas.Admin.Controllers
         }
 
         [HttpDelete]
-        public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+        public async Task<IActionResult> Delete(Guid id, [FromBody] Dictionary<string, string>? body = null, CancellationToken ct = default)
         {
             AttachBearerIfAny();
-            var res = await _svc.DeleteAsync(id, ct);
+            var lockReason = body?.GetValueOrDefault("LockReason");
+            var res = await _svc.DeleteAsync(id, lockReason, ct);
             var text = await res.Content.ReadAsStringAsync(ct);
             return StatusCode((int)res.StatusCode, text);
         }

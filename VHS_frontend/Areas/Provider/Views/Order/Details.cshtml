@@ -239,6 +239,10 @@
                                             string.Equals(currentStatus, "Canceled", StringComparison.OrdinalIgnoreCase);
                 var isServiceCompletedCheck = string.Equals(currentStatus, "Service Completed", StringComparison.OrdinalIgnoreCase) ||
                                              string.Equals(currentStatus, "Service-Completed", StringComparison.OrdinalIgnoreCase);
+                
+                // Kiểm tra xem có event CHECK IN trong timeline không
+                var hasCheckedIn = Model?.Timeline != null && Model.Timeline.Any(e => 
+                    string.Equals((e.Code ?? "").Trim(), "CHECK IN", StringComparison.OrdinalIgnoreCase));
             }
             
             @* Chỉ hiển thị phần phân công nhân viên nếu đơn hàng chưa hoàn thành hoặc hủy (Service Completed vẫn hiển thị nhưng disable) *@
@@ -262,8 +266,8 @@
                                                              string.Equals((Model.Status ?? string.Empty).Trim(), "Service-Completed", StringComparison.OrdinalIgnoreCase);
                         }
                         
-                        @* Hiển thị "Đã phân công" khi status là Confirmed trở lên (bao gồm Service Completed) *@
-                        @if ((isConfirmedOrAbove || isServiceCompletedForStaff) && Model.StaffId.HasValue)
+                        @* Hiển thị "Đã phân công" khi status là Confirmed trở lên (bao gồm Service Completed) hoặc đã check-in *@
+                        @if ((isConfirmedOrAbove || isServiceCompletedForStaff || hasCheckedIn) && Model.StaffId.HasValue)
                         {
                             <div class="alert alert-success">
                                 <i class="bi bi-person-check-fill"></i>
@@ -272,6 +276,13 @@
                                 {
                                     <p class="mb-0 mt-2 small">
                                         Đơn hàng đã được nhân viên hoàn thành và đang chờ khách hàng xác nhận. 
+                                        Không thể thay đổi phân công nhân viên lúc này.
+                                    </p>
+                                }
+                                else if (hasCheckedIn)
+                                {
+                                    <p class="mb-0 mt-2 small">
+                                        Nhân viên đã bắt đầu làm việc (đã check-in). 
                                         Không thể thay đổi phân công nhân viên lúc này.
                                     </p>
                                 }
@@ -307,8 +318,8 @@
                             </div>
                         }
 
-                        @* Chỉ hiển thị phần chọn nhân viên khi chưa Service Completed *@
-                        @if (!isServiceCompletedForStaff && ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
+                        @* Chỉ hiển thị phần chọn nhân viên khi chưa Service Completed và chưa check-in *@
+                        @if (!isServiceCompletedForStaff && !hasCheckedIn && ViewBag.StaffList != null && ((List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>)ViewBag.StaffList).Any())
                         {
                             <div class="mt-3">
                                 <!-- Thông báo lỗi/thành công -->
@@ -372,8 +383,13 @@
                 </div>
                 <div class="card-body">
                     <div class="status-badge-wrapper mb-4">
-                        <span class="status-badge-lg status-@(Model.Status.ToLower().Replace(" ", "-"))">
-                            @GetStatusText(Model.Status)
+                        @{
+                            // Nếu đã check-in, hiển thị "Bắt đầu làm việc" thay vì status hiện tại
+                            var displayStatus = hasCheckedIn ? "Bắt đầu làm việc" : GetStatusText(Model.Status);
+                            var statusClass = hasCheckedIn ? "status-inprogress" : Model.Status.ToLower().Replace(" ", "-");
+                        }
+                        <span class="status-badge-lg status-@statusClass">
+                            @displayStatus
                         </span>
                     </div>
 
@@ -386,8 +402,8 @@
                                                  string.Equals(statusNorm, "Service-Completed", StringComparison.OrdinalIgnoreCase);
                         bool isCanceled  = string.Equals(statusNorm, "Canceled", StringComparison.OrdinalIgnoreCase) ||
                                           string.Equals(statusNorm, "Cancelled", StringComparison.OrdinalIgnoreCase);
-                        // Hiển thị nút nếu đơn chưa ở các trạng thái cuối cùng (bao gồm Service Completed)
-                        bool canAct = !(isConfirmed || isCompleted || isServiceCompleted || isCanceled);
+                        // Hiển thị nút nếu đơn chưa ở các trạng thái cuối cùng (bao gồm Service Completed) VÀ chưa check-in
+                        bool canAct = !(isConfirmed || isCompleted || isServiceCompleted || isCanceled || hasCheckedIn);
                         
                         // Kiểm tra xem có nhân viên nào không bị xóa không
                         var staffList = ViewBag.StaffList as List<VHS_frontend.Areas.Provider.Models.Staff.StaffDTO>;
@@ -468,6 +484,17 @@
                             <button type="button" class="btn btn-cancel" onclick="cancelOrder()">
                                 <i class="bi bi-x-circle"></i> Từ chối đơn hàng
                             </button>
+                        </div>
+                    }
+                    else if (hasCheckedIn)
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-check-circle"></i>
+                            <strong>Nhân viên đã bắt đầu làm việc</strong>
+                            <p class="mb-0 mt-2 small">
+                                Nhân viên <strong>@(Model.StaffName ?? "chưa phân công")</strong> đã check-in và đang thực hiện công việc. 
+                                Bạn không thể xác nhận hoặc từ chối đơn hàng lúc này.
+                            </p>
                         </div>
                     }
                     else if (Model.Status == "Confirmed")
@@ -1386,6 +1413,23 @@
             
             // Kiểm tra trạng thái booking
             const bookingStatus = '@Model.Status'.trim().toLowerCase();
+            
+            // Kiểm tra xem có event CHECK IN trong timeline không
+            const timelineItems = @Html.Raw(Json.Serialize(Model?.Timeline ?? new List<VHS_frontend.Areas.Provider.Models.Booking.TrackingEventDTO>()));
+            const hasCheckedIn = timelineItems && timelineItems.some(e => {
+                const code = (e.code || '').trim().toUpperCase();
+                return code === 'CHECK IN';
+            });
+            
+            // ✨ Không cho phép gán khi đã check-in
+            if (hasCheckedIn) {
+                showStaffMessage(
+                    '<i class="bi bi-check-circle me-2"></i><strong>Nhân viên đã bắt đầu làm việc (đã check-in).</strong><br>' +
+                    'Không thể thay đổi phân công nhân viên khi nhân viên đã bắt đầu làm việc.',
+                    'info'
+                );
+                return;
+            }
             
             // ✨ Chỉ cho phép gán khi status là Confirmed
             if (bookingStatus !== 'confirmed') {

@@ -569,14 +569,70 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 return Json(new { success = false, message = "Bạn cần đăng nhập." });
             }
 
+            // Clean OTP before validation to avoid ModelState errors
+            if (!string.IsNullOrWhiteSpace(model.OTP))
+            {
+                model.OTP = model.OTP.Trim().Replace(" ", "").Replace("-", "").Replace(".", "");
+            }
+
+            // Clear OTP validation errors from ModelState and re-validate manually
+            ModelState.Remove("OTP");
+            
+            // Validate OTP
+            if (string.IsNullOrWhiteSpace(model.OTP))
+            {
+                ModelState.AddModelError("OTP", "Mã OTP là bắt buộc");
+            }
+            else if (model.OTP.Length != 6 || !System.Text.RegularExpressions.Regex.IsMatch(model.OTP, @"^\d{6}$"))
+            {
+                ModelState.AddModelError("OTP", "Mã OTP phải có đúng 6 chữ số");
+            }
+
+            // Validate ModelState
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(x => x.Value?.Errors.Count > 0)
+                    .SelectMany(x => x.Value.Errors.Select(e => e.ErrorMessage))
+                    .ToList();
+                
+                // Translate common validation errors to Vietnamese
+                var translatedErrors = errors.Select(e =>
+                {
+                    if (e.Contains("OTP") && e.Contains("required") || e.Contains("không được để trống"))
+                        return "Mã OTP là bắt buộc";
+                    if (e.Contains("OTP") && (e.Contains("6") || e.Contains("ký tự")))
+                        return "Mã OTP phải có đúng 6 chữ số";
+                    if (e.Contains("Email") && e.Contains("required") || e.Contains("không được để trống"))
+                        return "Email mới là bắt buộc";
+                    if (e.Contains("Email") && e.Contains("invalid") || e.Contains("không hợp lệ"))
+                        return "Email không hợp lệ";
+                    return e;
+                }).ToList();
+                
+                return Json(new { success = false, message = string.Join(", ", translatedErrors), errors = translatedErrors });
+            }
+
             try
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
                 
+                // OTP has already been cleaned above, just verify it's valid
+                if (string.IsNullOrWhiteSpace(model.OTP))
+                {
+                    return Json(new { success = false, message = "Mã OTP là bắt buộc" });
+                }
+                
+                // Check if NewEmail is provided
+                if (string.IsNullOrWhiteSpace(model.NewEmail))
+                {
+                    return Json(new { success = false, message = "Email mới là bắt buộc" });
+                }
+                
                 var changeDto = new ChangeEmailDTO
                 {
-                    NewEmail = model.NewEmail,
-                    OtpCode = model.OTP  // Map OTP from ViewModel to OtpCode in DTO
+                    NewEmail = model.NewEmail?.Trim(),
+                    OtpCode = model.OTP?.Trim()  // Map OTP from ViewModel to OtpCode in DTO
                 };
 
                 var result = await _profileService.ChangeEmailAsync(changeDto, jwtToken);

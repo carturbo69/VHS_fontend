@@ -218,6 +218,9 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 TagIds = service.Tags.Select(t => t.TagId).ToList(),
                 OptionIds = service.Options.Select(o => o.OptionId).ToList()
             };
+            
+            // Lưu status hiện tại vào ViewBag để kiểm tra trong view
+            ViewBag.CurrentStatus = service.Status;
 
             // Tạo dictionary OptionValues từ Options (nếu có Value)
             // Dùng Dictionary<string, string> để đảm bảo keys là string khi serialize sang JSON
@@ -288,6 +291,28 @@ namespace VHS_frontend.Areas.Provider.Controllers
             // Không tự động nâng ảnh đầu tiên thành Avatar trong trang chỉnh sửa
             // Ảnh mới sẽ được thêm vào cuối danh sách; Avatar chỉ thay khi người dùng chọn Avatar riêng
 
+            // Lấy service hiện tại để kiểm tra status
+            var currentService = await _serviceManagementService.GetServiceByIdAsync(id, token);
+            if (currentService == null)
+            {
+                TempData["Error"] = "Không tìm thấy dịch vụ.";
+                return RedirectToAction("Index");
+            }
+            
+            // Xử lý status dựa trên trạng thái hiện tại
+            if (string.Equals(currentService.Status, "Pending", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(currentService.Status, "PendingUpdate", StringComparison.OrdinalIgnoreCase))
+            {
+                // Nếu đang chờ duyệt, giữ nguyên status
+                model.Status = currentService.Status;
+            }
+            else if (string.Equals(currentService.Status, "Inactive", StringComparison.OrdinalIgnoreCase))
+            {
+                // Nếu đang tạm dừng, chuyển thành "Pending" khi sửa để tránh lách luật
+                model.Status = "Pending";
+            }
+            // Nếu là "Active", giữ nguyên status từ model (cho phép provider chọn Active/Inactive)
+            
             // Bind OptionValues từ form data (Dictionary binding từ multipart form)
             if (model.OptionValues == null)
             {

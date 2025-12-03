@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using VHS_frontend.Areas.Admin.Models.Customer;
 
 namespace VHS_frontend.Services.Admin
@@ -47,10 +48,16 @@ namespace VHS_frontend.Services.Admin
             return _http.PutAsJsonAsync($"/api/account/{id}", dto, _json, ct);
         }
 
-        public Task<HttpResponseMessage> DeleteAsync(Guid id, CancellationToken ct = default)
+        public Task<HttpResponseMessage> DeleteAsync(Guid id, string? lockReason = null, CancellationToken ct = default)
         {
             AttachAuth();
-            return _http.DeleteAsync($"/api/account/{id}", ct);
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/account/{id}");
+            if (!string.IsNullOrWhiteSpace(lockReason))
+            {
+                var dto = new { LockReason = lockReason };
+                request.Content = JsonContent.Create(dto, options: _json);
+            }
+            return _http.SendAsync(request, ct);
         }
 
         public Task<HttpResponseMessage> RestoreAsync(Guid id, CancellationToken ct = default)
