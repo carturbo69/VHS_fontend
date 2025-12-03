@@ -228,10 +228,29 @@
 
             // Cờ logic
             var isCompleted = stCode.Equals("Completed", StringComparison.OrdinalIgnoreCase);
-            var canReview = isCompleted && !isServiceCompleted;
             var isDone = isCompleted;
 
             var isReviewed = o.HasReview; // đã có review hay chưa
+            
+            // Kiểm tra xem đã qua 7 ngày từ khi hoàn thành chưa (để ẩn nút báo cáo và đánh giá)
+            var canReport = true; // Mặc định cho phép báo cáo
+            var canReview = isCompleted && !isServiceCompleted; // Ban đầu cho phép đánh giá nếu Completed và không phải ServiceCompleted
+            
+            if (isDone)
+            {
+                if (o.CompletedAt.HasValue)
+                {
+                    var completedDate = o.CompletedAt.Value;
+                    var now = DateTimeOffset.Now;
+                    var daysSinceCompleted = (now - completedDate).TotalDays;
+                    // Nếu đã qua 7 ngày (>= 7) thì không cho báo cáo và đánh giá nữa
+                    var within7Days = daysSinceCompleted < 7; // < 7 nghĩa là chưa đến 7 ngày
+                    canReport = within7Days;
+                    canReview = canReview && within7Days; // Chỉ cho phép đánh giá nếu chưa qua 7 ngày
+                }
+                // Nếu không có CompletedAt nhưng đã Completed, vẫn cho phép báo cáo và đánh giá (fallback)
+                // Backend cần trả về CompletedAt để logic này hoạt động đúng
+            }
 
             <div class="shop-row order-card" data-status="@stCode" data-title="@o.ServiceTitle @o.ProviderName">
                 <!-- Header -->
@@ -448,7 +467,7 @@
                                 <i class="bi bi-file-earmark-text me-1"></i>Xem báo cáo
                             </a>
                         }
-                        else
+                        else if (canReport)
                         {
                             <a asp-area="Customer"
                                asp-controller="BookingService"
@@ -458,6 +477,7 @@
                                 Báo cáo
                             </a>
                         }
+                        @* Nếu đã qua 7 ngày từ khi hoàn thành, không hiển thị nút báo cáo *@
 
                         @if (canReview && !isReviewed)
                         {

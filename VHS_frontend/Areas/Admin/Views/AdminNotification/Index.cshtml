@@ -256,8 +256,19 @@
                 <div class="table-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0"><i class="bi bi-inbox me-2"></i>Thông báo từ Khách hàng & Nhà cung cấp</h6>
-                        <div class="table-info">
-                            <span class="text-muted small">Hiển thị @inboxNotifications.Count thông báo</span>
+                        <div class="d-flex align-items-center gap-2">
+                            @if (inboxNotifications.Any())
+                            {
+                                <button class="btn btn-sm btn-success soft" id="btnMarkAllReadInbox" type="button" title="Đánh dấu tất cả đã đọc">
+                                    <i class="bi bi-check-all"></i> Đánh dấu đọc tất cả
+                                </button>
+                                <button class="btn btn-sm btn-danger soft" id="btnDeleteAllInbox" type="button" title="Xóa tất cả thông báo">
+                                    <i class="bi bi-trash"></i> Xóa tất cả
+                                </button>
+                            }
+                            <div class="table-info">
+                                <span class="text-muted small">Hiển thị @inboxNotifications.Count thông báo</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1161,6 +1172,90 @@
                 }
             } catch (err) {
                 alert('Không thể đánh dấu đã đọc');
+            }
+        });
+
+        // ===== Mark All as Read (Inbox) =====
+        document.getElementById('btnMarkAllReadInbox')?.addEventListener('click', async () => {
+            const btn = document.getElementById('btnMarkAllReadInbox');
+            if (!btn) return;
+            
+            btn.disabled = true;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xử lý...';
+            
+            try {
+                const res = await fetch(routes.markAllAsRead, { method: 'POST' });
+                if (res.ok) {
+                    showCenterToast('Đã đánh dấu tất cả thông báo đã đọc!', 'success');
+                    setTimeout(() => {
+                        applyFilter();
+                    }, 500);
+                } else {
+                    const error = await res.json();
+                    showCenterToast(error.message || 'Có lỗi xảy ra khi đánh dấu đã đọc', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            } catch (err) {
+                showCenterToast('Không thể đánh dấu đã đọc', 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        });
+
+        // ===== Delete All (Inbox) =====
+        document.getElementById('btnDeleteAllInbox')?.addEventListener('click', async () => {
+            const btn = document.getElementById('btnDeleteAllInbox');
+            if (!btn) return;
+            
+            btn.disabled = true;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xóa...';
+            
+            try {
+                // Lấy tất cả notification IDs từ inbox table
+                const rows = document.querySelectorAll('#tblInboxNotifications tbody tr.notification-row');
+                const notificationIds = Array.from(rows).map(row => row.dataset.id).filter(id => id);
+                
+                if (notificationIds.length === 0) {
+                    showCenterToast('Không có thông báo nào để xóa', 'warn');
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                    return;
+                }
+                
+                // Xóa từng notification
+                let successCount = 0;
+                let failCount = 0;
+                
+                for (const id of notificationIds) {
+                    try {
+                        const res = await fetch(routes.delete + `?id=${id}`, { method: 'DELETE' });
+                        if (res.status === 204) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    } catch (err) {
+                        failCount++;
+                    }
+                }
+                
+                if (successCount > 0) {
+                    showCenterToast(`Đã xóa ${successCount} thông báo${failCount > 0 ? ` (${failCount} thất bại)` : ''}`, 'success');
+                    setTimeout(() => {
+                        applyFilter();
+                    }, 500);
+                } else {
+                    showCenterToast('Không thể xóa thông báo', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            } catch (err) {
+                showCenterToast('Có lỗi xảy ra khi xóa thông báo', 'error');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
             }
         });
 

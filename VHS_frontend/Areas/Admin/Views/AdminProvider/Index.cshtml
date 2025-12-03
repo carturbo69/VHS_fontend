@@ -115,6 +115,30 @@
     <div id="notif-root" aria-live="polite" aria-atomic="true"></div>
 </section>
 
+<!-- Modal: Nhập lý do khóa tài khoản -->
+<div class="modal fade" id="lockAccountModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content card-x">
+            <div class="modal-header">
+                <h5 class="modal-title">Khóa tài khoản</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Lý do khóa tài khoản <span class="text-danger">*</span></label>
+                    <textarea id="lockReasonInput" class="form-control" rows="4" placeholder="Nhập lý do khóa tài khoản..." required></textarea>
+                    <div class="invalid-feedback">Vui lòng nhập lý do khóa tài khoản.</div>
+                </div>
+                <div class="form-text">Lý do này sẽ được gửi qua email cho tài khoản bị khóa.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost soft" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger soft" id="btnConfirmLock">Xác nhận khóa</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 @section Scripts {
     <script>
@@ -236,20 +260,65 @@
 
 
         // Soft-delete / Restore
+        let currentDeleteId = null;
+        const lockModal = new bootstrap.Modal(document.getElementById('lockAccountModal'));
+        const lockReasonInput = document.getElementById('lockReasonInput');
+        const btnConfirmLock = document.getElementById('btnConfirmLock');
+        
         async function doDelete(id){
-          const res = await fetch(routes.del + '?id=' + encodeURIComponent(id), { method:'DELETE' });
-          if(res.ok){ 
-            showNotice('Đã khóa tài khoản.', 'success', 2500);
-            updateRowStatus(id, true);
-          }
-          else { 
-            showNotice((await res.text()) || 'Khóa thất bại.', 'error', 3000); 
-          }
+          currentDeleteId = id;
+          lockReasonInput.value = '';
+          lockReasonInput.classList.remove('is-invalid');
+          lockModal.show();
         }
+        
+        btnConfirmLock.addEventListener('click', async function(){
+          const reason = lockReasonInput.value.trim();
+          if(!reason){
+            lockReasonInput.classList.add('is-invalid');
+            return;
+          }
+          
+          lockReasonInput.classList.remove('is-invalid');
+          btnConfirmLock.disabled = true;
+          btnConfirmLock.textContent = 'Đang xử lý...';
+          
+          try {
+            const res = await fetch(routes.del + '?id=' + encodeURIComponent(currentDeleteId), {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ LockReason: reason })
+            });
+            
+            if(res.ok){ 
+              showNotice('Đã khóa tài khoản và gửi email thông báo.', 'success', 2500);
+              updateRowStatus(currentDeleteId, true);
+              lockModal.hide();
+            }
+            else { 
+              showNotice((await res.text()) || 'Khóa thất bại.', 'error', 3000); 
+            }
+          } catch(error) {
+            showNotice('Có lỗi xảy ra: ' + error.message, 'error', 3000);
+          } finally {
+            btnConfirmLock.disabled = false;
+            btnConfirmLock.textContent = 'Xác nhận khóa';
+            currentDeleteId = null;
+          }
+        });
+        
+        // Reset modal khi đóng
+        document.getElementById('lockAccountModal').addEventListener('hidden.bs.modal', function(){
+          lockReasonInput.value = '';
+          lockReasonInput.classList.remove('is-invalid');
+          currentDeleteId = null;
+        });
         async function doRestore(id){
           const res = await fetch(routes.restore + '?id=' + encodeURIComponent(id), { method:'POST' });
           if(res.ok){ 
-            showNotice('Đã khôi phục tài khoản.', 'success', 2500);
+            showNotice('Đã khôi phục tài khoản và gửi email thông báo.', 'success', 2500);
             updateRowStatus(id, false);
           }
           else { 

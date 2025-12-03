@@ -1,6 +1,6 @@
 @model List<VHS_frontend.Areas.Provider.Models.Service.ServiceProviderReadDTO>
 @{
-    var providerName = ViewBag.ProviderName as string ?? "Provider";
+    var providerName = ViewBag.ProviderName as string ?? "Nhà cung cấp";
     var providerId = ViewBag.ProviderId as Guid?;
     ViewData["Title"] = $"Dịch vụ của {providerName}";
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
@@ -54,7 +54,7 @@
 }
 
 <div class="admin-service-management">
-    <!-- Header -->
+    <!-- Tiêu đề -->
     <div class="admin-service-management__header">
         <h3><i class="bi bi-briefcase-fill"></i>Dịch vụ của @providerName</h3>
         <a asp-action="Index" class="btn btn-secondary btn-sm">
@@ -62,7 +62,7 @@
         </a>
     </div>
 
-    <!-- Statistics Cards -->
+    <!-- Thẻ thống kê -->
     <div class="row g-3 mb-4">
         <div class="col-md-3 col-sm-6">
             <div class="card-x stat-card">
@@ -110,7 +110,7 @@
         </div>
     </div>
 
-    <!-- Filters and Search -->
+    <!-- Bộ lọc và Tìm kiếm -->
     <div class="card-x mb-4">
         <div class="card-body">
             <div class="row g-3">
@@ -144,14 +144,14 @@
         </div>
     </div>
 
-    <!-- Services Table -->
+    <!-- Bảng dịch vụ -->
     <div class="card-x">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-list-ul me-2"></i>Danh sách dịch vụ</span>
             <span class="badge bg-secondary" id="serviceCount">@totalServices dịch vụ</span>
         </div>
         <div class="card-body">
-            <!-- No results message -->
+            <!-- Thông báo không có kết quả -->
             <div id="noResultsMessage" class="alert alert-info" style="display: none;">
                 <i class="bi bi-info-circle me-2"></i>Không tìm thấy dịch vụ nào phù hợp với bộ lọc.
             </div>
@@ -175,7 +175,7 @@
                         @foreach (var s in Model)
                         {
                             var firstImage = GetFirstImage(s.Images);
-                            var serviceStatus = s.Status ?? "Unknown";
+                            var serviceStatus = s.Status ?? "Không xác định";
                             <tr data-service-title="@s.Title.ToLower()" 
                                 data-service-description="@(s.Description?.ToLower() ?? "")" 
                                 data-service-category="@s.CategoryName.ToLower()"
@@ -217,7 +217,24 @@
                                     }
                                     else
                                     {
-                                        <span class="badge bg-secondary">@s.Status</span>
+                                        <span class="badge bg-secondary">
+                                            @if (string.Equals(s.Status, "Inactive", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <text>Không hoạt động</text>
+                                            }
+                                            else if (string.Equals(s.Status, "Rejected", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <text>Từ chối</text>
+                                            }
+                                            else if (string.Equals(s.Status, "Unknown", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <text>Không xác định</text>
+                                            }
+                                            else
+                                            {
+                                                @s.Status
+                                            }
+                                        </span>
                                     }
                                 </td>
                                 <td class="text-end">
@@ -271,13 +288,13 @@
                     const category = row.getAttribute('data-service-category') || '';
                     const status = row.getAttribute('data-service-status') || '';
 
-                    // Search filter
+                    // Bộ lọc tìm kiếm
                     const matchesSearch = searchTerm === '' || 
                         title.includes(searchTerm) || 
                         description.includes(searchTerm) || 
                         category.includes(searchTerm);
 
-                    // Status filter
+                    // Bộ lọc trạng thái
                     let matchesStatus = true;
                     if (statusValue) {
                         if (statusValue === 'Other') {
@@ -295,7 +312,7 @@
                     }
                 });
 
-                // Update UI
+                // Cập nhật giao diện
                 clearSearchBtn.style.display = searchTerm ? 'inline-block' : 'none';
                 serviceCount.textContent = visibleCount + ' dịch vụ';
 
@@ -308,7 +325,7 @@
                 }
             }
 
-            // Event listeners
+            // Lắng nghe sự kiện
             searchInput.addEventListener('input', filterServices);
             statusFilter.addEventListener('change', filterServices);
             

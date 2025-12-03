@@ -22,7 +22,7 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
         public string? FullName { get; set; }
 
         [Phone(ErrorMessage = "Số điện thoại không hợp lệ")]
-        [StringLength(20, ErrorMessage = "Số điện thoại không được quá 20 ký tự")]
+        [StringLength(11, ErrorMessage = "Số điện thoại không được quá 11 ký tự")]
         [Display(Name = "Số điện thoại")]
         public string? PhoneNumber { get; set; }
 

@@ -55,7 +55,7 @@
     var IsReviewed = Model?.HasReview == true;
 
     // Chỉ đơn Hoàn thành thật sự (không phải ServiceCompleted) mới được phép đánh giá
-    var canReview = IsCompleted && !IsServiceCompleted;
+    var canReview = IsCompleted && !IsServiceCompleted; // Ban đầu cho phép đánh giá nếu Completed và không phải ServiceCompleted
 
     // Steps chỉ áp dụng cho 4 trạng thái chính
     var IsFourStates = IsPending || IsConfirmed || IsWorking || IsCompleted;
@@ -136,6 +136,58 @@
         .FirstOrDefault();
 
     Func<DateTimeOffset?, string> fmt = t => t.HasValue ? t.Value.ToString("HH:mm dd-MM") : "—";
+    
+    // Kiểm tra xem đã qua 7 ngày từ khi hoàn thành chưa (để ẩn nút báo cáo)
+    var canReport = true; // Mặc định cho phép báo cáo
+    if (IsCompleted)
+    {
+        // Ưu tiên dùng CompletedAt từ DTO
+        DateTimeOffset? completedDate = Model?.CompletedAt;
+        
+        // Nếu không có CompletedAt, thử lấy từ Timeline với nhiều biến thể code
+        if (!completedDate.HasValue && Model?.Timeline != null && Model.Timeline.Any())
+        {
+            // Thử nhiều biến thể của code trong Timeline
+            var possibleCodes = new[] { "CHECK OUT", "Check Out", "CHECKOUT", "check out", 
+                                       "COMPLETED", "Completed", "completed" };
+            
+            foreach (var code in possibleCodes)
+            {
+                completedDate = timeOf(code);
+                if (completedDate.HasValue)
+                {
+                    break;
+                }
+            }
+            
+            // Nếu vẫn không tìm thấy, thử tìm event có code chứa "out" hoặc "complete"
+            if (!completedDate.HasValue)
+            {
+                var completedEvent = Model.Timeline
+                    .Where(e => e.Code != null && 
+                           (e.Code.Contains("out", StringComparison.OrdinalIgnoreCase) ||
+                            e.Code.Contains("complete", StringComparison.OrdinalIgnoreCase)))
+                    .OrderByDescending(e => e.Time)
+                    .FirstOrDefault();
+                
+                if (completedEvent != null)
+                {
+                    completedDate = completedEvent.Time;
+                }
+            }
+        }
+        
+        if (completedDate.HasValue)
+        {
+            var now = DateTimeOffset.Now;
+            var daysSinceCompleted = (now - completedDate.Value).TotalDays;
+            // Nếu đã qua 7 ngày (>= 7) thì không cho báo cáo và đánh giá nữa
+            var within7Days = daysSinceCompleted < 7; // < 7 nghĩa là chưa đến 7 ngày
+            canReport = within7Days;
+            canReview = canReview && within7Days; // Chỉ cho phép đánh giá nếu chưa qua 7 ngày
+        }
+        // Nếu không có thông tin về thời gian hoàn thành, vẫn cho phép báo cáo và đánh giá (fallback)
+    }
 
     // Thứ tự cho 4 trạng thái
     var order = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
@@ -274,12 +326,13 @@
                         <i class="bi bi-file-earmark-text"></i> Xem chi tiết báo cáo
                     </a>
                 }
-                else
+                else if (canReport)
                 {
                     <a asp-area="Customer" asp-controller="BookingService" asp-action="ReportService" asp-route-bookingId="@Model.BookingId" class="btn btn-outline-secondary">
                         <i class="bi bi-exclamation-triangle"></i> Báo cáo
                     </a>
                 }
+                @* Nếu đã qua 7 ngày từ khi hoàn thành, không hiển thị nút báo cáo *@
 
                 if (canReview)
                 {

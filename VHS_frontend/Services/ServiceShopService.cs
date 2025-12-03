@@ -931,11 +931,12 @@ namespace VHS_frontend.Services
         }
 
         /// <summary>
-        /// Lấy bestselling services
+        /// Lấy bestselling services - chỉ lấy các dịch vụ có rating >= 4 sao
         /// </summary>
         private List<ServiceItem> GetBestsellingServices(List<ServiceItem> allServiceItems)
         {
             return allServiceItems
+                .Where(s => s.Rating >= 4.0) // Chỉ lấy dịch vụ có rating >= 4 sao
                 .OrderByDescending(s => s.Rating)
                 .ThenByDescending(s => s.SalesCount)
                 .Take(6)

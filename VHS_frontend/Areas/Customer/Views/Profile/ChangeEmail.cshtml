@@ -25,8 +25,14 @@
     </div>
 
     <div class="edit-form-container">
-        <form asp-action="ChangeEmail" method="post" class="profile-edit-form">
+        <form asp-action="ChangeEmail" method="post" class="profile-edit-form" id="changeEmailForm">
             @Html.AntiForgeryToken()
+            
+            <!-- Error message container -->
+            <div id="formError" class="alert alert-danger" style="display: none;" role="alert">
+                <i class="bi bi-exclamation-circle me-2"></i>
+                <span id="formErrorText"></span>
+            </div>
             
             <!-- Security Notice -->
             <div class="alert alert-warning">
@@ -37,10 +43,10 @@
             <!-- Email Section -->
             <div class="form-section">
                 <h3><i class="bi bi-envelope-at"></i> Thông tin email mới</h3>
-                <div class="form-group">
-                    <label asp-for="NewEmail" class="form-label required"></label>
-                    <input asp-for="NewEmail" type="email" class="form-control" placeholder="Nhập email mới">
-                    <span asp-validation-for="NewEmail" class="text-danger"></span>
+                    <div class="form-group">
+                        <label asp-for="NewEmail" class="form-label required"></label>
+                        <input asp-for="NewEmail" type="email" class="form-control" id="newEmailInput" placeholder="Nhập email mới">
+                        <span asp-validation-for="NewEmail" class="text-danger"></span>
                     <div class="form-text">
                         <i class="bi bi-info-circle"></i>
                         Email mới sẽ được sử dụng để đăng nhập và nhận thông báo từ hệ thống
@@ -63,10 +69,10 @@
                     </div>
                     <div class="form-group">
                         <label asp-for="OTP" class="form-label required"></label>
-                        <input asp-for="OTP" class="form-control otp-input" placeholder="Nhập mã OTP 6 số" maxlength="6">
+                        <input asp-for="OTP" class="form-control otp-input" id="otpInput" placeholder="Nhập mã OTP 6 số" maxlength="6">
                         <span asp-validation-for="OTP" class="text-danger"></span>
                         <div class="otp-timer" id="otpTimer" style="display: none;">
-                            <small class="text-muted">Có thể gửi lại sau <span id="countdown">60</span> giây</small>
+                            <small class="text-muted">Có thể gửi lại sau <span id="countdown">2:00</span> phút</small>
                         </div>
                     </div>
                 </div>
@@ -77,7 +83,7 @@
                 <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
                     <i class="bi bi-x-circle"></i> Hủy
                 </button>
-                <button type="submit" class="btn btn-info">
+                <button type="submit" class="btn btn-info" id="submitEmailBtn">
                     <i class="bi bi-envelope-check"></i> Đổi email
                 </button>
             </div>
@@ -100,11 +106,22 @@
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang gửi...';
 
             try {
+                var tokenInput = null;
+                var allInputs = document.getElementsByTagName('input');
+                for (var i = 0; i < allInputs.length; i++) {
+                    var currentInput = allInputs.item(i);
+                    if (currentInput && currentInput.name === '__RequestVerificationToken') {
+                        tokenInput = currentInput;
+                        break;
+                    }
+                }
+                var token = tokenInput ? tokenInput.value : '';
+                
                 const response = await fetch('@Url.Action("RequestEmailChangeOTP")', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        'RequestVerificationToken': token
                     }
                 });
 
@@ -113,8 +130,8 @@
                 if (result.success) {
                     showToast('Mã OTP đã được gửi đến email hiện tại của bạn', 'success');
                     
-                    // Start cooldown timer
-                    otpCooldown = 60;
+                    // Start cooldown timer (2 phút = 120 giây)
+                    otpCooldown = 120;
                     timer.style.display = 'block';
                     startOTPTimer();
                 } else {
@@ -133,7 +150,13 @@
         function startOTPTimer() {
             otpTimerInterval = setInterval(() => {
                 otpCooldown--;
-                document.getElementById('countdown').textContent = otpCooldown;
+                
+                // Format thời gian: phút:giây (ví dụ: 2:00, 1:59, 0:30)
+                const minutes = Math.floor(otpCooldown / 60);
+                const seconds = otpCooldown % 60;
+                const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                document.getElementById('countdown').textContent = timeString;
                 
                 if (otpCooldown <= 0) {
                     clearInterval(otpTimerInterval);
@@ -146,6 +169,38 @@
 
         // Auto-request OTP when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Translate validation errors on page load
+            translateValidationErrors();
+            
+            // Observe for new validation errors (from server-side validation)
+            const observer = new MutationObserver(() => {
+                translateValidationErrors();
+            });
+            
+            // Observe changes to validation error spans
+            var allSpans = document.getElementsByTagName('span');
+            var errorSpans = document.getElementsByClassName('text-danger');
+            var fieldErrors = document.getElementsByClassName('field-validation-error');
+            
+            for (var i = 0; i < allSpans.length; i++) {
+                var currentSpan = allSpans.item(i);
+                if (currentSpan && currentSpan.hasAttribute('data-valmsg-for')) {
+                    observer.observe(currentSpan, { childList: true, characterData: true, subtree: true });
+                }
+            }
+            for (var i = 0; i < errorSpans.length; i++) {
+                var currentErrorSpan = errorSpans.item(i);
+                if (currentErrorSpan) {
+                    observer.observe(currentErrorSpan, { childList: true, characterData: true, subtree: true });
+                }
+            }
+            for (var i = 0; i < fieldErrors.length; i++) {
+                var currentFieldError = fieldErrors.item(i);
+                if (currentFieldError) {
+                    observer.observe(currentFieldError, { childList: true, characterData: true, subtree: true });
+                }
+            }
+            
             // Auto request OTP for better UX
             setTimeout(() => {
                 if (otpCooldown === 0) {
@@ -154,10 +209,395 @@
             }, 1000);
         });
 
+        // Translate error messages to Vietnamese
+        function translateError(message) {
+            if (!message) return message;
+            
+            const errorMap = {
+                // OTP errors
+                'OTP code is required': 'Mã OTP là bắt buộc',
+                'OTP code must be exactly 6 digits': 'Mã OTP phải có đúng 6 chữ số',
+                'OTP is required': 'Mã OTP là bắt buộc',
+                'OTP must be exactly 6 digits': 'Mã OTP phải có đúng 6 chữ số',
+                'Invalid OTP': 'Mã OTP không hợp lệ',
+                'OTP has expired': 'Mã OTP đã hết hạn',
+                'OTP expired': 'Mã OTP đã hết hạn',
+                
+                // Email errors
+                'Email is required': 'Email là bắt buộc',
+                'Email is invalid': 'Email không hợp lệ',
+                'Email already exists': 'Email đã tồn tại',
+                'This email is already in use': 'Email này đã được sử dụng',
+                
+                // General errors
+                'Bad request': 'Yêu cầu không hợp lệ',
+                'Unauthorized': 'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn',
+                'Not found': 'Không tìm thấy dữ liệu',
+                'Internal server error': 'Lỗi hệ thống. Vui lòng thử lại sau',
+            };
+            
+            // Check exact match first
+            if (errorMap.hasOwnProperty(message)) {
+                var exactValue = Object.getOwnPropertyDescriptor(errorMap, message);
+                if (exactValue && exactValue.value) {
+                    return exactValue.value;
+                }
+            }
+            
+            // Check case-insensitive match
+            const lowerMessage = message.toLowerCase();
+            var errorMapKeys = Object.keys(errorMap);
+            for (var i = 0; i < errorMapKeys.length; i++) {
+                var key = errorMapKeys.item ? errorMapKeys.item(i) : errorMapKeys[i];
+                if (errorMap.hasOwnProperty(key)) {
+                    var propDesc = Object.getOwnPropertyDescriptor(errorMap, key);
+                    if (propDesc && propDesc.value) {
+                        var mapValue = propDesc.value;
+                        if (mapValue && lowerMessage.includes(key.toLowerCase())) {
+                            return mapValue;
+                        }
+                    }
+                }
+            }
+            
+            // Check for common patterns
+            if (lowerMessage.includes('otp') && lowerMessage.includes('required')) {
+                return 'Mã OTP là bắt buộc';
+            }
+            if (lowerMessage.includes('otp') && (lowerMessage.includes('digit') || lowerMessage.includes('6'))) {
+                return 'Mã OTP phải có đúng 6 chữ số';
+            }
+            if (lowerMessage.includes('otp') && (lowerMessage.includes('invalid') || lowerMessage.includes('không hợp lệ'))) {
+                return 'Mã OTP không hợp lệ';
+            }
+            if (lowerMessage.includes('otp') && (lowerMessage.includes('expired') || lowerMessage.includes('hết hạn'))) {
+                return 'Mã OTP đã hết hạn';
+            }
+            if (lowerMessage.includes('email') && lowerMessage.includes('required')) {
+                return 'Email là bắt buộc';
+            }
+            if (lowerMessage.includes('email') && (lowerMessage.includes('invalid') || lowerMessage.includes('không hợp lệ'))) {
+                return 'Email không hợp lệ';
+            }
+            if (lowerMessage.includes('email') && (lowerMessage.includes('already') || lowerMessage.includes('tồn tại'))) {
+                return 'Email đã tồn tại';
+            }
+            
+            return message;
+        }
+        
+        // Translate all validation errors on the page
+        function translateValidationErrors() {
+            // Translate span validation errors
+            var allSpans = document.getElementsByTagName('span');
+            for (var i = 0; i < allSpans.length; i++) {
+                var span = allSpans.item(i);
+                if (span.hasAttribute('data-valmsg-for') && span.textContent.trim()) {
+                    span.textContent = translateError(span.textContent.trim());
+                }
+            }
+            
+            // Translate field validation errors
+            var errorElements = document.getElementsByClassName('text-danger');
+            for (var i = 0; i < errorElements.length; i++) {
+                var element = errorElements.item(i);
+                if (element.textContent.trim()) {
+                    element.textContent = translateError(element.textContent.trim());
+                }
+            }
+            
+            var fieldErrors = document.getElementsByClassName('field-validation-error');
+            for (var i = 0; i < fieldErrors.length; i++) {
+                var element = fieldErrors.item(i);
+                if (element.textContent.trim()) {
+                    element.textContent = translateError(element.textContent.trim());
+                }
+            }
+        }
+        
         // Toast notification function
         function showToast(message, type = 'info') {
+            // Translate error messages
+            const translatedMessage = type === 'error' ? translateError(message) : message;
             // Implementation depends on your toast system
-            console.log(`${type.toUpperCase()}: ${message}`);
+            console.log(`${type.toUpperCase()}: ${translatedMessage}`);
         }
+        
+        // Handle form submission with better error handling
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('changeEmailForm');
+            const formError = document.getElementById('formError');
+            const formErrorText = document.getElementById('formErrorText');
+            const submitBtn = document.getElementById('submitEmailBtn');
+            
+            if (form) {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    // Hide previous errors
+                    if (formError) {
+                        formError.style.display = 'none';
+                        formErrorText.textContent = '';
+                    }
+                    
+                    // Clear ASP.NET Core validation errors
+                    var validationSpans = form.querySelectorAll('span[data-valmsg-for]');
+                    for (var i = 0; i < validationSpans.length; i++) {
+                        var span = validationSpans.item(i);
+                        if (span) {
+                            span.textContent = '';
+                            span.style.display = 'none';
+                        }
+                    }
+                    
+                    // Clear invalid classes from inputs
+                    var invalidInputs = form.querySelectorAll('.is-invalid');
+                    for (var i = 0; i < invalidInputs.length; i++) {
+                        var input = invalidInputs.item(i);
+                        if (input) {
+                            input.classList.remove('is-invalid');
+                        }
+                    }
+                    
+                    // Client-side validation
+                    const newEmailInput = document.getElementById('newEmailInput');
+                    const otpInput = document.getElementById('otpInput');
+                    
+                    let hasError = false;
+                    let errorMessages = new Array();
+                    
+                    // Validate NewEmail
+                    if (!newEmailInput || !newEmailInput.value.trim()) {
+                        hasError = true;
+                        errorMessages.push('Email mới là bắt buộc');
+                        if (newEmailInput) {
+                            newEmailInput.classList.add('is-invalid');
+                        }
+                    } else {
+                        // Basic email validation - simple check for email format
+                        var emailValue = newEmailInput.value.trim();
+                        var atSymbol = String.fromCharCode(64);
+                        var hasAt = emailValue.indexOf(atSymbol) > 0;
+                        var dotIndex = emailValue.indexOf('.');
+                        var atIndex = emailValue.indexOf(atSymbol);
+                        var hasDot = dotIndex > atIndex;
+                        var emailLength = emailValue.length;
+                        var isValidEmail = hasAt && hasDot && emailLength > 5;
+                        
+                        if (!isValidEmail) {
+                            hasError = true;
+                            errorMessages.push('Email không hợp lệ');
+                            newEmailInput.classList.add('is-invalid');
+                        } else {
+                            newEmailInput.classList.remove('is-invalid');
+                        }
+                    }
+                    
+                    // Validate OTP
+                    if (!otpInput) {
+                        hasError = true;
+                        errorMessages.push('Mã OTP là bắt buộc');
+                    } else {
+                        var otpValueRaw = otpInput.value || '';
+                        var otpValue = otpValueRaw.trim().replace(/\s+/g, '').replace(/-/g, '').replace(/\./g, '');
+                        
+                        // Always update input value to cleaned version
+                        if (otpValueRaw !== otpValue && otpValue.length > 0) {
+                            otpInput.value = otpValue;
+                        }
+                        
+                        if (!otpValue || otpValue.length === 0) {
+                            hasError = true;
+                            errorMessages.push('Mã OTP là bắt buộc');
+                            otpInput.classList.add('is-invalid');
+                        } else {
+                            // Check if OTP is exactly 6 digits (only numbers, no spaces)
+                            var otpLength = otpValue.length;
+                            var isAllDigits = /^\d+$/.test(otpValue);
+                            
+                            if (otpLength !== 6 || !isAllDigits) {
+                                hasError = true;
+                                errorMessages.push('Mã OTP phải có đúng 6 chữ số');
+                                otpInput.classList.add('is-invalid');
+                            } else {
+                                // Ensure input value is set correctly before submit
+                                otpInput.value = otpValue;
+                                otpInput.classList.remove('is-invalid');
+                            }
+                        }
+                    }
+                    
+                    // If validation fails, show errors and return
+                    if (hasError) {
+                        const errorMessage = errorMessages.join(', ');
+                        if (formError && formErrorText) {
+                            formErrorText.textContent = errorMessage;
+                            formError.style.display = 'block';
+                            formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        showToast(errorMessage, 'error');
+                        return;
+                    }
+                    
+                    // Ensure OTP is cleaned one more time before submit
+                    if (otpInput) {
+                        var finalOtpValue = (otpInput.value || '').trim().replace(/\s+/g, '').replace(/-/g, '').replace(/\./g, '');
+                        if (finalOtpValue.length === 6 && /^\d+$/.test(finalOtpValue)) {
+                            otpInput.value = finalOtpValue;
+                        }
+                    }
+                    
+                    // Show loading state
+                    if (submitBtn) {
+                        const originalBtnText = submitBtn.innerHTML;
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+                        
+                        try {
+                            const formData = new FormData(form);
+                            
+                            const response = await fetch(form.action, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            // Always read response as text first
+                            const responseText = await response.text();
+                            let result = null;
+                            
+                            // Try to parse as JSON
+                            try {
+                                result = JSON.parse(responseText);
+                            } catch (parseError) {
+                                // If not JSON, check if it's HTML or plain text
+                                console.warn('Response is not JSON:', responseText.substring(0, 200));
+                                result = { success: false, message: 'Có lỗi xảy ra khi đổi email' };
+                            }
+                            
+                            if (!response.ok) {
+                                // Handle HTTP errors (400, 500, etc.)
+                                let errorMessage = 'Có lỗi xảy ra khi đổi email';
+                                
+                                // Try multiple ways to extract error message
+                                if (result) {
+                                    errorMessage = result.message || result.Message || result.error || result.Error || errorMessage;
+                                    
+                                    // If it's a validation error, try to extract more details
+                                    if (result.errors && typeof result.errors === 'object') {
+                                        const errorMessages = Object.values(result.errors).flat();
+                                        if (errorMessages.length > 0) {
+                                            errorMessage = errorMessages.join(', ');
+                                        }
+                                    }
+                                    
+                                    // Check for detail field (common in API error responses)
+                                    if (result.detail || result.Detail) {
+                                        errorMessage = result.detail || result.Detail;
+                                    }
+                                } else if (responseText) {
+                                    // If we couldn't parse JSON, try to extract error from HTML/text
+                                    // Look for common error patterns
+                                    var errorPatternPart1 = '(?:message|error|Message|Error)[\\s:=]+["\']?';
+                                    var errorPatternPart2 = '(';
+                                    var bracketOpen = String.fromCharCode(91);
+                                    var caret = String.fromCharCode(94);
+                                    var bracketClose = String.fromCharCode(93);
+                                    var errorPatternPart3 = caret + '"\'';
+                                    var errorPatternPart4 = bracketClose + '+)["\']?';
+                                    var errorPattern = errorPatternPart1 + errorPatternPart2 + errorPatternPart3 + errorPatternPart4;
+                                    var errorMatch = responseText.match(new RegExp(errorPattern, 'i'));
+                                    if (errorMatch) {
+                                        var matchLength = errorMatch.length;
+                                        if (matchLength > 1) {
+                                            var matchArray = Array.prototype.slice.call(errorMatch);
+                                            var matchArrayLength = matchArray.length;
+                                            if (matchArrayLength > 1) {
+                                                var matchSlice = matchArray.slice(1);
+                                                var matchSliceLength = matchSlice.length;
+                                                if (matchSliceLength > 0) {
+                                                    var firstMatch = matchSlice.shift();
+                                                    if (firstMatch) {
+                                                        errorMessage = firstMatch;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    var responseTextLength = responseText.length;
+                                    if (!errorMessage || responseTextLength < 500) {
+                                        // If response is short, might be plain text error
+                                        errorMessage = responseText.trim();
+                                    }
+                                }
+                                
+                                // Translate error message to Vietnamese
+                                errorMessage = translateError(errorMessage);
+                                
+                                // Show error in form
+                                if (formError && formErrorText) {
+                                    formErrorText.textContent = errorMessage;
+                                    formError.style.display = 'block';
+                                    formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                                
+                                showToast(errorMessage, 'error');
+                                
+                                // Reset button state
+                                if (submitBtn) {
+                                    submitBtn.disabled = false;
+                                    submitBtn.innerHTML = originalBtnText;
+                                }
+                                return;
+                            }
+                            
+                            if (result.success) {
+                                showToast('Đổi email thành công! Vui lòng đăng nhập lại với email mới.', 'success');
+                                setTimeout(() => {
+                                    window.location.href = '@Url.Action("Index", "Profile", new { area = "Customer" })';
+                                }, 1500);
+                            } else {
+                                let errorMessage = result.message || result.Message || 'Có lỗi xảy ra khi đổi email';
+                                
+                                // Translate error message to Vietnamese
+                                errorMessage = translateError(errorMessage);
+                                
+                                // Show error in form
+                                if (formError && formErrorText) {
+                                    formErrorText.textContent = errorMessage;
+                                    formError.style.display = 'block';
+                                    formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                                
+                                showToast(errorMessage, 'error');
+                                
+                                // Reset button state
+                                if (submitBtn) {
+                                    submitBtn.disabled = false;
+                                    submitBtn.innerHTML = originalBtnText;
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error changing email:', error);
+                            const errorMessage = 'Có lỗi xảy ra khi đổi email: ' + (error.message || 'Vui lòng thử lại');
+                            
+                            // Show error in form
+                            if (formError && formErrorText) {
+                                formErrorText.textContent = errorMessage;
+                                formError.style.display = 'block';
+                                formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                            
+                            showToast(errorMessage, 'error');
+                            
+                            // Reset button state
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.innerHTML = originalBtnText;
+                            }
+                        }
+                    }
+                });
+            }
+        });
     </script>
 }

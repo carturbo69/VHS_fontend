@@ -344,12 +344,13 @@
             if (result.success) {
                 location.reload();
             } else {
-                alert('Lỗi: ' + (result.message || 'Không xóa được'));
+                const errorMsg = translateError(result.message) || 'Không thể xóa lịch làm việc';
+                alert('Lỗi: ' + errorMsg);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Lỗi khi xóa lịch');
+            alert('Lỗi khi xóa lịch làm việc');
         });
     }
     
@@ -371,7 +372,8 @@
             if (result.success) {
                 location.reload();
             } else {
-                alert('Lỗi: ' + (result.message || 'Không xóa được'));
+                const errorMsg = translateError(result.message) || 'Không thể xóa ngày nghỉ';
+                alert('Lỗi: ' + errorMsg);
             }
         })
         .catch(error => {
@@ -412,13 +414,70 @@
             if (result.success) {
                 location.reload();
             } else {
-                alert('Lỗi: ' + result.message);
+                const errorMsg = translateError(result.message) || 'Đã xảy ra lỗi khi tạo lịch làm việc';
+                alert('Lỗi: ' + errorMsg);
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Lỗi khi tạo lịch');
+            alert('Lỗi khi tạo lịch làm việc');
         }
     });
+    
+    // Translate error messages from English to Vietnamese
+    function translateError(errorText) {
+        if (!errorText) return null;
+        
+        // Try to parse JSON if it's a JSON string
+        let message = errorText;
+        try {
+            const parsed = JSON.parse(errorText);
+            if (parsed.message) {
+                message = parsed.message;
+            } else if (typeof parsed === 'string') {
+                message = parsed;
+            }
+        } catch (e) {
+            // Not JSON, use as is
+            message = errorText;
+        }
+        
+        const lowerText = message.toLowerCase();
+        
+        // Error message translations (sắp xếp từ dài đến ngắn để match chính xác hơn)
+        const translations = {
+            'time-off conflicts with existing bookings': 'Ngày nghỉ trùng với đơn đặt lịch hiện có',
+            'time-off already exists for this date': 'Ngày nghỉ đã tồn tại cho ngày này',
+            'schedule already exists for this day': 'Lịch làm việc đã tồn tại cho ngày này',
+            'time-off already exists': 'Ngày nghỉ đã tồn tại',
+            'schedule already exists': 'Lịch làm việc đã tồn tại',
+            'already exists for this date': 'Đã tồn tại cho ngày này',
+            'conflicts with existing bookings': 'Trùng với đơn đặt lịch hiện có',
+            'conflicts with existing': 'Trùng với dữ liệu hiện có',
+            'cannot create time-off': 'Không thể tạo ngày nghỉ',
+            'cannot add day': 'Không thể thêm ngày',
+            'cannot create schedule': 'Không thể tạo lịch làm việc',
+            'cannot update schedule': 'Không thể cập nhật lịch làm việc',
+            'cannot delete schedule': 'Không thể xóa lịch làm việc',
+            'cannot delete time-off': 'Không thể xóa ngày nghỉ',
+            'already exists': 'Đã tồn tại',
+            'unauthorized': 'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn',
+            'not found': 'Không tìm thấy dữ liệu',
+            'bad request': 'Yêu cầu không hợp lệ',
+            'internal server error': 'Lỗi hệ thống. Vui lòng thử lại sau',
+            'conflicts': 'Xung đột dữ liệu'
+        };
+        
+        // Check for exact matches (từ dài đến ngắn)
+        const sortedKeys = Object.keys(translations).sort((a, b) => b.length - a.length);
+        for (const key of sortedKeys) {
+            if (lowerText.includes(key)) {
+                return translations[key];
+            }
+        }
+        
+        // Return original message if no translation found
+        return message;
+    }
     
     // Initialize
     updateCalendarDisplay();
