@@ -59,12 +59,21 @@
                         <p class="card-subtitle">Quản lý tất cả thông báo của bạn</p>
                     </div>
                 </div>
-                @if (ViewBag.Unread > 0 && Model != null && Model.Any())
+                @if (Model != null && Model.Any())
                 {
-                    <button class="btn-mark-all-read" onclick="markAllNotificationsRead(); return false;" title="Đánh dấu tất cả đã đọc">
-                        <i class="bi bi-check-all"></i>
-                        <span>Đánh dấu tất cả</span>
-                    </button>
+                    <div class="header-actions" style="display: flex; gap: 8px;">
+                        @if (ViewBag.Unread > 0)
+                        {
+                            <button class="btn-mark-all-read" onclick="markAllNotificationsRead(); return false;" title="Đánh dấu tất cả đã đọc">
+                                <i class="bi bi-check-all"></i>
+                                <span>Đánh dấu tất cả</span>
+                            </button>
+                        }
+                        <button class="btn-delete-all" onclick="deleteAllNotifications(); return false;" title="Xóa tất cả thông báo" style="background-color: #fee2e2; color: #dc2626; border: 1px solid #fecaca; padding: 8px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; transition: all 0.2s;">
+                            <i class="bi bi-trash3"></i>
+                            <span>Xóa tất cả</span>
+                        </button>
+                    </div>
                 }
             </div>
         </div>
@@ -360,8 +369,6 @@
 
         // Đánh dấu tất cả đã đọc
         async function markAllNotificationsRead() {
-            if (!confirm('Bạn có chắc muốn đánh dấu tất cả thông báo đã đọc?')) return;
-
             saveScrollPosition();
             
             try {
@@ -409,10 +416,93 @@
             }
         }
 
+        // Xóa tất cả thông báo
+        async function deleteAllNotifications() {
+            const allCards = document.querySelectorAll('.notification-card');
+            if (allCards.length === 0) {
+                alert('Không có thông báo nào để xóa');
+                return;
+            }
+
+            saveScrollPosition();
+            
+            // Lấy tất cả notification IDs
+            const notificationIds = Array.from(allCards).map(card => card.getAttribute('data-notification-id')).filter(id => id);
+            
+            if (notificationIds.length === 0) {
+                alert('Không có thông báo nào để xóa');
+                restoreScrollPosition();
+                return;
+            }
+
+            try {
+                // Xóa từng notification
+                let successCount = 0;
+                let failCount = 0;
+                
+                for (const id of notificationIds) {
+                    try {
+                        const res = await fetch(`/Provider/ProviderNotification/Delete/${id}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        const result = await res.json();
+                        
+                        if (result.success) {
+                            successCount++;
+                            // Xóa card với animation
+                            removeNotificationCard(id);
+                        } else {
+                            failCount++;
+                        }
+                    } catch (err) {
+                        failCount++;
+                    }
+                }
+                
+                // Cập nhật stats sau khi xóa
+                setTimeout(() => {
+                    const stats = calculateStatsFromDOM();
+                    updateStats(stats.total, stats.unread, stats.read);
+                    
+                    // Kiểm tra nếu không còn notification nào
+                    const remainingCards = document.querySelectorAll('.notification-card');
+                    if (remainingCards.length === 0) {
+                        const listContainer = document.querySelector('.notifications-list');
+                        if (listContainer) {
+                            listContainer.innerHTML = `
+                                <div class="empty-state">
+                                    <div class="empty-icon">
+                                        <i class="bi bi-inbox"></i>
+                                    </div>
+                                    <h5>Không có thông báo nào</h5>
+                                    <p>Bạn chưa có thông báo nào trong hộp thư đến</p>
+                                </div>
+                            `;
+                            // Cập nhật stats về 0
+                            updateStats(0, 0, 0);
+                        }
+                    }
+                }, 350);
+                
+                // Khôi phục scroll position
+                requestAnimationFrame(() => {
+                    restoreScrollPosition();
+                });
+            } catch (e) {
+                console.error('Error deleting all notifications:', e);
+                alert('Có lỗi xảy ra khi xóa thông báo');
+                restoreScrollPosition();
+            }
+        }
+
         // Expose functions để dropdown có thể gọi
         window.markNotificationRead = markNotificationRead;
         window.deleteNotification = deleteNotification;
         window.markAllNotificationsRead = markAllNotificationsRead;
+        window.deleteAllNotifications = deleteAllNotifications;
 
         // ===== SignalR Real-time Notifications =====
         let notificationConnection = null;

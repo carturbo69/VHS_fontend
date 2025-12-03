@@ -361,9 +361,9 @@
                         <div class="mb-3">
                             <label class="form-label">Mật khẩu mới</label>
                             <input type="password" class="form-control" name="NewPassword" 
-                                   pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
+                                   pattern=".{6,}"
                                required />
-                            <small class="text-muted">Tối thiểu 6 ký tự, bao gồm chữ hoa, chữ thường và số</small>
+                            <small class="text-muted">Tối thiểu 6 ký tự</small>
                         </div>
 
                         <div class="mb-3">
@@ -424,8 +424,9 @@
                                     <i class="bi bi-envelope-paper me-1"></i>Gửi mã OTP
                                 </button>
                             </div>
-                            <input type="text" class="form-control" name="OtpCode" maxlength="6" 
+                            <input type="text" class="form-control" name="OTP" id="emailOtpInput" maxlength="6" 
                                    pattern="\d{6}" placeholder="Nhập 6 chữ số" required />
+                            <span class="text-danger" id="emailOtpError" style="display: none; margin-top: 0.5rem; font-size: 0.875rem;"></span>
                             <small class="text-muted" id="emailOtpTimer"></small>
                         </div>
                     </div>
@@ -1156,12 +1157,16 @@
                         if (result.success) {
                             showToast('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra email.', 'success');
                             this.innerHTML = '<i class="bi bi-check-circle me-1"></i>Đã gửi';
-                            // Countdown timer
-                            let countdown = 60;
+                            // Countdown timer (2 phút = 120 giây)
+                            let countdown = 120;
                             const timer = setInterval(() => {
                                 countdown--;
                                 if (countdown > 0) {
-                                    this.innerHTML = `<i class="bi bi-clock me-1"></i>Gửi lại (${countdown}s)`;
+                                    // Format thời gian: phút:giây (ví dụ: 2:00, 1:59, 0:30)
+                                    const minutes = Math.floor(countdown / 60);
+                                    const seconds = countdown % 60;
+                                    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                                    this.innerHTML = `<i class="bi bi-clock me-1"></i>Gửi lại (${timeString})`;
                                 } else {
                                     clearInterval(timer);
                                     this.disabled = false;
@@ -1226,12 +1231,16 @@
                         if (result.success) {
                             showToast('Mã OTP đã được gửi đến email hiện tại của bạn. Vui lòng kiểm tra email.', 'success');
                             this.innerHTML = '<i class="bi bi-check-circle me-1"></i>Đã gửi';
-                            // Countdown timer
-                            let countdown = 60;
+                            // Countdown timer (2 phút = 120 giây)
+                            let countdown = 120;
                             const timer = setInterval(() => {
                                 countdown--;
                                 if (countdown > 0) {
-                                    this.innerHTML = `<i class="bi bi-clock me-1"></i>Gửi lại (${countdown}s)`;
+                                    // Format thời gian: phút:giây (ví dụ: 2:00, 1:59, 0:30)
+                                    const minutes = Math.floor(countdown / 60);
+                                    const seconds = countdown % 60;
+                                    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                                    this.innerHTML = `<i class="bi bi-clock me-1"></i>Gửi lại (${timeString})`;
                                 } else {
                                     clearInterval(timer);
                                     this.disabled = false;
@@ -1252,26 +1261,379 @@
                 });
             }
 
+            // Translate error messages to Vietnamese
+            function translateError(message) {
+                if (!message) return message;
+                
+                const errorMap = {
+                    // OTP errors
+                    'OTP code is required': 'Mã OTP là bắt buộc',
+                    'OTP code must be exactly 6 digits': 'Mã OTP phải có đúng 6 chữ số',
+                    'OTP is required': 'Mã OTP là bắt buộc',
+                    'OTP must be exactly 6 digits': 'Mã OTP phải có đúng 6 chữ số',
+                    'Invalid OTP': 'Mã OTP không hợp lệ',
+                    'OTP has expired': 'Mã OTP đã hết hạn',
+                    'OTP expired': 'Mã OTP đã hết hạn',
+                    
+                    // Email errors
+                    'Email is required': 'Email là bắt buộc',
+                    'Email is invalid': 'Email không hợp lệ',
+                    'Email already exists': 'Email đã tồn tại',
+                    'This email is already in use': 'Email này đã được sử dụng',
+                    
+                    // General errors
+                    'Bad request': 'Yêu cầu không hợp lệ',
+                    'Unauthorized': 'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn',
+                    'Not found': 'Không tìm thấy dữ liệu',
+                    'Internal server error': 'Lỗi hệ thống. Vui lòng thử lại sau',
+                };
+                
+                // Check exact match first
+                if (errorMap[message]) {
+                    return errorMap[message];
+                }
+                
+                // Check case-insensitive match
+                const lowerMessage = message.toLowerCase();
+                for (const [key, value] of Object.entries(errorMap)) {
+                    if (lowerMessage.includes(key.toLowerCase())) {
+                        return value;
+                    }
+                }
+                
+                // Check for common patterns
+                if (lowerMessage.includes('otp') && lowerMessage.includes('required')) {
+                    return 'Mã OTP là bắt buộc';
+                }
+                if (lowerMessage.includes('otp') && (lowerMessage.includes('digit') || lowerMessage.includes('6'))) {
+                    return 'Mã OTP phải có đúng 6 chữ số';
+                }
+                if (lowerMessage.includes('otp') && (lowerMessage.includes('invalid') || lowerMessage.includes('không hợp lệ'))) {
+                    return 'Mã OTP không hợp lệ';
+                }
+                if (lowerMessage.includes('otp') && (lowerMessage.includes('expired') || lowerMessage.includes('hết hạn'))) {
+                    return 'Mã OTP đã hết hạn';
+                }
+                if (lowerMessage.includes('email') && lowerMessage.includes('required')) {
+                    return 'Email là bắt buộc';
+                }
+                if (lowerMessage.includes('email') && (lowerMessage.includes('invalid') || lowerMessage.includes('không hợp lệ'))) {
+                    return 'Email không hợp lệ';
+                }
+                if (lowerMessage.includes('email') && (lowerMessage.includes('already') || lowerMessage.includes('tồn tại'))) {
+                    return 'Email đã tồn tại';
+                }
+                
+                return message;
+            }
+            
+            // Validate Email OTP Input (similar to ChangePassword)
+            function validateEmailOTPInput(value) {
+                const emailOtpInput = document.getElementById('emailOtpInput');
+                const emailOtpError = document.getElementById('emailOtpError');
+                
+                if (!emailOtpInput) return false;
+                
+                const trimmed = (value || '').trim().replace(/\s+/g, '').replace(/-/g, '').replace(/\./g, '');
+                
+                if (trimmed === '') {
+                    emailOtpInput.classList.remove('is-valid');
+                    emailOtpInput.classList.add('is-invalid');
+                    if (emailOtpError) {
+                        emailOtpError.textContent = 'Mã OTP không được để trống';
+                        emailOtpError.style.display = 'block';
+                    }
+                    return false;
+                }
+                
+                if (trimmed.length !== 6) {
+                    emailOtpInput.classList.remove('is-valid');
+                    emailOtpInput.classList.add('is-invalid');
+                    if (emailOtpError) {
+                        emailOtpError.textContent = 'Mã OTP phải có đúng 6 chữ số';
+                        emailOtpError.style.display = 'block';
+                    }
+                    return false;
+                }
+                
+                if (!/^[0-9]{6}$/.test(trimmed)) {
+                    emailOtpInput.classList.remove('is-valid');
+                    emailOtpInput.classList.add('is-invalid');
+                    if (emailOtpError) {
+                        emailOtpError.textContent = 'Mã OTP chỉ được chứa số';
+                        emailOtpError.style.display = 'block';
+                    }
+                    return false;
+                }
+                
+                // Valid OTP - update input value to cleaned version
+                if (emailOtpInput.value !== trimmed) {
+                    emailOtpInput.value = trimmed;
+                }
+                emailOtpInput.classList.remove('is-invalid');
+                emailOtpInput.classList.add('is-valid');
+                if (emailOtpError) {
+                    emailOtpError.textContent = '';
+                    emailOtpError.style.display = 'none';
+                }
+                return true;
+            }
+            
+            // Clear OTP errors when ChangeEmail modal is opened
+            const changeEmailModal = document.getElementById('changeEmailModal');
+            if (changeEmailModal) {
+                changeEmailModal.addEventListener('show.bs.modal', function() {
+                    const emailOtpInput = document.getElementById('emailOtpInput');
+                    const emailOtpError = document.getElementById('emailOtpError');
+                    if (emailOtpInput) {
+                        emailOtpInput.value = '';
+                        emailOtpInput.classList.remove('is-invalid', 'is-valid');
+                    }
+                    if (emailOtpError) {
+                        emailOtpError.textContent = '';
+                        emailOtpError.style.display = 'none';
+                    }
+                });
+            }
+            
+            // Setup OTP input validation for ChangeEmail
+            const emailOtpInput = document.getElementById('emailOtpInput');
+            if (emailOtpInput) {
+                // Input event - chỉ cho phép số và tự động clean
+                emailOtpInput.addEventListener('input', function(e) {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    e.target.value = value;
+                    
+                    // Validate when has value
+                    if (value.length > 0) {
+                        validateEmailOTPInput(value);
+                    } else {
+                        emailOtpInput.classList.remove('is-invalid', 'is-valid');
+                        const emailOtpError = document.getElementById('emailOtpError');
+                        if (emailOtpError) {
+                            emailOtpError.style.display = 'none';
+                        }
+                    }
+                });
+
+                emailOtpInput.addEventListener('blur', function() {
+                    validateEmailOTPInput(this.value);
+                });
+
+                // Ngăn chặn nhập ký tự không phải số
+                emailOtpInput.addEventListener('keydown', function(e) {
+                    if (e.key.length === 1 && !/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+
+                // Xử lý paste
+                emailOtpInput.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const paste = (e.clipboardData || window.clipboardData).getData('text');
+                    const digits = paste.replace(/[^0-9]/g, '').slice(0, 6);
+                    e.target.value = digits;
+                    if (digits.length > 0) {
+                        validateEmailOTPInput(digits);
+                    }
+                });
+            }
+            
             const changeEmailForm = document.getElementById('changeEmailForm');
             if (changeEmailForm) {
                 changeEmailForm.addEventListener('submit', async function(e) {
                     e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Get OTP input
+                    const emailOtpInput = document.getElementById('emailOtpInput');
+                    const emailOtpError = document.getElementById('emailOtpError');
+                    
+                    // Validate OTP before submit
+                    let isValid = true;
+                    let otpValue = '';
+                    
+                    console.log('[ChangeEmail] Starting validation...');
+                    console.log('[ChangeEmail] OTP Input element:', emailOtpInput);
+                    
+                    if (!emailOtpInput) {
+                        isValid = false;
+                        console.error('[ChangeEmail] OTP input not found!');
+                        showToast('Không tìm thấy trường nhập OTP', 'error');
+                    } else {
+                        // Get raw OTP value
+                        const rawOtpValue = emailOtpInput.value || '';
+                        console.log('[ChangeEmail] Raw OTP value:', rawOtpValue, 'Length:', rawOtpValue.length);
+                        
+                        // Get and clean OTP value
+                        otpValue = rawOtpValue.trim().replace(/\s+/g, '').replace(/-/g, '').replace(/\./g, '');
+                        console.log('[ChangeEmail] Cleaned OTP value:', otpValue, 'Length:', otpValue.length);
+                        
+                        // Validate OTP
+                        if (!otpValue || otpValue.length === 0) {
+                            isValid = false;
+                            console.error('[ChangeEmail] OTP is empty');
+                            emailOtpInput.classList.add('is-invalid');
+                            emailOtpInput.classList.remove('is-valid');
+                            if (emailOtpError) {
+                                emailOtpError.textContent = 'Mã OTP không được để trống';
+                                emailOtpError.style.display = 'block';
+                            }
+                            showToast('Vui lòng nhập mã OTP', 'error');
+                        } else if (otpValue.length !== 6) {
+                            isValid = false;
+                            console.error('[ChangeEmail] OTP length is not 6:', otpValue.length);
+                            emailOtpInput.classList.add('is-invalid');
+                            emailOtpInput.classList.remove('is-valid');
+                            if (emailOtpError) {
+                                emailOtpError.textContent = 'Mã OTP phải có đúng 6 chữ số';
+                                emailOtpError.style.display = 'block';
+                            }
+                            showToast('Mã OTP phải có đúng 6 chữ số', 'error');
+                        } else if (!/^[0-9]{6}$/.test(otpValue)) {
+                            isValid = false;
+                            console.error('[ChangeEmail] OTP contains non-numeric characters');
+                            emailOtpInput.classList.add('is-invalid');
+                            emailOtpInput.classList.remove('is-valid');
+                            if (emailOtpError) {
+                                emailOtpError.textContent = 'Mã OTP chỉ được chứa số';
+                                emailOtpError.style.display = 'block';
+                            }
+                            showToast('Mã OTP chỉ được chứa số', 'error');
+                        } else {
+                            // Valid OTP - update input value
+                            console.log('[ChangeEmail] OTP is valid:', otpValue);
+                            if (emailOtpInput.value !== otpValue) {
+                                emailOtpInput.value = otpValue;
+                                console.log('[ChangeEmail] Updated OTP input value to:', otpValue);
+                            }
+                            emailOtpInput.classList.remove('is-invalid');
+                            emailOtpInput.classList.add('is-valid');
+                            if (emailOtpError) {
+                                emailOtpError.textContent = '';
+                                emailOtpError.style.display = 'none';
+                            }
+                        }
+                    }
+                    
+                    // If validation fails, stop and focus on OTP input
+                    if (!isValid) {
+                        console.error('[ChangeEmail] Validation failed, stopping submit');
+                        if (emailOtpInput) {
+                            emailOtpInput.focus();
+                            emailOtpInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return false;
+                    }
+                    
+                    console.log('[ChangeEmail] Validation passed, preparing form data...');
+                    
+                    // Create form data and ensure OTP is set correctly
                     const formData = new FormData(this);
+                    
+                    // Log all form data before setting OTP
+                    console.log('[ChangeEmail] Form data before OTP update:');
+                    for (const pair of formData.entries()) {
+                        console.log('  ', pair[0], ':', pair[1]);
+                    }
+                    
+                    // Update OTP in formData with cleaned value
+                    formData.set('OTP', otpValue);
+                    console.log('[ChangeEmail] OTP set in formData:', otpValue);
+                    
+                    // Verify OTP is in formData
+                    const verifyOtp = formData.get('OTP');
+                    console.log('[ChangeEmail] Verified OTP in formData:', verifyOtp);
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+                    
+                    // Show loading state
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Đang xử lý...';
+                    }
+                    
                     try {
+                        console.log('[ChangeEmail] Sending request to:', '@Url.Action("ChangeEmail")');
                         const response = await fetch('@Url.Action("ChangeEmail")', {
                             method: 'POST',
                             body: formData
                         });
-                        const result = await response.json();
+                        
+                        console.log('[ChangeEmail] Response status:', response.status, response.statusText);
+                        console.log('[ChangeEmail] Response headers:', response.headers.get('content-type'));
+                        
+                        // Always read response as text first to handle both JSON and non-JSON responses
+                        const responseText = await response.text();
+                        console.log('[ChangeEmail] Response text:', responseText);
+                        
+                        let result;
+                        try {
+                            result = JSON.parse(responseText);
+                            console.log('[ChangeEmail] Parsed JSON result:', result);
+                        } catch (parseError) {
+                            console.error('[ChangeEmail] Failed to parse JSON:', parseError);
+                            // If not JSON, create error result
+                            result = { 
+                                success: false, 
+                                message: responseText.length < 500 ? responseText : 'Có lỗi xảy ra khi đổi email' 
+                            };
+                        }
+                        
+                        if (!response.ok) {
+                            console.error('[ChangeEmail] Request failed with status:', response.status);
+                            // Handle HTTP errors (400, 500, etc.)
+                            let errorMessage = result.message || result.Message || result.error || result.Error || 'Có lỗi xảy ra khi đổi email';
+                            
+                            // If it's a validation error, try to extract more details
+                            if (result.errors && typeof result.errors === 'object') {
+                                const errorMessages = Object.values(result.errors).flat();
+                                if (errorMessages.length > 0) {
+                                    errorMessage = errorMessages.map(msg => translateError(msg)).join(', ');
+                                }
+                            } else {
+                                // Translate error message to Vietnamese
+                                errorMessage = translateError(errorMessage);
+                            }
+                            
+                            console.error('[ChangeEmail] Error message:', errorMessage);
+                            showToast(errorMessage, 'error');
+                            
+                            // Reset button state
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.innerHTML = originalBtnText;
+                            }
+                            return;
+                        }
+                        
                         if (result.success) {
                             showToast('Đổi email thành công!', 'success');
                             bootstrap.Modal.getInstance(document.getElementById('changeEmailModal')).hide();
-                            location.reload();
+                            setTimeout(() => {
+                                location.reload();
+                            }, 1000);
                         } else {
-                            showToast(result.message || 'Có lỗi xảy ra', 'error');
+                            let errorMessage = result.message || result.Message || 'Có lỗi xảy ra khi đổi email';
+                            // Translate error message to Vietnamese
+                            errorMessage = translateError(errorMessage);
+                            showToast(errorMessage, 'error');
+                            
+                            // Reset button state
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.innerHTML = originalBtnText;
+                            }
                         }
                     } catch (error) {
-                        showToast('Có lỗi xảy ra khi đổi email', 'error');
+                        console.error('Error changing email:', error);
+                        showToast('Có lỗi xảy ra khi đổi email: ' + (error.message || 'Vui lòng thử lại'), 'error');
+                        
+                        // Reset button state
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnText;
+                        }
                     }
                 });
             }
@@ -1280,6 +1642,9 @@
             function showToast(message, type = 'info') {
                 const container = document.getElementById('profileToastContainer');
                 if (!container) return;
+
+                // Translate error messages to Vietnamese
+                const translatedMessage = type === 'error' ? translateError(message) : message;
 
                 const toast = document.createElement('div');
                 toast.className = `profile-toast profile-toast-${type}`;
@@ -1292,7 +1657,7 @@
 
                 toast.innerHTML = `
                     <span class="profile-toast-icon">${icons[type] || icons.info}</span>
-                    <span class="profile-toast-message">${message}</span>
+                    <span class="profile-toast-message">${translatedMessage}</span>
                     <button type="button" class="profile-toast-close" onclick="this.parentElement.remove()">×</button>
                 `;
 

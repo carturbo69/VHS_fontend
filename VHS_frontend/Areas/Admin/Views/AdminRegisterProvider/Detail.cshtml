@@ -567,14 +567,23 @@
                     
                     // Check if there are any remaining tags
                     setTimeout(() => {
-                        const tagContainer = document.querySelector(`#cert-row-${certId} td:nth-child(3)`);
+                        const row = document.getElementById(`cert-row-${certId}`);
+                        if (!row) return;
+                        
+                        const tagContainer = row.querySelector('td:nth-child(3)');
                         if (tagContainer) {
                             const remainingBadges = tagContainer.querySelectorAll('span.badge');
+                            
+                            // Nếu không còn tag nào, tự động xóa certificate
                             if (remainingBadges.length === 0) {
-                                const noServiceSpan = document.createElement('span');
-                                noServiceSpan.className = 'text-muted';
-                                noServiceSpan.textContent = 'Không có dịch vụ';
-                                tagContainer.appendChild(noServiceSpan);
+                                // Lấy tên danh mục từ row
+                                const categoryCell = row.querySelector('td:nth-child(2)');
+                                const categoryName = categoryCell ? categoryCell.textContent.trim() : 'Danh mục';
+                                
+                                console.log('🔥 Không còn tag nào, tự động xóa certificate:', certId);
+                                
+                                // Tự động xóa certificate
+                                deleteCertificate(certId, categoryName);
                             }
                         }
                     }, 250);

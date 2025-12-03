@@ -262,12 +262,56 @@
 
                 <!-- Status -->
                 <div class="mt-3">
-                    <label asp-for="Status" class="form-label">Trạng thái</label>
-                    <select asp-for="Status" class="form-select">
-                        <option value="Active">Hoạt động</option>
-                        <option value="Inactive">Tạm dừng</option>
-                    </select>
-                    <span asp-validation-for="Status" class="text-danger small"></span>
+                    @{
+                        var currentStatus = ViewBag.CurrentStatus as string ?? Model.Status;
+                        var isPendingStatus = string.Equals(currentStatus, "Pending", StringComparison.OrdinalIgnoreCase) ||
+                                             string.Equals(currentStatus, "PendingUpdate", StringComparison.OrdinalIgnoreCase);
+                        var isInactiveStatus = string.Equals(currentStatus, "Inactive", StringComparison.OrdinalIgnoreCase);
+                    }
+                    
+                    @if (isPendingStatus)
+                    {
+                        <!-- Ẩn field Status nếu đang chờ duyệt, chỉ hiển thị thông báo -->
+                        <input type="hidden" asp-for="Status" value="@currentStatus" />
+                        <label class="form-label">Trạng thái</label>
+                        <div class="alert alert-warning mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Dịch vụ đang chờ duyệt</strong>
+                            @if (string.Equals(currentStatus, "Pending", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <span class="badge bg-warning text-dark ms-2">Chờ duyệt</span>
+                            }
+                            else if (string.Equals(currentStatus, "PendingUpdate", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <span class="badge bg-warning text-dark ms-2">Chờ duyệt chỉnh sửa</span>
+                            }
+                            <br />
+                            <small>Khi bạn cập nhật dịch vụ, trạng thái sẽ vẫn là "Chờ duyệt" cho đến khi admin duyệt.</small>
+                        </div>
+                    }
+                    else if (isInactiveStatus)
+                    {
+                        <!-- Nếu đang tạm dừng, ẩn field Status và hiển thị thông báo -->
+                        <input type="hidden" asp-for="Status" value="Pending" />
+                        <label class="form-label">Trạng thái</label>
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Dịch vụ đang tạm dừng</strong>
+                            <span class="badge bg-secondary ms-2">Tạm dừng</span>
+                            <br />
+                            <small>Khi bạn cập nhật dịch vụ, trạng thái sẽ tự động chuyển thành <strong>"Chờ duyệt"</strong> và cần admin duyệt lại trước khi hoạt động.</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Hiển thị select Status bình thường nếu đang hoạt động -->
+                        <label asp-for="Status" class="form-label">Trạng thái</label>
+                        <select asp-for="Status" class="form-select">
+                            <option value="Active">Hoạt động</option>
+                            <option value="Inactive">Tạm dừng</option>
+                        </select>
+                        <span asp-validation-for="Status" class="text-danger small"></span>
+                    }
                 </div>
 
                 <!-- Images (Gộp avatar + ảnh mô tả) -->

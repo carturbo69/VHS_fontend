@@ -9,6 +9,64 @@
 
 let confirmCallback = null;
 
+// Translate error messages from English to Vietnamese
+function translateError(errorText) {
+    if (!errorText) return null;
+    
+    // Try to parse JSON if it's a JSON string
+    let message = errorText;
+    try {
+        const parsed = JSON.parse(errorText);
+        if (parsed.message) {
+            message = parsed.message;
+        } else if (parsed.data && typeof parsed.data === 'string') {
+            message = parsed.data;
+        } else if (typeof parsed === 'string') {
+            message = parsed;
+        }
+    } catch (e) {
+        // Not JSON, use as is
+        message = errorText;
+    }
+    
+    const lowerText = message.toLowerCase();
+    
+    // Error message translations (sắp xếp từ dài đến ngắn để match chính xác hơn)
+    const translations = {
+        'time-off conflicts with existing bookings': 'Ngày nghỉ trùng với đơn đặt lịch hiện có',
+        'time-off already exists for this date': 'Ngày nghỉ đã tồn tại cho ngày này',
+        'schedule already exists for this day': 'Lịch làm việc đã tồn tại cho ngày này',
+        'time-off already exists': 'Ngày nghỉ đã tồn tại',
+        'schedule already exists': 'Lịch làm việc đã tồn tại',
+        'already exists for this date': 'Đã tồn tại cho ngày này',
+        'conflicts with existing bookings': 'Trùng với đơn đặt lịch hiện có',
+        'conflicts with existing': 'Trùng với dữ liệu hiện có',
+        'cannot create time-off': 'Không thể tạo ngày nghỉ',
+        'cannot add day': 'Không thể thêm ngày',
+        'cannot create schedule': 'Không thể tạo lịch làm việc',
+        'cannot update schedule': 'Không thể cập nhật lịch làm việc',
+        'cannot delete schedule': 'Không thể xóa lịch làm việc',
+        'cannot delete time-off': 'Không thể xóa ngày nghỉ',
+        'already exists': 'Đã tồn tại',
+        'unauthorized': 'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn',
+        'not found': 'Không tìm thấy dữ liệu',
+        'bad request': 'Yêu cầu không hợp lệ',
+        'internal server error': 'Lỗi hệ thống. Vui lòng thử lại sau',
+        'conflicts': 'Xung đột dữ liệu'
+    };
+    
+    // Check for exact matches (từ dài đến ngắn)
+    const sortedKeys = Object.keys(translations).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+        if (lowerText.includes(key)) {
+            return translations[key];
+        }
+    }
+    
+    // Return original message if no translation found
+    return message;
+}
+
 // Toast Notification Function (Global)
 window.showToast = function(type, title, message) {
     const toastContainer = document.getElementById('toastContainer');
@@ -26,6 +84,15 @@ window.showToast = function(type, title, message) {
         'info': title || 'Thông báo'
     };
     
+    // Translate error messages
+    let displayMessage = message;
+    if (type === 'error' && message) {
+        const translated = translateError(message);
+        if (translated) {
+            displayMessage = translated;
+        }
+    }
+    
     const toast = document.createElement('div');
     toast.className = 'toast-custom';
     toast.id = toastId;
@@ -36,7 +103,7 @@ window.showToast = function(type, title, message) {
             <button class="toast-close" onclick="closeToast('${toastId}')">&times;</button>
         </div>
         <div class="toast-body-custom">
-            ${message}
+            ${displayMessage}
         </div>
     `;
     
@@ -326,7 +393,8 @@ window.deleteSchedule = function(id, dayName, startTime, endTime) {
                     showToast('success', 'Đã xóa', 'Lịch làm việc đã được xóa thành công!');
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showToast('error', 'Lỗi', result.message || 'Không thể xóa lịch làm việc');
+                    const errorMsg = translateError(result.message) || 'Không thể xóa lịch làm việc';
+                    showToast('error', 'Lỗi', errorMsg);
                 }
             })
             .catch(error => {
@@ -369,7 +437,8 @@ window.deleteTimeOff = function(id, date, reason) {
                     showToast('success', 'Đã xóa', 'Ngày nghỉ đã được xóa thành công!');
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showToast('error', 'Lỗi', result.message || 'Không thể xóa ngày nghỉ');
+                    const errorMsg = translateError(result.message) || 'Không thể xóa ngày nghỉ';
+                    showToast('error', 'Lỗi', errorMsg);
                 }
             })
             .catch(error => {
@@ -566,11 +635,29 @@ $(document).ready(function() {
                     bootstrap.Modal.getInstance(document.getElementById('editScheduleModal')).hide();
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showToast('error', 'Không thể cập nhật', result.message || 'Đã xảy ra lỗi khi cập nhật lịch làm việc');
+                    setLoading(false);
+                    // Đóng modal trước khi hiển thị lỗi
+                    const editModal = bootstrap.Modal.getInstance(document.getElementById('editScheduleModal'));
+                    if (editModal) {
+                        editModal.hide();
+                    }
+                    // Đợi modal đóng xong rồi mới hiển thị thông báo
+                    setTimeout(() => {
+                        const errorMsg = translateError(result.message) || 'Đã xảy ra lỗi khi cập nhật lịch làm việc';
+                        showToast('error', 'Không thể cập nhật', errorMsg);
+                    }, 300);
                 }
             } catch (error) {
                 setLoading(false);
-                showToast('error', 'Lỗi hệ thống', 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+                // Đóng modal trước khi hiển thị lỗi
+                const editModal = bootstrap.Modal.getInstance(document.getElementById('editScheduleModal'));
+                if (editModal) {
+                    editModal.hide();
+                }
+                // Đợi modal đóng xong rồi mới hiển thị thông báo
+                setTimeout(() => {
+                    showToast('error', 'Lỗi hệ thống', 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+                }, 300);
             }
         });
     }
@@ -623,6 +710,7 @@ $(document).ready(function() {
             };
             
             try {
+                setLoading(true);
                 const url = window.createWeeklyScheduleUrl;
                 
                 const response = await fetch(url, {
@@ -634,16 +722,34 @@ $(document).ready(function() {
                 });
                 
                 const result = await response.json();
+                setLoading(false);
                 
                 if (result.success) {
                     showToast('success', 'Thành công', 'Đã tạo lịch làm việc theo tuần thành công!');
                     bootstrap.Modal.getInstance(document.getElementById('createWeeklyModal')).hide();
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showToast('error', 'Không thể tạo lịch', result.message || 'Đã xảy ra lỗi khi tạo lịch tuần');
+                    // Đóng modal trước khi hiển thị lỗi
+                    const weeklyModal = bootstrap.Modal.getInstance(document.getElementById('createWeeklyModal'));
+                    if (weeklyModal) {
+                        weeklyModal.hide();
+                    }
+                    // Đợi modal đóng xong rồi mới hiển thị thông báo
+                    setTimeout(() => {
+                        const errorMsg = translateError(result.message) || 'Đã xảy ra lỗi khi tạo lịch tuần';
+                        showToast('error', 'Không thể tạo lịch', errorMsg);
+                    }, 300);
                 }
             } catch (error) {
-                showToast('error', 'Lỗi hệ thống', 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+                // Đóng modal trước khi hiển thị lỗi
+                const weeklyModal = bootstrap.Modal.getInstance(document.getElementById('createWeeklyModal'));
+                if (weeklyModal) {
+                    weeklyModal.hide();
+                }
+                // Đợi modal đóng xong rồi mới hiển thị thông báo
+                setTimeout(() => {
+                    showToast('error', 'Lỗi hệ thống', 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+                }, 300);
             }
         });
     }
@@ -682,6 +788,7 @@ $(document).ready(function() {
             };
             
             try {
+                setLoading(true);
                 const url = window.createScheduleUrl;
                 
                 const response = await fetch(url, {
@@ -693,16 +800,34 @@ $(document).ready(function() {
                 });
                 
                 const result = await response.json();
+                setLoading(false);
                 
                 if (result.success) {
                     showToast('success', 'Thành công', 'Đã thêm ngày làm việc thành công!');
                     bootstrap.Modal.getInstance(document.getElementById('createDailyModal')).hide();
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showToast('error', 'Không thể thêm ngày', result.message || 'Đã xảy ra lỗi khi thêm ngày làm việc');
+                    // Đóng modal trước khi hiển thị lỗi
+                    const dailyModal = bootstrap.Modal.getInstance(document.getElementById('createDailyModal'));
+                    if (dailyModal) {
+                        dailyModal.hide();
+                    }
+                    // Đợi modal đóng xong rồi mới hiển thị thông báo
+                    setTimeout(() => {
+                        const errorMsg = translateError(result.message) || 'Đã xảy ra lỗi khi thêm ngày làm việc';
+                        showToast('error', 'Không thể thêm ngày', errorMsg);
+                    }, 300);
                 }
             } catch (error) {
-                showToast('error', 'Lỗi hệ thống', 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+                // Đóng modal trước khi hiển thị lỗi
+                const dailyModal = bootstrap.Modal.getInstance(document.getElementById('createDailyModal'));
+                if (dailyModal) {
+                    dailyModal.hide();
+                }
+                // Đợi modal đóng xong rồi mới hiển thị thông báo
+                setTimeout(() => {
+                    showToast('error', 'Lỗi hệ thống', 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+                }, 300);
             }
         });
     }
@@ -739,6 +864,7 @@ $(document).ready(function() {
             };
             
             try {
+                setLoading(true);
                 const url = window.createTimeOffUrl;
                 
                 const response = await fetch(url, {
@@ -750,16 +876,34 @@ $(document).ready(function() {
                 });
                 
                 const result = await response.json();
+                setLoading(false);
                 
                 if (result.success) {
                     showToast('success', 'Thành công', 'Đã tạo ngày nghỉ thành công!');
                     bootstrap.Modal.getInstance(document.getElementById('createTimeOffModal')).hide();
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showToast('error', 'Không thể tạo ngày nghỉ', result.message || 'Đã xảy ra lỗi khi tạo ngày nghỉ');
+                    // Đóng modal trước khi hiển thị lỗi
+                    const timeOffModal = bootstrap.Modal.getInstance(document.getElementById('createTimeOffModal'));
+                    if (timeOffModal) {
+                        timeOffModal.hide();
+                    }
+                    // Đợi modal đóng xong rồi mới hiển thị thông báo
+                    setTimeout(() => {
+                        const errorMsg = translateError(result.message) || 'Đã xảy ra lỗi khi tạo ngày nghỉ';
+                        showToast('error', 'Không thể tạo ngày nghỉ', errorMsg);
+                    }, 300);
                 }
             } catch (error) {
-                showToast('error', 'Lỗi hệ thống', 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+                // Đóng modal trước khi hiển thị lỗi
+                const timeOffModal = bootstrap.Modal.getInstance(document.getElementById('createTimeOffModal'));
+                if (timeOffModal) {
+                    timeOffModal.hide();
+                }
+                // Đợi modal đóng xong rồi mới hiển thị thông báo
+                setTimeout(() => {
+                    showToast('error', 'Lỗi hệ thống', 'Không thể kết nối đến server. Vui lòng thử lại sau.');
+                }, 300);
             }
         });
     }

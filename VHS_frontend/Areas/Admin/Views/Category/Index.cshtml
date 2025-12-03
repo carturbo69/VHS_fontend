@@ -390,6 +390,178 @@
         };
         const includeDeleted = @includeDeleted.ToString().ToLower();
 
+        // Hàm kiểm tra tag có đang được sử dụng trong service không
+        async function checkTagInUse(tagId) {
+          try {
+            // Thử gọi API delete để kiểm tra (backend sẽ trả về lỗi nếu đang được sử dụng)
+            // Nhưng không thực sự xóa, chỉ kiểm tra response
+            const res = await fetch(routes.tagDelete + `?id=${tagId}`, { method: 'DELETE' });
+            
+            if (res.status === 204) {
+              // Nếu xóa thành công, nghĩa là không có service nào sử dụng
+              // Nhưng chúng ta đã xóa mất rồi, cần restore lại
+              await fetch(routes.tagRestore + `?id=${tagId}`, { method: 'POST' });
+              return false; // Không được sử dụng
+            } else {
+              // Có lỗi, kiểm tra xem có phải do đang được sử dụng không
+              const errorText = await res.text();
+              const lowerText = (errorText || '').toLowerCase();
+              
+              // Kiểm tra các dấu hiệu cho thấy tag đang được sử dụng
+              if (res.status === 409 || 
+                  lowerText.includes('service') || 
+                  lowerText.includes('dịch vụ') || 
+                  lowerText.includes('đang sử dụng') ||
+                  lowerText.includes('cannot delete') ||
+                  lowerText.includes('is being used') ||
+                  lowerText.includes('được sử dụng')) {
+                return true; // Đang được sử dụng
+              }
+              return false;
+            }
+          } catch (error) {
+            console.error('Lỗi khi kiểm tra tag:', error);
+            return false; // Mặc định cho phép nếu có lỗi
+          }
+        }
+
+        // Hàm kiểm tra option có đang được sử dụng trong service không
+        async function checkOptionInUse(optionId, tagId) {
+          try {
+            // Lấy thông tin option hiện tại trước khi kiểm tra
+            const res = await fetch(routes.optionsByTag + `?tagId=${tagId}`);
+            if (!res.ok) return false;
+            
+            const list = await res.json();
+            const opt = list.find(o => o.optionId === optionId);
+            if (!opt) return false;
+            
+            // Lưu thông tin option để có thể tạo lại nếu cần
+            const optionData = {
+              optionName: opt.optionName,
+              tagId: opt.tagId,
+              type: opt.type,
+              family: opt.family
+            };
+            
+            // Thử gọi API delete để kiểm tra (backend sẽ trả về lỗi nếu đang được sử dụng)
+            const deleteRes = await fetch(routes.optionDelete + `?id=${optionId}`, { method: 'DELETE' });
+            
+            if (deleteRes.status === 204) {
+              // Nếu xóa thành công, nghĩa là không có service nào sử dụng
+              // Tạo lại option với thông tin đã lưu
+              const createBody = JSON.stringify({
+                optionName: optionData.optionName,
+                tagId: optionData.tagId,
+                type: optionData.type,
+                family: optionData.family
+              });
+              
+              const createRes = await fetch(routes.optionCreate, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: createBody
+              });
+              
+              if (createRes.ok) {
+                const createdOption = await createRes.json();
+                // Cập nhật optionId trong DOM
+                const optionItem = document.querySelector(`[data-option-id="${optionId}"]`);
+                if (optionItem && createdOption.optionId) {
+                  optionItem.dataset.optionId = createdOption.optionId;
+                }
+                return false; // Không được sử dụng
+              } else {
+                // Nếu không tạo lại được, vẫn trả về false để tránh block
+                console.error('Không thể tạo lại option sau khi kiểm tra');
+                return false;
+              }
+            } else {
+              // Có lỗi, kiểm tra xem có phải do đang được sử dụng không
+              const errorText = await deleteRes.text();
+              const lowerText = (errorText || '').toLowerCase();
+              
+              // Kiểm tra các dấu hiệu cho thấy option đang được sử dụng
+              if (deleteRes.status === 409 || 
+                  lowerText.includes('service') || 
+                  lowerText.includes('dịch vụ') || 
+                  lowerText.includes('đang sử dụng') ||
+                  lowerText.includes('cannot delete') ||
+                  lowerText.includes('is being used') ||
+                  lowerText.includes('được sử dụng')) {
+                return true; // Đang được sử dụng
+              }
+              return false;
+            }
+          } catch (error) {
+            console.error('Lỗi khi kiểm tra option:', error);
+            return false; // Mặc định cho phép nếu có lỗi
+          }
+        }
+
+        // Hàm chuyển đổi thông báo lỗi từ tiếng Anh sang tiếng Việt
+        function translateError(errorText) {
+          if (!errorText) return null;
+          const lowerText = errorText.toLowerCase();
+          
+          // Category errors
+          if (lowerText.includes('cannot delete category') || lowerText.includes('cannot delete') && lowerText.includes('category')) {
+            if (lowerText.includes('active tags') || lowerText.includes('still has active tags')) {
+              return 'Không thể xóa danh mục vì vẫn còn tag đang hoạt động.';
+            }
+            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng')) {
+              return 'Không thể xóa danh mục vì đang có dịch vụ đang sử dụng.';
+            }
+            return 'Không thể xóa danh mục. Vui lòng kiểm tra lại.';
+          }
+          
+          // Tag errors
+          if (lowerText.includes('cannot delete tag') || lowerText.includes('cannot delete') && lowerText.includes('tag')) {
+            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng')) {
+              return 'Không thể xóa tag này vì đang có dịch vụ đang sử dụng.';
+            }
+            return 'Không thể xóa tag. Vui lòng thử lại.';
+          }
+          
+          if (lowerText.includes('cannot update tag') || lowerText.includes('cannot update') && lowerText.includes('tag')) {
+            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng')) {
+              return 'Không thể cập nhật tag này vì đang có dịch vụ đang sử dụng.';
+            }
+            return 'Không thể cập nhật tag. Vui lòng thử lại.';
+          }
+          
+          // Option errors
+          if (lowerText.includes('cannot delete option') || lowerText.includes('cannot delete') && lowerText.includes('option')) {
+            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng')) {
+              return 'Không thể xóa tùy chọn này vì đang có dịch vụ đang sử dụng.';
+            }
+            return 'Không thể xóa tùy chọn. Vui lòng thử lại.';
+          }
+          
+          if (lowerText.includes('cannot update option') || lowerText.includes('cannot update') && lowerText.includes('option')) {
+            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng')) {
+              return 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.';
+            }
+            return 'Không thể cập nhật tùy chọn. Vui lòng thử lại.';
+          }
+          
+          // Duplicate name errors
+          if (lowerText.includes('already exists') || lowerText.includes('duplicate') || lowerText.includes('đã tồn tại')) {
+            if (lowerText.includes('category') || lowerText.includes('danh mục')) {
+              return 'Tên danh mục đã tồn tại. Vui lòng chọn tên khác.';
+            }
+            if (lowerText.includes('tag')) {
+              return 'Tên tag đã tồn tại trong danh mục này. Vui lòng chọn tên khác.';
+            }
+            if (lowerText.includes('option') || lowerText.includes('tùy chọn')) {
+              return 'Tên tùy chọn đã tồn tại. Vui lòng chọn tên khác.';
+            }
+          }
+          
+          // Return original if no match found (might already be in Vietnamese)
+          return errorText;
+        }
+
 
         // Search
         document.getElementById('txtSearch').addEventListener('input', function(){
@@ -441,7 +613,7 @@
           // edit
           if (btn.classList.contains('btn-edit')) {
             const res = await fetch(routes.catGet + `?id=${id}`);
-            if (!res.ok) { showNotice('Không đọc được dữ liệu', 'error', 3000); return; }
+            if (!res.ok) { showNotice('Không thể đọc dữ liệu. Vui lòng thử lại.', 'error', 3000); return; }
             const dto = await res.json();
             document.getElementById('catModalTitle').textContent = 'Sửa danh mục';
             catIdEl.value = dto.categoryId;
@@ -491,7 +663,8 @@
                showNotice('Xóa danh mục thành công!', 'success', 2500);
              } else {
                const errorText = await res.text();
-               showNotice(errorText || 'Không thể xóa danh mục', 'error', 3000);
+               const translatedError = translateError(errorText);
+               showNotice(translatedError || 'Không thể xóa danh mục. Vui lòng thử lại.', 'error', 4000);
              }
              return;
            }
@@ -593,14 +766,16 @@
              }
            } else {
             const errorText = await res.text();
+            const translatedError = translateError(errorText);
+            
             if (res.status === 409) {
-              catErr.textContent = 'Tên danh mục đã tồn tại. Vui lòng chọn tên khác.';
+              catErr.textContent = translatedError || 'Tên danh mục đã tồn tại. Vui lòng chọn tên khác.';
             } else if (res.status === 400) {
-              catErr.textContent = errorText || 'Dữ liệu không hợp lệ.';
+              catErr.textContent = translatedError || 'Dữ liệu không hợp lệ.';
             } else if (res.status === 404) {
               catErr.textContent = 'Không tìm thấy danh mục.';
             } else {
-              catErr.textContent = errorText || 'Có lỗi xảy ra.';
+              catErr.textContent = translatedError || 'Có lỗi xảy ra.';
             }
           }
         });
@@ -726,22 +901,61 @@
           if (!catId) return;
 
             if (btn.classList.contains('btn-edit-tag')) {
-              document.getElementById('tagModalTitle').textContent = 'Sửa tag';
-              tagIdEl.value = tagId; tagCatIdEl.value = catId;
-              tagNameEl.value = li.querySelector('.tag-name').textContent.trim();
-              tagErr.textContent = ''; tagNameEl.classList.remove('is-invalid');
-            tagModal.show(); 
+              // Kiểm tra xem tag có đang được sử dụng không trước khi cho phép sửa
+              btn.disabled = true;
+              btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang kiểm tra...';
+              
+              const isInUse = await checkTagInUse(tagId);
+              
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-pencil-square"></i> Sửa';
+              
+              if (isInUse) {
+                showNotice('Không thể sửa tag này vì đang có dịch vụ đang sử dụng.', 'error', 4000);
+                return;
+              }
+              
+              try {
+                document.getElementById('tagModalTitle').textContent = 'Sửa tag';
+                tagIdEl.value = tagId; tagCatIdEl.value = catId;
+                tagNameEl.value = li.querySelector('.tag-name').textContent.trim();
+                tagErr.textContent = ''; tagNameEl.classList.remove('is-invalid');
+                tagModal.show(); 
+              } catch (error) {
+                showNotice('Không thể mở form sửa tag. Vui lòng thử lại.', 'error', 3000);
+              }
             return;
             }
 
             if (btn.classList.contains('btn-delete-tag')) {
+              // Kiểm tra xem tag có đang được sử dụng không trước khi xóa
+              btn.disabled = true;
+              btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang kiểm tra...';
+              
+              const isInUse = await checkTagInUse(tagId);
+              
+              btn.disabled = false;
+              btn.innerHTML = '<i class="bi bi-trash"></i> Xoá';
+              
+              if (isInUse) {
+                showNotice('Không thể xóa tag này vì đang có dịch vụ đang sử dụng.', 'error', 4000);
+                return;
+              }
+              
+              // Xác nhận trước khi xóa
+              if (!confirm('Bạn có chắc chắn muốn xóa tag này không?')) {
+                return;
+              }
+              
+              // Thực hiện xóa (đã kiểm tra rồi nên chắc chắn không có service nào sử dụng)
               const res = await fetch(routes.tagDelete + `?id=${tagId}`, { method:'DELETE' });
               if (res.status === 204) {
                 await reloadTags(catId, pane);
                 showNotice('Xóa tag thành công!', 'success', 2500);
               } else {
                 const errorText = await res.text();
-                showNotice(errorText || 'Không thể xóa tag', 'error', 3000);
+                const translatedError = translateError(errorText);
+                showNotice(translatedError || 'Không thể xóa tag. Vui lòng thử lại.', 'error', 4000);
               }
               return;
             }
@@ -798,14 +1012,23 @@
             }
           } else {
             const errorText = await res.text();
+            const translatedError = translateError(errorText);
+            
             if (res.status === 409) {
-              tagErr.textContent = 'Tên tag đã tồn tại trong danh mục này. Vui lòng chọn tên khác.';
+              // Kiểm tra xem có phải lỗi do tag đang được sử dụng không
+              const lowerText = (errorText || '').toLowerCase();
+              if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng') || lowerText.includes('cannot update')) {
+                tagModal.hide();
+                showNotice(translatedError || 'Không thể cập nhật tag này vì đang có dịch vụ đang sử dụng.', 'error', 4000);
+              } else {
+                tagErr.textContent = translatedError || 'Tên tag đã tồn tại trong danh mục này. Vui lòng chọn tên khác.';
+              }
             } else if (res.status === 400) {
-              tagErr.textContent = errorText || 'Dữ liệu không hợp lệ.';
+              tagErr.textContent = translatedError || 'Dữ liệu không hợp lệ.';
             } else if (res.status === 404) {
               tagErr.textContent = 'Không tìm thấy tag hoặc danh mục.';
             } else {
-              tagErr.textContent = errorText || 'Có lỗi xảy ra.';
+              tagErr.textContent = translatedError || 'Có lỗi xảy ra.';
             }
           }
         });
@@ -1118,7 +1341,7 @@
               optionFamilyEl.value = optionFamilyUUIDEl.value;
             }
           } catch (error) {
-            console.error('Error loading groups:', error);
+            console.error('Lỗi khi tải danh sách nhóm:', error);
           }
         }
 
@@ -1160,14 +1383,35 @@
           if (!tagId) return;
 
           if (btn.classList.contains('btn-edit-option')) {
+            // Kiểm tra xem option có đang được sử dụng không trước khi cho phép sửa
+            btn.disabled = true;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang kiểm tra...';
+            
+            const isInUse = await checkOptionInUse(optionId, tagId);
+            
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            
+            if (isInUse) {
+              showNotice('Không thể sửa tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 4000);
+              return;
+            }
+            
+            // Reload lại danh sách options vì optionId có thể đã thay đổi sau khi kiểm tra
+            await reloadOptions(tagId, optionsBox);
+            
+            // Lấy lại optionId mới từ DOM (nếu đã được tạo lại)
+            const updatedOptionId = li?.dataset?.optionId || optionId;
+            
             const res = await fetch(routes.optionsByTag + `?tagId=${tagId}`);
-            if (!res.ok) { showNotice('Không thể đọc dữ liệu tùy chọn', 'error', 3000); return; }
+            if (!res.ok) { showNotice('Không thể đọc dữ liệu tùy chọn. Vui lòng thử lại.', 'error', 3000); return; }
             const list = await res.json();
-            const opt = list.find(o => o.optionId === optionId);
-            if (!opt) { showNotice('Không tìm thấy tùy chọn', 'error', 3000); return; }
+            const opt = list.find(o => o.optionId === updatedOptionId);
+            if (!opt) { showNotice('Không tìm thấy tùy chọn. Vui lòng thử lại.', 'error', 3000); return; }
 
             document.getElementById('optionModalTitle').innerHTML = '<i class="bi bi-pencil-square me-2"></i>Sửa tùy chọn';
-            optionIdEl.value = optionId; 
+            optionIdEl.value = updatedOptionId; 
             optionTagIdEl.value = tagId;
             optionNameEl.value = opt.optionName || '';
             optionTypeEl.value = opt.type || '';
@@ -1197,17 +1441,35 @@
           }
 
           if (btn.classList.contains('btn-delete-option')) {
+            // Kiểm tra xem option có đang được sử dụng không trước khi xóa
+            btn.disabled = true;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang kiểm tra...';
+            
+            const isInUse = await checkOptionInUse(optionId, tagId);
+            
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            
+            if (isInUse) {
+              showNotice('Không thể xóa tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 4000);
+              return;
+            }
+            
+            // Xác nhận trước khi xóa
+            if (!confirm('Bạn có chắc chắn muốn xóa tùy chọn này không?')) {
+              return;
+            }
+            
+            // Thực hiện xóa (đã kiểm tra rồi nên chắc chắn không có service nào sử dụng)
             const res = await fetch(routes.optionDelete + `?id=${optionId}`, { method:'DELETE' });
             if (res.status === 204) {
               await reloadOptions(tagId, optionsBox);
               showNotice('Xóa tùy chọn thành công!', 'success', 2500);
-            } else if (res.status === 409) {
-              // Option đang được sử dụng bởi service
-              const errorText = await res.text();
-              showNotice(errorText || 'Không thể xóa tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 4000);
             } else {
               const errorText = await res.text();
-              showNotice(errorText || 'Không thể xóa tùy chọn. Vui lòng thử lại.', 'error', 3000);
+              const translatedError = translateError(errorText);
+              showNotice(translatedError || 'Không thể xóa tùy chọn. Vui lòng thử lại.', 'error', 4000);
             }
             return;
           }
@@ -1292,14 +1554,23 @@
             }
           } else {
             const errorText = await res.text();
+            const translatedError = translateError(errorText);
+            
             if (res.status === 409) {
-              optionErr.textContent = 'Tên tùy chọn đã tồn tại. Vui lòng chọn tên khác.';
+              // Kiểm tra xem có phải lỗi do option đang được sử dụng không
+              const lowerText = (errorText || '').toLowerCase();
+              if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng') || lowerText.includes('cannot update')) {
+                optionModal.hide();
+                showNotice(translatedError || 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 4000);
+              } else {
+                optionErr.textContent = translatedError || 'Tên tùy chọn đã tồn tại. Vui lòng chọn tên khác.';
+              }
             } else if (res.status === 400) {
-              optionErr.textContent = errorText || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+              optionErr.textContent = translatedError || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
             } else if (res.status === 404) {
               optionErr.textContent = 'Không tìm thấy tùy chọn hoặc tag. Vui lòng thử lại.';
             } else {
-              optionErr.textContent = errorText || 'Có lỗi xảy ra. Vui lòng thử lại sau.';
+              optionErr.textContent = translatedError || 'Có lỗi xảy ra. Vui lòng thử lại sau.';
             }
           }
         });

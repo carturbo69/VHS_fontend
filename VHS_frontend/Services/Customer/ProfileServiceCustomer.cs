@@ -245,15 +245,83 @@ namespace VHS_frontend.Services.Customer
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                     throw new UnauthorizedAccessException("Phiên đăng nhập đã hết hạn hoặc không hợp lệ.");
 
-                response.EnsureSuccessStatusCode();
+                // Read response content before checking status
+                var responseContent = await response.Content.ReadAsStringAsync();
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    // Try to parse error message from response
+                    string errorMessage = "Có lỗi xảy ra khi đổi email";
+                    
+                    try
+                    {
+                        var errorResult = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(responseContent);
+                        
+                        // Try multiple common error message fields
+                        if (errorResult.TryGetProperty("message", out var messageProp))
+                            errorMessage = messageProp.GetString() ?? errorMessage;
+                        else if (errorResult.TryGetProperty("Message", out var messageProp2))
+                            errorMessage = messageProp2.GetString() ?? errorMessage;
+                        else if (errorResult.TryGetProperty("error", out var errorProp))
+                            errorMessage = errorProp.GetString() ?? errorMessage;
+                        else if (errorResult.TryGetProperty("Error", out var errorProp2))
+                            errorMessage = errorProp2.GetString() ?? errorMessage;
+                        else if (errorResult.TryGetProperty("detail", out var detailProp))
+                            errorMessage = detailProp.GetString() ?? errorMessage;
+                        else if (errorResult.TryGetProperty("Detail", out var detailProp2))
+                            errorMessage = detailProp2.GetString() ?? errorMessage;
+                        else if (errorResult.TryGetProperty("title", out var titleProp))
+                            errorMessage = titleProp.GetString() ?? errorMessage;
+                        
+                        // Check for validation errors
+                        if (errorResult.TryGetProperty("errors", out var errorsProp))
+                        {
+                            var errors = new List<string>();
+                            foreach (var error in errorsProp.EnumerateObject())
+                            {
+                                if (error.Value.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                {
+                                    foreach (var err in error.Value.EnumerateArray())
+                                    {
+                                        if (err.ValueKind == System.Text.Json.JsonValueKind.String)
+                                            errors.Add(err.GetString() ?? "");
+                                    }
+                                }
+                                else if (error.Value.ValueKind == System.Text.Json.JsonValueKind.String)
+                                {
+                                    errors.Add(error.Value.GetString() ?? "");
+                                }
+                            }
+                            if (errors.Count > 0)
+                                errorMessage = string.Join(", ", errors);
+                        }
+                    }
+                    catch
+                    {
+                        // If can't parse JSON, use response content if it's short enough
+                        if (responseContent.Length < 500)
+                            errorMessage = responseContent;
+                    }
+                    
+                    return new ProfileResponseDTO { Success = false, Message = errorMessage };
+                }
 
+                // Parse success response
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                return await response.Content.ReadFromJsonAsync<ProfileResponseDTO>(options) 
+                return System.Text.Json.JsonSerializer.Deserialize<ProfileResponseDTO>(responseContent, options) 
                        ?? new ProfileResponseDTO { Success = false, Message = "Không thể parse response" };
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new ProfileResponseDTO { Success = false, Message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." };
             }
             catch (HttpRequestException ex)
             {
-                return new ProfileResponseDTO { Success = false, Message = $"Lỗi khi gọi API: {ex.Message}" };
+                return new ProfileResponseDTO { Success = false, Message = $"Lỗi kết nối: {ex.Message}" };
+            }
+            catch (Exception ex)
+            {
+                return new ProfileResponseDTO { Success = false, Message = $"Có lỗi xảy ra: {ex.Message}" };
             }
         }
 

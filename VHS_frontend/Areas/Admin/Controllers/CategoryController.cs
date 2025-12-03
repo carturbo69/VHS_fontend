@@ -41,7 +41,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CategoryCreateDTO dto, CancellationToken ct)
         {
-            if (string.IsNullOrWhiteSpace(dto?.Name)) return BadRequest("Name is required.");
+            if (string.IsNullOrWhiteSpace(dto?.Name)) return BadRequest("Tên danh mục là bắt buộc.");
             var res = await _svc.CreateAsync(dto, ct);
             var text = await res.Content.ReadAsStringAsync(ct);
             return StatusCode((int)res.StatusCode, text);
@@ -84,7 +84,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         public async Task<IActionResult> CreateTag([FromBody] TagCreateDTO dto, CancellationToken ct)
         {
             if (dto == null || dto.CategoryId == Guid.Empty || string.IsNullOrWhiteSpace(dto.Name))
-                return BadRequest("CategoryId & Name are required.");
+                return BadRequest("Danh mục và tên tag là bắt buộc.");
 
             var res = await _tagSvc.CreateAsync(dto, ct);
             var text = await res.Content.ReadAsStringAsync(ct);
@@ -127,7 +127,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         public async Task<IActionResult> CreateOption([FromBody] OptionCreateDTO dto, CancellationToken ct)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.OptionName) || string.IsNullOrWhiteSpace(dto.Type))
-                return BadRequest("OptionName & Type are required.");
+                return BadRequest("Tên tùy chọn và loại là bắt buộc.");
 
             var res = await _optionSvc.CreateAsync(dto, ct);
             var text = await res.Content.ReadAsStringAsync(ct);
