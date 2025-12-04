@@ -293,26 +293,51 @@
             });
             
             if(res.ok){ 
+              // Thành công: đóng modal và cập nhật UI
+              lockModal.hide();
               showNotice('Đã khóa tài khoản và gửi email thông báo.', 'success', 2500);
               updateRowStatus(currentDeleteId, true);
-              lockModal.hide();
+              currentDeleteId = null;
             }
             else { 
-              showNotice((await res.text()) || 'Khóa thất bại.', 'error', 3000); 
+              // Lỗi: đóng modal trước, sau đó hiển thị thông báo lỗi
+              const errorMsg = await res.text();
+              const displayMsg = errorMsg && errorMsg.trim() ? errorMsg : 'Khóa thất bại. Vui lòng thử lại.';
+              
+              // Đóng modal trước
+              lockModal.hide();
+              
+              // Đợi modal đóng xong rồi mới hiển thị thông báo
+              setTimeout(function() {
+                showNotice(displayMsg, 'error', 5000);
+              }, 300); // Đợi 300ms để modal đóng hoàn toàn
+              
+              btnConfirmLock.disabled = false;
+              btnConfirmLock.textContent = 'Xác nhận khóa';
+              // KHÔNG reset currentDeleteId để người dùng có thể thử lại
             }
           } catch(error) {
-            showNotice('Có lỗi xảy ra: ' + error.message, 'error', 3000);
-          } finally {
+            // Lỗi kết nối: đóng modal trước, sau đó hiển thị thông báo
+            lockModal.hide();
+            
+            // Đợi modal đóng xong rồi mới hiển thị thông báo
+            setTimeout(function() {
+              showNotice('Có lỗi xảy ra khi kết nối đến server. Vui lòng kiểm tra kết nối và thử lại.', 'error', 5000);
+            }, 300);
+            
             btnConfirmLock.disabled = false;
             btnConfirmLock.textContent = 'Xác nhận khóa';
-            currentDeleteId = null;
+            // KHÔNG reset currentDeleteId để người dùng có thể thử lại
           }
         });
         
-        // Reset modal khi đóng
+        // Reset modal khi đóng (chỉ khi đóng thành công hoặc hủy)
         document.getElementById('lockAccountModal').addEventListener('hidden.bs.modal', function(){
           lockReasonInput.value = '';
           lockReasonInput.classList.remove('is-invalid');
+          btnConfirmLock.disabled = false;
+          btnConfirmLock.textContent = 'Xác nhận khóa';
+          // Chỉ reset currentDeleteId khi modal đóng (có thể là đóng thành công hoặc hủy)
           currentDeleteId = null;
         });
         async function doRestore(id){

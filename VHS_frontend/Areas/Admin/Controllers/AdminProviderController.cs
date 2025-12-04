@@ -11,15 +11,18 @@ namespace VHS_frontend.Areas.Admin.Controllers
         private readonly ProviderAdminService _svc;
         private readonly ServiceManagementService _serviceManagementService;
         private readonly ProviderProfileService _providerProfileService;
+        private readonly AdminBookingService _adminBookingService;
 
         public AdminProviderController(
             ProviderAdminService svc,
             ServiceManagementService serviceManagementService,
-            ProviderProfileService providerProfileService)
+            ProviderProfileService providerProfileService,
+            AdminBookingService adminBookingService)
         {
             _svc = svc;
             _serviceManagementService = serviceManagementService;
             _providerProfileService = providerProfileService;
+            _adminBookingService = adminBookingService;
         }
         
         private void AttachBearerIfAny()
@@ -67,6 +70,35 @@ namespace VHS_frontend.Areas.Admin.Controllers
             
             // Lấy lý do từ body
             var lockReason = body?.GetValueOrDefault("LockReason");
+            
+            // Kiểm tra provider có đơn đang xử lý không
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    // Lấy ProviderId từ AccountId
+                    var providerIdStr = await _providerProfileService.GetProviderIdByAccountAsync(id.ToString(), token, ct);
+                    
+                    if (!string.IsNullOrWhiteSpace(providerIdStr) && Guid.TryParse(providerIdStr, out var providerId))
+                    {
+                        // Set token cho AdminBookingService
+                        _adminBookingService.SetBearerToken(token);
+                        
+                        // Kiểm tra có đơn đang xử lý không
+                        var hasActiveBookings = await _adminBookingService.CheckProviderHasActiveBookingsAsync(providerId, ct);
+                        
+                        if (hasActiveBookings)
+                        {
+                            return BadRequest("Không thể khóa tài khoản. Provider này đang có đơn hàng đang xử lý (Chờ xử lý, Đã xác nhận, hoặc Đang làm việc). Vui lòng đợi các đơn hàng hoàn thành hoặc hủy trước khi khóa.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Nếu có lỗi khi kiểm tra, trả về lỗi để an toàn (không cho khóa nếu không chắc chắn)
+                return BadRequest($"Không thể kiểm tra trạng thái đơn hàng: {ex.Message}. Vui lòng thử lại sau.");
+            }
             
             // Xóa (khóa) tài khoản
             var res = await _svc.DeleteAsync(id, lockReason, ct);
