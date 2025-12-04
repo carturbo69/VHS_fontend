@@ -169,6 +169,56 @@ namespace VHS_frontend.Services.Admin
                 return null;
             }
         }
+
+        /// <summary>
+        /// Kiểm tra provider có đơn đang xử lý không (Pending, Confirmed, InProgress)
+        /// </summary>
+        public async Task<bool> CheckProviderHasActiveBookingsAsync(Guid providerId, CancellationToken ct = default)
+        {
+            try
+            {
+                AttachAuth();
+
+                // Lấy danh sách đơn với các status đang xử lý
+                var activeStatuses = new[] { "Pending", "Confirmed", "InProgress" };
+                var hasActiveBookings = false;
+
+                foreach (var status in activeStatuses)
+                {
+                    var filter = new AdminBookingFilterDTO
+                    {
+                        ProviderId = providerId,
+                        Status = status,
+                        PageNumber = 1,
+                        PageSize = 1 // Chỉ cần kiểm tra có hay không
+                    };
+
+                    var json = JsonSerializer.Serialize(filter);
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                    var response = await _http.PostAsync("/api/admin/bookings/list", content, ct);
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseContent = await response.Content.ReadAsStringAsync(ct);
+                        var result = JsonSerializer.Deserialize<BookingListResultDTO>(responseContent, _json);
+                        
+                        if (result != null && result.Items != null && result.Items.Any())
+                        {
+                            hasActiveBookings = true;
+                            break;
+                        }
+                    }
+                }
+
+                return hasActiveBookings;
+            }
+            catch
+            {
+                // Nếu có lỗi, trả về true để an toàn (không cho khóa nếu không chắc chắn)
+                return true;
+            }
+        }
     }
 }
 
