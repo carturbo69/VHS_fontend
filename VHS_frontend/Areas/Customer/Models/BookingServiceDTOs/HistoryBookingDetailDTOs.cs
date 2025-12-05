@@ -16,6 +16,7 @@
 
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? CompletedAt { get; set; }
+        public DateTime BookingTime { get; set; }
 
         // Người nhận & địa chỉ
         public string RecipientFullName { get; set; } = string.Empty;
