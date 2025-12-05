@@ -10,6 +10,7 @@ using VHS_frontend.Areas.Customer.Models.ReportDTOs;
 using VHS_frontend.Services.Customer;
 using VHS_frontend.Services.Provider;
 using VHS_frontend.Areas.Provider.Models.Staff;
+using Microsoft.Extensions.Configuration;
 
 namespace VHS_frontend.Areas.Customer.Controllers
 {
@@ -22,6 +23,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         private readonly UserAddressService _userAddressService;
         private readonly ReportService _reportService;
         private readonly StaffManagementService _staffService;
+        private readonly IConfiguration _configuration;
 
         // Session keys để giữ lựa chọn trong flow checkout
         private const string SS_SELECTED_IDS = "CHECKOUT_SELECTED_IDS";
@@ -38,13 +40,15 @@ namespace VHS_frontend.Areas.Customer.Controllers
             BookingServiceCustomer bookingServiceCustomer, 
             UserAddressService userAddressService,
             ReportService reportService,
-            StaffManagementService staffService)
+            StaffManagementService staffService,
+            IConfiguration configuration)
         {
             _cartService = cartService;
             _bookingServiceCustomer = bookingServiceCustomer;
             _userAddressService = userAddressService;
             _reportService = reportService;
             _staffService = staffService;
+            _configuration = configuration;
         }
 
         // Helper: Kiểm tra xem booking đã thanh toán chưa
@@ -174,6 +178,10 @@ namespace VHS_frontend.Areas.Customer.Controllers
         [HttpGet]
         public async Task<IActionResult> Index(string? selectedKeysCsv, Guid? voucherId, bool refresh = false)
         {
+            // Pass VietMap tilemap key to view
+            var vietMapTilemapKey = _configuration["VietMap:TilemapKey"] ?? "";
+            ViewBag.VietMapTilemapKey = vietMapTilemapKey;
+            
             var jwt = HttpContext.Session.GetString("JWToken");
 
             // ❌ KHÔNG gọi CancelPendingIfAnyAsync ở đây nữa vì:
