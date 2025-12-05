@@ -1,5 +1,7 @@
 ﻿
 @using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
 @model BookingViewModel
 @{
     ViewData["Title"] = "Đặt lịch";
@@ -8,11 +10,127 @@
 
     // CHỈNH: đặt sẵn id cho form chính để các input ở chỗ khác có thể "gửi chung"
     var placeOrderFormId = "placeOrderForm";
+    var backendUrl = Configuration["Apis:Backend"] ?? "http://localhost:5154";
 }
 
-<!-- Leaflet Maps (OpenStreetMap) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- VietMap GL JS -->
+<link href="https://unpkg.com/@@vietmap/vietmap-gl-js@6.0.0/dist/vietmap-gl.css" rel="stylesheet" />
+<script>
+  // Load VietMap GL JS script with onload handler
+  (function() {
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/@@vietmap/vietmap-gl-js@6.0.0/dist/vietmap-gl.js';
+    script.async = false; // Load synchronously to ensure it's available
+    script.onload = function() {
+      console.log('VietMap GL JS script loaded, checking for vietmapgl...');
+      // Wait a bit for the global to be available
+      setTimeout(function() {
+        if (typeof vietmapgl !== 'undefined') {
+          console.log('VietMap GL JS is ready, vietmapgl type:', typeof vietmapgl);
+          window.dispatchEvent(new Event('vietmapgl:loaded'));
+        } else {
+          console.warn('Script loaded but vietmapgl not found, will retry...');
+          // Retry checking
+          let retries = 0;
+          const maxRetries = 20;
+          const retryInterval = setInterval(function() {
+            retries++;
+            if (typeof vietmapgl !== 'undefined') {
+              clearInterval(retryInterval);
+              console.log('VietMap GL JS found after retry');
+              window.dispatchEvent(new Event('vietmapgl:loaded'));
+            } else if (retries >= maxRetries) {
+              clearInterval(retryInterval);
+              console.error('VietMap GL JS script loaded but vietmapgl global not found');
+            }
+          }, 100);
+        }
+      }, 100);
+    };
+    script.onerror = function() {
+      console.error('Failed to load VietMap GL JS script');
+      const errorEl = document.getElementById('upsertFormError');
+      if (errorEl) {
+        errorEl.textContent = '⚠️ Không thể tải thư viện VietMap GL JS. Vui lòng kiểm tra kết nối mạng.';
+        errorEl.style.display = 'block';
+        errorEl.style.visibility = 'visible';
+        errorEl.style.opacity = '1';
+      }
+    };
+    document.head.appendChild(script);
+  })();
+</script>
+<script>
+  // Set VietMap tilemap key
+  const vietMapTilemapKey = '@ViewBag.VietMapTilemapKey';
+  
+  // Function to check if VietMap is ready and trigger event
+  function checkVietMapReady() {
+    // Check if vietmapgl is available
+    if (typeof vietmapgl !== 'undefined') {
+      console.log('VietMap GL JS is ready, vietmapgl:', typeof vietmapgl);
+      if (vietMapTilemapKey && vietMapTilemapKey !== '') {
+        console.log('VietMap GL JS initialized with tilemap key:', vietMapTilemapKey.substring(0, 10) + '...');
+        // Trigger custom event to notify that VietMap is ready
+        window.dispatchEvent(new Event('vietmapgl:loaded'));
+      } else {
+        console.error('VietMap tilemap key not configured');
+        const errorEl = document.getElementById('upsertFormError');
+        if (errorEl) {
+          errorEl.textContent = '⚠️ VietMap tilemap key chưa được cấu hình. Vui lòng kiểm tra appsettings.json.';
+          errorEl.style.display = 'block';
+          errorEl.style.visibility = 'visible';
+          errorEl.style.opacity = '1';
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+  
+  // Try to check immediately
+  if (checkVietMapReady()) {
+    // Already ready
+  } else {
+    // Wait for script to load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        // Check again after DOM is ready
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds
+        const checkInterval = setInterval(function() {
+          attempts++;
+          if (checkVietMapReady()) {
+            clearInterval(checkInterval);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(checkInterval);
+            console.error('VietMap GL JS không thể load sau 5 giây. Kiểm tra console để xem lỗi.');
+            const errorEl = document.getElementById('upsertFormError');
+            if (errorEl) {
+              errorEl.textContent = '⚠️ Không thể tải thư viện VietMap GL JS. Vui lòng kiểm tra kết nối mạng hoặc refresh trang.';
+              errorEl.style.display = 'block';
+              errorEl.style.visibility = 'visible';
+              errorEl.style.opacity = '1';
+            }
+          }
+        }, 100);
+      });
+    } else {
+      // DOM already ready, check immediately
+      let attempts = 0;
+      const maxAttempts = 50;
+      const checkInterval = setInterval(function() {
+        attempts++;
+        if (checkVietMapReady()) {
+          clearInterval(checkInterval);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(checkInterval);
+          console.error('VietMap GL JS không thể load sau 5 giây');
+        }
+      }, 100);
+    }
+  }
+</script>
 
 @if (Model.Address.Latitude.HasValue && Model.Address.Longitude.HasValue)
 {
@@ -23,31 +141,70 @@
         function initMap() {
             const lat = @Model.Address.Latitude.Value;
             const lng = @Model.Address.Longitude.Value;
+            const tilemapKey = '@ViewBag.VietMapTilemapKey';
             
-            // Khởi tạo Leaflet Map
-            map = L.map('addressMap').setView([lat, lng], 15);
-            
-            // Thêm tile layer (OpenStreetMap)
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
-            }).addTo(map);
+            // Khởi tạo VietMap
+            map = new vietmapgl.Map({
+                container: 'addressMap',
+                style: `https://maps.vietmap.vn/maps/styles/tm/style.json?apikey=${tilemapKey}`,
+                center: [lng, lat], // [longitude, latitude]
+                zoom: 15
+            });
             
             // Thêm marker
-            marker = L.marker([lat, lng], {
+            marker = new vietmapgl.Marker({
                 draggable: false
-            }).addTo(map);
+            })
+                .setLngLat([lng, lat])
+                .setPopup(new vietmapgl.Popup().setHTML('<div style="padding: 8px;"><strong>@Html.Raw(Model.Address.ToDisplayString())</strong></div>'))
+                .addTo(map);
             
-            // Thêm popup với địa chỉ
-            marker.bindPopup('<div style="padding: 8px;"><strong>@Html.Raw(Model.Address.ToDisplayString())</strong></div>').openPopup();
+            // Mở popup mặc định
+            marker.togglePopup();
         }
         
-        // Khởi tạo bản đồ khi trang load
-        document.addEventListener('DOMContentLoaded', function() {
-            if (document.getElementById('addressMap')) {
-                initMap();
+        // Khởi tạo bản đồ khi trang load và VietMap đã sẵn sàng
+        function waitForVietMapAndInit() {
+            function tryInit() {
+                if (typeof vietmapgl !== 'undefined' && document.getElementById('addressMap')) {
+                    initMap();
+                    return true;
+                }
+                return false;
             }
-        });
+            
+            if (tryInit()) {
+                return;
+            }
+            
+            // Đợi VietMap load xong
+            const handler = function() {
+                tryInit();
+                window.removeEventListener('vietmapgl:loaded', handler);
+            };
+            window.addEventListener('vietmapgl:loaded', handler);
+            
+            // Fallback: kiểm tra lại sau mỗi 200ms, tối đa 10 giây
+            let attempts = 0;
+            const maxAttempts = 50;
+            const checkInterval = setInterval(function() {
+                attempts++;
+                if (tryInit()) {
+                    clearInterval(checkInterval);
+                    window.removeEventListener('vietmapgl:loaded', handler);
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                    window.removeEventListener('vietmapgl:loaded', handler);
+                    console.error('Cannot initialize map: VietMap not loaded or container not found');
+                }
+            }, 200);
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', waitForVietMapAndInit);
+        } else {
+            waitForVietMapAndInit();
+        }
     </script>
 }
 
@@ -121,8 +278,7 @@
         var addressDisplay = Model.Address?.ToDisplayString() ?? "";
         var hasAddressId = Model.Address?.AddressId != null && Model.Address.AddressId != Guid.Empty;
         var hasValidAddressParts = !string.IsNullOrWhiteSpace(Model.Address?.StreetAddress) &&
-                                   !string.IsNullOrWhiteSpace(Model.Address?.ProvinceName) &&
-                                   !string.IsNullOrWhiteSpace(Model.Address?.DistrictName);
+                                   !string.IsNullOrWhiteSpace(Model.Address?.ProvinceName);
         // Loại trừ các giá trị không hợp lệ như "0", "...", hoặc chỉ có dấu phẩy
         var isValidDisplay = !string.IsNullOrWhiteSpace(addressDisplay) && 
                             addressDisplay.Trim() != "0" && 
@@ -543,7 +699,6 @@
                         <div class="addr-item"
                              data-id="@addr.AddressId"
                              data-province="@addr.ProvinceName"
-                             data-district="@addr.DistrictName"
                              data-ward="@addr.WardName"
                              data-street="@addr.StreetAddress"
                              data-recipientname="@(addr.RecipientName ?? "")"
@@ -732,6 +887,8 @@
             const wardName = document.getElementById('wardName');
             if (wardName) wardName.value = '';
             
+            // District field removed
+            
             const provinceName = document.getElementById('provinceName');
             if (provinceName) provinceName.value = '';
             
@@ -908,6 +1065,7 @@
                 <input type="text" id="wardName" name="wardName" required class="form-input" />
                 <small class="field-error-message" id="wardNameError" style="display: none; color: var(--danger); margin-top: 4px; font-size: 0.875rem;"></small>
             </div>
+            <!-- District field removed - Vietnam now uses 34 provinces/cities directly without districts -->
             <div class="form-row">
                 <label for="provinceName">Tỉnh/Thành <span style="color: red;">*</span></label>
                 <input type="text" id="provinceName" name="provinceName" required class="form-input" />
@@ -1330,7 +1488,7 @@
                 }
                 
                 // Cập nhật map nếu có tọa độ
-                if (lat && lng && typeof L !== 'undefined') {
+                if (lat && lng && typeof vietmapgl !== 'undefined') {
                   let mapContainer = document.getElementById('addressMap');
                   if (!mapContainer) {
                     const addrBody = document.querySelector('.addr-body');
@@ -1341,22 +1499,32 @@
                       addrBody.appendChild(mapContainer);
 }
                   }
-                  if (mapContainer && typeof L !== 'undefined' && L.map) {
+                  if (mapContainer && typeof google !== 'undefined' && google.maps) {
                     setTimeout(() => {
+                      // Destroy old map if exists
                       if (window.existingMap) {
-                        window.existingMap.remove();
+                        window.existingMap = null;
                       }
-                      window.existingMap = L.map('addressMap').setView([parseFloat(lat), parseFloat(lng)], 15);
-                      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '© OpenStreetMap contributors'
-                      }).addTo(window.existingMap);
-                      const marker = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(window.existingMap);
-                      marker.bindPopup(addressText, {
-                          autoPan: true,
-                          autoPanPadding: [20, 20],
-                          maxWidth: 250,
-                          className: 'address-popup'
-                      }).openPopup();
+                      
+                      // Create Google Maps
+                      window.existingMap = new google.maps.Map(mapContainer, {
+                        center: { lat: parseFloat(lat), lng: parseFloat(lng) },
+                        zoom: 15,
+                        mapTypeId: 'roadmap'
+                      });
+                      
+                      // Add marker
+                      const marker = new google.maps.Marker({
+                        position: { lat: parseFloat(lat), lng: parseFloat(lng) },
+                        map: window.existingMap,
+                        title: addressText
+                      });
+                      
+                      // Add info window
+                      const infoWindow = new google.maps.InfoWindow({
+                        content: `<div style="padding: 8px;"><strong>${addressText}</strong></div>`
+                      });
+                      infoWindow.open(window.existingMap, marker);
                     }, 100);
                   }
                 }
@@ -1858,26 +2026,32 @@
               }
             }
             // Khởi tạo map với tọa độ mới
-            if(mapContainer && typeof L !== 'undefined') {
+            if(mapContainer && typeof google !== 'undefined' && google.maps) {
               setTimeout(() => {
-                if(typeof L !== 'undefined' && L.map) {
                   // Destroy old map if exists
                   if(window.existingMap) {
-                    window.existingMap.remove();
-                  }
-                  // Create new map
-                  window.existingMap = L.map('addressMap').setView([parseFloat(lat), parseFloat(lng)], 15);
-                  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                  }).addTo(window.existingMap);
-                  const marker = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(window.existingMap);
-                  marker.bindPopup(text, {
-                      autoPan: true,
-                      autoPanPadding: [20, 20],
-                      maxWidth: 250,
-                      className: 'address-popup'
-                  }).openPopup();
+                  window.existingMap = null;
                 }
+                
+                // Create Google Maps
+                window.existingMap = new google.maps.Map(mapContainer, {
+                  center: { lat: parseFloat(lat), lng: parseFloat(lng) },
+                  zoom: 15,
+                  mapTypeId: 'roadmap'
+                });
+                
+                // Add marker
+                const marker = new google.maps.Marker({
+                  position: { lat: parseFloat(lat), lng: parseFloat(lng) },
+                  map: window.existingMap,
+                  title: text
+                });
+                
+                // Add info window
+                const infoWindow = new google.maps.InfoWindow({
+                  content: `<div style="padding: 8px;"><strong>${text}</strong></div>`
+                });
+                infoWindow.open(window.existingMap, marker);
               }, 100);
             }
           }
@@ -1969,13 +2143,13 @@
               initAddressPickerMap();
               // Đảm bảo map được render đúng kích thước sau khi modal hiển thị
               setTimeout(() => {
-                if (addressPickerMap) {
-                  console.log('Invalidating map size after initialization...');
-                  addressPickerMap.invalidateSize();
+                if (addressPickerMap && typeof vietmapgl !== 'undefined') {
+                  console.log('Resizing map after initialization...');
+                  addressPickerMap.resize();
                   // Thử lại sau 300ms nữa để đảm bảo
                   setTimeout(() => {
                     if (addressPickerMap) {
-                      addressPickerMap.invalidateSize();
+                      addressPickerMap.resize();
                     }
                   }, 300);
                 }
@@ -1989,21 +2163,70 @@
         function initAddressPickerMap() {
           console.log('=== initAddressPickerMap called ===');
           
-          // Kiểm tra Leaflet đã load chưa
-          if (typeof L === 'undefined') {
-            console.error('Leaflet chưa được load. Kiểm tra xem script Leaflet đã được include chưa.');
-            // Hiển thị lỗi trong form error nếu có
-            const errorEl = document.getElementById('upsertFormError');
-            if (errorEl) {
-              errorEl.textContent = '⚠️ Leaflet Maps chưa sẵn sàng. Vui lòng refresh trang.';
-              errorEl.style.display = 'block';
-              errorEl.style.visibility = 'visible';
-              errorEl.style.opacity = '1';
+          // Hàm helper để đợi VietMap load xong
+          function waitForVietMap(callback) {
+            // Check if already loaded
+            if (typeof vietmapgl !== 'undefined') {
+              console.log('VietMap already loaded, executing callback');
+              callback();
+              return;
             }
-            return;
+            
+            console.log('VietMap not loaded yet, waiting...');
+            console.log('Checking for vietmapgl in window:', typeof window.vietmapgl);
+            
+            // Đợi event VietMap loaded
+            const handler = function() {
+              console.log('Received vietmapgl:loaded event');
+              callback();
+              window.removeEventListener('vietmapgl:loaded', handler);
+            };
+            window.addEventListener('vietmapgl:loaded', handler);
+            
+            // Fallback: kiểm tra lại sau mỗi 100ms, tối đa 10 giây
+            let attempts = 0;
+            const maxAttempts = 100; // 10 seconds
+            const checkInterval = setInterval(function() {
+              attempts++;
+              if (typeof vietmapgl !== 'undefined') {
+                console.log('VietMap loaded after', attempts * 100, 'ms');
+                clearInterval(checkInterval);
+                window.removeEventListener('vietmapgl:loaded', handler);
+                callback();
+              } else if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                window.removeEventListener('vietmapgl:loaded', handler);
+                console.error('VietMap GL JS không thể load sau 10 giây');
+                console.log('Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('viet') || k.toLowerCase().includes('map')));
+                console.log('Scripts in document:', Array.from(document.scripts).map(s => s.src));
+                const errorEl = document.getElementById('upsertFormError');
+                if (errorEl) {
+                  errorEl.textContent = '⚠️ VietMap GL JS không thể tải. Vui lòng kiểm tra console để xem lỗi chi tiết.';
+                  errorEl.style.display = 'block';
+                  errorEl.style.visibility = 'visible';
+                  errorEl.style.opacity = '1';
+                }
+              }
+            }, 100);
           }
           
-          console.log('Leaflet loaded:', typeof L);
+          waitForVietMap(function() {
+            console.log('VietMap GL JS is ready');
+            
+            const tilemapKey = '@ViewBag.VietMapTilemapKey';
+            if (!tilemapKey || tilemapKey === '') {
+              console.error('VietMap tilemap key chưa được cấu hình.');
+              const errorEl = document.getElementById('upsertFormError');
+              if (errorEl) {
+                errorEl.textContent = '⚠️ VietMap tilemap key chưa được cấu hình. Vui lòng kiểm tra appsettings.json.';
+                errorEl.style.display = 'block';
+                errorEl.style.visibility = 'visible';
+                errorEl.style.opacity = '1';
+              }
+              return;
+            }
+            
+            console.log('VietMap GL JS loaded');
           
           // Kiểm tra element có tồn tại không
           const mapContainer = document.getElementById('addressMapPicker');
@@ -2038,63 +2261,81 @@
           // Nếu map chưa được khởi tạo, tạo mới
           if (!addressPickerMap) {
             try {
-              console.log('Creating new map...');
-              // Khởi tạo Leaflet Map
-              addressPickerMap = L.map('addressMapPicker', {
-                center: [defaultLat, defaultLng],
-                zoom: 13
-              });
+              console.log('Creating new VietMap map...');
+              const tilemapKey = '@ViewBag.VietMapTilemapKey';
+              // Khởi tạo VietMap với error handling
+              try {
+                addressPickerMap = new vietmapgl.Map({
+                  container: 'addressMapPicker',
+                  style: `https://maps.vietmap.vn/maps/styles/tm/style.json?apikey=${tilemapKey}`,
+                  center: [defaultLng, defaultLat], // [longitude, latitude]
+                  zoom: 13
+                });
+                
+                // Wait for map to load
+                addressPickerMap.on('load', function() {
+                  console.log('VietMap map loaded successfully');
+                });
+                
+                addressPickerMap.on('error', function(e) {
+                  console.error('VietMap error:', e);
+                  const errorEl = document.getElementById('upsertFormError');
+                  if (errorEl) {
+                    errorEl.textContent = '⚠️ Không thể tải bản đồ VietMap. Vui lòng kiểm tra tilemap key.';
+                    errorEl.style.display = 'block';
+                    errorEl.style.visibility = 'visible';
+                    errorEl.style.opacity = '1';
+                  }
+                });
+              } catch (mapError) {
+                console.error('Error creating VietMap map:', mapError);
+                const errorEl = document.getElementById('upsertFormError');
+                if (errorEl) {
+                  errorEl.textContent = '⚠️ Không thể khởi tạo bản đồ. Lỗi: ' + mapError.message;
+                  errorEl.style.display = 'block';
+                  errorEl.style.visibility = 'visible';
+                  errorEl.style.opacity = '1';
+                }
+                return;
+              }
               
               console.log('Map created:', addressPickerMap);
-              
-              // Thêm tile layer (OpenStreetMap)
-              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
-              }).addTo(addressPickerMap);
-              
-              console.log('Tile layer added');
-              
+                
               // Thêm marker có thể kéo
-              addressPickerMarker = L.marker([defaultLat, defaultLng], {
+              addressPickerMarker = new vietmapgl.Marker({
                 draggable: true
-              }).addTo(addressPickerMap);
-              
+              })
+                .setLngLat([defaultLng, defaultLat])
+                .addTo(addressPickerMap);
+                
               console.log('Marker added');
-              
+                
               // Cập nhật tọa độ khi kéo marker
-              addressPickerMarker.on('dragend', function(e) {
-                const pos = addressPickerMarker.getLatLng();
-                console.log('Marker dragged to:', pos.lat, pos.lng);
-                if (latInput) latInput.value = pos.lat;
-                if (lngInput) lngInput.value = pos.lng;
-              });
-              
-              // Nhấn vào bản đồ để di chuyển marker
-              addressPickerMap.on('click', function(e) {
-                const lat = e.latlng.lat;
-                const lng = e.latlng.lng;
-                
-                console.log('Map clicked at:', lat, lng);
-                
+              addressPickerMarker.on('dragend', function() {
+                const lngLat = addressPickerMarker.getLngLat();
+                const lat = lngLat.lat;
+                const lng = lngLat.lng;
+                console.log('Marker dragged to:', lat, lng);
                 if (latInput) latInput.value = lat;
                 if (lngInput) lngInput.value = lng;
+              });
                 
+              // Nhấn vào bản đồ để di chuyển marker
+              addressPickerMap.on('click', function(e) {
+                const lat = e.lngLat.lat;
+                const lng = e.lngLat.lng;
+                  
+                console.log('Map clicked at:', lat, lng);
+                  
+                if (latInput) latInput.value = lat;
+                if (lngInput) lngInput.value = lng;
+                  
                 // Di chuyển marker đến vị trí mới
                 if (addressPickerMarker) {
-                  addressPickerMarker.setLatLng([lat, lng]);
+                  addressPickerMarker.setLngLat([lng, lat]);
                 }
               });
-              
-              // Invalidate size để đảm bảo map render đúng
-              setTimeout(() => {
-                if (addressPickerMap) {
-                  console.log('Invalidating map size...');
-                  addressPickerMap.invalidateSize();
-                  console.log('Map size invalidated');
-                }
-              }, 200);
-              
+                
               console.log('✅ Map initialized successfully');
             } catch (error) {
               console.error('❌ Error initializing map:', error);
@@ -2111,18 +2352,13 @@
           } else {
             console.log('Map already exists, updating position...');
             // Cập nhật vị trí nếu map đã được khởi tạo
-            addressPickerMap.setView([defaultLat, defaultLng], 13);
+            addressPickerMap.setCenter([defaultLng, defaultLat]);
+            addressPickerMap.setZoom(13);
             if (addressPickerMarker) {
-              addressPickerMarker.setLatLng([defaultLat, defaultLng]);
+              addressPickerMarker.setLngLat([defaultLng, defaultLat]);
             }
-            // Invalidate size để đảm bảo map render đúng sau khi modal mở
-            setTimeout(() => {
-              if (addressPickerMap) {
-                console.log('Invalidating existing map size...');
-                addressPickerMap.invalidateSize();
-              }
-            }, 200);
           }
+          }); // End of waitForVietMap callback
         }
         
         // Nút "Lấy địa chỉ từ vị trí đã chọn" - Reverse Geocoding (Nominatim API)
@@ -2177,72 +2413,41 @@
             btn.style.pointerEvents = 'none';
             btn.innerHTML = '<span class="btn-icon">⏳</span><span>Đang tải...</span>';
             
-            // Gọi Nominatim API (OpenStreetMap) để lấy địa chỉ từ tọa độ
-            // Nominatim là miễn phí, không cần API key
-            // Thêm zoom=12 để có độ chi tiết tốt hơn (tỉnh/thành sẽ rõ ràng hơn)
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1&accept-language=vi&extratags=1`)
-              .then(response => response.json())
+            // Gọi backend API để lấy địa chỉ từ tọa độ (backend sẽ gọi Vietmap API)
+            const backendUrl = 'http://localhost:5154'; // Sử dụng backend URL từ config
+            const apiUrl = `${backendUrl}/api/Geocoding/geocode`;
+            
+            fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                latitude: parseFloat(lat),
+                longitude: parseFloat(lng),
+                language: 'vi'
+              })
+            })
+              .then(async response => {
+                const responseData = await response.json();
+                if (!response.ok) {
+                  // Try to get error message from response
+                  const errorMsg = responseData?.message || responseData?.data?.errorMessage || `HTTP error! status: ${response.status}`;
+                  throw new Error(errorMsg);
+                }
+                return responseData;
+              })
               .then(data => {
-                console.log('=== Nominatim API Response ===');
+                console.log('=== Backend Geocoding API Response ===');
                 console.log('Full response:', data);
-                console.log('Address object:', data.address);
                 
-                if (data && data.address) {
-                  const address = data.address;
+                if (data && data.success && data.data && data.data.isSuccess) {
+                  const result = data.data;
                   
-                  // Parse address từ Nominatim API
-                  // Nominatim trả về các trường như: road, house_number, suburb, city_district, city, state, etc.
-                  let streetNumber = address.house_number || '';
-                  let route = address.road || address.street || '';
-                  
-                  // Parse Phường/Xã - thử nhiều field
-                  let ward = address.suburb || 
-                            address.city_district || 
-                            address.neighbourhood || 
-                            address.quarter || 
-                            address.village || 
-                            '';
-                  
-                  // Parse Tỉnh/Thành - thử nhiều field khác nhau
-                  // Ở Việt Nam, Nominatim có thể trả về: state, city, province, region, county, town, municipality
-                  let province = address.city || 
-                                address.state || 
-                                address.province || 
-                                address.region || 
-                                address.county || 
-                                address.town || 
-                                address.municipality || 
-                                '';
-                  
-                  // Nếu vẫn không có tỉnh/thành, thử parse từ display_name
-                  if (!province && data.display_name) {
-                    console.log('Trying to parse province from display_name:', data.display_name);
-                    // Parse từ display_name
-                    // Format thường gặp: "Đường, Phường/Xã, Quận/Huyện, Thành phố/Tỉnh, Vietnam"
-                    // Hoặc: "Đường, Phường/Xã, Thành phố/Tỉnh, Vietnam"
-                    const parts = data.display_name.split(',').map(p => p.trim()).filter(p => p);
-                    console.log('Display name parts:', parts);
-                    
-                    // Tỉnh/thành thường là phần ngay trước "Vietnam" (phần thứ 2 từ cuối)
-                    // Hoặc có thể là phần thứ 3 từ cuối nếu có Quận/Huyện
-                    if (parts.length >= 3) {
-                      // Thử lấy phần thứ 2 từ cuối (trước "Vietnam")
-                      let candidate = parts[parts.length - 2];
-                      
-                      // Nếu phần đó quá ngắn (< 4 ký tự) hoặc là số, thử phần thứ 3 từ cuối
-                      if (!candidate || candidate.length < 4 || candidate.match(/^\d+$/)) {
-                        if (parts.length >= 4) {
-                          candidate = parts[parts.length - 3];
-                        }
-                      }
-                      
-                      // Nếu candidate hợp lệ (không phải "Vietnam", không phải số, có độ dài > 3)
-                      if (candidate && !candidate.match(/^Vietnam$/i) && !candidate.match(/^\d+$/) && candidate.length > 3) {
-                        province = candidate;
-                        console.log('Found province from display_name:', province);
-                      }
-                    }
-                  }
+                  // Parse address từ backend response
+                  let streetAddress = result.streetAddress || '';
+                  let ward = result.wardName || '';
+                  let province = result.provinceName || '';
                   
                   // Xử lý tên tỉnh/thành phố (loại bỏ "Tỉnh", "Thành phố" ở đầu nếu có)
                   if (province) {
@@ -2254,19 +2459,11 @@
                     ward = ward.replace(/^(Phường|Xã|P\.?|X\.?)\s*/i, '').trim();
                   }
                   
-                  // Tạo street address
-                  const streetAddress = (streetNumber + ' ' + route).trim() || route || address.house || '';
-                  
                   // Log để debug
                   console.log('=== Parsed Address ===');
-                  console.log('Street Number:', streetNumber);
-                  console.log('Route:', route);
                   console.log('Street Address:', streetAddress);
                   console.log('Ward:', ward);
-                  console.log('Province (raw):', address.state || address.city || address.province || address.region || address.county);
-                  console.log('Province (parsed):', province);
-                  console.log('All address fields:', Object.keys(address));
-                  console.log('Address values:', address);
+                  console.log('Province:', province);
                   
                   // Điền vào form
                   document.getElementById('streetAddress').value = streetAddress;
@@ -2320,10 +2517,22 @@
                     }
                   }
                 } else {
-                  console.warn('Không tìm thấy địa chỉ tại vị trí này.');
+                  const errorMessage = data?.data?.errorMessage || data?.message || 'Không tìm thấy địa chỉ tại vị trí này.';
+                  console.warn('Geocoding failed:', errorMessage);
                   const errorEl = document.getElementById('upsertFormError');
                   if (errorEl) {
-                    errorEl.textContent = '⚠️ Không tìm thấy địa chỉ tại vị trí này. Vui lòng thử lại hoặc chọn vị trí khác.';
+                    let displayMessage = `⚠️ ${errorMessage}`;
+                    
+                    // Check for specific error messages and provide helpful guidance
+                    if (errorMessage.includes('REQUEST_DENIED') || errorMessage.includes('Geocoding API access denied')) {
+                      displayMessage = '⚠️ <strong>Geocoding API chưa được enable hoặc API key không có quyền.</strong><br>Vui lòng: 1) Enable Geocoding API trong Google Cloud Console, 2) Kiểm tra API key restrictions.';
+                    } else if (errorMessage.includes('OVER_QUERY_LIMIT')) {
+                      displayMessage = '⚠️ Đã vượt quá giới hạn truy vấn. Vui lòng thử lại sau.';
+                    } else if (errorMessage.includes('ZERO_RESULTS')) {
+                      displayMessage = '⚠️ Không tìm thấy địa chỉ cho vị trí này. Vui lòng chọn vị trí khác.';
+                    }
+                    
+                    errorEl.innerHTML = displayMessage;
                     errorEl.style.display = 'block';
                     errorEl.style.visibility = 'visible';
                     errorEl.style.opacity = '1';
@@ -2331,7 +2540,7 @@
                       errorEl.style.display = 'none';
                       errorEl.style.visibility = 'hidden';
                       errorEl.style.opacity = '0';
-                    }, 5000);
+                    }, 8000); // Hiển thị lâu hơn cho lỗi quan trọng
                   }
                   btn.disabled = false;
                   btn.classList.remove('loading');
@@ -2341,10 +2550,25 @@
               })
               .catch(error => {
                 console.error('Geocoding error:', error);
-                // Hiển thị lỗi trong form error
+                // Hiển thị lỗi trong form error với thông báo chi tiết
                 const errorEl = document.getElementById('upsertFormError');
                 if (errorEl) {
-                  errorEl.textContent = '⚠️ Không thể lấy địa chỉ từ vị trí đã chọn. Vui lòng thử lại.';
+                  let errorMessage = '⚠️ Không thể lấy địa chỉ từ vị trí đã chọn.';
+                  
+                  // Check for specific error messages
+                  if (error.message) {
+                    if (error.message.includes('REQUEST_DENIED') || error.message.includes('Geocoding API access denied')) {
+                      errorMessage = '⚠️ <strong>Geocoding API chưa được enable hoặc API key không có quyền.</strong><br>Vui lòng: 1) Enable Geocoding API trong Google Cloud Console, 2) Kiểm tra API key restrictions.';
+                    } else if (error.message.includes('OVER_QUERY_LIMIT')) {
+                      errorMessage = '⚠️ Đã vượt quá giới hạn truy vấn. Vui lòng thử lại sau.';
+                    } else if (error.message.includes('ZERO_RESULTS')) {
+                      errorMessage = '⚠️ Không tìm thấy địa chỉ cho vị trí này. Vui lòng chọn vị trí khác.';
+                    } else {
+                      errorMessage = `⚠️ ${error.message}`;
+                    }
+                  }
+                  
+                  errorEl.innerHTML = errorMessage;
                   errorEl.style.display = 'block';
                   errorEl.style.visibility = 'visible';
                   errorEl.style.opacity = '1';
@@ -2352,7 +2576,7 @@
                     errorEl.style.display = 'none';
                     errorEl.style.visibility = 'hidden';
                     errorEl.style.opacity = '0';
-                  }, 5000);
+                  }, 8000); // Hiển thị lâu hơn cho lỗi quan trọng
                 }
                 btn.disabled = false;
                 btn.classList.remove('loading');
@@ -2375,6 +2599,7 @@
           document.getElementById('AddressId').value = row.dataset.id || '';
           document.getElementById('streetAddress').value = row.dataset.street || '';
           document.getElementById('wardName').value = row.dataset.ward || '';
+          // District field removed
           document.getElementById('provinceName').value = row.dataset.province || '';
           
           // Set tên và số điện thoại
@@ -2467,15 +2692,16 @@
                     const lngNum = parseFloat(lng);
                     if (!isNaN(latNum) && !isNaN(lngNum)) {
                       console.log('Setting map view to:', latNum, lngNum);
-                      addressPickerMap.setView([latNum, lngNum], 15);
+                      addressPickerMap.setCenter([lngNum, latNum]);
+                      addressPickerMap.setZoom(15);
                       if (addressPickerMarker) {
-                        addressPickerMarker.setLatLng([latNum, lngNum]);
+                        addressPickerMarker.setLngLat([lngNum, latNum]);
                       }
-                      addressPickerMap.invalidateSize();
+                      addressPickerMap.resize();
                       // Thử lại sau 300ms nữa
                       setTimeout(() => {
                         if (addressPickerMap) {
-                          addressPickerMap.invalidateSize();
+                          addressPickerMap.resize();
                         }
                       }, 300);
                     }
@@ -2485,10 +2711,10 @@
                 // Nếu không có tọa độ, đảm bảo map được render đúng
                 setTimeout(() => {
                   if (addressPickerMap) {
-                    addressPickerMap.invalidateSize();
+                    addressPickerMap.resize();
                     setTimeout(() => {
                       if (addressPickerMap) {
-                        addressPickerMap.invalidateSize();
+                        addressPickerMap.resize();
                       }
                     }, 300);
                   }
