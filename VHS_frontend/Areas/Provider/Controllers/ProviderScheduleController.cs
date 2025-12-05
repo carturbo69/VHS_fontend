@@ -213,6 +213,41 @@ namespace VHS_frontend.Areas.Provider.Controllers
             return Json(new { success = true, data = json });
         }
 
+        [HttpPut]
+        public async Task<IActionResult> UpdateSchedule(string id, [FromBody] UpdateScheduleViewModel model)
+        {
+            var jwt = GetJwtToken();
+            if (string.IsNullOrEmpty(jwt))
+            {
+                return Json(new { success = false, message = "Unauthorized" });
+            }
+
+            var dto = new
+            {
+                StartTime = model.StartTime,
+                EndTime = model.EndTime,
+                BookingLimit = model.BookingLimit
+            };
+
+            Console.WriteLine($"Updating Schedule {id} - StartTime: {dto.StartTime}, EndTime: {dto.EndTime}, BookingLimit: {dto.BookingLimit}");
+
+            var request = new HttpRequestMessage(HttpMethod.Put, $"{GetApiBaseUrl()}/api/ProviderSchedule/schedules/{id}");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", jwt);
+            request.Content = new StringContent(JsonSerializer.Serialize(dto), System.Text.Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.SendAsync(request);
+            var json = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"UpdateSchedule Response: {response.StatusCode} - {json}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = json });
+            }
+
+            return Json(new { success = true, data = json });
+        }
+
         [HttpDelete]
         public async Task<IActionResult> DeleteSchedule(string id)
         {

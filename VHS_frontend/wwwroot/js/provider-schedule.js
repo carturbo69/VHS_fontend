@@ -31,29 +31,36 @@ function translateError(errorText) {
     
     const lowerText = message.toLowerCase();
     
-    // Error message translations (sắp xếp từ dài đến ngắn để match chính xác hơn)
-    const translations = {
-        'time-off conflicts with existing bookings': 'Ngày nghỉ trùng với đơn đặt lịch hiện có',
-        'time-off already exists for this date': 'Ngày nghỉ đã tồn tại cho ngày này',
-        'schedule already exists for this day': 'Lịch làm việc đã tồn tại cho ngày này',
-        'time-off already exists': 'Ngày nghỉ đã tồn tại',
-        'schedule already exists': 'Lịch làm việc đã tồn tại',
-        'already exists for this date': 'Đã tồn tại cho ngày này',
-        'conflicts with existing bookings': 'Trùng với đơn đặt lịch hiện có',
-        'conflicts with existing': 'Trùng với dữ liệu hiện có',
-        'cannot create time-off': 'Không thể tạo ngày nghỉ',
-        'cannot add day': 'Không thể thêm ngày',
-        'cannot create schedule': 'Không thể tạo lịch làm việc',
-        'cannot update schedule': 'Không thể cập nhật lịch làm việc',
-        'cannot delete schedule': 'Không thể xóa lịch làm việc',
-        'cannot delete time-off': 'Không thể xóa ngày nghỉ',
-        'already exists': 'Đã tồn tại',
-        'unauthorized': 'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn',
-        'not found': 'Không tìm thấy dữ liệu',
-        'bad request': 'Yêu cầu không hợp lệ',
-        'internal server error': 'Lỗi hệ thống. Vui lòng thử lại sau',
-        'conflicts': 'Xung đột dữ liệu'
-    };
+        // Error message translations (sắp xếp từ dài đến ngắn để match chính xác hơn)
+        const translations = {
+            'working hours must be between 07:00 and 17:00 during pilot period': 'Giờ làm việc phải trong khoảng từ 07:00 đến 17:00 trong giai đoạn thử nghiệm',
+            'invalid start time format. expected hh:mm': 'Định dạng giờ bắt đầu không hợp lệ. Vui lòng nhập theo định dạng HH:mm',
+            'invalid end time format. expected hh:mm': 'Định dạng giờ kết thúc không hợp lệ. Vui lòng nhập theo định dạng HH:mm',
+            'start time must be before end time': 'Giờ bắt đầu phải nhỏ hơn giờ kết thúc',
+            'schedule not found or does not belong to provider': 'Không tìm thấy lịch làm việc hoặc lịch không thuộc về nhà cung cấp này',
+            'booking limit must be between 1 and 100': 'Giới hạn đơn phải từ 1 đến 100',
+            'time-off conflicts with existing bookings': 'Ngày nghỉ trùng với đơn đặt lịch hiện có',
+            'time-off already exists for this date': 'Ngày nghỉ đã tồn tại cho ngày này',
+            'schedule already exists for this day': 'Lịch làm việc đã tồn tại cho ngày này',
+            'time-off already exists': 'Ngày nghỉ đã tồn tại',
+            'schedule already exists': 'Lịch làm việc đã tồn tại',
+            'already exists for this date': 'Đã tồn tại cho ngày này',
+            'conflicts with existing bookings': 'Trùng với đơn đặt lịch hiện có',
+            'conflicts with existing': 'Trùng với dữ liệu hiện có',
+            'cannot create time-off': 'Không thể tạo ngày nghỉ',
+            'cannot add day': 'Không thể thêm ngày',
+            'cannot create schedule': 'Không thể tạo lịch làm việc',
+            'cannot update schedule': 'Không thể cập nhật lịch làm việc',
+            'failed to update schedule': 'Không thể cập nhật lịch làm việc',
+            'cannot delete schedule': 'Không thể xóa lịch làm việc',
+            'cannot delete time-off': 'Không thể xóa ngày nghỉ',
+            'already exists': 'Đã tồn tại',
+            'unauthorized': 'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn',
+            'not found': 'Không tìm thấy dữ liệu',
+            'bad request': 'Yêu cầu không hợp lệ',
+            'internal server error': 'Lỗi hệ thống. Vui lòng thử lại sau',
+            'conflicts': 'Xung đột dữ liệu'
+        };
     
     // Check for exact matches (từ dài đến ngắn)
     const sortedKeys = Object.keys(translations).sort((a, b) => b.length - a.length);
@@ -320,40 +327,20 @@ function validateTimeOffForm() {
 function validateEditScheduleForm() {
     let isValid = true;
     
-    // Validate start time
-    const startTime = document.getElementById('editStartTime').value;
-    if (!startTime) {
-        showError('editStartTime', 'Vui lòng chọn giờ bắt đầu');
-        isValid = false;
-    } else {
-        clearError('editStartTime');
-    }
-    
-    // Validate end time
-    const endTime = document.getElementById('editEndTime').value;
-    if (!endTime) {
-        showError('editEndTime', 'Vui lòng chọn giờ kết thúc');
-        isValid = false;
-    } else {
-        clearError('editEndTime');
-    }
-    
-    // Validate time range
-    if (startTime && endTime && startTime >= endTime) {
-        showError('editEndTime', 'Giờ kết thúc phải lớn hơn giờ bắt đầu');
-        isValid = false;
-    }
-    
-    // Validate booking limit if provided
-    const bookingLimit = document.getElementById('editBookingLimit').value;
-    if (bookingLimit) {
-        const limit = parseInt(bookingLimit);
+    // Chỉ validate booking limit (không validate giờ làm việc vì chỉ chỉnh sửa giới hạn đơn)
+    const bookingLimitInput = document.getElementById('editBookingLimit').value;
+    // Chỉ validate nếu có giá trị và không phải rỗng/null
+    if (bookingLimitInput && bookingLimitInput.trim() !== '' && bookingLimitInput !== 'null') {
+        const limit = parseInt(bookingLimitInput.trim());
         if (isNaN(limit) || limit < 1 || limit > 100) {
             showError('editBookingLimit', 'Giới hạn đơn phải từ 1 đến 100');
             isValid = false;
         } else {
             clearError('editBookingLimit');
         }
+    } else {
+        // Nếu rỗng hoặc null thì clear error (cho phép không giới hạn)
+        clearError('editBookingLimit');
     }
     
     return isValid;
@@ -449,13 +436,34 @@ window.deleteTimeOff = function(id, date, reason) {
     });
 };
 
+// Open Edit Schedule Modal from button (using data attributes)
+window.openEditScheduleModalFromButton = function(button) {
+    const scheduleId = button.getAttribute('data-schedule-id');
+    const dayName = button.getAttribute('data-day-name');
+    const startTime = button.getAttribute('data-start-time');
+    const endTime = button.getAttribute('data-end-time');
+    const bookingLimit = button.getAttribute('data-booking-limit');
+    
+    openEditScheduleModal(scheduleId, dayName, startTime, endTime, bookingLimit);
+};
+
 // Open Edit Schedule Modal (Global)
 window.openEditScheduleModal = function(scheduleId, dayName, startTime, endTime, bookingLimit) {
     document.getElementById('editScheduleId').value = scheduleId;
     document.getElementById('editScheduleDayName').textContent = dayName;
-    document.getElementById('editStartTime').value = startTime;
-    document.getElementById('editEndTime').value = endTime;
-    document.getElementById('editBookingLimit').value = bookingLimit || '';
+    
+    // Hiển thị giờ làm việc (read-only)
+    document.getElementById('editStartTimeDisplay').value = startTime || '';
+    document.getElementById('editEndTimeDisplay').value = endTime || '';
+    document.getElementById('editStartTime').value = startTime || '';
+    document.getElementById('editEndTime').value = endTime || '';
+    
+    // Xử lý bookingLimit: nếu là null, "null", undefined, hoặc rỗng thì để trống
+    if (bookingLimit === null || bookingLimit === undefined || bookingLimit === 'null' || bookingLimit === '' || bookingLimit === 'undefined') {
+        document.getElementById('editBookingLimit').value = '';
+    } else {
+        document.getElementById('editBookingLimit').value = bookingLimit;
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('editScheduleModal'));
     modal.show();
@@ -600,26 +608,38 @@ $(document).ready(function() {
             }
             
             const scheduleId = document.getElementById('editScheduleId').value;
-            const startTime = document.getElementById('editStartTime').value;
-            const endTime = document.getElementById('editEndTime').value;
-            const bookingLimit = document.getElementById('editBookingLimit').value;
+            const bookingLimitInput = document.getElementById('editBookingLimit').value;
             
             if (!scheduleId) {
                 showToast('error', 'Lỗi hệ thống', 'Không tìm thấy ID lịch làm việc');
                 return;
             }
             
+            // Xử lý bookingLimit: nếu rỗng, null, hoặc "null" thì gửi null, ngược lại parse thành số
+            let bookingLimit = null;
+            if (bookingLimitInput && bookingLimitInput.trim() !== '' && bookingLimitInput !== 'null') {
+                const parsed = parseInt(bookingLimitInput.trim());
+                if (!isNaN(parsed) && parsed > 0) {
+                    bookingLimit = parsed;
+                }
+            }
+            
+            // Chỉ gửi BookingLimit, không gửi StartTime và EndTime (chỉ chỉnh sửa giới hạn đơn)
             const data = {
-                startTime: startTime,
-                endTime: endTime,
-                bookingLimit: bookingLimit ? parseInt(bookingLimit) : null
+                BookingLimit: bookingLimit
             };
+            
+            console.log('Update Schedule Data:', data);
+            console.log('Schedule ID:', scheduleId);
             
             try {
                 setLoading(true);
                 showToast('info', 'Đang xử lý', 'Đang cập nhật lịch làm việc...');
                 
-                const response = await fetch(`/Provider/ProviderSchedule/schedules/${scheduleId}`, {
+                const url = `/Provider/ProviderSchedule/UpdateSchedule/${scheduleId}`;
+                console.log('Update URL:', url);
+                
+                const response = await fetch(url, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
@@ -627,15 +647,42 @@ $(document).ready(function() {
                     body: JSON.stringify(data)
                 });
                 
-                const result = await response.json();
+                console.log('Response Status:', response.status);
+                
+                const responseText = await response.text();
+                console.log('Response Text:', responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('Failed to parse response as JSON:', e);
+                    setLoading(false);
+                    showToast('error', 'Lỗi hệ thống', 'Phản hồi từ server không hợp lệ');
+                    return;
+                }
+                
+                console.log('Parsed Result:', result);
                 setLoading(false);
                 
                 if (result.success) {
-                    showToast('success', 'Thành công', 'Đã cập nhật lịch làm việc thành công!');
+                    showToast('success', 'Thành công', 'Đã cập nhật giới hạn đơn thành công!');
                     bootstrap.Modal.getInstance(document.getElementById('editScheduleModal')).hide();
                     setTimeout(() => location.reload(), 1000);
                 } else {
                     setLoading(false);
+                    // Parse error message (có thể là JSON string)
+                    let errorMsg = result.message || 'Đã xảy ra lỗi khi cập nhật giới hạn đơn';
+                    try {
+                        // Thử parse JSON nếu message là JSON string
+                        const parsed = JSON.parse(errorMsg);
+                        if (parsed.message) {
+                            errorMsg = parsed.message;
+                        }
+                    } catch (e) {
+                        // Không phải JSON, dùng message trực tiếp
+                    }
+                    
                     // Đóng modal trước khi hiển thị lỗi
                     const editModal = bootstrap.Modal.getInstance(document.getElementById('editScheduleModal'));
                     if (editModal) {
@@ -643,8 +690,8 @@ $(document).ready(function() {
                     }
                     // Đợi modal đóng xong rồi mới hiển thị thông báo
                     setTimeout(() => {
-                        const errorMsg = translateError(result.message) || 'Đã xảy ra lỗi khi cập nhật lịch làm việc';
-                        showToast('error', 'Không thể cập nhật', errorMsg);
+                        const translatedMsg = translateError(errorMsg) || errorMsg;
+                        showToast('error', 'Không thể cập nhật', translatedMsg);
                     }, 300);
                 }
             } catch (error) {
