@@ -3561,25 +3561,25 @@
             document.querySelectorAll('input[type="datetime-local"].booking-input').forEach(input => {
                 const index = parseInt(input.id.replace('booking-time-', ''));
                 if (!isNaN(index)) {
-                    // Tạo debounced validation function cho mỗi input
+                    // Tạo debounced validation function cho mỗi input - giảm delay để nhanh hơn
                     const debouncedValidate = debounce(() => {
                         validateBookingDateTime(input, index);
-                    }, 300); // Delay 300ms để datetime picker đóng hoàn toàn
+                    }, 150); // Giảm từ 300ms xuống 150ms
                     
-                    // Validate khi input thay đổi
+                    // Validate khi input thay đổi - giảm delay
                     input.addEventListener('change', function() {
-                        // Đợi một chút để browser hoàn tất việc điều chỉnh giá trị (nếu có)
+                        // Giảm delay để validate nhanh hơn
                         setTimeout(() => {
                             validateBookingDateTime(this, index);
-                        }, 200);
+                        }, 50); // Giảm từ 200ms xuống 50ms
                     });
                     
-                    // Validate khi input blur (rời khỏi input) - delay lâu hơn để picker đóng hoàn toàn
+                    // Validate khi input blur (rời khỏi input) - giảm delay
                     input.addEventListener('blur', function() {
-                        // Delay lâu hơn để datetime picker đóng hoàn toàn trước khi validate
+                        // Giảm delay để validate nhanh hơn
                         setTimeout(() => {
                             validateBookingDateTime(this, index);
-                        }, 400);
+                        }, 100); // Giảm từ 400ms xuống 100ms
                     });
                     
                     // Validate khi input được nhập (input event) - debounced
@@ -3609,16 +3609,12 @@
             
             if (!dateTimeValue) {
                 if (errorDiv) {
-                    // Ẩn error mượt mà với transition
+                    // Ẩn error ngay lập tức - không dùng transition
+                    errorDiv.style.transition = 'none';
+                    errorDiv.style.display = 'none';
+                    errorDiv.style.visibility = 'hidden';
                     errorDiv.style.opacity = '0';
-                    errorDiv.style.maxHeight = '0';
-                    errorDiv.style.marginTop = '0';
-                    errorDiv.style.paddingTop = '0';
-                    errorDiv.style.paddingBottom = '0';
-                    setTimeout(() => {
-                        errorDiv.style.display = 'none';
-                        errorDiv.textContent = '';
-                    }, 300); // Đợi transition hoàn tất
+                    errorDiv.textContent = '';
                 }
                 input.classList.remove('booking-input-error');
                 bookingTimeValidations.set(index, true);
@@ -3643,15 +3639,18 @@
                     errorDiv.style.borderLeftColor = '';
                     errorDiv.style.background = '';
                     errorDiv.style.color = '';
-                    // Hiển thị error mượt mà với transition
+                    // Tắt transition để tránh chớp
+                    errorDiv.style.transition = 'none';
+                    // Hiển thị error ngay lập tức
                     errorDiv.style.display = 'block';
-                    // Force reflow để transition hoạt động
-                    errorDiv.offsetHeight;
+                    errorDiv.style.visibility = 'visible';
                     errorDiv.style.opacity = '1';
-                    errorDiv.style.maxHeight = '200px';
+                    errorDiv.style.maxHeight = 'none';
                     errorDiv.style.marginTop = '8px';
                     errorDiv.style.paddingTop = '8px';
                     errorDiv.style.paddingBottom = '8px';
+                    errorDiv.style.overflow = 'visible';
+                    void errorDiv.offsetHeight; // Force reflow
                 }
                 input.classList.add('booking-input-error');
                 bookingTimeValidations.set(index, false);
@@ -3661,16 +3660,12 @@
             
             // Thời gian hợp lệ, ẩn lỗi và gọi validateBookingTime để kiểm tra với API
             if (errorDiv) {
-                // Ẩn error mượt mà với transition
+                // Ẩn error ngay lập tức - không dùng transition
+                errorDiv.style.transition = 'none';
+                errorDiv.style.display = 'none';
+                errorDiv.style.visibility = 'hidden';
                 errorDiv.style.opacity = '0';
-                errorDiv.style.maxHeight = '0';
-                errorDiv.style.marginTop = '0';
-                errorDiv.style.paddingTop = '0';
-                errorDiv.style.paddingBottom = '0';
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                    errorDiv.textContent = '';
-                }, 300); // Đợi transition hoàn tất
+                errorDiv.textContent = '';
             }
             input.classList.remove('booking-input-error');
             
@@ -3754,19 +3749,12 @@
             const errorDiv = document.getElementById(`booking-time-error-${index}`);
             if (!errorDiv) return true;
 
-            // Show loading state
-            errorDiv.textContent = '⏳ Đang kiểm tra tính khả dụng...';
-            errorDiv.style.borderLeftColor = '#0ea5e9';
-            errorDiv.style.background = 'linear-gradient(135deg, color-mix(in oklab, #0ea5e9 12%, transparent), color-mix(in oklab, #0ea5e9 8%, transparent))';
-            errorDiv.style.color = '#0284c7';
-            // Hiển thị loading state mượt mà
-            errorDiv.style.display = 'block';
-            errorDiv.offsetHeight; // Force reflow
-            errorDiv.style.opacity = '1';
-            errorDiv.style.maxHeight = '200px';
-            errorDiv.style.marginTop = '8px';
-            errorDiv.style.paddingTop = '8px';
-            errorDiv.style.paddingBottom = '8px';
+            // Không hiển thị loading state - ẩn error div trước khi kiểm tra
+            errorDiv.style.transition = 'none';
+            errorDiv.style.display = 'none';
+            errorDiv.style.visibility = 'hidden';
+            errorDiv.style.opacity = '0';
+            errorDiv.textContent = '';
 
             try {
                 const url = `${API_BASE_URL}/ProviderAvailability/${providerId}?date=${date}&time=${time}`;
@@ -3868,6 +3856,7 @@
             const errorDiv = document.getElementById(`booking-time-error-${index}`);
             if (!errorDiv) return;
             
+            // Set nội dung trước
             errorDiv.textContent = message;
             
             // Reset styles nếu là error (không phải loading)
@@ -3877,31 +3866,33 @@
                 errorDiv.style.color = '';
             }
             
-            // Hiển thị error mượt mà với transition
+            // Tắt transition tạm thời để tránh chớp
+            errorDiv.style.transition = 'none';
+            
+            // Hiển thị error ngay lập tức - set tất cả cùng lúc
             errorDiv.style.display = 'block';
-            // Force reflow để transition hoạt động
-            errorDiv.offsetHeight;
+            errorDiv.style.visibility = 'visible';
             errorDiv.style.opacity = '1';
-            errorDiv.style.maxHeight = '200px';
+            errorDiv.style.maxHeight = 'none';
             errorDiv.style.marginTop = '8px';
             errorDiv.style.paddingTop = '8px';
             errorDiv.style.paddingBottom = '8px';
+            errorDiv.style.overflow = 'visible';
+            
+            // Force reflow để đảm bảo browser render ngay
+            void errorDiv.offsetHeight;
         }
 
         function hideBookingTimeError(index) {
             const errorDiv = document.getElementById(`booking-time-error-${index}`);
             const input = document.getElementById(`booking-time-${index}`);
             if (errorDiv) {
-                // Ẩn error mượt mà với transition
+                // Ẩn error ngay lập tức - không dùng transition để tránh chớp
+                errorDiv.style.transition = 'none';
+                errorDiv.style.display = 'none';
+                errorDiv.style.visibility = 'hidden';
                 errorDiv.style.opacity = '0';
-                errorDiv.style.maxHeight = '0';
-                errorDiv.style.marginTop = '0';
-                errorDiv.style.paddingTop = '0';
-                errorDiv.style.paddingBottom = '0';
-                setTimeout(() => {
-                    errorDiv.style.display = 'none';
-                    errorDiv.textContent = '';
-                }, 300); // Đợi transition hoàn tất
+                errorDiv.textContent = '';
             }
             if (input) {
                 input.classList.remove('booking-input-error');
