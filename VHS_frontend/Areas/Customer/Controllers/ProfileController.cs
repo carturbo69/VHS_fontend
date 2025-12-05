@@ -201,6 +201,9 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 
                 if (result.Success)
                 {
+                    // Cập nhật session Username với AccountName mới
+                    HttpContext.Session.SetString("Username", model.AccountName);
+                    
                     TempData["ToastSuccess"] = "Cập nhật profile thành công!";
                     return RedirectToAction(nameof(Index));
                 }
@@ -273,6 +276,9 @@ namespace VHS_frontend.Areas.Customer.Controllers
                 
                 if (result.Success)
                 {
+                    // Cập nhật session Username với AccountName mới
+                    HttpContext.Session.SetString("Username", model.AccountName);
+                    
                     return Json(new { success = true, message = "Cập nhật thông tin thành công!" });
                 }
                 else

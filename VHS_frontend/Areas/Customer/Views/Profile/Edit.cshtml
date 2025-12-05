@@ -28,6 +28,8 @@
         <form asp-action="Edit" method="post" class="profile-edit-form">
             @Html.AntiForgeryToken()
             
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+            
             <!-- Profile Image Section -->
             <div class="form-section">
                 <h3><i class="bi bi-image"></i> Ảnh đại diện</h3>
@@ -140,8 +142,96 @@
 </div>
 
 @section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
     <script src="~/js/image-helper.js"></script>
     <script>
+        // AccountName validation
+        document.addEventListener('DOMContentLoaded', function() {
+            const accountNameInput = document.querySelector('input[name="AccountName"]');
+            const accountNameError = document.querySelector('span[data-valmsg-for="AccountName"]');
+            
+            if (accountNameInput) {
+                // Validation on blur (khi rời khỏi trường)
+                accountNameInput.addEventListener('blur', function() {
+                    validateAccountName(this);
+                });
+                
+                // Clear error when user starts typing again
+                accountNameInput.addEventListener('input', function() {
+                    // Chỉ xóa lỗi khi người dùng bắt đầu nhập lại, không validate real-time
+                    if (this.classList.contains('is-invalid')) {
+                        const formGroup = this.closest('.form-group');
+                        const errorSpan = formGroup ? formGroup.querySelector('span[asp-validation-for], span.text-danger') : null;
+                        if (errorSpan) {
+                            errorSpan.style.display = 'none';
+                        }
+                        this.classList.remove('is-invalid');
+                    }
+                });
+            }
+            
+            function validateAccountName(input) {
+                const value = input.value.trim();
+                const formGroup = input.closest('.form-group');
+                const errorSpan = formGroup ? formGroup.querySelector('span[asp-validation-for], span.text-danger') : null;
+                
+                // Remove previous error classes
+                input.classList.remove('is-invalid');
+                if (errorSpan) {
+                    errorSpan.textContent = '';
+                    errorSpan.style.display = 'none';
+                }
+                
+                // Validation rules
+                if (value.length === 0) {
+                    return; // Let required validation handle empty
+                }
+                
+                if (value.length < 8) {
+                    showError(input, 'Tối thiểu 8 ký tự, chữ và số, không dấu, không khoảng cách');
+                    return false;
+                }
+                
+                // Check for invalid characters (non-alphanumeric)
+                if (!/^[a-zA-Z0-9]+$/.test(value)) {
+                    showError(input, 'Tối thiểu 8 ký tự, chữ và số, không dấu, không khoảng cách');
+                    return false;
+                }
+                
+                // Valid
+                input.classList.remove('is-invalid');
+                if (errorSpan) {
+                    errorSpan.textContent = '';
+                    errorSpan.style.display = 'none';
+                }
+                return true;
+            }
+            
+            function showError(input, message) {
+                input.classList.add('is-invalid');
+                const formGroup = input.closest('.form-group');
+                const errorSpan = formGroup ? formGroup.querySelector('span[asp-validation-for], span.text-danger') : null;
+                if (errorSpan) {
+                    errorSpan.textContent = message;
+                    errorSpan.style.display = 'block';
+                }
+            }
+            
+            // Form submit validation
+            const form = document.querySelector('.profile-edit-form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const accountNameInput = document.querySelector('input[name="AccountName"]');
+                    if (accountNameInput && !validateAccountName(accountNameInput)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        accountNameInput.focus();
+                        return false;
+                    }
+                });
+            }
+        });
+        
         // Image upload functionality
         function openImageUpload() {
             const modal = new bootstrap.Modal(document.getElementById('imageUploadModal'));

@@ -5,7 +5,7 @@ namespace VHS_frontend.Areas.Admin.Models.Notification
     public class AdminNotificationItemDTO
     {
         public Guid NotificationId { get; set; }
-        public Guid AccountReceivedId { get; set; }
+        public Guid? AccountReceivedId { get; set; }
         public string ReceiverRole { get; set; } = null!;
         public string NotificationType { get; set; } = null!;
         public string Content { get; set; } = null!;
