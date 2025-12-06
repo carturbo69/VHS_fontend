@@ -71,6 +71,40 @@
                 display: grid !important;
             }
         }
+        
+        /* FIX: Force màu thời gian cho notification page - Light mode */
+        body .notification-page .notification-list .time,
+        body .notification-page .notification-item .time,
+        body .notification-page .notification-content .time,
+        body .notification-page .notification-meta .time {
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            opacity: 1 !important;
+            filter: none !important;
+            letter-spacing: 0.1px !important;
+            color: #64748b !important;
+            -webkit-text-fill-color: #64748b !important;
+        }
+        
+        /* FIX: Force màu thời gian cho notification page - Dark mode */
+        html.dark body .notification-page .notification-list .time,
+        html.dark body .notification-page .notification-item .time,
+        html.dark body .notification-page .notification-content .time,
+        html.dark body .notification-page .notification-meta .time,
+        .dark body .notification-page .notification-list .time,
+        .dark body .notification-page .notification-item .time,
+        .dark body .notification-page .notification-content .time,
+        .dark body .notification-page .notification-meta .time {
+            color: #e2e8f0 !important;
+            -webkit-text-fill-color: #e2e8f0 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            opacity: 1 !important;
+            filter: none !important;
+            letter-spacing: 0.1px !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+        }
     </style>
 }
 
@@ -162,7 +196,10 @@
                         <div class="notification-content">
                             <div class="content-text">@notification.Content</div>
                             <div class="notification-meta">
-                                <span class="time">@ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm")</span>
+                                @{
+                                    var timeText = ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm");
+                                }
+                                <span class="time vhs-time-display" style="color: #334155 !important; font-weight: 700 !important; font-size: 14px !important; opacity: 1 !important;">@timeText</span>
                                 <span class="type-badge type-@notification.NotificationType.ToLower()">
                                     @GetNotificationTypeVN(notification.NotificationType)
                                 </span>
@@ -197,6 +234,89 @@
 
 @section Scripts {
     <script>
+        // Fix màu thời gian cho notification page
+        (function() {
+            'use strict';
+            
+            function isDarkMode() {
+                const html = document.documentElement;
+                const body = document.body;
+                return html.classList.contains('dark') || 
+                       body.classList.contains('dark') ||
+                       html.getAttribute('data-theme') === 'dark' ||
+                       window.getComputedStyle(html).colorScheme === 'dark';
+            }
+            
+            function forceApplyTimeColor() {
+                const isDark = isDarkMode();
+                const lightColor = '#334155';
+                const darkColor = '#ffffff';
+                const targetColor = isDark ? darkColor : lightColor;
+                
+                // Tìm tất cả các element có class .time hoặc .vhs-time-display trong notification page
+                const timeElements = document.querySelectorAll('.notification-page .time, .notification-page .vhs-time-display, .notification-list .time, .notification-list .vhs-time-display, .notification-item .time, .notification-item .vhs-time-display, .notification-content .time, .notification-content .vhs-time-display, .notification-meta .time, .notification-meta .vhs-time-display');
+                
+                timeElements.forEach(function(el) {
+                    if (el && el.nodeType === 1) {
+                        // Xóa các style cũ về color
+                        el.style.cssText = el.style.cssText.replace(/color\s*:[^;]+;?/gi, '');
+                        el.style.cssText = el.style.cssText.replace(/-webkit-text-fill-color\s*:[^;]+;?/gi, '');
+                        
+                        // Force apply với nhiều cách - override mọi thứ
+                        el.style.setProperty('color', targetColor, 'important');
+                        el.style.setProperty('-webkit-text-fill-color', targetColor, 'important');
+                        el.style.setProperty('font-weight', '700', 'important');
+                        el.style.setProperty('font-size', '14px', 'important');
+                        el.style.setProperty('opacity', '1', 'important');
+                        el.style.setProperty('letter-spacing', '0.1px', 'important');
+                        el.style.setProperty('filter', 'none', 'important');
+                        el.style.setProperty('-webkit-font-smoothing', 'antialiased', 'important');
+                        el.style.setProperty('-moz-osx-font-smoothing', 'grayscale', 'important');
+                        
+                        // Force bằng cách set attribute trực tiếp
+                        el.setAttribute('data-time-color-applied', targetColor);
+                    }
+                });
+            }
+            
+            // Chạy ngay lập tức
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', forceApplyTimeColor);
+            } else {
+                forceApplyTimeColor();
+            }
+            
+            // Chạy lại nhiều lần với delay khác nhau
+            [0, 10, 50, 100, 200, 500, 1000].forEach(function(delay) {
+                setTimeout(forceApplyTimeColor, delay);
+            });
+            
+            // Quan sát thay đổi DOM
+            const observer = new MutationObserver(function() {
+                forceApplyTimeColor();
+            });
+            
+            // Quan sát html và body để catch dark mode change
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['class', 'data-theme']
+            });
+            
+            if (document.body) {
+                observer.observe(document.body, {
+                    attributes: true,
+                    attributeFilter: ['class', 'data-theme']
+                });
+            }
+            
+            // Listen for theme toggle events
+            window.addEventListener('themeChanged', forceApplyTimeColor);
+            window.addEventListener('theme-toggle', forceApplyTimeColor);
+            
+            // Expose function globally
+            window.fixNotificationPageTimeColor = forceApplyTimeColor;
+        })();
+        
         // Force fix icons visibility on notification page
         (function() {
             function forceIconsVisible() {

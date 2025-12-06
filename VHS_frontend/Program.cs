@@ -197,6 +197,12 @@ builder.Services.AddHttpClient<StaffManagementService>(client => {
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); 
 });
 
+// HttpClient cho Admin Settings Service
+builder.Services.AddHttpClient<AdminSettingsService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
 // HttpClient cho Booking Provider Service
 builder.Services.AddHttpClient<BookingProviderService>(client =>
 {

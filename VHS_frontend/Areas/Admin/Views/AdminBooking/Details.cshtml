@@ -1,7 +1,7 @@
 @model VHS_frontend.Areas.Provider.Models.Booking.BookingDetailDTO
 @{
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
-    ViewData["Title"] = "Chi tiết đơn hàng";
+    ViewData["Title"] = "Chi tiết đặt dịch vụ";
     // CHỈ XEM - Admin không có quyền chỉnh sửa (update status, assign staff, cancel order)
     
     // Helper function để xử lý URL ảnh (thêm domain prefix nếu cần)
@@ -18,8 +18,8 @@
                         <i class="bi bi-file-earmark-text"></i>
                     </div>
                     <div class="title-content">
-                        <h1>Chi tiết Đơn hàng</h1>
-                        <p>Đơn hàng @Model.BookingCode - Tạo lúc: @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</p>
+                        <h1>Chi tiết Đặt dịch vụ</h1>
+                        <p>Đặt dịch vụ @Model.BookingCode - Tạo lúc: @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")</p>
                     </div>
                 </div>
             </div>
@@ -180,7 +180,7 @@
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-calendar-check me-2"></i>
-                        Thông tin đặt hàng
+                        Thông tin đặt dịch vụ
                     </h5>
                 </div>
                 <div class="card-body">
@@ -243,7 +243,7 @@
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-info-circle me-2"></i>
-                        Trạng thái đơn hàng
+                        Trạng thái đặt dịch vụ
                     </h5>
                 </div>
                 <div class="card-body">
@@ -267,7 +267,8 @@
                     @* Hiển thị countdown timer cho booking Pending *@
                     @if (isPending)
                     {
-                        var cancelMinutes = Model.AutoCancelMinutes ?? 30; // Mặc định 30 phút
+                        var defaultCancelMinutes = (int)(ViewBag.DefaultCancelMinutes ?? 30);
+                        var cancelMinutes = Model.AutoCancelMinutes ?? defaultCancelMinutes; // Dùng giá trị từ system settings
                         // Sử dụng CreatedAt từ Model, nếu không có thì dùng thời gian hiện tại
                         DateTime validCreatedAt;
                         if (Model.CreatedAt != default(DateTime) && Model.CreatedAt != DateTime.MinValue && Model.CreatedAt.Year > 2000)
@@ -434,7 +435,8 @@
                         {
                             // QUAN TRỌNG: Timer PHẢI bắt đầu từ ConfirmedAt (thời gian provider xác nhận)
                             // Không dùng CreatedAt cho Confirmed booking - timer chỉ bắt đầu từ khi xác nhận
-                            var cancelMinutes = Model.AutoCancelMinutes ?? 30; // Sử dụng AutoCancelMinutes từ model, mặc định 30 phút
+                            var defaultCancelMinutes = (int)(ViewBag.DefaultCancelMinutes ?? 30);
+                            var cancelMinutes = Model.AutoCancelMinutes ?? defaultCancelMinutes; // Dùng giá trị từ system settings
                             DateTime validConfirmedAt;
                             
                             // PHẢI dùng ConfirmedAt từ database (để đồng bộ với provider)

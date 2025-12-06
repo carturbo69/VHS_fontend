@@ -627,7 +627,7 @@
                                                         <strong>Phản hồi</strong>
                                                         <small class="rv-reply-meta">Từ nhà cung cấp</small>
                                                     </div>
-                                                    <div class="rv-reply-content">
+                                                    <div class="rv-reply-content" style="padding-left: 0 !important; margin-left: 0 !important; text-indent: 0 !important; padding: 0 !important;">
                                                         @rv.Reply
                                                     </div>
                                                 </div>
@@ -1166,6 +1166,60 @@
                     }
                 }
             }
+            
+            // Fix thụt lề cho phần phản hồi của nhà cung cấp - tương tự như phần mô tả
+            const replyContents = document.querySelectorAll('.rv-reply-content');
+            replyContents.forEach(function(replyContent) {
+                // Force reset style
+                replyContent.style.paddingLeft = '0';
+                replyContent.style.marginLeft = '0';
+                replyContent.style.textIndent = '0';
+                replyContent.style.padding = '0';
+                replyContent.style.whiteSpace = 'pre-wrap';
+                
+                // Lấy toàn bộ HTML content
+                let html = replyContent.innerHTML;
+                
+                // Nếu text bắt đầu bằng spaces/tabs, loại bỏ chúng
+                if (html) {
+                    // Loại bỏ leading spaces/tabs ở đầu HTML (chỉ ở đầu, không phải mỗi dòng)
+                    html = html.replace(/^[\s\t]+/, '');
+                    replyContent.innerHTML = html;
+                }
+                
+                // Reset tất cả phần tử con
+                const allElements = replyContent.querySelectorAll('*');
+                allElements.forEach(function(el) {
+                    el.style.paddingLeft = '0';
+                    el.style.marginLeft = '0';
+                    el.style.textIndent = '0';
+                    el.style.padding = '0';
+                });
+                
+                // Xử lý text nodes trực tiếp
+                const walker = document.createTreeWalker(
+                    replyContent,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+                
+                let firstTextNode = null;
+                let node;
+                while (node = walker.nextNode()) {
+                    if (!firstTextNode && node.textContent.trim()) {
+                        firstTextNode = node;
+                    }
+                    // Trim leading spaces chỉ ở text node đầu tiên
+                    if (node === firstTextNode) {
+                        const text = node.textContent;
+                        const trimmed = text.replace(/^[\s\t]+/, '');
+                        if (trimmed !== text) {
+                            node.textContent = trimmed;
+                        }
+                    }
+                }
+            });
         });
     </script>
 }
