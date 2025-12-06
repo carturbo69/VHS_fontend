@@ -284,12 +284,21 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="editProfileForm">
+            <form id="editProfileForm" novalidate>
                 @Html.AntiForgeryToken()
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Tên đăng nhập</label>
-                        <input type="text" class="form-control" name="AccountName" value="@Model.AccountName" required />
+                        <input type="text" 
+                               class="form-control" 
+                               name="AccountName" 
+                               id="accountNameInput"
+                               value="@Model.AccountName" 
+                               required />
+                        <span class="text-danger" id="accountNameError" style="display: none; font-size: 0.875rem; margin-top: 0.25rem;"></span>
+                        <small class="form-text text-muted">
+                            Tối thiểu 8 ký tự, chữ và số, không dấu, không khoảng cách
+                        </small>
                     </div>
 
                     <div class="mb-3">
@@ -926,6 +935,60 @@
                 });
             }
             
+            // AccountName validation function
+            window.validateAccountName = function(input) {
+                if (!input) return false;
+                
+                const accountName = input.value.trim();
+                const accountNameError = document.getElementById('accountNameError');
+                
+                // Remove previous error classes
+                input.classList.remove('is-invalid', 'is-valid');
+                if (accountNameError) {
+                    accountNameError.textContent = '';
+                    accountNameError.style.display = 'none';
+                }
+                
+                // Validation rules
+                if (accountName.length === 0) {
+                    // Empty is not allowed (required field)
+                    input.classList.add('is-invalid');
+                    if (accountNameError) {
+                        accountNameError.textContent = 'Tên đăng nhập không được để trống';
+                        accountNameError.style.display = 'block';
+                    }
+                    return false;
+                }
+                
+                if (accountName.length < 8) {
+                    input.classList.add('is-invalid');
+                    if (accountNameError) {
+                        accountNameError.textContent = 'Tối thiểu 8 ký tự, chữ và số, không dấu, không khoảng cách';
+                        accountNameError.style.display = 'block';
+                    }
+                    return false;
+                }
+                
+                // Check for invalid characters (non-alphanumeric)
+                if (!/^[a-zA-Z0-9]+$/.test(accountName)) {
+                    input.classList.add('is-invalid');
+                    if (accountNameError) {
+                        accountNameError.textContent = 'Tối thiểu 8 ký tự, chữ và số, không dấu, không khoảng cách';
+                        accountNameError.style.display = 'block';
+                    }
+                    return false;
+                }
+                
+                // Valid
+                input.classList.remove('is-invalid');
+                input.classList.add('is-valid');
+                if (accountNameError) {
+                    accountNameError.textContent = '';
+                    accountNameError.style.display = 'none';
+                }
+                return true;
+            };
+            
             // Phone number validation function
             window.validatePhoneNumber = function(input) {
                 if (!input) return false;
@@ -974,6 +1037,38 @@
                     return true;
                 }
             };
+            
+            // Real-time AccountName validation
+            function setupAccountNameValidation() {
+                const accountNameInput = document.getElementById('accountNameInput');
+                if (!accountNameInput) return;
+                
+                // Check if already set up to avoid duplicate listeners
+                if (accountNameInput.dataset.validationSetup === 'true') return;
+                accountNameInput.dataset.validationSetup = 'true';
+                
+                // Validation on blur (khi rời khỏi trường)
+                accountNameInput.addEventListener('blur', function(e) {
+                    validateAccountName(e.target);
+                });
+                
+                // Clear error when user starts typing again
+                accountNameInput.addEventListener('input', function(e) {
+                    // Chỉ xóa lỗi khi người dùng bắt đầu nhập lại, không validate real-time
+                    if (e.target.classList.contains('is-invalid')) {
+                        const accountNameError = document.getElementById('accountNameError');
+                        if (accountNameError) {
+                            accountNameError.style.display = 'none';
+                        }
+                        e.target.classList.remove('is-invalid');
+                    }
+                });
+                
+                // Initial validation if value exists
+                if (accountNameInput.value) {
+                    validateAccountName(accountNameInput);
+                }
+            }
             
             // Real-time phone number formatting and validation
             $(document).ready(function() {
@@ -1028,6 +1123,7 @@
                 
                 // Setup validation initially
                 setupPhoneValidation();
+                setupAccountNameValidation();
                 
                 // Re-setup validation when modal is shown (in case modal content is re-rendered)
                 const editModal = document.getElementById('editProfileModal');
@@ -1038,7 +1134,12 @@
                         if (phoneInput) {
                             phoneInput.dataset.validationSetup = 'false';
                         }
+                        const accountNameInput = document.getElementById('accountNameInput');
+                        if (accountNameInput) {
+                            accountNameInput.dataset.validationSetup = 'false';
+                        }
                         setupPhoneValidation();
+                        setupAccountNameValidation();
                     });
                 }
             });
@@ -1048,6 +1149,14 @@
             if (editForm) {
                 editForm.addEventListener('submit', async function(e) {
                     e.preventDefault();
+                    
+                    // Validate AccountName before submit
+                    const accountNameInput = document.getElementById('accountNameInput');
+                    if (accountNameInput && !validateAccountName(accountNameInput)) {
+                        showToast('Vui lòng nhập tên đăng nhập hợp lệ (tối thiểu 8 ký tự, chữ và số, không dấu, không khoảng cách)', 'error');
+                        accountNameInput.focus();
+                        return;
+                    }
                     
                     // Validate phone number before submit
                     const phoneInput = document.getElementById('phoneNumberInput');

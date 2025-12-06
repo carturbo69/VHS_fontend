@@ -695,35 +695,49 @@
                 {
                     foreach (var addr in Model.Addresses)
                     {
-                        var isChecked = addr.AddressId == Model.Address.AddressId ? "checked" : "";
-                        <div class="addr-item"
-                             data-id="@addr.AddressId"
-                             data-province="@addr.ProvinceName"
-                             data-ward="@addr.WardName"
-                             data-street="@addr.StreetAddress"
-                             data-recipientname="@(addr.RecipientName ?? "")"
-                             data-recipientphone="@(addr.RecipientPhone ?? "")"
-                             data-latitude="@(addr.Latitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
-                             data-longitude="@(addr.Longitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
-                            <input type="radio" name="addressChoice" value="@addr.AddressId" @isChecked style="margin-top:3px" />
-                            <div style="flex:1">
-                                <div>
-                                    <strong>@(!string.IsNullOrEmpty(addr.RecipientName) ? addr.RecipientName : Model.RecipientFullName)</strong> 
-                                    (@(!string.IsNullOrEmpty(addr.RecipientPhone) ? addr.RecipientPhone : Model.RecipientPhone))
+                        // Kiểm tra địa chỉ có dữ liệu hợp lệ không
+                        var hasValidData = !string.IsNullOrWhiteSpace(addr.StreetAddress) && 
+                                          !string.IsNullOrWhiteSpace(addr.ProvinceName);
+                        var recipientName = !string.IsNullOrEmpty(addr.RecipientName) ? addr.RecipientName : Model.RecipientFullName;
+                        var recipientPhone = !string.IsNullOrEmpty(addr.RecipientPhone) ? addr.RecipientPhone : Model.RecipientPhone;
+                        var addrDisplayText = addr.ToDisplayString();
+                        var hasContent = !string.IsNullOrWhiteSpace(recipientName) || 
+                                        !string.IsNullOrWhiteSpace(recipientPhone) || 
+                                        !string.IsNullOrWhiteSpace(addrDisplayText);
+                        
+                        // Chỉ hiển thị nếu có dữ liệu hợp lệ
+                        if (hasValidData || hasContent)
+                        {
+                            var isChecked = addr.AddressId == Model.Address.AddressId ? "checked" : "";
+                            <div class="addr-item"
+                                 data-id="@addr.AddressId"
+                                 data-province="@addr.ProvinceName"
+                                 data-ward="@addr.WardName"
+                                 data-street="@addr.StreetAddress"
+                                 data-recipientname="@(addr.RecipientName ?? "")"
+                                 data-recipientphone="@(addr.RecipientPhone ?? "")"
+                                 data-latitude="@(addr.Latitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                                 data-longitude="@(addr.Longitude?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")">
+                                <input type="radio" name="addressChoice" value="@addr.AddressId" @isChecked style="margin-top:3px" />
+                                <div style="flex:1">
+                                    <div>
+                                        <strong>@recipientName</strong> 
+                                        (@recipientPhone)
+                                    </div>
+                                    <div class="muted">@addrDisplayText</div>
                                 </div>
-                                <div class="muted">@addr.ToDisplayString()</div>
-                            </div>
 
-                            <div style="display:flex;flex-direction:column;gap:4px">
-                                <button type="button" class="btn small" onclick="openEditAddressForm(this)">📝</button>
-                                <button type="button"
-                                        class="btn small"
-                                        style="color:#d00"
-                                        onclick="deleteAddress('@addr.AddressId', this)">
-                                    🗑️
-                                </button>
+                                <div style="display:flex;flex-direction:column;gap:4px">
+                                    <button type="button" class="btn small" onclick="openEditAddressForm(this)">📝</button>
+                                    <button type="button"
+                                            class="btn small"
+                                            style="color:#d00"
+                                            onclick="deleteAddress('@addr.AddressId', this)">
+                                        🗑️
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        }
                     }
                 }
                 else

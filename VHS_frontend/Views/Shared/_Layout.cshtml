@@ -27,11 +27,46 @@
     <!-- <link rel="stylesheet" href="~/css/service-shop.css" asp-append-version="true" /> -->
     <link rel="stylesheet" href="~/css/header.css" asp-append-version="true" /> <!-- MUST BE LAST to override everything -->
     
-    <!-- CRITICAL FIX: Force white color for notification item-time in dark mode - Load after all CSS -->
-    <style>
-        /* ULTIMATE FIX: Force white cho item-time trong dark mode - Priority cao nhất */
+    <!-- CRITICAL FIX: Force color for notification item-time - Load after all CSS -->
+    <style id="layout-notification-time-fix">
+        /* ULTIMATE FIX: Force color cho item-time và notification-time-display - Light mode */
+        .item-time,
+        .item-time.notification-time-white,
+        .item-time.vhs-time-display,
+        .notification-time-display,
+        .small.notification-time-display,
+        #notificationDropdown .item-time,
+        .notification-dropdown .item-time,
+        .notification-items .item-time,
+        .notification-item .item-time,
+        .item-content .item-time,
+        .notification-item .item-content .item-time,
+        #notificationDropdown .notification-item .item-time,
+        .notification-dropdown .notification-item .item-time,
+        #notificationDropdown .item-content .item-time,
+        .notification-dropdown .item-content .item-time,
+        #notificationDropdown .notification-item .item-content .item-time,
+        .notification-dropdown .notification-item .item-content .item-time,
+        body #notificationDropdown .item-time,
+        body .notification-dropdown .item-time,
+        html body #notificationDropdown .item-time,
+        html body .notification-dropdown .item-time {
+            color: #334155 !important;
+            -webkit-text-fill-color: #334155 !important;
+            font-weight: 700 !important;
+            font-size: 12px !important;
+            opacity: 1 !important;
+            filter: none !important;
+            letter-spacing: 0.1px !important;
+        }
+        
+        /* ULTIMATE FIX: Force color cho item-time trong dark mode - Priority cao nhất */
         .dark .item-time,
         .dark .item-time.notification-time-bright,
+        .dark .item-time.notification-time-white,
+        .dark .item-time.vhs-time-display,
+        .dark .notification-time-display,
+        .dark .small.notification-time-display,
         .dark #notificationDropdown .item-time,
         .dark .notification-dropdown .item-time,
         .dark .notification-items .item-time,
@@ -47,16 +82,40 @@
         .dark body #notificationDropdown .item-time,
         .dark body .notification-dropdown .item-time,
         .dark html body #notificationDropdown .item-time,
-        .dark html body .notification-dropdown .item-time {
+        .dark html body .notification-dropdown .item-time,
+        html.dark .item-time,
+        html.dark .notification-time-display,
+        html.dark body .item-time,
+        html.dark body #notificationDropdown .item-time,
+        html.dark body .notification-dropdown .item-time {
             color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
             font-weight: 700 !important;
-            font-size: 13px !important;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 4px rgba(255, 255, 255, 0.3) !important;
+            font-size: 12px !important;
             opacity: 1 !important;
             filter: none !important;
-            letter-spacing: 0.3px !important;
+            letter-spacing: 0.1px !important;
             -webkit-font-smoothing: antialiased !important;
             -moz-osx-font-smoothing: grayscale !important;
+        }
+        
+        /* Override Bootstrap text-muted cho notification time */
+        .notification-time-display,
+        .small.notification-time-display,
+        .notification-menu .small.notification-time-display,
+        #notificationMenu .small.notification-time-display {
+            color: #334155 !important;
+            opacity: 1 !important;
+            font-weight: 700 !important;
+        }
+        
+        .dark .notification-time-display,
+        .dark .small.notification-time-display,
+        .dark .notification-menu .small.notification-time-display,
+        .dark #notificationMenu .small.notification-time-display {
+            color: #ffffff !important;
+            opacity: 1 !important;
+            font-weight: 700 !important;
         }
     </style>
 
@@ -218,10 +277,21 @@
                 
                 li.innerHTML = `
                     <div class="d-block text-decoration-none">
-                        <div class="small text-muted">${formattedTime}</div>
+                        <div class="small notification-time-display" style="color: #334155 !important; font-weight: 700 !important; opacity: 1 !important;">${formattedTime}</div>
                         <div>${n.content}</div>
                         <div><strong>Loại:</strong> ${getNotificationTypeVN(n.notificationType)}</div>
                     </div>`;
+                
+                // Apply màu ngay sau khi tạo element
+                const timeEl = li.querySelector('.notification-time-display');
+                if (timeEl) {
+                    const isDark = document.documentElement.classList.contains('dark') || document.body.classList.contains('dark');
+                    const timeColor = isDark ? '#ffffff' : '#334155';
+                    timeEl.style.setProperty('color', timeColor, 'important');
+                    timeEl.style.setProperty('font-weight', '700', 'important');
+                    timeEl.style.setProperty('opacity', '1', 'important');
+                    timeEl.classList.remove('text-muted');
+                }
                 
                 // Sử dụng addEventListener thay vì onclick để tránh mất handler
                 li.addEventListener('click', function(e) {
@@ -229,6 +299,11 @@
                 });
                 
                 menu.appendChild(li);
+                
+                // Apply lại sau khi append
+                if (timeEl && typeof applyTimeStyle === 'function') {
+                    setTimeout(applyTimeStyle, 0);
+                }
             });
             
             // View all notifications button
@@ -750,9 +825,28 @@
     
     <!-- ULTIMATE FIX: Inject CSS cho notification item-time - Load cuối cùng -->
     <style id="notification-time-ultimate-fix" data-priority="99999">
-        /* ULTIMATE FIX: Force white cho item-time trong dark mode - Priority cao nhất */
+        /* ULTIMATE FIX: Force color cho item-time - Light mode */
+        .item-time,
+        .item-time.vhs-time-display,
+        .item-time.notification-time-white,
+        #notificationDropdown .item-time,
+        .notification-dropdown .item-time,
+        body .item-time,
+        html body .item-time {
+            color: #64748b !important;
+            -webkit-text-fill-color: #64748b !important;
+            font-weight: 600 !important;
+            font-size: 12px !important;
+            opacity: 1 !important;
+            filter: none !important;
+            letter-spacing: 0.1px !important;
+        }
+        
+        /* ULTIMATE FIX: Force color cho item-time trong dark mode - Priority cao nhất */
         .dark .item-time,
         .dark .item-time.notification-time-bright,
+        .dark .item-time.notification-time-white,
+        .dark .item-time.vhs-time-display,
         .dark #notificationDropdown .item-time,
         .dark .notification-dropdown .item-time,
         .dark .notification-items .item-time,
@@ -770,14 +864,18 @@
         .dark html body #notificationDropdown .item-time,
         .dark html body .notification-dropdown .item-time,
         .dark html.dark body #notificationDropdown .item-time,
-        .dark html.dark body .notification-dropdown .item-time {
-            color: #ffffff !important;
-            font-weight: 700 !important;
-            font-size: 13px !important;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 4px rgba(255, 255, 255, 0.3) !important;
+        .dark html.dark body .notification-dropdown .item-time,
+        html.dark .item-time,
+        html.dark body .item-time,
+        html.dark body #notificationDropdown .item-time,
+        html.dark body .notification-dropdown .item-time {
+            color: #e2e8f0 !important;
+            -webkit-text-fill-color: #e2e8f0 !important;
+            font-weight: 600 !important;
+            font-size: 12px !important;
             opacity: 1 !important;
             filter: none !important;
-            letter-spacing: 0.3px !important;
+            letter-spacing: 0.1px !important;
             -webkit-font-smoothing: antialiased !important;
             -moz-osx-font-smoothing: grayscale !important;
         }
@@ -789,13 +887,73 @@
         
         // Force apply style ngay khi script load
         (function() {
+            function isDarkMode() {
+                return document.documentElement.classList.contains('dark') || 
+                       document.body.classList.contains('dark');
+            }
+            
             function applyTimeStyle() {
-                const items = document.querySelectorAll('.item-time, #notificationDropdown .item-time, .notification-dropdown .item-time');
+                const isDark = isDarkMode();
+                const lightColor = '#334155';
+                const darkColor = '#ffffff';
+                const targetColor = isDark ? darkColor : lightColor;
+                
+                const items = document.querySelectorAll('.item-time, .vhs-time-display, .notification-time-white, .notification-time-display, .small.notification-time-display, .notification-menu .small, #notificationMenu .small, #notificationDropdown .item-time, .notification-dropdown .item-time, .notification-item .item-content .item-time, .notification-item .item-content span.item-time');
                 items.forEach(function(el) {
-                    el.style.setProperty('color', '#ffffff', 'important');
+                    // Xóa style cũ về color
+                    el.style.cssText = el.style.cssText.replace(/color\s*:[^;]+;?/gi, '');
+                    el.style.cssText = el.style.cssText.replace(/-webkit-text-fill-color\s*:[^;]+;?/gi, '');
+                    
+                    // Xóa class text-muted nếu có
+                    el.classList.remove('text-muted');
+                    
+                    // Force apply với nhiều cách
+                    el.style.color = targetColor;
+                    el.style.setProperty('color', targetColor, 'important');
+                    el.style.setProperty('-webkit-text-fill-color', targetColor, 'important');
                     el.style.setProperty('font-weight', '700', 'important');
+                    el.style.setProperty('font-size', '12px', 'important');
+                    el.style.setProperty('opacity', '1', 'important');
+                    el.style.setProperty('-webkit-font-smoothing', 'antialiased', 'important');
+                    el.style.setProperty('-moz-osx-font-smoothing', 'grayscale', 'important');
+                    el.style.setProperty('letter-spacing', '0.1px', 'important');
+                    el.style.setProperty('filter', 'none', 'important');
                 });
             }
+            
+            // Chạy ngay
+            applyTimeStyle();
+            
+            // Chạy lại nhiều lần
+            [10, 50, 100, 200, 500, 1000, 2000].forEach(function(delay) {
+                setTimeout(applyTimeStyle, delay);
+            });
+            
+            // Chạy khi DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', applyTimeStyle);
+            }
+            
+            // Quan sát thay đổi DOM
+            const observer = new MutationObserver(function() {
+                applyTimeStyle();
+            });
+            
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+            
+            if (document.body) {
+                observer.observe(document.body, {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
+            }
+            
+            // Listen for theme changes
+            window.addEventListener('themeChanged', applyTimeStyle);
+            window.addEventListener('theme-toggle', applyTimeStyle);
             
             applyTimeStyle();
             setTimeout(applyTimeStyle, 100);

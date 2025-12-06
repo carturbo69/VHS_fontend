@@ -8,7 +8,9 @@ namespace VHS_frontend.Areas.Customer.Models.Profile
     public class EditProfileViewModel
     {
         [Required(ErrorMessage = "Tên đăng nhập không được để trống")]
+        [MinLength(8, ErrorMessage = "Tối thiểu 8 ký tự, chữ và số, không dấu, không khoảng cách")]
         [StringLength(100, ErrorMessage = "Tên đăng nhập không được quá 100 ký tự")]
+        [RegularExpression(@"^[a-zA-Z0-9]{8,}$", ErrorMessage = "Tối thiểu 8 ký tự, chữ và số, không dấu, không khoảng cách")]
         [Display(Name = "Tên đăng nhập")]
         public string AccountName { get; set; } = string.Empty;
 
