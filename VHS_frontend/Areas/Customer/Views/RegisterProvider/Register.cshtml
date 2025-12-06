@@ -79,7 +79,7 @@
                             </div>
 
                             <div class="file-row">
-                                <input type="file" id="ProfileImage" name="ProfileImage" accept="image/*" class="file-input" />
+                                <input type="file" id="ProfileImage" name="ProfileImage" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp" class="file-input" />
                                 <div class="file-actions">
                                     <span id="fileName" class="file-name">Chưa chọn tệp</span>
                                     <label for="ProfileImage" class="btn ghost">Chọn tệp khác</label>
@@ -189,7 +189,7 @@
                                type="file"
                                name="BusinessLicenses"
                                class="file-input"
-                               accept="image/*"
+                               accept=".jpg,.jpeg,.png,.gif,.bmp,.webp"
                                multiple
                                required />
                         <div class="file-actions">
@@ -470,12 +470,19 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
           const overlayBtn  = document.getElementById("avatarOverlay");
           const isResubmit  = document.getElementById("IsResubmit")?.value === "true";
 
+          // Helper function to validate image file extension
+          function isValidImageFile(file) {
+            const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+            const fileName = file.name.toLowerCase();
+            return allowedExtensions.some(ext => fileName.endsWith(ext));
+          }
+
           placeholder?.addEventListener("click", () => fileInput?.click());
           fileInput?.addEventListener("change", e => {
             const f = e.target.files?.[0]; if (!f) return;
-            // validate avatar client-side
-            if (!f.type.startsWith("image/")) {
-              alert("Ảnh đại diện không hợp lệ.");
+            // validate avatar client-side - check extension
+            if (!isValidImageFile(f)) {
+              alert("Ảnh đại diện không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp");
               fileInput.value = "";
               return;
             }
@@ -744,8 +751,9 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             const newFiles = Array.from(e.target.files || []);
 
             newFiles.forEach(f => {
-              if (!f.type.startsWith('image/')) {
-                alert(`Tệp ${f.name} không phải là ảnh.`);
+              // Validate file extension
+              if (!isValidImageFile(f)) {
+                alert(`Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp`);
                 return;
               }
 
@@ -1136,8 +1144,8 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             console.log('Total files to submit:', allFiles.length);
 
             allFiles.forEach((f, idx) => {
-              if (!f.type.startsWith('image/')) {
-                errors.push({ msg: `Tệp "${f.name}" không hợp lệ (không phải ảnh).`, el: null });
+              if (!isValidImageFile(f)) {
+                errors.push({ msg: `Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp`, el: null });
               }
               totalBytes += f.size;
               console.log(`  File[${idx}]: ${f.name} - ${(f.size / 1024 / 1024).toFixed(2)} MB - ${f.type}`);
