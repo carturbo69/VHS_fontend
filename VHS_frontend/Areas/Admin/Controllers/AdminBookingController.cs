@@ -12,11 +12,16 @@ namespace VHS_frontend.Areas.Admin.Controllers
     {
         private readonly AdminBookingService _bookingService;
         private readonly StaffManagementService _staffService;
+        private readonly AdminSettingsService _settingsService;
 
-        public AdminBookingController(AdminBookingService bookingService, StaffManagementService staffService)
+        public AdminBookingController(
+            AdminBookingService bookingService, 
+            StaffManagementService staffService,
+            AdminSettingsService settingsService)
         {
             _bookingService = bookingService;
             _staffService = staffService;
+            _settingsService = settingsService;
         }
 
         // GET: Admin/AdminBooking/Index
@@ -39,6 +44,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
             }
 
             _bookingService.SetBearerToken(token);
+            _settingsService.SetBearerToken(token);
 
             var filter = new AdminBookingFilterDTO
             {
@@ -77,6 +83,10 @@ namespace VHS_frontend.Areas.Admin.Controllers
             ViewBag.MonthCompleted = statistics?.CompletedBookings ?? 0;
             ViewBag.MonthCanceled = statistics?.CancelledBookings ?? 0;
 
+            // Lấy thời gian hủy mặc định từ system settings
+            var defaultCancelMinutes = await _settingsService.GetAutoCancelMinutesAsync();
+            ViewBag.DefaultCancelMinutes = defaultCancelMinutes;
+
             // Pass filter data to view
             ViewBag.CurrentStatus = status;
             ViewBag.FromDate = fromDate?.ToString("yyyy-MM-dd");
@@ -99,6 +109,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
             }
 
             _bookingService.SetBearerToken(token);
+            _settingsService.SetBearerToken(token);
 
             try
             {
@@ -109,6 +120,10 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     TempData["ErrorMessage"] = "Không tìm thấy đơn hàng.";
                     return RedirectToAction(nameof(Index));
                 }
+
+                // Lấy thời gian hủy mặc định từ system settings
+                var defaultCancelMinutes = await _settingsService.GetAutoCancelMinutesAsync();
+                ViewBag.DefaultCancelMinutes = defaultCancelMinutes;
 
                 // Timeline đã được backend tạo sẵn trong AdminBookingService.GetBookingDetailAsync
                 // Không cần tạo lại ở đây nữa

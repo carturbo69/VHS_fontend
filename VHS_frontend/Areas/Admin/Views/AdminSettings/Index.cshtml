@@ -1,0 +1,172 @@
+@{
+    ViewData["Title"] = "Cài đặt hệ thống";
+    Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
+    
+    var autoCancelMinutes = (int)(ViewBag.AutoCancelMinutes ?? 30);
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/admin-settings.css" asp-append-version="true" />
+}
+
+<div class="settings-page">
+    <!-- Header -->
+    <div class="settings-header">
+        <div class="settings-header-top">
+            <div class="settings-header-icon">
+                <i class="bi bi-gear-fill"></i>
+            </div>
+            <h1>Cài đặt hệ thống</h1>
+        </div>
+        <p>Quản lý các cài đặt mặc định của hệ thống</p>
+    </div>
+
+    <!-- Cài đặt thời gian hủy -->
+    <div class="settings-card">
+        <div class="settings-section-title">
+            <i class="bi bi-clock-history"></i>
+            <span>Thời gian tự động hủy booking</span>
+        </div>
+        
+        <p class="settings-description">
+            Thời gian mặc định để tự động hủy các đơn đặt dịch vụ chưa được xác nhận hoặc chưa thanh toán. 
+            Giá trị này sẽ được áp dụng cho tất cả đơn đặt dịch vụ mới nếu không có cài đặt riêng.
+        </p>
+        
+        <div class="settings-input-group">
+            <label for="autoCancelMinutes" class="settings-label">
+                Thời gian hủy mặc định (phút)
+            </label>
+            
+            <div class="settings-input-wrapper">
+                <input type="number" 
+                       id="autoCancelMinutes" 
+                       class="settings-input" 
+                       value="@autoCancelMinutes" 
+                       min="1" 
+                       max="1440"
+                       placeholder="Nhập số phút (1-1440)" />
+                <span class="settings-input-unit">phút</span>
+            </div>
+            
+            <div class="settings-current-value">
+                Giá trị hiện tại: <strong id="currentValue">@autoCancelMinutes</strong> phút
+            </div>
+        </div>
+        
+        <div id="saveMessage" class="settings-message"></div>
+        
+        <div class="settings-actions">
+            <button type="button" 
+                    class="settings-btn settings-btn-primary" 
+                    id="btnSaveCancelMinutes">
+                <i class="bi bi-save"></i>
+                <span>Lưu thay đổi</span>
+            </button>
+            <button type="button" 
+                    class="settings-btn settings-btn-secondary" 
+                    id="btnResetCancelMinutes">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                <span>Đặt lại mặc định (30 phút)</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Thông tin bổ sung -->
+    <div class="settings-info-card">
+        <div class="settings-info-title">
+            <i class="bi bi-info-circle"></i>
+            <span>Lưu ý quan trọng</span>
+        </div>
+        <ul class="settings-info-list">
+            <li>Thời gian hủy mặc định sẽ được áp dụng cho tất cả các đơn đặt dịch vụ mới nếu không có cài đặt riêng.</li>
+            <li>Quản trị viên có thể chỉnh sửa thời gian hủy cho từng đơn đặt dịch vụ cụ thể trong trang chi tiết đơn hàng.</li>
+            <li>Thời gian hủy được tính từ thời điểm đơn đặt dịch vụ được tạo (Chờ xử lý) hoặc được xác nhận (Đã xác nhận nhưng chưa thanh toán).</li>
+            <li>Giá trị hợp lệ: từ 1 đến 1440 phút (tối đa 24 giờ).</li>
+        </ul>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputMinutes = document.getElementById('autoCancelMinutes');
+            const btnSave = document.getElementById('btnSaveCancelMinutes');
+            const btnReset = document.getElementById('btnResetCancelMinutes');
+            const saveMessage = document.getElementById('saveMessage');
+            const currentValue = document.getElementById('currentValue');
+            
+            // Lưu thay đổi
+            btnSave.addEventListener('click', async function() {
+                const minutes = parseInt(inputMinutes.value);
+                
+                if (isNaN(minutes) || minutes < 1 || minutes > 1440) {
+                    showMessage('Vui lòng nhập số phút hợp lệ (1-1440)', 'danger');
+                    inputMinutes.focus();
+                    return;
+                }
+                
+                btnSave.disabled = true;
+                btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span><span>Đang lưu...</span>';
+                
+                try {
+                    const response = await fetch('@Url.Action("UpdateAutoCancelMinutes", "AdminSettings", new { area = "Admin" })', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ minutes: minutes })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showMessage(result.message || 'Đã cập nhật thành công!', 'success');
+                        currentValue.textContent = minutes;
+                        inputMinutes.value = minutes;
+                        
+                        // Highlight input briefly
+                        inputMinutes.style.borderColor = 'var(--success)';
+                        setTimeout(() => {
+                            inputMinutes.style.borderColor = '';
+                        }, 2000);
+                    } else {
+                        showMessage(result.message || 'Lỗi khi cập nhật', 'danger');
+                    }
+                } catch (error) {
+                    showMessage('Lỗi: ' + error.message, 'danger');
+                } finally {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = '<i class="bi bi-save"></i><span>Lưu thay đổi</span>';
+                }
+            });
+            
+            // Đặt lại mặc định
+            btnReset.addEventListener('click', function() {
+                if (confirm('Bạn có chắc muốn đặt lại thời gian hủy về mặc định (30 phút)?')) {
+                    inputMinutes.value = 30;
+                    btnSave.click();
+                }
+            });
+            
+            // Enter key để lưu
+            inputMinutes.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    btnSave.click();
+                }
+            });
+            
+            // Hiển thị thông báo
+            function showMessage(message, type) {
+                saveMessage.className = `settings-message settings-message-${type}`;
+                saveMessage.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>${message}`;
+                saveMessage.style.display = 'block';
+                
+                // Tự động ẩn sau 5 giây
+                setTimeout(() => {
+                    saveMessage.style.display = 'none';
+                }, 5000);
+            }
+        });
+    </script>
+}
