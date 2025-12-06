@@ -24,29 +24,63 @@
     }
 }
 
-<style>
-    /* FIX: Force white cho notification-time-white - Priority cao nhất */
-    .notification-time-white,
-    .item-time.notification-time-white,
-    #notificationDropdown .notification-time-white,
-    .notification-dropdown .notification-time-white,
-    .notification-items .notification-time-white,
-    .notification-item .notification-time-white,
-    .item-content .notification-time-white,
-    .notification-item .item-content .notification-time-white,
-    .dark .notification-time-white,
-    .dark .item-time.notification-time-white,
-    .dark #notificationDropdown .notification-time-white,
-    .dark .notification-dropdown .notification-time-white,
-    html .notification-time-white,
-    html body .notification-time-white,
-    html.dark .notification-time-white,
-    html.dark body .notification-time-white {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
+<style id="vhs-notification-time-force-style">
+    /* FORCE STYLE - Highest Priority - Light Mode */
+    .vhs-time-display,
+    .vhs-time-display.item-time,
+    .vhs-time-display.notification-time-white,
+    html body .vhs-time-display,
+    html body #notificationDropdown .vhs-time-display,
+    html body .notification-dropdown .vhs-time-display,
+    html body .notification-item .vhs-time-display,
+    html body .notification-item .item-content .vhs-time-display {
+        color: #64748b !important;
+        -webkit-text-fill-color: #64748b !important;
         font-weight: 600 !important;
         font-size: 12px !important;
         opacity: 1 !important;
+        filter: none !important;
+        letter-spacing: 0.1px !important;
+        display: block !important;
+    }
+    
+    /* FORCE STYLE - Highest Priority - Dark Mode */
+    html.dark .vhs-time-display,
+    html.dark .vhs-time-display.item-time,
+    html.dark .vhs-time-display.notification-time-white,
+    html.dark body .vhs-time-display,
+    html.dark body #notificationDropdown .vhs-time-display,
+    html.dark body .notification-dropdown .vhs-time-display,
+    html.dark body .notification-item .vhs-time-display,
+    html.dark body .notification-item .item-content .vhs-time-display,
+    .dark .vhs-time-display,
+    .dark body .vhs-time-display {
+        color: #e2e8f0 !important;
+        -webkit-text-fill-color: #e2e8f0 !important;
+        font-weight: 600 !important;
+        font-size: 12px !important;
+        opacity: 1 !important;
+        filter: none !important;
+        letter-spacing: 0.1px !important;
+        display: block !important;
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+    }
+    
+    /* Override cho notification page */
+    html body .notification-page .vhs-time-display,
+    html body .notification-page .time.vhs-time-display {
+        font-size: 14px !important;
+        color: #64748b !important;
+        -webkit-text-fill-color: #64748b !important;
+    }
+    
+    html.dark body .notification-page .vhs-time-display,
+    html.dark body .notification-page .time.vhs-time-display,
+    .dark body .notification-page .vhs-time-display {
+        font-size: 14px !important;
+        color: #e2e8f0 !important;
+        -webkit-text-fill-color: #e2e8f0 !important;
     }
 </style>
 
@@ -98,7 +132,13 @@
                         
                         <div class="item-content">
                             <div class="content-text">@notification.Content</div>
-                            <span class="item-time notification-time-white" style="display: block; color: #ffffff !important; font-weight: 600 !important; font-size: 12px !important; opacity: 1 !important; -webkit-text-fill-color: #ffffff !important;">@ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm")</span>
+                            @{
+                                var timeText = ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm");
+                            }
+                            <span class="item-time notification-time-white vhs-time-display" 
+                                  data-time-color="auto"
+                                  data-time-text="@timeText"
+                                  style="display: block !important; font-size: 12px !important; font-weight: 700 !important; opacity: 1 !important; letter-spacing: 0.1px !important; color: #ffffff !important;">@timeText</span>
                         </div>
                         
                         @if (!notification.IsRead)
@@ -139,49 +179,260 @@
 </div>
 
 <script>
-    // Force màu trắng cho notification-time-white - Cách đơn giản nhất
+    // Fix màu thời gian cho cả light và dark mode - CÁCH MẠNH NHẤT
     (function() {
-        function fixTimeColor() {
-            const items = document.querySelectorAll('.notification-time-white, .item-time.notification-time-white, #notificationDropdown .item-time, .notification-dropdown .item-time');
-            items.forEach(function(el) {
-                // Force với nhiều cách
-                el.style.color = '#ffffff';
-                el.style.setProperty('color', '#ffffff', 'important');
-                el.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
-                el.style.fontWeight = '600';
-                el.style.setProperty('font-weight', '600', 'important');
-                el.style.opacity = '1';
-                el.style.setProperty('opacity', '1', 'important');
+        'use strict';
+        
+        // Tạo dynamic style tag để override mọi CSS
+        let dynamicStyle = document.getElementById('notification-time-force-style');
+        if (!dynamicStyle) {
+            dynamicStyle = document.createElement('style');
+            dynamicStyle.id = 'notification-time-force-style';
+            dynamicStyle.setAttribute('data-priority', '999999');
+            document.head.appendChild(dynamicStyle);
+        }
+        
+        function updateDynamicStyle(isDark) {
+            const lightColor = '#334155';
+            const darkColor = '#ffffff';
+            const targetColor = isDark ? darkColor : lightColor;
+            
+            dynamicStyle.textContent = `
+                /* FORCE STYLE - Highest Priority */
+                html body #notificationDropdown .notification-item .item-content .item-time,
+                html body .notification-dropdown .notification-item .item-content .item-time,
+                html body #notificationDropdown .notification-item .item-content span.item-time,
+                html body .notification-dropdown .notification-item .item-content span.item-time,
+                html body #notificationDropdown .notification-item .item-content .notification-time-white,
+                html body .notification-dropdown .notification-item .item-content .notification-time-white,
+                html body #notificationDropdown .notification-item .item-content span.notification-time-white,
+                html body .notification-dropdown .notification-item .item-content span.notification-time-white,
+                html body [data-time-color="auto"] {
+                    color: ${targetColor} !important;
+                    -webkit-text-fill-color: ${targetColor} !important;
+                    font-weight: 700 !important;
+                    font-size: 12px !important;
+                    opacity: 1 !important;
+                    filter: none !important;
+                    letter-spacing: 0.1px !important;
+                    -webkit-font-smoothing: antialiased !important;
+                    -moz-osx-font-smoothing: grayscale !important;
+                }
+                
+                html.dark body #notificationDropdown .notification-item .item-content .item-time,
+                html.dark body .notification-dropdown .notification-item .item-content .item-time,
+                html.dark body #notificationDropdown .notification-item .item-content span.item-time,
+                html.dark body .notification-dropdown .notification-item .item-content span.item-time,
+                html.dark body #notificationDropdown .notification-item .item-content .notification-time-white,
+                html.dark body .notification-dropdown .notification-item .item-content .notification-time-white,
+                html.dark body #notificationDropdown .notification-item .item-content span.notification-time-white,
+                html.dark body .notification-dropdown .notification-item .item-content span.notification-time-white,
+                html.dark body [data-time-color="auto"] {
+                    color: ${darkColor} !important;
+                    -webkit-text-fill-color: ${darkColor} !important;
+                    font-weight: 700 !important;
+                    font-size: 12px !important;
+                    opacity: 1 !important;
+                    filter: none !important;
+                    letter-spacing: 0.1px !important;
+                    -webkit-font-smoothing: antialiased !important;
+                    -moz-osx-font-smoothing: grayscale !important;
+                }
+            `;
+        }
+        
+        function isDarkMode() {
+            const html = document.documentElement;
+            const body = document.body;
+            return html.classList.contains('dark') || 
+                   body.classList.contains('dark') ||
+                   html.getAttribute('data-theme') === 'dark' ||
+                   window.getComputedStyle(html).colorScheme === 'dark';
+        }
+        
+        function forceApplyTimeColor() {
+            const isDark = isDarkMode();
+            const lightColor = '#334155';
+            const darkColor = '#ffffff';
+            const targetColor = isDark ? darkColor : lightColor;
+            
+            // Cập nhật dynamic style
+            updateDynamicStyle(isDark);
+            
+            // Tìm tất cả các element có class vhs-time-display hoặc các selector khác
+            const selectors = [
+                '.vhs-time-display',
+                '.notification-time-white',
+                '.item-time',
+                '.item-time.notification-time-white',
+                '.item-time.vhs-time-display',
+                '#notificationDropdown .item-time',
+                '#notificationDropdown .vhs-time-display',
+                '.notification-dropdown .item-time',
+                '.notification-dropdown .vhs-time-display',
+                '.notification-item .item-content .item-time',
+                '.notification-item .item-content span.item-time',
+                '.notification-item .item-content .vhs-time-display',
+                '.notification-item .item-content span.vhs-time-display',
+                '[data-time-color="auto"]'
+            ];
+            
+            selectors.forEach(function(selector) {
+                try {
+                    const items = document.querySelectorAll(selector);
+                    items.forEach(function(el) {
+                        if (el && el.nodeType === 1) {
+                            // XÓA TẤT CẢ style cũ về color - cách mạnh nhất
+                            const currentStyle = el.getAttribute('style') || '';
+                            let newStyle = currentStyle
+                                .replace(/color\s*:[^;!]*!?important;?/gi, '')
+                                .replace(/-webkit-text-fill-color\s*:[^;!]*!?important;?/gi, '')
+                                .replace(/color\s*:[^;]*;?/gi, '')
+                                .replace(/-webkit-text-fill-color\s*:[^;]*;?/gi, '');
+                            
+                            // Thêm style mới
+                            newStyle += ' color: ' + targetColor + ' !important;';
+                            newStyle += ' -webkit-text-fill-color: ' + targetColor + ' !important;';
+                            newStyle += ' font-weight: 600 !important;';
+                            newStyle += ' font-size: 12px !important;';
+                            newStyle += ' opacity: 1 !important;';
+                            newStyle += ' letter-spacing: 0.1px !important;';
+                            newStyle += ' filter: none !important;';
+                            newStyle += ' display: block !important;';
+                            
+                            // Set lại toàn bộ style
+                            el.setAttribute('style', newStyle);
+                            
+                            // Force bằng setProperty
+                            el.style.setProperty('color', targetColor, 'important');
+                            el.style.setProperty('-webkit-text-fill-color', targetColor, 'important');
+                            el.style.setProperty('font-weight', '700', 'important');
+                            el.style.setProperty('font-size', '12px', 'important');
+                            el.style.setProperty('opacity', '1', 'important');
+                            el.style.setProperty('letter-spacing', '0.1px', 'important');
+                            el.style.setProperty('filter', 'none', 'important');
+                            el.style.setProperty('display', 'block', 'important');
+                            el.style.setProperty('-webkit-font-smoothing', 'antialiased', 'important');
+                            el.style.setProperty('-moz-osx-font-smoothing', 'grayscale', 'important');
+                            
+                            // Force bằng cách set attribute trực tiếp
+                            el.setAttribute('data-time-color-applied', targetColor);
+                            el.setAttribute('data-time-color', targetColor);
+                        }
+                    });
+                } catch (e) {
+                    console.warn('Error applying time color:', e);
+                }
             });
         }
         
-        // Chạy ngay
-        fixTimeColor();
+        // Chạy ngay lập tức
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', forceApplyTimeColor);
+        } else {
+            forceApplyTimeColor();
+        }
         
-        // Chạy lại nhiều lần
-        [10, 50, 100, 200, 500, 1000].forEach(function(delay) {
-            setTimeout(fixTimeColor, delay);
+        // Chạy lại nhiều lần với delay khác nhau
+        [0, 10, 50, 100, 200, 500, 1000, 2000].forEach(function(delay) {
+            setTimeout(forceApplyTimeColor, delay);
         });
         
-        // Quan sát thay đổi
-        const observer = new MutationObserver(function() {
-            fixTimeColor();
+        // Chạy liên tục mỗi 500ms trong 5 giây đầu
+        let intervalCount = 0;
+        const forceInterval = setInterval(function() {
+            forceApplyTimeColor();
+            intervalCount++;
+            if (intervalCount >= 10) {
+                clearInterval(forceInterval);
+            }
+        }, 500);
+        
+        // Quan sát thay đổi DOM với nhiều observer
+        const observer1 = new MutationObserver(function(mutations) {
+            forceApplyTimeColor();
         });
         
+        const observer2 = new MutationObserver(function(mutations) {
+            forceApplyTimeColor();
+        });
+        
+        // Quan sát dropdown
         const dropdown = document.getElementById('notificationDropdown');
         if (dropdown) {
-            observer.observe(dropdown, { 
+            observer1.observe(dropdown, { 
                 childList: true, 
                 subtree: true,
                 attributes: true,
-                attributeFilter: ['class', 'style']
+                attributeFilter: ['class', 'style', 'data-theme']
             });
         }
         
-        // Quan sát html để catch dark mode change
-        observer.observe(document.documentElement, {
+        // Quan sát html và body để catch dark mode change
+        observer2.observe(document.documentElement, {
             attributes: true,
-            attributeFilter: ['class']
+            attributeFilter: ['class', 'data-theme']
         });
+        
+        if (document.body) {
+            observer2.observe(document.body, {
+                attributes: true,
+                attributeFilter: ['class', 'data-theme']
+            });
+        }
+        
+        // Listen for theme toggle events
+        window.addEventListener('themeChanged', forceApplyTimeColor);
+        window.addEventListener('theme-toggle', forceApplyTimeColor);
+        
+        // Quan sát khi dropdown được mở - CÁCH MẠNH NHẤT
+        const notificationBtn = document.getElementById('notificationBtn');
+        if (notificationBtn) {
+            // Click event
+            notificationBtn.addEventListener('click', function() {
+                setTimeout(forceApplyTimeColor, 0);
+                setTimeout(forceApplyTimeColor, 10);
+                setTimeout(forceApplyTimeColor, 50);
+                setTimeout(forceApplyTimeColor, 100);
+                setTimeout(forceApplyTimeColor, 200);
+                setTimeout(forceApplyTimeColor, 500);
+            });
+            
+            // Mouseover event (khi hover vào button)
+            notificationBtn.addEventListener('mouseover', function() {
+                forceApplyTimeColor();
+            });
+        }
+        
+        // Quan sát khi dropdown được hiển thị (display: block)
+        const dropdown = document.getElementById('notificationDropdown');
+        if (dropdown) {
+            const dropdownObserver = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                        const style = dropdown.getAttribute('style') || '';
+                        if (style.includes('display') && !style.includes('display: none')) {
+                            // Dropdown đang hiển thị
+                            setTimeout(forceApplyTimeColor, 0);
+                            setTimeout(forceApplyTimeColor, 10);
+                            setTimeout(forceApplyTimeColor, 50);
+                            setTimeout(forceApplyTimeColor, 100);
+                        }
+                    }
+                });
+            });
+            
+            dropdownObserver.observe(dropdown, {
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        }
+        
+        // Quan sát khi có thay đổi trong window
+        window.addEventListener('load', forceApplyTimeColor);
+        window.addEventListener('resize', forceApplyTimeColor);
+        
+        // Expose function globally để có thể gọi từ bên ngoài
+        window.fixNotificationTimeColor = forceApplyTimeColor;
     })();
 </script>

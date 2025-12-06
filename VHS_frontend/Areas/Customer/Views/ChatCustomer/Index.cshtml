@@ -1210,6 +1210,13 @@
               return false;
             }
 
+            // Đánh dấu conversation này để đưa lên đầu khi có update
+            var conversationIdInput = form.querySelector('input[name="conversationId"]');
+            if (conversationIdInput && conversationIdInput.value) {
+              window.__customerLastSentConversationId = conversationIdInput.value.toLowerCase();
+              console.log('[Chat] Marked conversation for move to top:', window.__customerLastSentConversationId);
+            }
+
             if (fileInput && fileInput.files && fileInput.files.length > 0) {
               var file = fileInput.files[0];
 
@@ -1642,6 +1649,13 @@
             const me = '@(Model.CurrentAccount?.AccountId.ToString() ?? Guid.Empty.ToString())'.toLowerCase();
             const GUID_EMPTY = '00000000-0000-0000-0000-000000000000';
 
+            // Lưu conversationId của tin nhắn mà người dùng vừa gửi (để biết khi nào cần đưa lên đầu)
+            // Lưu vào window để có thể truy cập từ form submit
+            if (!window.__customerLastSentConversationId) {
+                window.__customerLastSentConversationId = null;
+            }
+            let lastSentConversationId = window.__customerLastSentConversationId;
+
             if (!me || me === GUID_EMPTY) {
                 console.warn('[customer-chat] me là GUID rỗng, bỏ qua SignalR init');
                 return;
@@ -1805,6 +1819,12 @@
                 msgList.appendChild(wrap);
                 msgList.scrollTop = msgList.scrollHeight;
 
+                // Nếu là tin nhắn của người dùng, đánh dấu conversation này để đưa lên đầu
+                if (isMine) {
+                    lastSentConversationId = msgConvId;
+                    window.__customerLastSentConversationId = msgConvId;
+                }
+
                 if (!isMine) {
                     __customerChatMarkReadCurrent();
                 }
@@ -1865,7 +1885,18 @@
                     }
                 }
 
-                list.prepend(row);
+                // Chỉ đưa conversation lên đầu khi người dùng tự gửi tin nhắn
+                // Kiểm tra xem conversation này có phải là conversation mà người dùng vừa gửi tin không
+                const currentLastSent = window.__customerLastSentConversationId;
+                const shouldMoveToTop = currentLastSent && 
+                                        convId.toLowerCase() === currentLastSent.toLowerCase();
+                
+                if (shouldMoveToTop) {
+                    list.prepend(row);
+                    // Reset sau khi đã đưa lên đầu
+                    window.__customerLastSentConversationId = null;
+                }
+                // Nếu không phải tin nhắn của người dùng, chỉ cập nhật thông tin, không di chuyển vị trí
             });
 
             // 4) Tổng unread
