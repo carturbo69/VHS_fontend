@@ -6,6 +6,31 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/provider-withdrawal.css" asp-append-version="true" />
+    <style>
+        #pendingWithdrawalModal .modal-footer button:hover {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4) !important;
+        }
+        
+        #pendingWithdrawalModal .modal-footer button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+        }
+        
+        #pendingWithdrawalModal .bi-hourglass-split {
+            animation: spin 2s linear infinite;
+        }
+        
+        @@keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 }
 
 <div class="withdrawal-container">
@@ -14,6 +39,36 @@
         <div class="success-notification-content">
             <i class="bi bi-check-circle-fill me-2" id="successNotificationIcon"></i>
             <span id="successNotificationText"></span>
+        </div>
+    </div>
+
+    <!-- Modal thông báo có yêu cầu đang chờ xử lý -->
+    <div class="modal fade" id="pendingWithdrawalModal" tabindex="-1" aria-labelledby="pendingWithdrawalModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius: 16px; border: 2px solid rgba(245, 158, 11, 0.3); box-shadow: 0 10px 30px rgba(245, 158, 11, 0.3);">
+                <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-bottom: none; border-radius: 16px 16px 0 0; padding: 1.5rem;">
+                    <h5 class="modal-title" id="pendingWithdrawalModalLabel" style="color: #fff; font-weight: 700; display: flex; align-items: center;">
+                        <i class="bi bi-exclamation-triangle-fill me-2" style="font-size: 1.25rem;"></i>
+                        Thông báo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center" style="padding: 2rem; background: linear-gradient(135deg, #fff 0%, #fef9e7 100%);">
+                    <div class="mb-3">
+                        <i class="bi bi-hourglass-split" style="font-size: 4rem; color: #f59e0b;"></i>
+                    </div>
+                    <h5 class="mb-3" style="color: #78350f; font-weight: 700;">Bạn đang có yêu cầu rút tiền đang chờ xử lý</h5>
+                    <p class="text-muted mb-0" style="color: #64748b; font-weight: 500;">
+                        Vui lòng chờ yêu cầu hiện tại được xử lý xong trước khi tạo yêu cầu rút tiền mới.
+                    </p>
+                </div>
+                <div class="modal-footer justify-content-center" style="border-top: none; padding: 1rem 2rem 2rem; background: linear-gradient(135deg, #fff 0%, #fef9e7 100%); border-radius: 0 0 16px 16px;">
+                    <button type="button" class="btn" data-bs-dismiss="modal" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border: none; color: #fff; font-weight: 700; padding: 0.75rem 2rem; border-radius: 0.75rem; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); transition: all 0.3s ease;">
+                        <i class="bi bi-check-circle me-2"></i>
+                        Đã hiểu
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -329,10 +384,62 @@
 @section Scripts {
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // Kiểm tra xem có yêu cầu rút tiền đang chờ xử lý không
+            const hasPendingWithdrawal = @(Model.Withdrawals != null && Model.Withdrawals.Any(w => w.Status == "Pending") ? "true" : "false");
+            
+            // Khởi tạo modal nếu element tồn tại
+            const pendingWithdrawalModalEl = document.getElementById('pendingWithdrawalModal');
+            let pendingWithdrawalModal = null;
+            if (pendingWithdrawalModalEl) {
+                pendingWithdrawalModal = new bootstrap.Modal(pendingWithdrawalModalEl);
+            }
+
+            // Hàm kiểm tra và hiển thị modal nếu có pending withdrawal
+            function checkPendingWithdrawal() {
+                if (hasPendingWithdrawal && pendingWithdrawalModal) {
+                    pendingWithdrawalModal.show();
+                    return true; // Có pending withdrawal
+                }
+                return false; // Không có pending withdrawal
+            }
+
             const formEl = document.getElementById('withdrawalForm');
             if (!formEl) {
                 console.warn('withdrawalForm not found - form is hidden when available balance is 0');
                 return;
+            }
+
+            // Kiểm tra khi click vào nút "Tạo yêu cầu rút tiền"
+            const requestWithdrawalBtn = document.querySelector('[data-bs-target="#withdrawalFormCollapse"]');
+            if (requestWithdrawalBtn) {
+                requestWithdrawalBtn.addEventListener('click', function(e) {
+                    if (hasPendingWithdrawal) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Đóng collapse nếu đang mở
+                        const collapseEl = document.getElementById('withdrawalFormCollapse');
+                        if (collapseEl && collapseEl.classList.contains('show')) {
+                            const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+                            bsCollapse.hide();
+                        }
+                        checkPendingWithdrawal();
+                    }
+                });
+            }
+
+            // Lắng nghe sự kiện khi collapse được mở
+            const collapseEl = document.getElementById('withdrawalFormCollapse');
+            if (collapseEl) {
+                collapseEl.addEventListener('show.bs.collapse', function() {
+                    if (hasPendingWithdrawal) {
+                        // Ngăn collapse mở và hiển thị modal
+                        setTimeout(() => {
+                            const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+                            bsCollapse.hide();
+                            checkPendingWithdrawal();
+                        }, 10);
+                    }
+                });
             }
 
             // Clear error messages
@@ -513,6 +620,11 @@
 
             formEl.addEventListener('submit', async function(e) {
                 e.preventDefault();
+                
+                // Kiểm tra nếu có yêu cầu đang chờ xử lý
+                if (checkPendingWithdrawal()) {
+                    return; // Ngăn submit form
+                }
                 
                 if (!validateForm()) {
                     // Scroll to first error
