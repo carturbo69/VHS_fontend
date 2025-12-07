@@ -69,15 +69,16 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 };
             }
 
-            // THỐNG KÊ THÁNG NÀY - Lấy từng loại riêng biệt
-            // Sử dụng GetStatisticsAsync để filter theo CreatedAt (đúng cho thống kê)
-            var thisMonthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-            var thisMonthEnd = thisMonthStart.AddMonths(1).AddTicks(-1); // Cuối tháng
+            // THỐNG KÊ TỔNG QUAN - Lấy tất cả bookings (không filter theo tháng)
+            // Sử dụng GetStatisticsAsync với date range rộng để lấy TẤT CẢ bookings
+            // Date range: 10 năm trước đến 10 năm sau để đảm bảo bao gồm tất cả bookings
+            var allTimeStart = DateTime.Now.AddYears(-10).Date;
+            var allTimeEnd = DateTime.Now.AddYears(10).Date.AddDays(1).AddTicks(-1);
             
-            // Lấy thống kê tổng thể (filter theo CreatedAt)
-            var statistics = await _bookingService.GetStatisticsAsync(thisMonthStart, thisMonthEnd);
+            // Lấy thống kê tổng thể (tất cả bookings, không filter theo tháng)
+            var statistics = await _bookingService.GetStatisticsAsync(allTimeStart, allTimeEnd);
             
-            // Lấy trực tiếp từ statistics (đã filter theo CreatedAt)
+            // Lấy trực tiếp từ statistics (đã bao gồm tất cả bookings)
             ViewBag.MonthPending = statistics?.PendingBookings ?? 0;
             ViewBag.MonthConfirmed = statistics?.ConfirmedBookings ?? 0;
             ViewBag.MonthCompleted = statistics?.CompletedBookings ?? 0;

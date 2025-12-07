@@ -471,9 +471,28 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase));
             var activeVouchers = vouchers.Count;
             
-            // Tính toán dữ liệu booking/payment
-            var todayRevenue = todayStats?.TotalRevenue ?? 0;
-            var yesterdayRevenue = yesterdayStats?.TotalRevenue ?? 0;
+            // Tính toán dữ liệu booking/payment - Chỉ tính VNPAY đã thanh toán
+            decimal todayRevenue = 0;
+            decimal yesterdayRevenue = 0;
+            try
+            {
+                // Lấy doanh thu hôm nay từ VNPAY payments
+                var todayVN = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")).Date;
+                todayRevenue = await _paymentService.GetTodayVNPAYRevenueAsync(todayVN);
+                System.Diagnostics.Debug.WriteLine($"[AdminDashboard] ✅ Today VNPAY Revenue: {todayRevenue:N0}");
+                
+                // Lấy doanh thu hôm qua từ VNPAY payments
+                var yesterday = todayVN.AddDays(-1);
+                yesterdayRevenue = await _paymentService.GetTodayVNPAYRevenueAsync(yesterday);
+                System.Diagnostics.Debug.WriteLine($"[AdminDashboard] ✅ Yesterday VNPAY Revenue: {yesterdayRevenue:N0}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AdminDashboard] ❌ Error getting VNPAY revenue: {ex.Message}");
+                todayRevenue = 0;
+                yesterdayRevenue = 0;
+            }
+            
             var revenueChange = yesterdayRevenue > 0 
                 ? Math.Round((double)(todayRevenue - yesterdayRevenue) / (double)yesterdayRevenue * 100, 1)
                 : (todayRevenue > 0 ? 100 : 0);
@@ -499,6 +518,22 @@ namespace VHS_frontend.Areas.Admin.Controllers
             var conversionChange = yesterdayConversion > 0
                 ? Math.Round(conversionRate - yesterdayConversion, 1)
                 : (conversionRate > 0 ? conversionRate : 0);
+
+            // Tổng doanh thu hệ thống - chỉ tính các đơn VNPAY đã thanh toán
+            decimal totalSystemRevenue = 0;
+            try
+            {
+                System.Diagnostics.Debug.WriteLine($"[TotalSystemRevenue] Bắt đầu lấy tổng doanh thu VNPAY...");
+                // Lấy trực tiếp từ Payments table thông qua API endpoint
+                totalSystemRevenue = await _paymentService.GetTotalVNPAYRevenueAsync();
+                System.Diagnostics.Debug.WriteLine($"[TotalSystemRevenue] ✅ Tổng doanh thu hệ thống (VNPAY): {totalSystemRevenue:N0} VND");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TotalSystemRevenue] ❌ Error calculating total system revenue: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[TotalSystemRevenue] ❌ Stack trace: {ex.StackTrace}");
+                totalSystemRevenue = 0;
+            }
 
             // Tổng số dịch vụ (gộp của tất cả provider)
             try
@@ -577,33 +612,125 @@ namespace VHS_frontend.Areas.Admin.Controllers
             }).ToList();
             var customerLabels = newCustomersByDay.Select(d => $"{d.Day}/{d.Month}").ToList();
             
-            // Đơn hàng theo tuần (4 tuần trong tháng hiện tại)
-            var weeklyLabels = new List<string> { "Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4" };
-            var weeklyCounts = new List<int> { 0, 0, 0, 0 };
+            // Đơn hàng theo tuần (7 ngày: Thứ 2 - Chủ nhật của tuần hiện tại)
+            var weeklyLabels = new List<string> { "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật" };
+            var weeklyCounts = new List<int> { 0, 0, 0, 0, 0, 0, 0 }; // Số lượng booking
+            var weeklyServiceCounts = new List<int> { 0, 0, 0, 0, 0, 0, 0 }; // Số lượng dịch vụ
             try
             {
                 var nowDt = DateTime.Now;
-                var monthStart = new DateTime(nowDt.Year, nowDt.Month, 1);
-                var monthEnd = monthStart.AddMonths(1).AddTicks(-1);
-                var filterMonth = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
+                
+                // Tính thứ 2 đầu tuần (DayOfWeek: Monday = 1, Sunday = 0)
+                int daysFromMonday = ((int)nowDt.DayOfWeek + 6) % 7; // Chuyển Sunday (0) thành 6
+                var mondayThisWeek = nowDt.Date.AddDays(-daysFromMonday);
+                var sundayThisWeek = mondayThisWeek.AddDays(6).AddHours(23).AddMinutes(59).AddSeconds(59);
+                
+                System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] Tuần hiện tại: {mondayThisWeek:dd/MM/yyyy} - {sundayThisWeek:dd/MM/yyyy}");
+                
+                // Lấy TẤT CẢ booking với phạm vi date rất rộng để đảm bảo không bỏ sót
+                // Sau đó sẽ filter lại theo CreatedAt ở phía controller
+                // Sử dụng phạm vi rộng (2 năm trước đến 1 năm sau) để đảm bảo lấy được tất cả booking
+                var wideFilterStart = DateTime.Now.AddYears(-2).Date;
+                var wideFilterEnd = DateTime.Now.AddYears(1).Date;
+                
+                // Lấy TẤT CẢ booking qua nhiều page để đảm bảo không bỏ sót
+                var allBookingsList = new List<VHS_frontend.Areas.Provider.Models.Booking.BookingListItemDTO>();
+                int currentPage = 1;
+                const int pageSize = 1000; // Lấy 1000 booking mỗi page
+                
+                while (true)
                 {
-                    FromDate = monthStart,
-                    ToDate = monthEnd,
-                    PageNumber = 1,
-                    PageSize = 100000
-                };
-                var monthBookings = await _bookingService.GetAllBookingsAsync(filterMonth);
-                if (monthBookings != null)
-                {
-                    foreach (var b in monthBookings.Items.Where(x => x.BookingTime >= monthStart && x.BookingTime <= monthEnd))
+                    var filterAll = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
                     {
-                        var weekIndex = Math.Min((b.BookingTime.Day - 1) / 7, 3); // 0..3
-                        weeklyCounts[weekIndex]++;
+                        FromDate = wideFilterStart, // Lấy từ 2 năm trước
+                        ToDate = wideFilterEnd,     // Đến 1 năm sau
+                        PageNumber = currentPage,
+                        PageSize = pageSize
+                    };
+                    
+                    var pageResult = await _bookingService.GetAllBookingsAsync(filterAll);
+                    
+                    if (pageResult == null || pageResult.Items == null || !pageResult.Items.Any())
+                    {
+                        break; // Không còn dữ liệu
                     }
+                    
+                    allBookingsList.AddRange(pageResult.Items);
+                    
+                    System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] Page {currentPage}: Lấy được {pageResult.Items.Count} booking (Total từ API: {pageResult.TotalCount})");
+                    
+                    // Nếu số lượng booking trong page < pageSize hoặc đã lấy đủ, dừng lại
+                    if (pageResult.Items.Count < pageSize || (pageResult.TotalCount > 0 && allBookingsList.Count >= pageResult.TotalCount))
+                    {
+                        break;
+                    }
+                    
+                    currentPage++;
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] Phạm vi lấy dữ liệu: {wideFilterStart:dd/MM/yyyy} - {wideFilterEnd:dd/MM/yyyy}");
+                System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] Tổng số booking lấy được từ API (qua {currentPage} page(s)): {allBookingsList.Count}");
+                System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] Tuần hiện tại cần đếm: {mondayThisWeek:dd/MM/yyyy} - {sundayThisWeek:dd/MM/yyyy}");
+                
+                if (allBookingsList.Any())
+                {
+                    int totalCounted = 0;
+                    int skippedInvalid = 0;
+                    int skippedOutsideWeek = 0;
+                    
+                    // Đếm booking và dịch vụ theo ngày trong tuần (dựa trên CreatedAt)
+                    foreach (var booking in allBookingsList)
+                    {
+                        // Sử dụng CreatedAt thay vì BookingTime
+                        var createdAt = booking.CreatedAt;
+                        
+                        // Kiểm tra CreatedAt hợp lệ
+                        if (createdAt == default(DateTime) || createdAt.Year <= 2000)
+                        {
+                            skippedInvalid++;
+                            continue;
+                        }
+                        
+                        // Kiểm tra CreatedAt nằm trong tuần hiện tại
+                        if (createdAt >= mondayThisWeek && createdAt <= sundayThisWeek)
+                        {
+                            var bookingDate = createdAt.Date;
+                            var dayIndex = (int)(bookingDate - mondayThisWeek).TotalDays;
+                            
+                            // dayIndex sẽ là 0-6 (0 = Thứ 2, 6 = Chủ nhật)
+                            if (dayIndex >= 0 && dayIndex <= 6)
+                            {
+                                // Đếm số lượng booking (đơn hàng)
+                                weeklyCounts[dayIndex]++;
+                                
+                                // Đếm số lượng dịch vụ - ĐẾM TẤT CẢ DỊCH VỤ
+                                // Mỗi booking hiện tại có 1 dịch vụ, nên số dịch vụ = số booking
+                                // Logic này đảm bảo đếm TẤT CẢ dịch vụ được đặt trong tuần
+                                int serviceCount = 1; // Mỗi booking = 1 dịch vụ (đếm tất cả)
+                                
+                                // Nếu sau này một booking có nhiều dịch vụ, cần cập nhật:
+                                // serviceCount = booking.Services?.Count ?? 1; // Đếm số dịch vụ thực tế trong booking
+                                
+                                weeklyServiceCounts[dayIndex] += serviceCount; // Cộng dồn để đếm TẤT CẢ dịch vụ
+                                totalCounted++;
+                            }
+                        }
+                        else
+                        {
+                            skippedOutsideWeek++;
+                        }
+                    }
+                    
+                    System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] ✅ Đã đếm: {totalCounted} booking trong tuần");
+                    System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] ⚠️ Bỏ qua (invalid CreatedAt): {skippedInvalid}");
+                    System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] ⚠️ Bỏ qua (ngoài tuần): {skippedOutsideWeek}");
+                    System.Diagnostics.Debug.WriteLine($"[WeeklyOrders] 📊 Tổng: {totalCounted} + {skippedInvalid} + {skippedOutsideWeek} = {totalCounted + skippedInvalid + skippedOutsideWeek}");
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"❌ Error getting weekly orders: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"❌ Stack trace: {ex.StackTrace}");
                 // keep default zeros
             }
             
@@ -629,6 +756,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 
                 ActiveVouchers = activeVouchers, // Dữ liệu thật
                 TotalServices = totalServices,
+                TotalSystemRevenue = totalSystemRevenue, // Tổng doanh thu hệ thống (chỉ tính đơn đã thanh toán)
                 
                 ConversionRate = conversionRate, // Tỷ lệ booking hoàn thành / tổng booking
                 ConversionChange = conversionChange,
@@ -652,6 +780,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 SelectedYear = DateTime.Now.Year,
                 
                 WeeklyOrdersData = weeklyCounts,
+                WeeklyServicesData = weeklyServiceCounts,
                 WeeklyOrdersLabels = weeklyLabels,
                 
                 // Service Distribution - Dựa trên danh mục (Category), không dùng Tag
