@@ -607,11 +607,76 @@
             await deleteCertificate(certId, catName);
         }
 
+        // Function để hiển thị thông báo ở giữa màn hình
+        function showCenterNotification(message, type = 'warning') {
+            // Xóa notification cũ nếu có
+            const oldNotif = document.getElementById('center-notification');
+            if (oldNotif) {
+                oldNotif.remove();
+            }
+
+            // Tạo notification mới
+            const notification = document.createElement('div');
+            notification.id = 'center-notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 10000;
+                background: ${type === 'warning' ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' : '#ffffff'};
+                color: ${type === 'warning' ? '#92400e' : '#000000'};
+                padding: 20px 32px;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+                border: 2px solid ${type === 'warning' ? '#f59e0b' : '#e2e8f0'};
+                font-size: 16px;
+                font-weight: 600;
+                text-align: center;
+                min-width: 400px;
+                animation: slideInCenter 0.3s ease-out;
+            `;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 24px; color: #f59e0b;"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+
+            // Thêm animation CSS nếu chưa có
+            if (!document.getElementById('center-notification-style')) {
+                const style = document.createElement('style');
+                style.id = 'center-notification-style';
+                style.textContent = `
+                    @@keyframes slideInCenter {
+                        from {
+                            opacity: 0;
+                            transform: translate(-50%, -60%);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: translate(-50%, -50%);
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            document.body.appendChild(notification);
+
+            // Tự động ẩn sau 2 giây
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 2000);
+        }
+
         // Function to delete entire certificate
         async function deleteCertificate(certId, categoryName) {
             const row = document.getElementById(`cert-row-${certId}`);
             if (!row) {
-                alert('Không tìm thấy chứng chỉ!');
+                showCenterNotification('Không tìm thấy chứng chỉ!', 'error');
                 return;
             }
 
@@ -625,30 +690,77 @@
                 });
 
                 if (response.ok) {
-                    // Animate row removal
+                    // Đếm số certificate còn lại (trước khi xóa row khỏi DOM)
+                    const tbody = document.querySelector('tbody');
+                    const allCertificateRows = tbody ? Array.from(tbody.children).filter(row => row.id && row.id.startsWith('cert-row-')) : [];
+                    const remainingCountAfterDelete = allCertificateRows.length - 1; // Trừ đi row đang xóa
+                    
+                    // Kiểm tra nếu không còn certificate nào (đã xóa hết) - kiểm tra TRƯỚC khi animate
+                    if (remainingCountAfterDelete === 0) {
+                        // Đã xóa hết certificate - tự động từ chối hồ sơ provider NGAY LẬP TỨC
+                        const providerId = '@Model.ProviderId';
+                        const rejectReason = 'Đã xóa hết danh mục dịch vụ';
+                        
+                        console.log('🔥 Đã xóa hết certificate, tự động từ chối provider:', providerId);
+                        
+                        // Xóa row ngay lập tức (không animate để nhanh hơn)
+                        row.remove();
+                        
+                        // Hiển thị thông báo ở giữa màn hình
+                        showCenterNotification('⚠️ Đã xóa hết danh mục dịch vụ. Hệ thống sẽ tự động từ chối hồ sơ này.', 'warning');
+                        
+                        // Tạo form để submit reject ngay lập tức
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = `/Admin/AdminRegisterProvider/Reject/${providerId}`;
+                        form.style.display = 'none';
+                        
+                        // Thêm anti-forgery token
+                        const token = document.querySelector('input[name="__RequestVerificationToken"]');
+                        if (token) {
+                            const tokenInput = document.createElement('input');
+                            tokenInput.type = 'hidden';
+                            tokenInput.name = '__RequestVerificationToken';
+                            tokenInput.value = token.value;
+                            form.appendChild(tokenInput);
+                        }
+                        
+                        // Thêm reason
+                        const reasonInput = document.createElement('input');
+                        reasonInput.type = 'hidden';
+                        reasonInput.name = 'reason';
+                        reasonInput.value = rejectReason;
+                        form.appendChild(reasonInput);
+                        
+                        // Submit ngay lập tức (không đợi delay)
+                        document.body.appendChild(form);
+                        form.submit();
+                        return; // Không tiếp tục vì sẽ redirect
+                    }
+                    
+                    // Nếu còn certificate, mới animate row removal
                     row.style.backgroundColor = '#fee2e2';
-                    row.style.transition = 'opacity 0.3s ease-out';
+                    row.style.transition = 'opacity 0.1s ease-out';
                     row.style.opacity = '0';
                     
                     setTimeout(() => {
                         row.remove();
                         
-                        // Check if table is now empty
-                        const tbody = document.querySelector('tbody');
-                        if (tbody && tbody.children.length === 0) {
-                            // Create empty message row instead of reloading
+                        // Nếu còn certificate, hiển thị empty message nếu table trống
+                        const remainingRows = tbody ? Array.from(tbody.children).filter(row => row.id && row.id.startsWith('cert-row-')) : [];
+                        if (remainingRows.length === 0) {
                             const emptyRow = document.createElement('tr');
                             emptyRow.innerHTML = '<td colspan="4" class="text-center text-muted" style="padding: 40px;">Không có chứng chỉ</td>';
                             tbody.appendChild(emptyRow);
                         }
-                    }, 300);
+                    }, 100); // Nhanh hơn - chỉ 100ms
                 } else {
                     const error = await response.text();
-                    alert(`Lỗi xóa chứng chỉ: ${error}`);
+                    showCenterNotification(`Lỗi xóa chứng chỉ: ${error}`, 'error');
                 }
             } catch (err) {
                 console.error('Error deleting certificate:', err);
-                alert('Có lỗi xảy ra khi xóa chứng chỉ!');
+                showCenterNotification('Có lỗi xảy ra khi xóa chứng chỉ!', 'error');
             }
         }
     </script>
