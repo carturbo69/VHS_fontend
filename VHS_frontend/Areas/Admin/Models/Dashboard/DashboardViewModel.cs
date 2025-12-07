@@ -27,6 +27,9 @@ namespace VHS_frontend.Areas.Admin.Models.Dashboard
         // Services
         public int TotalServices { get; set; }
         
+        // Total System Revenue (chỉ tính đơn đã thanh toán)
+        public decimal TotalSystemRevenue { get; set; }
+        
         public double ConversionRate { get; set; }
         public double ConversionChange { get; set; }
         
@@ -49,6 +52,7 @@ namespace VHS_frontend.Areas.Admin.Models.Dashboard
         public int SelectedYear { get; set; } = DateTime.Now.Year;
         
         public List<int> WeeklyOrdersData { get; set; } = new List<int>();
+        public List<int> WeeklyServicesData { get; set; } = new List<int>(); // Số lượng dịch vụ theo tuần
         public List<string> WeeklyOrdersLabels { get; set; } = new List<string>();
         
         // Service Distribution

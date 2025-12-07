@@ -390,6 +390,102 @@ namespace VHS_frontend.Services.Admin
             return response?.Data;
         }
 
+        /// <summary>
+        /// Get total revenue from VNPAY paid payments
+        /// </summary>
+        public async Task<decimal> GetTotalVNPAYRevenueAsync(CancellationToken ct = default)
+        {
+            AttachAuth();
+            
+            try
+            {
+                var res = await _http.GetAsync("/api/PaymentManagement/total-vnpay-revenue", ct);
+                
+                if (!res.IsSuccessStatusCode)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[GetTotalVNPAYRevenue] API call failed: {res.StatusCode}");
+                    var errorContent = await res.Content.ReadAsStringAsync(ct);
+                    System.Diagnostics.Debug.WriteLine($"[GetTotalVNPAYRevenue] Error response: {errorContent}");
+                    return 0;
+                }
+                
+                var json = await res.Content.ReadAsStringAsync(ct);
+                System.Diagnostics.Debug.WriteLine($"[GetTotalVNPAYRevenue] Response: {json}");
+                
+                // Parse using ApiResponse pattern like GetDashboardAsync
+                var response = JsonSerializer.Deserialize<ApiResponse<TotalVNPAYRevenueDTO>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+                if (response?.Data != null)
+                {
+                    var revenue = response.Data.TotalRevenue;
+                    System.Diagnostics.Debug.WriteLine($"[GetTotalVNPAYRevenue] ✅ Parsed revenue: {revenue:N0}");
+                    return revenue;
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"[GetTotalVNPAYRevenue] ❌ Could not parse revenue from response");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GetTotalVNPAYRevenue] ❌ Exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[GetTotalVNPAYRevenue] ❌ Stack trace: {ex.StackTrace}");
+                return 0;
+            }
+        }
+        
+        /// <summary>
+        /// Get today revenue from VNPAY paid payments
+        /// </summary>
+        public async Task<decimal> GetTodayVNPAYRevenueAsync(DateTime? date = null, CancellationToken ct = default)
+        {
+            AttachAuth();
+            
+            try
+            {
+                var dateParam = date ?? DateTime.Now;
+                var url = $"/api/PaymentManagement/today-vnpay-revenue?date={Uri.EscapeDataString(dateParam.ToString("o"))}";
+                var res = await _http.GetAsync(url, ct);
+                
+                if (!res.IsSuccessStatusCode)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] API call failed: {res.StatusCode}");
+                    var errorContent = await res.Content.ReadAsStringAsync(ct);
+                    System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] Error response: {errorContent}");
+                    return 0;
+                }
+                
+                var json = await res.Content.ReadAsStringAsync(ct);
+                System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] Response: {json}");
+                
+                // Parse using ApiResponse pattern
+                var response = JsonSerializer.Deserialize<ApiResponse<TotalVNPAYRevenueDTO>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+                if (response?.Data != null)
+                {
+                    var revenue = response.Data.TotalRevenue;
+                    System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] ✅ Parsed revenue: {revenue:N0}");
+                    return revenue;
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] ❌ Could not parse revenue from response");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] ❌ Exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] ❌ Stack trace: {ex.StackTrace}");
+                return 0;
+            }
+        }
+        
+        // Helper DTO for VNPAY revenue response
+        private class TotalVNPAYRevenueDTO
+        {
+            public decimal TotalRevenue { get; set; }
+        }
+
         // Helper class for API responses
         private class ApiResponse<T>
         {

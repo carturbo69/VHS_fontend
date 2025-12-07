@@ -12,13 +12,16 @@ namespace VHS_frontend.Areas.Provider.Controllers
     {
         private readonly BookingProviderService _bookingService;
         private readonly StaffManagementService _staffService;
+        private readonly ProviderSettingsService _settingsService;
 
         public OrderController(
             BookingProviderService bookingService,
-            StaffManagementService staffService)
+            StaffManagementService staffService,
+            ProviderSettingsService settingsService)
         {
             _bookingService = bookingService;
             _staffService = staffService;
+            _settingsService = settingsService;
         }
 
         // DEBUG: Kiểm tra session
@@ -200,6 +203,19 @@ namespace VHS_frontend.Areas.Provider.Controllers
                         Console.WriteLine($"[DEBUG] Added {newCanceledItems.Count} canceled bookings to list");
                     }
                 }
+            }
+
+            // Lấy thời gian hủy mặc định từ system settings
+            var token = HttpContext.Session.GetString("JWTToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                _settingsService.SetBearerToken(token);
+                var defaultCancelMinutes = await _settingsService.GetDefaultAutoCancelMinutesAsync();
+                ViewBag.DefaultCancelMinutes = defaultCancelMinutes;
+            }
+            else
+            {
+                ViewBag.DefaultCancelMinutes = 30; // Mặc định nếu không có token
             }
 
             // Pass filter data to view
@@ -576,6 +592,18 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 else
                 {
                     ViewBag.StaffList = new List<StaffDTO>();
+                }
+
+                // Lấy thời gian hủy mặc định từ system settings
+                if (!string.IsNullOrEmpty(token))
+                {
+                    _settingsService.SetBearerToken(token);
+                    var defaultCancelMinutes = await _settingsService.GetDefaultAutoCancelMinutesAsync();
+                    ViewBag.DefaultCancelMinutes = defaultCancelMinutes;
+                }
+                else
+                {
+                    ViewBag.DefaultCancelMinutes = 30; // Mặc định nếu không có token
                 }
 
                 return View(booking);

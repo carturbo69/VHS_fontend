@@ -209,6 +209,12 @@ builder.Services.AddHttpClient<BookingProviderService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
 });
 
+// HttpClient cho Provider Settings Service
+builder.Services.AddHttpClient<ProviderSettingsService>(client =>
+{
+    client.BaseAddress = new Uri(backendBase.TrimEnd('/'));
+});
+
 // HttpClient cho ChatCustomerService (Customer area)
 builder.Services.AddHttpClient<ChatCustomerService>(client =>
 {
