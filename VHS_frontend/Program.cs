@@ -233,7 +233,12 @@ builder.Services.AddHttpClient<GoogleAuthService>(client =>
     client.BaseAddress = new Uri(backendBase.TrimEnd('/')); 
 });
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = null; // Keep original property names
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true; // Case-insensitive binding
+    });
 
 
 builder.Services.AddHttpContextAccessor();

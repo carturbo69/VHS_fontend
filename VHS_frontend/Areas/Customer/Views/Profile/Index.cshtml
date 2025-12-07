@@ -1300,13 +1300,60 @@
             if (changePasswordForm) {
                 changePasswordForm.addEventListener('submit', async function(e) {
                     e.preventDefault();
+                    
+                    // Convert form to JSON object
                     const formData = new FormData(this);
+                    const data = {
+                        CurrentPassword: formData.get('CurrentPassword') || '',
+                        NewPassword: formData.get('NewPassword') || '',
+                        ConfirmPassword: formData.get('ConfirmPassword') || '',
+                        OTP: formData.get('OTP') || ''
+                    };
+                    
+                    // Get anti-forgery token
+                    var tokenInput = this.querySelector('input[name="__RequestVerificationToken"]');
+                    var token = tokenInput ? tokenInput.value : '';
+                    
+                    // Use explicit URL to ensure we hit the JSON endpoint
+                    const baseUrl = window.location.origin;
+                    const changePasswordUrl = baseUrl + '/Customer/Profile/ChangePasswordApi';
+                    
+                    console.log('[ChangePassword Modal] Sending request to:', changePasswordUrl);
+                    console.log('[ChangePassword Modal] Request data:', { 
+                        CurrentPassword: '***', 
+                        NewPassword: '***', 
+                        ConfirmPassword: '***', 
+                        OTP: data.OTP 
+                    });
+                    
                     try {
-                        const response = await fetch('@Url.Action("ChangePassword")', {
+                        const response = await fetch(changePasswordUrl, {
                             method: 'POST',
-                            body: formData
+                            headers: {
+                                'Content-Type': 'application/json; charset=utf-8',
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'RequestVerificationToken': token
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify(data)
                         });
-                        const result = await response.json();
+                        
+                        console.log('[ChangePassword Modal] Response status:', response.status);
+                        
+                        // Always read response as text first
+                        const responseText = await response.text();
+                        let result = null;
+                        
+                        // Try to parse as JSON
+                        try {
+                            result = JSON.parse(responseText);
+                        } catch (parseError) {
+                            console.warn('[ChangePassword Modal] Response is not JSON:', responseText.substring(0, 200));
+                            showToast('Có lỗi xảy ra khi đổi mật khẩu', 'error');
+                            return;
+                        }
+                        
                         if (result.success) {
                             showToast('Đổi mật khẩu thành công!', 'success');
                             bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
@@ -1315,6 +1362,7 @@
                             showToast(result.message || 'Có lỗi xảy ra', 'error');
                         }
                     } catch (error) {
+                        console.error('[ChangePassword Modal] Error:', error);
                         showToast('Có lỗi xảy ra khi đổi mật khẩu', 'error');
                     }
                 });
