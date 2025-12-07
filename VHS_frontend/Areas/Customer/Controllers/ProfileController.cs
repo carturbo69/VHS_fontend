@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text.Json;
 using VHS_frontend.Areas.Customer.Models.Profile;
 using VHS_frontend.Services.Customer;
 using VHS_frontend.Areas.Customer.Models.BookingServiceDTOs;
@@ -409,20 +410,108 @@ namespace VHS_frontend.Areas.Customer.Controllers
         }
 
         /// <summary>
-        /// API: Change password from modal
+        /// API: Change password from modal (JSON endpoint)
         /// </summary>
         [HttpPost]
-        public async Task<IActionResult> ChangePassword([FromForm] ChangePasswordViewModel model)
+        [IgnoreAntiforgeryToken]
+        [Consumes("application/json")]
+        [Produces("application/json")]
+        public async Task<IActionResult> ChangePasswordApi([FromBody] ChangePasswordViewModel model)
         {
+            // Log for debugging
+            System.Diagnostics.Debug.WriteLine($"[ProfileController] ChangePassword API called. Model is null: {model == null}");
+            System.Diagnostics.Debug.WriteLine($"[ProfileController] Request Content-Type: {Request.ContentType}");
+            System.Diagnostics.Debug.WriteLine($"[ProfileController] Request Method: {Request.Method}");
+            
+            if (model != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] Model received - OTP: {model.OTP?.Substring(0, Math.Min(2, model.OTP?.Length ?? 0))}..., CurrentPassword: {(string.IsNullOrEmpty(model.CurrentPassword) ? "empty" : "provided")}, NewPassword: {(string.IsNullOrEmpty(model.NewPassword) ? "empty" : "provided")}");
+            }
+            
+            // Fallback: If model binding failed, try to read JSON directly from request body
+            if (model == null)
+            {
+                try
+                {
+                    Request.EnableBuffering(); // Allow re-reading the stream
+                    Request.Body.Position = 0;
+                    
+                    using var reader = new StreamReader(Request.Body, System.Text.Encoding.UTF8, leaveOpen: true);
+                    var jsonBody = await reader.ReadToEndAsync();
+                    Request.Body.Position = 0;
+                    
+                    System.Diagnostics.Debug.WriteLine($"[ProfileController] JSON Body: {jsonBody}");
+                    
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                        // Don't use CamelCase policy since JavaScript sends PascalCase
+                    };
+                    
+                    model = JsonSerializer.Deserialize<ChangePasswordViewModel>(jsonBody, options);
+                    
+                    if (model == null)
+                    {
+                        return Json(new { success = false, message = "Dữ liệu không hợp lệ. Vui lòng thử lại." });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ProfileController] Error deserializing JSON: {ex.Message}");
+                    return Json(new { success = false, message = "Lỗi xử lý dữ liệu. Vui lòng thử lại." });
+                }
+            }
+
             var accountId = GetAccountId();
             if (accountId == Guid.Empty)
             {
                 return Json(new { success = false, message = "Bạn cần đăng nhập." });
             }
 
+            // Clean OTP before validation
+            if (!string.IsNullOrWhiteSpace(model.OTP))
+            {
+                model.OTP = model.OTP.Trim().Replace(" ", "").Replace("-", "").Replace(".", "");
+            }
+
+            // Clear OTP validation errors from ModelState and re-validate manually
+            ModelState.Remove("OTP");
+            
+            // Validate OTP
+            if (string.IsNullOrWhiteSpace(model.OTP))
+            {
+                ModelState.AddModelError("OTP", "Mã OTP là bắt buộc");
+            }
+            else if (model.OTP.Length != 6 || !System.Text.RegularExpressions.Regex.IsMatch(model.OTP, @"^\d{6}$"))
+            {
+                ModelState.AddModelError("OTP", "Mã OTP phải có đúng 6 chữ số");
+            }
+
+            // Validate ModelState
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(x => x.Value?.Errors.Count > 0)
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value?.Errors.Select(e => e.ErrorMessage).ToArray()
+                    );
+                
+                return Json(new { 
+                    success = false, 
+                    message = "Vui lòng kiểm tra lại thông tin.",
+                    errors = errors
+                });
+            }
+
             try
             {
                 var jwtToken = HttpContext.Session.GetString("JWToken");
+                
+                if (string.IsNullOrEmpty(jwtToken))
+                {
+                    return Json(new { success = false, message = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." });
+                }
                 
                 var changeDto = new ChangePasswordDTO
                 {
@@ -449,6 +538,8 @@ namespace VHS_frontend.Areas.Customer.Controllers
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] ChangePassword Exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[ProfileController] Stack trace: {ex.StackTrace}");
                 return Json(new { success = false, message = $"Lỗi: {ex.Message}" });
             }
         }
