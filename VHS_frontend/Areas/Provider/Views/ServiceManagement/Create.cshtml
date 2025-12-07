@@ -535,14 +535,25 @@
                 
                 const tags = await response.json();
                 console.log(`[Create] Received ${tags?.length || 0} tags from API`);
+                if (tags && tags.length > 0) {
+                    console.log('[Create] Sample tag structure:', tags[0]);
+                }
 
                 availableTags = tags || [];
 
                 if (availableTags.length > 0) {
                     let html = '<option value="">-- Chọn tag --</option>';
                     availableTags.forEach(function (tag) {
-                        // Hiển thị tất cả tags (vì chỉ chọn 1, không cần ẩn tag đã chọn)
-                        html += `<option value="${tag.tagId}" data-tag-name="${tag.name}">${tag.name}</option>`;
+                        // Xử lý cả camelCase và PascalCase (backend trả về PascalCase)
+                        const tagId = tag.tagId || tag.TagId || '';
+                        const tagName = tag.name || tag.Name || '';
+                        
+                        // Chỉ thêm option nếu có đầy đủ tagId và tagName
+                        if (tagId && tagName) {
+                            html += `<option value="${tagId}" data-tag-name="${tagName}">${tagName}</option>`;
+                        } else {
+                            console.warn('[Create] Tag missing id or name:', tag);
+                        }
                     });
                     tagSelect.innerHTML = html;
                     console.log(`[Create] Displayed ${availableTags.length} tags in dropdown`);
@@ -568,7 +579,7 @@
             }
 
             const selectedOption = this.options[this.selectedIndex];
-            const tagName = selectedOption.getAttribute('data-tag-name');
+            const tagName = selectedOption.getAttribute('data-tag-name') || selectedOption.textContent || '';
 
             // Nếu đã có tag được chọn, xóa tag cũ trước
             if (selectedTag) {
