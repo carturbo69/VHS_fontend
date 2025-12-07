@@ -624,8 +624,16 @@
                 if (availableTags.length > 0) {
                     let html = '<option value="">-- Chọn tag --</option>';
                     availableTags.forEach(function (tag) {
-                        // Hiển thị tất cả tags (vì chỉ chọn 1, không cần ẩn tag đã chọn)
-                        html += `<option value="${tag.tagId}" data-tag-name="${tag.name}">${tag.name}</option>`;
+                        // Xử lý cả camelCase và PascalCase (backend trả về PascalCase)
+                        const tagId = tag.tagId || tag.TagId || '';
+                        const tagName = tag.name || tag.Name || '';
+                        
+                        // Chỉ thêm option nếu có đầy đủ tagId và tagName
+                        if (tagId && tagName) {
+                            html += `<option value="${tagId}" data-tag-name="${tagName}">${tagName}</option>`;
+                        } else {
+                            console.warn('[Edit] Tag missing id or name:', tag);
+                        }
                     });
                     tagSelect.innerHTML = html;
                 } else {
@@ -1068,9 +1076,14 @@
                     const tags = await response.json();
 
                     if (tags && tags.length > 0) {
-                        const tag = tags.find(t => t.tagId === firstTagId);
+                        // Xử lý cả camelCase và PascalCase
+                        const tag = tags.find(t => (t.tagId || t.TagId) === firstTagId);
                         if (tag) {
-                            await setSelectedTag(tag.tagId, tag.name);
+                            const tagId = tag.tagId || tag.TagId || '';
+                            const tagName = tag.name || tag.Name || '';
+                            if (tagId && tagName) {
+                                await setSelectedTag(tagId, tagName);
+                            }
                         }
                     }
 
