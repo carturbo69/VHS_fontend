@@ -226,99 +226,23 @@
 </div>
 
 <script>
-    let currentMonth = new Date();
-    
-    function updateCalendarDisplay() {
-        const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
-            "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
-        document.getElementById('currentMonthDisplay').textContent = 
-            `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
-        renderCalendar();
-    }
-    
+    // Calendar navigation functions - sử dụng window.calendarCurrentMonth từ provider-schedule.js
     function previousMonth() {
-        currentMonth.setMonth(currentMonth.getMonth() - 1);
-        updateCalendarDisplay();
+        if (window.calendarCurrentMonth) {
+            window.calendarCurrentMonth.setMonth(window.calendarCurrentMonth.getMonth() - 1);
+            if (window.updateCalendarDisplay) {
+                window.updateCalendarDisplay();
+            }
+        }
     }
     
     function nextMonth() {
-        currentMonth.setMonth(currentMonth.getMonth() + 1);
-        updateCalendarDisplay();
-    }
-    
-    function renderCalendar() {
-        const calendar = document.getElementById('calendarMonth');
-        if (!calendar) return;
-        
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth();
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        const daysInMonth = lastDay.getDate();
-        const startingDayOfWeek = firstDay.getDay();
-        
-        const schedules = @Html.Raw(Json.Serialize(Model?.Schedules ?? Enumerable.Empty<ReadScheduleViewModel>()));
-        
-        let html = '';
-        
-        // Day headers
-        const dayHeaders = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-        dayHeaders.forEach(day => {
-            html += `<div class="calendar-day-header">${day}</div>`;
-        });
-        
-        // Empty cells for days before month starts
-        for (let i = 0; i < startingDayOfWeek; i++) {
-            html += '<div class="calendar-day empty"></div>';
-        }
-        
-        // Days of the month
-        for (let day = 1; day <= daysInMonth; day++) {
-            const date = new Date(year, month, day);
-            const dayOfWeek = date.getDay();
-            const hasSchedule = schedules && schedules.length > 0 && schedules.some(s => s.dayOfWeek === dayOfWeek);
-            
-            let className = 'calendar-day';
-            if (hasSchedule) {
-                className += ' has-schedule';
+        if (window.calendarCurrentMonth) {
+            window.calendarCurrentMonth.setMonth(window.calendarCurrentMonth.getMonth() + 1);
+            if (window.updateCalendarDisplay) {
+                window.updateCalendarDisplay();
             }
-            
-            html += `<div class="${className}" data-day="${day}">
-                <div class="day-number">${day}</div>
-            </div>`;
         }
-        
-        calendar.innerHTML = html;
-        
-        // Load time-offs
-        loadTimeOffsForMonth(firstDay.toISOString().split('T')[0], lastDay.toISOString().split('T')[0]);
-    }
-    
-    function loadTimeOffsForMonth(startDate, endDate) {
-        fetch(`/Provider/ProviderSchedule/GetTimeOffs?startDate=${startDate}&endDate=${endDate}`)
-            .then(async res => {
-                const text = await res.text();
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    return { success: false, data: [] };
-                }
-            })
-            .then(result => {
-                const timeOffs = result.success ? result.data : (result.data || []);
-                if (Array.isArray(timeOffs)) {
-                    timeOffs.forEach(to => {
-                        const dayElements = document.querySelectorAll(`[data-day]`);
-                        dayElements.forEach(el => {
-                            if (el.getAttribute('data-day') && parseInt(el.getAttribute('data-day')) === parseInt(to.date.split('-')[2])) {
-                                el.classList.remove('has-schedule');
-                                el.classList.add('has-timeoff');
-                            }
-                        });
-                    });
-                }
-            })
-            .catch(error => console.error('Error loading time-offs:', error));
     }
     
     // Modal management

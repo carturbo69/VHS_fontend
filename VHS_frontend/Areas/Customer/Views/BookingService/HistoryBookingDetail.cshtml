@@ -256,8 +256,6 @@
     }
 }
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
 <link rel="stylesheet" href="~/css/history-booking-detail.css" asp-append-version="true" />
 
 <div class="container my-3">
@@ -694,14 +692,15 @@
                                 <div class="opt-name" style="flex: 1; min-width: 0;">
                                     <div style="font-weight: 500; margin-bottom: 8px;">
                                         <span>✓</span>
-                                        <span>@op.OptionName</span>
-                                    </div>
                                     @if (!string.IsNullOrWhiteSpace(op.Value))
                                     {
-                                        <div style="margin-top: 8px;">
-                                            <span class="text-muted" style="margin-left: 4px;">@op.Value</span>
+                                            <span>@op.OptionName<span class="text-muted"> (@op.Value)</span></span>
+                                        }
+                                        else
+                                        {
+                                            <span>@op.OptionName</span>
+                                        }
                                         </div>
-                                    }
                                 </div>
                             </div>
                         }
@@ -714,21 +713,82 @@
                                 <div class="opt-name" style="flex: 1; min-width: 0;">
                                     <div style="font-weight: 500; margin-bottom: 8px;">
                                         <span>✓</span>
-                                        <span>@op.OptionName</span>
-                                    </div>
-                                    @if (!string.IsNullOrWhiteSpace(op.Value))
-                                    {
-                                        <div style="margin-top: 8px;">
-                                                       
-                                            @if (isTextarea)
+                                        @if (!string.IsNullOrWhiteSpace(op.Value))
+                                        {
+                                            @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                            var valueLines = new List<string>();
+                                            
+                                            @* Kiểm tra xem có ký tự xuống dòng không *@
+                                            if (op.Value.Contains('\n') || op.Value.Contains('\r'))
                                             {
-                                                <div class="option-value-text" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px; font-size: 0.9em; line-height: 1.5;">@op.Value</div>
+                                                @* Nếu có xuống dòng, split theo \n và \r *@
+                                                valueLines = op.Value
+                                                    .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                    .Select(v => v.Trim())
+                                                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                    .ToList();
                                             }
                                             else
                                             {
-                                                <span class="text-muted" style="margin-left: 4px;">@op.Value</span>
+                                                @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                valueLines = op.Value
+                                                    .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                    .Select(v => v.Trim())
+                                                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                    .ToList();
+                                            }
+                                            
+                                            @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                            if (valueLines.Count > 1)
+                                            {
+                                        <span>@op.OptionName</span>
+                                            }
+                                            else
+                                            {
+                                                @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                <span>@op.OptionName<span class="text-muted"> (@op.Value)</span></span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span>@op.OptionName</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(op.Value))
+                                    {
+                                        @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                        var valueLines = new List<string>();
+                                        
+                                        @* Kiểm tra xem có ký tự xuống dòng không *@
+                                        if (op.Value.Contains('\n') || op.Value.Contains('\r'))
+                                            {
+                                            @* Nếu có xuống dòng, split theo \n và \r *@
+                                            valueLines = op.Value
+                                                .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                .Select(v => v.Trim())
+                                                .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                .ToList();
+                                            }
+                                            else
+                                            {
+                                            @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                            valueLines = op.Value
+                                                .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                .Select(v => v.Trim())
+                                                .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                .ToList();
+                                        }
+                                        
+                                        @* Nếu có nhiều dòng, hiển thị các dòng Value *@
+                                        if (valueLines.Count > 1)
+                                        {
+                                            <div class="option-value-text" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px; font-size: 0.9em; line-height: 1.5;">
+                                                @foreach (var line in valueLines)
+                                                {
+                                                    <div>@line</div>
                                             }
                                         </div>
+                                        }
                                     }
                                     else if (isTextarea)
                                     {

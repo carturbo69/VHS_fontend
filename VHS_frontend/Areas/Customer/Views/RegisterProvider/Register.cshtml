@@ -148,6 +148,7 @@
                                            class="category-checkbox"
                                            data-category-name="@c.Name" />
                                     <label for="cat_@c.Id" class="category-label">
+                                        <i class="bi bi-check-circle category-check-icon"></i>
                                         <div class="category-icon">
                                             @{
                                                 var iconClass = "bi-tools"; // default
@@ -164,7 +165,6 @@
                                             <i class="bi @iconClass"></i>
                                         </div>
                                         <span class="category-name">@c.Name</span>
-                                        <i class="bi bi-check-circle category-check-icon"></i>
                                     </label>
 
                                     <!-- Tags cho category này (sẽ load từ API) -->
@@ -184,20 +184,23 @@
 
                     <!-- Giấy phép kinh doanh -->
                     <div class="field">
-                        <label for="BusinessLicenses">Hình ảnh giấy phép kinh doanh <span class="req">*</span> (có thể chọn nhiều)</label>
+                        <label for="BusinessLicenses">Hình ảnh/File giấy phép kinh doanh <span class="req">*</span> (có thể chọn nhiều)</label>
                         <input id="BusinessLicenses"
                                type="file"
                                name="BusinessLicenses"
                                class="file-input"
-                               accept=".jpg,.jpeg,.png,.gif,.bmp,.webp"
+                               accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf"
                                multiple
                                required />
                         <div class="file-actions">
                             <span class="file-name" id="licenseFileName">Chưa chọn tệp</span>
-                            <label for="BusinessLicenses" class="btn ghost">Chọn ảnh</label>
+                            <label for="BusinessLicenses" class="btn ghost">Chọn file</label>
+                        </div>
+                        <div class="form-text" style="margin-top: 8px; color: #64748b; font-size: 14px;">
+                            Chấp nhận: JPG, PNG, GIF, BMP, WEBP (tối đa 10MB/file) hoặc PDF (tối đa 20MB/file)
                         </div>
                         <div class="img-grid" id="licensePreviews" aria-live="polite"></div>
-                        <div class="field-error text-danger small d-none" id="licenseError">Vui lòng tải lên ít nhất 1 hình giấy phép kinh doanh.</div>
+                        <div class="field-error text-danger small d-none" id="licenseError">Vui lòng tải lên ít nhất 1 hình/file giấy phép kinh doanh.</div>
                     </div>
                 </div>
             </section>
@@ -476,6 +479,31 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             const fileName = file.name.toLowerCase();
             return allowedExtensions.some(ext => fileName.endsWith(ext));
           }
+          
+          // Helper function to validate file (image or PDF)
+          function isValidFile(file) {
+            const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.pdf'];
+            const fileName = file.name.toLowerCase();
+            return allowedExtensions.some(ext => fileName.endsWith(ext));
+          }
+          
+          // Helper function to check if file is PDF
+          function isPDFFile(file) {
+            const fileName = file.name.toLowerCase();
+            return fileName.endsWith('.pdf');
+          }
+          
+          // Helper function to validate file size
+          function validateFileSize(file, maxSizeMB) {
+            const maxSizeBytes = maxSizeMB * 1024 * 1024;
+            if (file.size > maxSizeBytes) {
+              return {
+                valid: false,
+                message: `File "${file.name}" vượt quá giới hạn ${maxSizeMB}MB. Kích thước hiện tại: ${(file.size / 1024 / 1024).toFixed(2)}MB`
+              };
+            }
+            return { valid: true };
+          }
 
           placeholder?.addEventListener("click", () => fileInput?.click());
           fileInput?.addEventListener("change", e => {
@@ -483,6 +511,13 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             // validate avatar client-side - check extension
             if (!isValidImageFile(f)) {
               alert("Ảnh đại diện không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp");
+              fileInput.value = "";
+              return;
+            }
+            // Validate file size (max 10MB for avatar)
+            const sizeCheck = validateFileSize(f, 10);
+            if (!sizeCheck.valid) {
+              alert(sizeCheck.message);
               fileInput.value = "";
               return;
             }
@@ -528,6 +563,12 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
 
           // Cache tags data
           const tagsCache = new Map();
+          
+          // Store auto-close timers for each category
+          const categoryAutoCloseTimers = new Map();
+          
+          // Track categories that are open but have no tags selected
+          const openCategoriesWithoutTags = new Set();
 
           // Check phone number duplicate
           let phoneCheckTimeout = null;
@@ -668,7 +709,7 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               `;
               container.appendChild(label);
 
-              // Add event listener để xóa lỗi khi chọn tag
+              // Add event listener để xóa lỗi khi chọn tag và hủy auto-close
               const tagCheckbox = label.querySelector('input[type="checkbox"]');
               tagCheckbox.addEventListener('change', function() {
                 const catId = this.dataset.categoryId;
@@ -679,6 +720,20 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 // Ẩn lỗi nếu đã chọn ít nhất 1 tag
                 if (tagsChecked.length > 0 && tagError) {
                   tagError.style.display = 'none';
+                }
+                
+                // Cập nhật set khi tag được chọn/bỏ chọn
+                if (tagsChecked.length === 0) {
+                  // Thêm vào set nếu category đang mở
+                  const categoryCheckbox = document.querySelector(`.category-checkbox[value="${catId}"]`);
+                  if (categoryCheckbox && categoryCheckbox.checked) {
+                    openCategoriesWithoutTags.add(catId);
+                    console.log('📝 Category added to openCategoriesWithoutTags (all tags unselected):', catId);
+                  }
+                } else {
+                  // Xóa khỏi set khi có tag được chọn
+                  openCategoriesWithoutTags.delete(catId);
+                  console.log('✅ Category removed from openCategoriesWithoutTags (tag selected):', catId);
                 }
               });
             });
@@ -699,6 +754,13 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               console.log('📍 Tags section:', tagsSection);
 
               if (this.checked) {
+                // Hủy auto-close timer cũ nếu có
+                const existingTimer = categoryAutoCloseTimers.get(categoryId);
+                if (existingTimer) {
+                  clearTimeout(existingTimer);
+                  categoryAutoCloseTimers.delete(categoryId);
+                }
+                
                 // Show tags for selected category
                 if (tagsSection) {
                   console.log('👁️ Showing tags section');
@@ -716,9 +778,27 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                     console.log('🚀 Loading tags...');
                     const tags = await loadTagsForCategory(categoryId);
                     renderTags(categoryId, tags);
+                    
+                    // Kiểm tra xem có tag nào được chọn không
+                    const tagsChecked = document.querySelectorAll(`[data-category="${categoryId}"] input[name="SelectedTags"]:checked`);
+                    if (tagsChecked.length === 0) {
+                      // Thêm vào set để track category mở nhưng chưa có tag
+                      openCategoriesWithoutTags.add(categoryId);
+                      console.log('📝 Category added to openCategoriesWithoutTags:', categoryId);
+                    }
                   }
                 }
               } else {
+                // Hủy auto-close timer nếu có
+                const existingTimer = categoryAutoCloseTimers.get(categoryId);
+                if (existingTimer) {
+                  clearTimeout(existingTimer);
+                  categoryAutoCloseTimers.delete(categoryId);
+                }
+                
+                // Xóa khỏi set khi category được đóng
+                openCategoriesWithoutTags.delete(categoryId);
+                
                 // Hide tags và uncheck tất cả tags của category này
                 if (tagsSection) {
                   console.log('🙈 Hiding tags section');
@@ -729,6 +809,36 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 }
               }
             });
+          });
+
+          // Handle click outside category to auto-close if no tags selected
+          document.addEventListener('click', function(e) {
+            // Kiểm tra xem click có nằm trong category card không
+            const clickedCategoryCard = e.target.closest('.category-card');
+            
+            // Nếu click ra ngoài tất cả category cards
+            if (!clickedCategoryCard) {
+              // Đóng tất cả categories không có tag được chọn
+              openCategoriesWithoutTags.forEach(categoryId => {
+                const categoryCheckbox = document.querySelector(`.category-checkbox[value="${categoryId}"]`);
+                if (categoryCheckbox && categoryCheckbox.checked) {
+                  const tagsChecked = document.querySelectorAll(`[data-category="${categoryId}"] input[name="SelectedTags"]:checked`);
+                  if (tagsChecked.length === 0) {
+                    console.log('🖱️ Click outside - closing category:', categoryId);
+                    categoryCheckbox.checked = false;
+                    categoryCheckbox.dispatchEvent(new Event('change'));
+                  }
+                }
+              });
+            } else {
+              // Nếu click trong category card, kiểm tra xem có click vào category label không
+              const clickedCategoryLabel = e.target.closest('.category-label');
+              const clickedTag = e.target.closest('.tag-checkbox');
+              
+              // Nếu click vào category label (để check/uncheck) hoặc tag, không làm gì
+              // Nếu click vào phần khác của category card (như tags section), cũng không làm gì
+              // Chỉ đóng khi click hoàn toàn ra ngoài category card
+            }
           });
 
           // Business License file upload
@@ -751,9 +861,17 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             const newFiles = Array.from(e.target.files || []);
 
             newFiles.forEach(f => {
-              // Validate file extension
-              if (!isValidImageFile(f)) {
-                alert(`Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp`);
+              // Validate file extension (image or PDF)
+              if (!isValidFile(f)) {
+                alert(`Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp, .pdf`);
+                return;
+              }
+              
+              // Validate file size
+              const maxSizeMB = isPDFFile(f) ? 20 : 10; // PDF: 20MB, Image: 10MB
+              const sizeCheck = validateFileSize(f, maxSizeMB);
+              if (!sizeCheck.valid) {
+                alert(sizeCheck.message);
                 return;
               }
 
@@ -792,19 +910,43 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               fig.className = 'thumb';
               fig.dataset.imageUrl = url;
               fig.dataset.imageName = f.name;
-              fig.innerHTML = `
-                <img src="${url}" alt="${f.name}">
-                <button type="button" class="thumb-del" data-index="${idx}" aria-label="Xóa">×</button>
-              `;
+              
+              if (isPDFFile(f)) {
+                // PDF file - show PDF icon
+                const fileSizeMB = (f.size / 1024 / 1024).toFixed(2);
+                fig.innerHTML = `
+                  <div class="pdf-preview">
+                    <i class="bi bi-file-earmark-pdf" style="font-size: 48px; color: #dc2626;"></i>
+                    <div class="pdf-info">
+                      <div class="pdf-name" title="${f.name}">${f.name.length > 20 ? f.name.substring(0, 20) + '...' : f.name}</div>
+                      <div class="pdf-size">${fileSizeMB} MB</div>
+                    </div>
+                  </div>
+                  <button type="button" class="thumb-del" data-index="${idx}" aria-label="Xóa">×</button>
+                `;
+              } else {
+                // Image file - show image preview
+                fig.innerHTML = `
+                  <img src="${url}" alt="${f.name}">
+                  <button type="button" class="thumb-del" data-index="${idx}" aria-label="Xóa">×</button>
+                `;
+              }
+              
               licensePreviews.appendChild(fig);
             });
 
-            // Add click event for image zoom
+            // Add click event for image zoom (only for images, not PDFs)
             document.querySelectorAll('#licensePreviews .thumb').forEach(thumb => {
               thumb.addEventListener('click', (e) => {
                 // Don't zoom if clicking delete button
                 if (e.target.closest('.thumb-del')) return;
-                openImageModal(thumb.dataset.imageUrl, thumb.dataset.imageName);
+                // Only zoom if it's an image, not PDF
+                if (thumb.querySelector('img')) {
+                  openImageModal(thumb.dataset.imageUrl, thumb.dataset.imageName);
+                } else {
+                  // For PDF, open in new tab
+                  window.open(thumb.dataset.imageUrl, '_blank');
+                }
               });
             });
           }
@@ -990,8 +1132,10 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
 
             // BẮT BUỘC ảnh đại diện (cho cả lần đầu và resubmit)
             const avatarError = document.getElementById('avatarError');
+            const avatarField = placeholder?.closest('.field') || fileInput?.closest('.field');
             if (!fileInput?.files || fileInput.files.length === 0) {
-              errors.push({ msg: "Vui lòng chọn ảnh đại diện.", el: fileInput });
+              // Sử dụng placeholder hoặc field chứa avatar để scroll
+              errors.push({ msg: "Vui lòng chọn ảnh đại diện.", el: placeholder || avatarField || fileInput });
               placeholder?.classList.add('is-invalid');
               avatarError?.classList.remove('d-none');
             } else {
@@ -1144,8 +1288,16 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             console.log('Total files to submit:', allFiles.length);
 
             allFiles.forEach((f, idx) => {
-              if (!isValidImageFile(f)) {
-                errors.push({ msg: `Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp`, el: null });
+              // Validate file extension (image or PDF)
+              if (!isValidFile(f)) {
+                errors.push({ msg: `Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp, .pdf`, el: null });
+              } else {
+                // Validate file size
+                const maxSizeMB = isPDFFile(f) ? 20 : 10; // PDF: 20MB, Image: 10MB
+                const sizeCheck = validateFileSize(f, maxSizeMB);
+                if (!sizeCheck.valid) {
+                  errors.push({ msg: sizeCheck.message, el: null });
+                }
               }
               totalBytes += f.size;
               console.log(`  File[${idx}]: ${f.name} - ${(f.size / 1024 / 1024).toFixed(2)} MB - ${f.type}`);
@@ -1165,22 +1317,72 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               // Hiển thị lỗi đầu tiên bằng toast
               if (firstError.msg) {
                 showToast(firstError.msg, 'error');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
               }
               
+              // Scroll đến trường lỗi đầu tiên
+              setTimeout(() => {
               if (firstError.el) {
                 // Special handling for terms checkbox
                 if (firstError.el === agreeTermsEl) {
                   scrollToTermsError();
+                  } else if (firstError.el === placeholder || firstError.el.classList?.contains('avatar-tile')) {
+                    // Avatar placeholder - scroll đến field chứa avatar
+                    const avatarField = firstError.el.closest('.field');
+                    if (avatarField) {
+                      avatarField.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 } else {
-                  setTimeout(() => {
                     firstError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  } else {
+                    // Scroll đến element và focus
+                    firstError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Focus sau khi scroll xong (chỉ với input, textarea, select)
+                    setTimeout(() => {
+                      if (firstError.el && 
+                          (firstError.el.tagName === 'INPUT' || 
+                           firstError.el.tagName === 'TEXTAREA' || 
+                           firstError.el.tagName === 'SELECT')) {
                     if (typeof firstError.el.focus === 'function') {
                       firstError.el.focus();
                     }
-                  }, 500);
+                      }
+                    }, 300);
                 }
-              }
+                } else {
+                  // Nếu không có element cụ thể, scroll đến phần liên quan dựa trên message
+                  if (firstError.msg.includes('danh mục')) {
+                    const categoryGrid = document.querySelector('.category-grid');
+                    if (categoryGrid) {
+                      categoryGrid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  } else if (firstError.msg.includes('dịch vụ cụ thể') || firstError.msg.includes('tag')) {
+                    // Tag error - scroll đến category card đầu tiên có lỗi
+                    const firstCategoryCard = document.querySelector('.category-card .tag-error');
+                    if (firstCategoryCard) {
+                      firstCategoryCard.closest('.category-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                      const categoryGrid = document.querySelector('.category-grid');
+                      if (categoryGrid) {
+                        categoryGrid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }
+                  } else if (firstError.msg.includes('giấy phép')) {
+                    // License error - scroll đến license input field
+                    const licenseField = document.querySelector('#BusinessLicenses')?.closest('.field');
+                    if (licenseField) {
+                      licenseField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                      const licenseInput = document.querySelector('#BusinessLicenses');
+                      if (licenseInput) {
+                        licenseInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }
+                  } else {
+                    // Default: scroll to top để người dùng thấy toast
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }
+              }, 100);
 
               return;
             }

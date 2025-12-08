@@ -126,8 +126,8 @@ namespace VHS_frontend.Areas.Admin.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateOption([FromBody] OptionCreateDTO dto, CancellationToken ct)
         {
-            if (dto == null || string.IsNullOrWhiteSpace(dto.OptionName) || string.IsNullOrWhiteSpace(dto.Type))
-                return BadRequest("Tên tùy chọn và loại là bắt buộc.");
+            if (dto == null || string.IsNullOrWhiteSpace(dto.OptionName))
+                return BadRequest("Tên tùy chọn là bắt buộc.");
 
             var res = await _optionSvc.CreateAsync(dto, ct);
             var text = await res.Content.ReadAsStringAsync(ct);

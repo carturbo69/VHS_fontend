@@ -226,7 +226,7 @@
                             <section class="svc-options">
                                 <h3 class="addons-title">
                                     <span class="title-icon">✨</span>
-                                    Tùy chọn đã bao gồm
+                                    Dịch vụ đã bao gồm:
                                 </h3>
                                 <div class="addons-list">
                                     @* Hiển thị options thường (không phải textarea/text) trên 1 hàng *@
@@ -237,15 +237,16 @@
                                                 <div class="option-head">
                                                     <div class="addon-name">
                                                         <span class="addon-icon">✓</span>
-                                                        <span class="fw-semibold">@o.OptionName</span>
+                                                        @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                        {
+                                                            <span class="fw-semibold">@o.OptionName<span class="text-muted"> (@o.Value)</span></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="fw-semibold">@o.OptionName</span>
+                                                        }
                                                     </div>
                                                 </div>
-                                                @if (!string.IsNullOrWhiteSpace(o.Value))
-                                                {
-                                                    <div class="addon-desc">
-                                                        <span class="addon-value">@o.Value</span>
-                                                    </div>
-                                                }
                                             </div>
                                         </div>
                                     }
@@ -257,21 +258,59 @@
                                                 <div class="option-head">
                                                     <div class="addon-name">
                                                         <span class="addon-icon">✓</span>
-                                                        <span class="fw-semibold">@o.OptionName</span>
+                                                        @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                        {
+                                                            @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                            var valueLines = new List<string>();
+                                                            
+                                                            @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                            if (o.Value.Contains('\n') || o.Value.Contains('\r'))
+                                                            {
+                                                                @* Nếu có xuống dòng, split theo \n và \r *@
+                                                                valueLines = o.Value
+                                                                    .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                    .Select(v => v.Trim())
+                                                                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                    .ToList();
+                                                            }
+                                                            else
+                                                            {
+                                                                @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                                valueLines = o.Value
+                                                                    .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                    .Select(v => v.Trim())
+                                                                    .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                    .ToList();
+                                                            }
+                                                            
+                                                            @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                                            if (valueLines.Count > 1)
+                                                            {
+                                                                <span class="fw-semibold">@o.OptionName</span>
+                                                                <div class="addon-desc">
+                                                                    <div class="addon-value-text">
+                                                                        @foreach (var line in valueLines)
+                                                                        {
+                                                                            <div>@line</div>
+                                                                        }
+                                                                    </div>
+                                                                </div>
+                                                            }
+                                                            else
+                                                            {
+                                                                @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                                <span class="fw-semibold">@o.OptionName<span class="text-muted"> (@o.Value)</span></span>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="fw-semibold">@o.OptionName</span>
+                                                            <div class="addon-desc addon-empty">
+                                                                <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
+                                                            </div>
+                                                        }
                                                     </div>
                                                 </div>
-                                                @if (!string.IsNullOrWhiteSpace(o.Value))
-                                                {
-                                                    <div class="addon-desc">
-                                                        <div class="addon-value-text">@o.Value</div>
-                                                    </div>
-                                                }
-                                                else
-                                                {
-                                                    <div class="addon-desc addon-empty">
-                                                        <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
-                                                    </div>
-                                                }
                                             </div>
                                         </div>
                                     }

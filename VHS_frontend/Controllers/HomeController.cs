@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Models;
 using VHS_frontend.Services.Admin;
 using VHS_frontend.Areas.Admin.Models.Feedback;
+using VHS_frontend.Services.Customer.Interfaces;
+using VHS_frontend.Models.ServiceDTOs;
 
 namespace VHS_frontend.Controllers
 {
@@ -11,15 +13,18 @@ namespace VHS_frontend.Controllers
         private readonly CustomerAdminService _customerService;
         private readonly ProviderAdminService _providerService;
         private readonly AdminFeedbackService _feedbackService;
+        private readonly IServiceCustomerService _serviceCustomerService;
 
         public HomeController(
             CustomerAdminService customerService,
             ProviderAdminService providerService,
-            AdminFeedbackService feedbackService)
+            AdminFeedbackService feedbackService,
+            IServiceCustomerService serviceCustomerService)
         {
             _customerService = customerService;
             _providerService = providerService;
             _feedbackService = feedbackService;
+            _serviceCustomerService = serviceCustomerService;
         }
 
         public async Task<IActionResult> Index()
@@ -62,6 +67,38 @@ namespace VHS_frontend.Controllers
             ViewBag.TotalAccounts = totalAccounts;
             ViewBag.TotalProviders = totalProviders;
             ViewBag.AverageRating = avgRating;
+
+            // Lấy dịch vụ nổi bật (>= 4 sao), random và lấy 4 cái
+            List<ListServiceHomePageDTOs> featuredServices = new List<ListServiceHomePageDTOs>();
+            try
+            {
+                var allServices = await _serviceCustomerService.GetAllServiceHomePageAsync();
+                var highRatedServices = allServices
+                    .Where(s => s != null && s.AverageRating >= 4.0)
+                    .ToList();
+
+                if (highRatedServices.Any())
+                {
+                    // Nếu có >= 4 dịch vụ, random và lấy 4 cái
+                    if (highRatedServices.Count >= 4)
+                    {
+                        var random = new Random((int)DateTime.Now.Ticks);
+                        featuredServices = highRatedServices
+                            .OrderBy(x => random.Next())
+                            .Take(4)
+                            .ToList();
+                    }
+                    else
+                    {
+                        // Nếu có < 4 dịch vụ, lấy tất cả
+                        featuredServices = highRatedServices;
+                    }
+                }
+                // Nếu không có dịch vụ nào >= 4 sao, featuredServices sẽ là list rỗng
+            }
+            catch { }
+
+            ViewBag.FeaturedServices = featuredServices;
 
             return View();
         }

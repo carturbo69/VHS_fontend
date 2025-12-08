@@ -1,5 +1,34 @@
 ﻿@{
     ViewData["Title"] = "Trang chủ";
+    var featuredServices = ViewBag.FeaturedServices as List<VHS_frontend.Models.ServiceDTOs.ListServiceHomePageDTOs> ?? new List<VHS_frontend.Models.ServiceDTOs.ListServiceHomePageDTOs>();
+    string PriceToDisplay(decimal p) => $"{p:n0}đ";
+    var fallbackImg = Url.Content("~/images/VeSinh.jpg");
+    
+    // Helper function để xử lý URL ảnh
+    string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
+}
+
+
+@functions {
+    string? FirstImageOrDefault(string? images)
+    {
+        if (string.IsNullOrWhiteSpace(images)) return null;
+
+        try
+        {
+            var arr = System.Text.Json.JsonSerializer.Deserialize<List<string>>(images);
+            if (arr != null && arr.Count > 0) return arr[0];
+        }
+        catch { }
+
+        if (images.Contains(','))
+        {
+            var first = images.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
+        return images;
+    }
 }
 
 <main id="main" role="main" aria-labelledby="home-title">
@@ -88,8 +117,8 @@
                     <span class="text-soft">cho mọi gia đình</span>
                 </h2>
                 <p class="split-sub">
-                    Đặt lịch dễ dàng qua website, nhận báo giá ngay lập tức. 
-                    Đội ngũ chuyên gia đến tận nhà đúng hẹn.
+                    Đặt lịch thuận tiện trên website và app, giá công khai rõ ràng 
+                    Đội ngũ chuyên nghiệp phục vụ đúng thời gian cam kết.
                 </p>
 
                 <ul class="split-list">
@@ -149,6 +178,134 @@
             </div>
         </div>
     </section>
+
+    <!-- ===== FEATURED SERVICES ===== -->
+    @if (featuredServices != null && featuredServices.Any())
+    {
+        <section class="section featured-services-x" aria-label="Dịch vụ nổi bật">
+            <div class="container-xl">
+                <div class="section-head section-head--emph">
+                    <h2 class="section-title section-title--xl">
+                        Dịch vụ <span class="text-primary">nổi bật</span>
+                    </h2>
+                    <p class="section-sub section-sub--lg">
+                        Khám phá những dịch vụ được đánh giá cao nhất từ khách hàng
+                    </p>
+                </div>
+
+                <div class="featured-services-grid">
+                    @foreach (var service in featuredServices)
+                    {
+                        var imgRaw = FirstImageOrDefault(service.Images) ?? fallbackImg;
+                        var img = ToUrl(imgRaw);
+                        var priceDisplay = PriceToDisplay(service.Price);
+                        var avg = service.AverageRating;
+
+                        <a asp-area="" asp-controller="Services" asp-action="Details" asp-route-id="@service.ServiceId" class="service-card">
+                            @if (!string.IsNullOrWhiteSpace(service.ProviderName))
+                            {
+                                <div class="provider-section provider-section-top">
+                                    <svg class="provider-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke-width="2" stroke-linecap="round"/>
+                                        <circle cx="12" cy="7" r="4" stroke-width="2"/>
+                                    </svg>
+                                    <span class="provider-name">@service.ProviderName</span>
+                                </div>
+                            }
+
+                            <div class="card-image-container">
+                                <div class="image-wrapper">
+                                    <img src="@img"
+                                         alt="@service.Title"
+                                         class="card-image"
+                                         loading="lazy"
+                                         onerror="this.onerror=null;this.src='@fallbackImg';" />
+                                    <div class="image-overlay"></div>
+                                </div>
+                                
+                                @if (!string.IsNullOrWhiteSpace(service.CategoryName))
+                                {
+                                    <div class="card-category-badge">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path d="M20.59 13.41L13.42 20.58C13.2343 20.766 13.0137 20.9135 12.7709 21.0141C12.5281 21.1148 12.2678 21.1666 12.005 21.1666C11.7422 21.1666 11.4819 21.1148 11.2391 21.0141C10.9963 20.9135 10.7757 20.766 10.59 20.58L2 12V2H12L20.59 10.59C20.9625 10.9647 21.1716 11.4716 21.1716 12C21.1716 12.5284 20.9625 13.0353 20.59 13.41Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <circle cx="7" cy="7" r="1.5" fill="currentColor"/>
+                                        </svg>
+                                        <span>@service.CategoryName</span>
+                                    </div>
+                                }
+                                
+                                @if (avg >= 4.5)
+                                {
+                                    <div class="trending-badge">
+                                        <svg viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M13 10V3L4 14H11L11 21L20 10L13 10Z"/>
+                                        </svg>
+                                        <span>HOT</span>
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="card-content">
+                                <h3 class="card-title">@service.Title</h3>
+
+                                @if (service.ServiceOptions != null && service.ServiceOptions.Any())
+                                {
+                                    var regularOptions = service.ServiceOptions
+                                        .Where(o => o.Type?.ToLower() != "textarea" && o.Type?.ToLower() != "text")
+                                        .Take(3)
+                                        .ToList();
+                                    
+                                    <div class="card-options">
+                                        @foreach (var opt in regularOptions)
+                                        {
+                                            <div class="card-option-item">
+                                                <span class="option-icon">✓</span>
+                                                <div class="option-content">
+                                                    @if (!string.IsNullOrWhiteSpace(opt.Value))
+                                                    {
+                                                        <span class="option-name">@opt.OptionName<span class="text-muted"> (@opt.Value)</span></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="option-name">@opt.OptionName</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="card-footer">
+                                    <div class="card-price">
+                                        <span class="price-label">GIÁ CHỈ</span>
+                                        <span class="price-value">@priceDisplay</span>
+                                    </div>
+                                    <div class="card-rating">
+                                        @for (int i = 0; i < 5; i++)
+                                        {
+                                            <svg class="star @(i < Math.Round(avg) ? "filled" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                            </svg>
+                                        }
+                                        <span class="rating-text">@avg.ToString("F1") (@service.TotalReviews)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    }
+                </div>
+
+                <div class="featured-services-cta">
+                    <a asp-controller="Services" asp-action="Index" class="btn btn-primary btn-lg btn-shine">
+                        <span>Xem tất cả dịch vụ</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+    }
 
     <!-- ===== WHY CHOOSE US ===== -->
     <section class="section ishow-x" aria-label="Các ưu điểm nổi bật">
@@ -251,7 +408,7 @@
                 </div>
                 <div class="benefit">
                     <span class="benefit-bullet">✓</span>
-                    <span>Hỗ trợ thanh toán đa dạng: Tiền mặt, chuyển khoản, ví điện tử</span>
+                    <span>Hỗ trợ thanh toán:  chuyển khoản</span>
                 </div>
             </div>
         </div>

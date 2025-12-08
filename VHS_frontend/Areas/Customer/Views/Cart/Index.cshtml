@@ -247,27 +247,66 @@
                                                                 <div class="opt-name" style="flex: 1; min-width: 0;">
                                                                     <div style="font-weight: 500; margin-bottom: 8px;">
                                                                         <span>✓</span>
-                                                                        <span>@a.OptionName</span>
-                                                                    </div>
-                                                                    @if (!string.IsNullOrWhiteSpace(a.Value))
-                                                                    {
-                                                                        <div style="margin-top: 8px;">
+                                                                        @if (!string.IsNullOrWhiteSpace(a.Value))
+                                                                        {
                                                                             @if (isTextarea)
                                                                             {
-                                                                                <div class="textarea-value-display" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px !important; padding: 8px !important; border-radius: 4px !important; font-size: 0.9em; line-height: 1.5; border: none !important; outline: none !important;">@a.Value</div>
+                                                                                @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                                                var valueLines = new List<string>();
+                                                                                
+                                                                                @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                                                if (a.Value.Contains('\n') || a.Value.Contains('\r'))
+                                                                                {
+                                                                                    @* Nếu có xuống dòng, split theo \n và \r *@
+                                                                                    valueLines = a.Value
+                                                                                        .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                                        .Select(v => v.Trim())
+                                                                                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                                        .ToList();
+                                                                                }
+                                                                                else
+                                                                                {
+                                                                                    @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                                                    valueLines = a.Value
+                                                                                        .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                                        .Select(v => v.Trim())
+                                                                                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                                        .ToList();
+                                                                                }
+                                                                                
+                                                                                @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                                                                if (valueLines.Count > 1)
+                                                                                {
+                                                                                    <span>@a.OptionName</span>
+                                                                                    <div class="textarea-value-display" style="white-space: pre-wrap; word-wrap: break-word; margin-top: 4px !important; padding: 8px !important; border-radius: 4px !important; font-size: 0.9em; line-height: 1.5; border: none !important; outline: none !important;">
+                                                                                        @foreach (var line in valueLines)
+                                                                                        {
+                                                                                            <div>@line</div>
+                                                                                        }
+                                                                                    </div>
+                                                                                }
+                                                                                else
+                                                                                {
+                                                                                    @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                                                    <span>@a.OptionName<span class="text-muted"> (@a.Value)</span></span>
+                                                                                }
                                                                             }
                                                                             else
                                                                             {
-                                                                                <span class="text-muted" style="margin-left: 4px;">@a.Value</span>
+                                                                                <span>@a.OptionName<span class="text-muted"> (@a.Value)</span></span>
                                                                             }
-                                                                        </div>
-                                                                    }
-                                                                    else if (isTextarea)
-                                                                    {
-                                                                        <div style="margin-top: 8px; color: #6c757d; font-size: 0.875em;">
-                                                                            <i class="bi bi-info-circle" style="margin-right: 4px;"></i>Chưa có
-                                                                        </div>
-                                                                    }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            <span>@a.OptionName</span>
+                                                                            @if (isTextarea)
+                                                                            {
+                                                                                <div style="margin-top: 8px; color: #6c757d; font-size: 0.875em;">
+                                                                                    <i class="bi bi-info-circle" style="margin-right: 4px;"></i>Chưa có
+                                                                                </div>
+                                                                            }
+                                                                        }
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         }
