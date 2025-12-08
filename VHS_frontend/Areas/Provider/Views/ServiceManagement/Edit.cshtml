@@ -545,59 +545,18 @@
             }
         }
 
-        // Function to get Vietnamese label for option type
-        function getTypeLabel(type) {
-            const typeMap = {
-                'checkbox': 'Chọn nhiều',
-                'radio': 'Chọn một',
-                'textarea': 'Nhập văn bản'
-            };
-            return typeMap[type?.toLowerCase()] || type || 'Chưa xác định';
-        }
-
         // Routes để lấy options theo tag
         const optionsByTagUrl = '@Url.Action("GetOptions", "Category", new { area = "Admin" })';
         
         // Lấy danh sách optionIds và tagIds đã chọn từ model
-        const selectedOptionIds = @Html.Raw(Json.Serialize(Model.OptionIds));
-        const initialTagIds = @Html.Raw(Json.Serialize(Model.TagIds));
+        const selectedOptionIds = @Html.Raw(Json.Serialize(Model.OptionIds ?? new List<Guid>()));
+        const initialTagIds = @Html.Raw(Json.Serialize(Model.TagIds ?? new List<Guid>()));
         const categoryId = '@(ViewBag.CategoryId ?? "")';
-        // Lấy giá trị đã lưu của options (từ service options)
-        // Dùng cả ViewBag.OptionValues (đã được tạo trong controller) và ViewBag.Options để đảm bảo có dữ liệu
-        const optionValuesMap = {};
         
-        // Thử từ ViewBag.OptionValues trước (Dictionary đã được tạo trong controller)
-        @{
-            var optionValuesFromBag = ViewBag.OptionValues as Dictionary<string, string> ?? new Dictionary<string, string>();
+        // Đảm bảo selectedOptionIds luôn là array
+        if (!Array.isArray(selectedOptionIds)) {
+            console.warn('[Edit] selectedOptionIds is not an array:', selectedOptionIds);
         }
-        @if (optionValuesFromBag != null && optionValuesFromBag.Any())
-        {
-            foreach (var kvp in optionValuesFromBag)
-            {
-                <text>
-                optionValuesMap['@kvp.Key'] = @Html.Raw(Json.Serialize(kvp.Value ?? string.Empty));
-                </text>
-            }
-        }
-        
-        // Nếu không có từ ViewBag.OptionValues, thử từ ViewBag.Options
-        @if ((optionValuesFromBag == null || !optionValuesFromBag.Any()) && options != null && options.Any())
-        {
-            foreach (var opt in options.Where(o => !string.IsNullOrWhiteSpace(o.Value)))
-            {
-                <text>
-                optionValuesMap['@opt.OptionId.ToString()'] = @Html.Raw(Json.Serialize(opt.Value ?? string.Empty));
-                </text>
-            }
-        }
-        
-        // Debug: Log ngay sau khi khởi tạo
-        console.log('=== optionValuesMap INITIALIZED ===');
-        console.log('optionValuesMap:', optionValuesMap);
-        console.log('optionValuesMap keys:', Object.keys(optionValuesMap));
-        console.log('Total options with values:', Object.keys(optionValuesMap).length);
-        console.log('ViewBag.OptionValues count:', @(optionValuesFromBag?.Count ?? 0));
-        console.log('ViewBag.Options count:', @(options?.Count ?? 0));
 
         let availableTags = [];
         let selectedTag = null; // Chỉ lưu 1 tag đã chọn: {tagId, name}
@@ -752,15 +711,6 @@
             // Xóa tất cả options cũ trước khi load mới
             optionsContainer.innerHTML = '';
             
-            // Debug: Log optionValuesMap để kiểm tra
-            console.log('=== loadOptionsForTag DEBUG ===');
-            console.log('optionValuesMap:', optionValuesMap);
-            console.log('Type of optionValuesMap:', typeof optionValuesMap);
-            if (optionValuesMap && typeof optionValuesMap === 'object') {
-                console.log('optionValuesMap keys:', Object.keys(optionValuesMap));
-                console.log('optionValuesMap values:', Object.values(optionValuesMap));
-            }
-            
             // Tạo loading indicator cho tag này
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'text-muted small mb-2';
@@ -773,8 +723,8 @@
                 const res = await fetch(`${optionsByTagUrl}?tagId=${tagId}`);
                 if (!res.ok) {
                     loadingDiv.innerHTML = `<div class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>Lỗi khi tải tùy chọn cho "${tagName}".</div>`;
-                            return;
-                        }
+                    return;
+                }
                         
                 const options = await res.json();
                 
@@ -787,264 +737,47 @@
                     noOptionsDiv.dataset.tagId = tagId;
                     noOptionsDiv.innerHTML = `<i class="bi bi-inbox me-1"></i>Tag "${tagName}" chưa có tùy chọn nào.`;
                     optionsContainer.appendChild(noOptionsDiv);
-                            return;
-                        }
-                        
-                // Nhóm options theo Family
-                const groupedOptions = {};
-                const ungroupedOptions = [];
-
-                options.forEach(o => {
-                    if (o.family) {
-                        if (!groupedOptions[o.family]) {
-                            groupedOptions[o.family] = [];
-                        }
-                        groupedOptions[o.family].push(o);
-                    } else {
-                        ungroupedOptions.push(o);
-                    }
-                });
-
-                // Sắp xếp các nhóm theo type (radio, select, checkbox)
-                const groupOrder = ['radio', 'select', 'checkbox'];
-                const sortedGroupIds = Object.keys(groupedOptions).sort((a, b) => {
-                    const typeA = groupedOptions[a][0]?.type?.toLowerCase() || '';
-                    const typeB = groupedOptions[b][0]?.type?.toLowerCase() || '';
-                    const indexA = groupOrder.indexOf(typeA);
-                    const indexB = groupOrder.indexOf(typeB);
-                    if (indexA === -1 && indexB === -1) return 0;
-                    if (indexA === -1) return 1;
-                    if (indexB === -1) return -1;
-                    return indexA - indexB;
-                });
-
-                // Render các nhóm (Family) - Sắp xếp theo thứ tự
-                sortedGroupIds.forEach(familyId => {
-                    const groupOptions = groupedOptions[familyId];
-                    const groupDiv = document.createElement('div');
-                    groupDiv.className = 'option-group mb-3';
-                    groupDiv.dataset.tagId = tagId;
-                    
-                    // Kiểm tra type của nhóm
-                    const groupType = groupOptions[0]?.type?.toLowerCase() || 'checkbox';
-                    const typeLabel = getTypeLabel(groupType);
-                    
-                    // Màu sắc theo loại nhóm
-                    let borderColor = '#ffc107'; // default (yellow)
-                    let bgColor = '#fffbf0'; // default
-                    let textColor = '#856404'; // default
-                    if (groupType === 'radio') {
-                        borderColor = '#0d6efd'; // blue
-                        bgColor = '#e7f3ff';
-                        textColor = '#084298';
-                    } else if (groupType === 'checkbox') {
-                        borderColor = '#6f42c1'; // purple
-                        bgColor = '#f3e8ff';
-                        textColor = '#5a189a';
-                    }
-                    
-                    groupDiv.style.cssText = `padding: 0.75rem; background: ${bgColor}; border-left: 4px solid ${borderColor}; border-radius: 0.5rem;`;
-                    
-                    let groupHtml = `
-                        <div class="group-header mb-2" style="font-weight: 600; color: ${textColor}; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
-                            <i class="bi bi-diagram-3" style="color: ${borderColor};"></i>
-                            <span>Nhóm: ${typeLabel} (${groupOptions.length} tùy chọn)</span>
-                            </div>`;
-                    
-                    const radioGroupName = `optionFamily_${tagId}_${familyId}`;
-                    
-                    groupOptions.forEach(o => {
-                        const isChecked = Array.isArray(selectedOptionIds) && selectedOptionIds.includes(o.optionId);
-                        const optionTypeLabel = getTypeLabel(o.type);
-                        const uniqueId = `option_${tagId}_${o.optionId}`;
-                        
-                        if (groupType === 'radio') {
-                            // Radio button - chỉ chọn 1 trong nhóm
-                            groupHtml += `
-                                <div class="mb-2" style="padding-left: 1.5rem; border-left: 2px solid ${borderColor};">
-                                    <input class="form-check-input form-check-input-sm" type="radio" name="${radioGroupName}" value="${o.optionId}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
-                                    <input type="hidden" name="OptionIds" value="${o.optionId}" ${isChecked ? '' : 'disabled'} />
-                                    <label class="form-check-label small" for="${uniqueId}">
-                                        <span class="fw-semibold">${o.optionName}</span>
-                                </label>
-                            </div>`;
-                    } else {
-                            // Checkbox - có thể chọn nhiều
-                            groupHtml += `
-                                <div class="mb-2" style="padding-left: 1.5rem; border-left: 2px solid ${borderColor};">
-                                    <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${o.optionId}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
-                                    <label class="form-check-label small" for="${uniqueId}">
-                                        <span class="fw-semibold">${o.optionName}</span>
-                                    </label>
-                                </div>`;
-                        }
-                    });
-                    
-                    groupDiv.innerHTML = groupHtml;
-                    optionsContainer.appendChild(groupDiv);
-                    
-                    // Xử lý radio buttons - khi chọn radio, enable/disable hidden input
-                    if (groupType === 'radio') {
-                        groupDiv.querySelectorAll(`input[type="radio"][name="${radioGroupName}"]`).forEach(radio => {
-                            radio.addEventListener('change', function() {
-                                // Disable tất cả hidden inputs trong nhóm
-                                groupDiv.querySelectorAll('input[type="hidden"][name="OptionIds"]').forEach(hidden => {
-                                    hidden.disabled = true;
-                                });
-                                // Enable hidden input của radio được chọn
-                                const hiddenInput = groupDiv.querySelector(`input[type="hidden"][value="${this.value}"]`);
-                                if (hiddenInput) {
-                                    hiddenInput.disabled = false;
-                                }
-                            });
-                            
-                            // Khởi tạo trạng thái cho radio đã checked
-                            if (radio.checked) {
-                                const hiddenInput = groupDiv.querySelector(`input[type="hidden"][value="${radio.value}"]`);
-                                if (hiddenInput) {
-                                    hiddenInput.disabled = false;
-                                }
-                    }
-                });
-            }
-        });
-
-                // Render các options không có nhóm - hiển thị sau các nhóm
-                if (ungroupedOptions.length > 0 && sortedGroupIds.length > 0) {
-                    const separator = document.createElement('div');
-                    separator.className = 'mb-2 mt-3';
-                    separator.style.cssText = 'border-top: 2px solid #dee2e6; padding-top: 0.75rem;';
-                    separator.innerHTML = '<small class="text-muted"><i class="bi bi-three-dots me-1"></i>Options độc lập</small>';
-                    optionsContainer.appendChild(separator);
+                    return;
                 }
                 
-                ungroupedOptions.forEach(o => {
+                // Render tất cả options đơn giản như checkbox
+                // Chuyển selectedOptionIds sang array of strings để so sánh (xử lý cả Guid và string)
+                const selectedOptionIdsStr = Array.isArray(selectedOptionIds) 
+                    ? selectedOptionIds.map(id => String(id || '').toLowerCase().trim())
+                    : [];
+                
+                // Debug log
+                console.log('[Edit] Loading options for tag:', tagName);
+                console.log('[Edit] Options from API:', options);
+                console.log('[Edit] Selected option IDs (raw):', selectedOptionIds);
+                console.log('[Edit] Selected option IDs (normalized):', selectedOptionIdsStr);
+                
+                options.forEach(o => {
                     const optionDiv = document.createElement('div');
                     optionDiv.className = 'mb-2';
                     optionDiv.dataset.tagId = tagId;
                     
-                    const isChecked = Array.isArray(selectedOptionIds) && selectedOptionIds.includes(o.optionId);
-                    const typeLabel = getTypeLabel(o.type);
-                    const uniqueId = `option_${tagId}_${o.optionId}`;
-                    const optionType = o.type?.toLowerCase() || 'checkbox';
+                    // Xử lý cả camelCase và PascalCase từ API response
+                    const optionIdValue = o.optionId || o.OptionId || '';
+                    const optionNameValue = o.optionName || o.OptionName || '';
                     
-                    if (optionType === 'textarea') {
-                        // Textarea - cho phép nhập văn bản nhiều dòng
-                        // Tìm giá trị đã nhập từ service options (nếu có)
-                        // Convert optionId sang string để so sánh với key trong optionValuesMap (keys đã là string)
-                        const optionIdStr = String(o.optionId).toLowerCase().trim();
-                        let existingValue = '';
-                        
-                        // Debug: Log để kiểm tra
-                        console.log(`\n--- Textarea option: ${o.optionName} ---`);
-                        console.log('o.optionId (raw):', o.optionId, 'type:', typeof o.optionId);
-                        console.log('optionIdStr (normalized):', optionIdStr);
-                        console.log('optionValuesMap keys:', Object.keys(optionValuesMap));
-                        
-                        if (optionValuesMap && typeof optionValuesMap === 'object' && Object.keys(optionValuesMap).length > 0) {
-                            // Normalize tất cả keys trong optionValuesMap để so sánh
-                            const normalizedMap = {};
-                            Object.keys(optionValuesMap).forEach(key => {
-                                const normalizedKey = String(key).toLowerCase().trim();
-                                normalizedMap[normalizedKey] = optionValuesMap[key];
-                            });
-                            
-                            // Thử tìm với normalized key
-                            if (normalizedMap[optionIdStr] !== undefined) {
-                                existingValue = normalizedMap[optionIdStr];
-                                console.log('✅ Found with normalized key');
-                            } else {
-                                // Thử tìm với exact match (case-sensitive)
-                                const exactKey = Object.keys(optionValuesMap).find(k => String(k).toLowerCase().trim() === optionIdStr);
-                                if (exactKey) {
-                                    existingValue = optionValuesMap[exactKey];
-                                    console.log('✅ Found with exact match:', exactKey);
-                                } else {
-                                    // Thử tìm với partial match (nếu có format khác)
-                                    const partialKey = Object.keys(optionValuesMap).find(k => {
-                                        const kNorm = String(k).toLowerCase().trim();
-                                        return kNorm.includes(optionIdStr) || optionIdStr.includes(kNorm);
-                                    });
-                                    if (partialKey) {
-                                        existingValue = optionValuesMap[partialKey];
-                                        console.log('✅ Found with partial match:', partialKey);
-                                    } else {
-                                        console.log('❌ NOT FOUND - No matching key');
-                                        console.log('Available normalized keys:', Object.keys(normalizedMap));
-                                    }
-                                }
-                            }
-                        } else {
-                            console.log('⚠️ optionValuesMap is empty or not an object');
-                        }
-                        
-                        console.log('Final existingValue:', existingValue);
-                        
-                        // Escape HTML để tránh XSS và giữ nguyên giá trị
-                        const escapedValue = existingValue.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-                        
-                        // Kiểm tra xem option này đã được chọn chưa (có trong selectedOptionIds)
-                        const isChecked = Array.isArray(selectedOptionIds) && selectedOptionIds.includes(o.optionId);
-                        const textareaCheckboxId = `textarea_checkbox_${uniqueId}`;
-                        
-                        optionDiv.innerHTML = `
-                            <div class="mb-2">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input form-check-input-sm" type="checkbox" id="${textareaCheckboxId}" ${isChecked ? 'checked' : ''} />
-                                    <label class="form-check-label small fw-semibold" for="${textareaCheckboxId}">
-                                        ${o.optionName}
-                                    </label>
-                                </div>
-                                <textarea class="form-control form-control-sm" id="${uniqueId}" name="OptionValues[${o.optionId}]" rows="2" placeholder="${o.optionName}..." ${isChecked ? '' : 'disabled'}>${escapedValue}</textarea>
-                                <input type="hidden" name="OptionIds" value="${o.optionId}" ${isChecked ? '' : 'disabled'} />
-                            </div>`;
-                        
-                        // Xử lý checkbox: enable/disable textarea và hidden input
-                        setTimeout(() => {
-                            const checkbox = document.getElementById(textareaCheckboxId);
-                            const textarea = document.getElementById(uniqueId);
-                            const hiddenInput = optionDiv.querySelector('input[type="hidden"][name="OptionIds"]');
-                            
-                            if (checkbox && textarea && hiddenInput) {
-                                // Đảm bảo nếu checkbox đã checked từ đầu, textarea và hidden input phải enabled
-                                if (checkbox.checked) {
-                                    textarea.disabled = false;
-                                    textarea.removeAttribute('disabled');
-                                    hiddenInput.disabled = false;
-                                    hiddenInput.removeAttribute('disabled');
-                                }
-                                
-                                checkbox.addEventListener('change', function() {
-                                    if (this.checked) {
-                                        textarea.disabled = false;
-                                        textarea.removeAttribute('disabled');
-                                        hiddenInput.disabled = false;
-                                        hiddenInput.removeAttribute('disabled');
-                                    } else {
-                                        textarea.disabled = true;
-                                        textarea.setAttribute('disabled', 'disabled');
-                                        textarea.value = ''; // Xóa giá trị khi bỏ chọn
-                                        hiddenInput.disabled = true;
-                                        hiddenInput.setAttribute('disabled', 'disabled');
-                                    }
-                                });
-                            }
-                        }, 100);
-                    } else if (optionType === 'checkbox') {
-                        // Checkbox - có thể chọn nhiều
-                        optionDiv.innerHTML = `
-                            <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${o.optionId}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
-                            <label class="form-check-label small" for="${uniqueId}">
-                                <span class="fw-semibold">${o.optionName}</span>
-                            </label>`;
-                    } else {
-                        // Radio hoặc loại khác - xử lý như checkbox
-                        optionDiv.innerHTML = `
-                            <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${o.optionId}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
-                            <label class="form-check-label small" for="${uniqueId}">
-                                <span class="fw-semibold">${o.optionName}</span>
-                            </label>`;
+                    // So sánh optionId (có thể là Guid hoặc string) với selectedOptionIds
+                    const optionIdStr = String(optionIdValue).toLowerCase().trim();
+                    const isChecked = selectedOptionIdsStr.includes(optionIdStr);
+                    
+                    // Debug log cho từng option
+                    if (isChecked) {
+                        console.log('[Edit] Option matched:', optionNameValue, 'ID:', optionIdValue, 'Normalized:', optionIdStr);
                     }
+                    
+                    const uniqueId = `option_${tagId}_${optionIdValue}`;
+                    
+                    optionDiv.innerHTML = `
+                        <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${optionIdValue}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
+                        <label class="form-check-label small" for="${uniqueId}">
+                            <span class="fw-semibold">${optionNameValue}</span>
+                        </label>`;
+                    
                     optionsContainer.appendChild(optionDiv);
                 });
             } catch (error) {
@@ -1055,15 +788,6 @@
 
         // Load tags và options đã chọn khi trang load
         document.addEventListener('DOMContentLoaded', async function() {
-            // Debug: Log optionValuesMap ngay khi trang load
-            console.log('=== DOMContentLoaded DEBUG ===');
-            console.log('optionValuesMap on page load:', optionValuesMap);
-            console.log('optionValuesMap type:', typeof optionValuesMap);
-            if (optionValuesMap && typeof optionValuesMap === 'object') {
-                console.log('optionValuesMap keys on page load:', Object.keys(optionValuesMap));
-                console.log('optionValuesMap entries on page load:', Object.entries(optionValuesMap));
-            }
-            
             // Load tags vào dropdown
             await loadTagsToDropdown();
 
@@ -1225,6 +949,34 @@
                         }
                     }
                     
+                    // Validate Options - phải chọn ít nhất một tùy chọn
+                    const selectedOptionsContainer = document.getElementById('selectedOptionsContainer');
+                    const selectedOptionsSection = document.getElementById('selectedOptionsSection');
+                    const checkedOptions = selectedOptionsContainer ? selectedOptionsContainer.querySelectorAll('input[type="checkbox"][name="OptionIds"]:checked') : [];
+                    
+                    if (!checkedOptions || checkedOptions.length === 0) {
+                        // Hiển thị thông báo lỗi trong section options
+                        if (selectedOptionsSection) {
+                            selectedOptionsSection.style.display = 'block';
+                            let errorDiv = selectedOptionsContainer.querySelector('.options-error-message');
+                            if (!errorDiv) {
+                                errorDiv = document.createElement('div');
+                                errorDiv.className = 'options-error-message alert alert-danger mb-2';
+                                errorDiv.innerHTML = '<i class="bi bi-exclamation-triangle me-2"></i>Vui lòng chọn ít nhất một tùy chọn.';
+                                selectedOptionsContainer.insertBefore(errorDiv, selectedOptionsContainer.firstChild);
+                            } else {
+                                errorDiv.style.display = 'block';
+                            }
+                        }
+                        isValid = false;
+                    } else {
+                        // Xóa thông báo lỗi nếu đã chọn
+                        const errorDiv = selectedOptionsContainer ? selectedOptionsContainer.querySelector('.options-error-message') : null;
+                        if (errorDiv) {
+                            errorDiv.remove();
+                        }
+                    }
+                    
                     // Chỉ chặn submit nếu không hợp lệ
                     if (!isValid) {
                         e.preventDefault();
@@ -1242,73 +994,6 @@
                         }
                         
                         return false;
-                    }
-                    
-                    console.log('=== FORM SUBMIT: Enabling all textareas ===');
-                    
-                    // Đảm bảo tất cả textarea đã checked đều enabled trước khi submit
-                    const textareaCheckboxes = document.querySelectorAll('input[type="checkbox"][id^="textarea_checkbox_"]');
-                    console.log('Found textarea checkboxes:', textareaCheckboxes.length);
-                    
-                    textareaCheckboxes.forEach(checkbox => {
-                        if (checkbox.checked) {
-                            // Tìm textarea: id của textarea = checkbox.id.replace('textarea_checkbox_', '')
-                            const textareaId = checkbox.id.replace('textarea_checkbox_', '');
-                            const textarea = document.getElementById(textareaId);
-                            
-                            // Tìm hidden input trong cùng container với checkbox
-                            const container = checkbox.closest('.mb-2');
-                            const hiddenInput = container ? container.querySelector('input[type="hidden"][name="OptionIds"]') : null;
-                            
-                            if (textarea) {
-                                textarea.disabled = false;
-                                textarea.removeAttribute('disabled'); // Đảm bảo remove disabled attribute
-                                console.log('✅ Enabled textarea:', textareaId, 'value:', textarea.value, 'name:', textarea.name);
-                            } else {
-                                console.warn('❌ Textarea not found:', textareaId);
-                            }
-                            
-                            if (hiddenInput) {
-                                hiddenInput.disabled = false;
-                                hiddenInput.removeAttribute('disabled'); // Đảm bảo remove disabled attribute
-                                console.log('✅ Enabled hidden input for option:', hiddenInput.value);
-                            } else {
-                                console.warn('❌ Hidden input not found for checkbox:', checkbox.id);
-                            }
-                        }
-                    });
-                    
-                    // Đảm bảo tất cả textarea có giá trị đều được enable (kể cả khi không có checkbox hoặc checkbox bị lỗi)
-                    const allTextareas = document.querySelectorAll('textarea[name^="OptionValues["]');
-                    console.log('Found all textareas with OptionValues:', allTextareas.length);
-                    
-                    allTextareas.forEach(textarea => {
-                        const hasValue = textarea.value && textarea.value.trim() !== '';
-                        if (hasValue || !textarea.disabled) {
-                            textarea.disabled = false;
-                            textarea.removeAttribute('disabled');
-                            console.log('✅ Enabled textarea by value check:', textarea.name, 'value:', textarea.value);
-                            
-                            // Tìm và enable hidden input tương ứng
-                            const container = textarea.closest('.mb-2');
-                            if (container) {
-                                const hiddenInput = container.querySelector('input[type="hidden"][name="OptionIds"]');
-                                if (hiddenInput) {
-                                    hiddenInput.disabled = false;
-                                    hiddenInput.removeAttribute('disabled');
-                                    console.log('✅ Enabled hidden input by value check:', hiddenInput.value);
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Final check: Log tất cả OptionValues và OptionIds sẽ được submit
-                    const formData = new FormData(editForm);
-                    console.log('=== FORM DATA TO SUBMIT ===');
-                    for (let [key, value] of formData.entries()) {
-                        if (key.startsWith('OptionValues[') || key === 'OptionIds') {
-                            console.log(key + ':', value);
-                        }
                     }
                     
                     const imageInput = document.getElementById('imageInputEdit');
@@ -1348,6 +1033,19 @@
                                 removedImagesContainer.appendChild(hiddenInput);
                             }
                         });
+                    }
+                });
+            }
+            
+            // Xóa thông báo lỗi options khi người dùng chọn option
+            const selectedOptionsContainer = document.getElementById('selectedOptionsContainer');
+            if (selectedOptionsContainer) {
+                selectedOptionsContainer.addEventListener('change', function(e) {
+                    if (e.target && e.target.type === 'checkbox' && e.target.name === 'OptionIds' && e.target.checked) {
+                        const errorDiv = selectedOptionsContainer.querySelector('.options-error-message');
+                        if (errorDiv) {
+                            errorDiv.remove();
+                        }
                     }
                 });
             }

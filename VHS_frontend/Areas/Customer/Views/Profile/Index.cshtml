@@ -10,6 +10,193 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/profile.css" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css" />
+    <style>
+        /* Image preview container */
+        .image-preview-container {
+            margin-top: 15px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Cropper container */
+        .cropper-container {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Ensure image is at the bottom layer */
+        .cropper-container .cropper-image {
+            z-index: 1 !important;
+        }
+        
+        .cropper-container .cropper-canvas {
+            z-index: 1 !important;
+        }
+        
+        /* Crop box and guides on top */
+        .cropper-container .cropper-crop-box {
+            z-index: 10 !important;
+        }
+        
+        .cropper-container .cropper-wrap-box {
+            z-index: 2 !important;
+        }
+        
+        /* Make cropper guides more visible and on top */
+        .cropper-container .cropper-face {
+            background-color: rgba(255, 255, 255, 0.1);
+            z-index: 10 !important;
+        }
+        
+        .cropper-container .cropper-line {
+            background-color: rgba(13, 110, 253, 0.6) !important;
+            z-index: 11 !important;
+        }
+        
+        .cropper-container .cropper-view-box {
+            outline: 3px solid #0d6efd !important;
+            outline-color: rgba(13, 110, 253, 0.9) !important;
+            z-index: 12 !important;
+        }
+        
+        /* Grid lines styling - on top */
+        .cropper-container .cropper-dashed {
+            border-color: rgba(13, 110, 253, 0.6) !important;
+            border-width: 1px !important;
+            z-index: 11 !important;
+        }
+        
+        /* Control points on top */
+        .cropper-container .cropper-point {
+            background-color: #0d6efd !important;
+            width: 10px !important;
+            height: 10px !important;
+            opacity: 0.9;
+            z-index: 20 !important;
+            border: 2px solid #fff !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .cropper-container .cropper-point:hover {
+            background-color: #0a58ca !important;
+            opacity: 1;
+            transform: scale(1.2);
+            z-index: 21 !important;
+        }
+        
+        /* Button container - ensure it's always visible */
+        .image-preview-container .d-flex {
+            margin-top: 15px;
+            position: relative;
+            z-index: 1000;
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Crop button styles */
+        #cropBtn, #applyCropBtn, #cancelCropBtn {
+            min-width: 120px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            padding: 10px 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            position: relative;
+            z-index: 1001;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        #cropBtn {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+        }
+        
+        #cropBtn:hover {
+            background: linear-gradient(135deg, #0a58ca 0%, #084298 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(13, 110, 253, 0.5);
+        }
+        
+        #cropBtn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.4);
+        }
+        
+        #applyCropBtn {
+            background: linear-gradient(135deg, #198754 0%, #157347 100%);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(25, 135, 84, 0.4);
+        }
+        
+        #applyCropBtn:hover {
+            background: linear-gradient(135deg, #157347 0%, #0f5132 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(25, 135, 84, 0.5);
+        }
+        
+        #applyCropBtn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(25, 135, 84, 0.4);
+        }
+        
+        #cancelCropBtn {
+            background: #fff;
+            border: 2px solid #6c757d;
+            color: #6c757d;
+            box-shadow: 0 2px 8px rgba(108, 117, 125, 0.2);
+        }
+        
+        #cancelCropBtn:hover {
+            background: #f8f9fa;
+            border-color: #495057;
+            color: #495057;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+        }
+        
+        #cancelCropBtn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 6px rgba(108, 117, 125, 0.2);
+        }
+        
+        /* Rotate buttons */
+        #rotateLeftBtn, #rotateRightBtn {
+            background: linear-gradient(135deg, #0dcaf0 0%, #0aa2c0 100%);
+            border: none;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(13, 202, 240, 0.4);
+        }
+        
+        #rotateLeftBtn:hover, #rotateRightBtn:hover {
+            background: linear-gradient(135deg, #0aa2c0 0%, #087990 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(13, 202, 240, 0.5);
+        }
+        
+        #rotateLeftBtn:active, #rotateRightBtn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(13, 202, 240, 0.4);
+        }
+        
+        /* Ensure buttons are always visible and clickable */
+        #cropBtn i, #applyCropBtn i, #cancelCropBtn i, #rotateLeftBtn i, #rotateRightBtn i {
+            font-size: 16px;
+        }
+        
+    </style>
 }
 
 <!-- Toast Container -->
@@ -256,8 +443,31 @@
                         <input type="file" class="form-control" id="profileImage" name="image" accept="image/*" required>
                         <div class="form-text">Chỉ chấp nhận file JPG, PNG, GIF, BMP, WEBP (tối đa 5MB)</div>
                     </div>
-                    <div class="image-preview" id="imagePreview" style="display: none;">
-                        <img id="previewImg" src="" alt="Preview" class="img-fluid rounded">
+                    <div class="image-preview-container" id="imagePreviewContainer" style="display: none;">
+                        <div class="cropper-container" style="max-width: 100%; max-height: 400px; margin-bottom: 15px;">
+                            <img id="previewImg" src="" alt="Preview" style="max-width: 100%; display: block;">
+                        </div>
+                        <div class="d-flex gap-2 justify-content-between align-items-center mb-2">
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-info btn-sm" id="rotateLeftBtn" style="display: none;" onclick="rotateImage(-90)" title="Xoay trái 90°">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-info btn-sm" id="rotateRightBtn" style="display: none;" onclick="rotateImage(90)" title="Xoay phải 90°">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="cropBtn" style="display: none;" onclick="startCrop()">
+                                    <i class="bi bi-scissors"></i> Cắt ảnh
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm" id="applyCropBtn" style="display: none;" onclick="applyCrop()">
+                                    <i class="bi bi-check-lg"></i> Áp dụng
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelCropBtn" style="display: none;" onclick="cancelCrop()">
+                                    <i class="bi bi-x-lg"></i> Hủy
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -454,6 +664,7 @@
     <script src="~/js/image-helper.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
     <script>
         $(document).ready(function() {
             console.log('Profile page script loaded');
@@ -477,10 +688,30 @@
                     if (form) {
                         form.reset();
                     }
-                    const imagePreview = document.getElementById('imagePreview');
-                    if (imagePreview) {
-                        imagePreview.style.display = 'none';
+                    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+                    if (imagePreviewContainer) {
+                        imagePreviewContainer.style.display = 'none';
                     }
+                    
+                    // Destroy cropper if exists
+                    if (cropper) {
+                        cropper.destroy();
+                        cropper = null;
+                    }
+                    isCropping = false;
+                    croppedBlob = null;
+                    
+                    // Reset buttons
+                    const cropBtn = document.getElementById('cropBtn');
+                    const applyCropBtn = document.getElementById('applyCropBtn');
+                    const cancelCropBtn = document.getElementById('cancelCropBtn');
+                    const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+                    const rotateRightBtn = document.getElementById('rotateRightBtn');
+                    if (cropBtn) cropBtn.style.display = 'none';
+                    if (applyCropBtn) applyCropBtn.style.display = 'none';
+                    if (cancelCropBtn) cancelCropBtn.style.display = 'none';
+                    if (rotateLeftBtn) rotateLeftBtn.style.display = 'none';
+                    if (rotateRightBtn) rotateRightBtn.style.display = 'none';
                     
                     // Reset upload button state
                     const uploadBtn = modalElement.querySelector('.btn-primary');
@@ -498,6 +729,7 @@
                     
                     // Reset preview URL
                     currentPreviewImageUrl = null;
+                    originalImageUrl = null;
                     
                     modal.show();
                 } else {
@@ -573,6 +805,10 @@
 
             // Store preview image URL globally for use in upload function
             let currentPreviewImageUrl = null;
+            let originalImageUrl = null; // Store original image URL
+            let cropper = null;
+            let isCropping = false;
+            let croppedBlob = null;
 
             window.uploadProfileImage = async function() {
                 console.log('uploadProfileImage called');
@@ -583,7 +819,7 @@
                     return;
                 }
                 
-                const file = fileInput.files[0];
+                let file = fileInput.files[0];
                 const uploadBtn = document.querySelector('#imageUploadModal .btn-primary');
                 const uploadSpinner = document.getElementById('uploadSpinner');
                 const uploadIcon = document.getElementById('uploadIcon');
@@ -594,7 +830,10 @@
                     return;
                 }
                 
-                if (!file) {
+                // Use cropped image if available
+                if (croppedBlob) {
+                    file = croppedBlob;
+                } else if (!file) {
                     showToast('Vui lòng chọn ảnh để tải lên', 'error');
                     return;
                 }
@@ -626,7 +865,18 @@
                 if (uploadIcon) uploadIcon.style.display = 'none';
 
                 const formData = new FormData();
-                formData.append('image', file);
+                // Use cropped blob if available, otherwise use original file
+                if (croppedBlob) {
+                    // Create a File object from blob with original filename
+                    const originalFile = fileInput.files[0];
+                    const croppedFile = new File([croppedBlob], originalFile.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    formData.append('image', croppedFile);
+                } else {
+                    formData.append('image', file);
+                }
                 
                 // Get AntiForgeryToken
                 const token = document.querySelector('input[name="__RequestVerificationToken"]');
@@ -686,8 +936,28 @@
                         // Reset form and preview
                         const form = document.getElementById('imageUploadForm');
                         if (form) form.reset();
-                        const preview = document.getElementById('imagePreview');
-                        if (preview) preview.style.display = 'none';
+                        const previewContainer = document.getElementById('imagePreviewContainer');
+                        if (previewContainer) previewContainer.style.display = 'none';
+                        
+                        // Destroy cropper
+                        if (cropper) {
+                            cropper.destroy();
+                            cropper = null;
+                        }
+                        isCropping = false;
+                        croppedBlob = null;
+                        
+                        // Hide crop buttons
+                        const cropBtn = document.getElementById('cropBtn');
+                        const applyCropBtn = document.getElementById('applyCropBtn');
+                        const cancelCropBtn = document.getElementById('cancelCropBtn');
+                        const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+                        const rotateRightBtn = document.getElementById('rotateRightBtn');
+                        if (cropBtn) cropBtn.style.display = 'none';
+                        if (applyCropBtn) applyCropBtn.style.display = 'none';
+                        if (cancelCropBtn) cancelCropBtn.style.display = 'none';
+                        if (rotateLeftBtn) rotateLeftBtn.style.display = 'none';
+                        if (rotateRightBtn) rotateRightBtn.style.display = 'none';
                         
                         // Reset button state
                         if (uploadBtn) uploadBtn.disabled = false;
@@ -770,14 +1040,40 @@
                         reader.onload = function(e) {
                             const previewUrl = e.target.result;
                             currentPreviewImageUrl = previewUrl; // Store globally
+                            originalImageUrl = previewUrl; // Store original image URL
                             const previewImg = document.getElementById('previewImg');
-                            const imagePreview = document.getElementById('imagePreview');
+                            const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+                            
                             if (previewImg) {
-                                previewImg.src = previewUrl;
+                                // Reset image src to force reload
+                                previewImg.src = '';
+                                setTimeout(() => {
+                                    previewImg.src = previewUrl;
+                                }, 10);
                             }
-                            if (imagePreview) {
-                                imagePreview.style.display = 'block';
+                            if (imagePreviewContainer) {
+                                imagePreviewContainer.style.display = 'block';
                             }
+                            
+                            // Destroy existing cropper if any
+                            if (cropper) {
+                                cropper.destroy();
+                                cropper = null;
+                            }
+                            isCropping = false;
+                            croppedBlob = null;
+                            
+                            // Show crop button
+                            const cropBtn = document.getElementById('cropBtn');
+                            const applyCropBtn = document.getElementById('applyCropBtn');
+                            const cancelCropBtn = document.getElementById('cancelCropBtn');
+                            const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+                            const rotateRightBtn = document.getElementById('rotateRightBtn');
+                            if (cropBtn) cropBtn.style.display = 'inline-block';
+                            if (applyCropBtn) applyCropBtn.style.display = 'none';
+                            if (cancelCropBtn) cancelCropBtn.style.display = 'none';
+                            if (rotateLeftBtn) rotateLeftBtn.style.display = 'none';
+                            if (rotateRightBtn) rotateRightBtn.style.display = 'none';
                             
                             // Ensure upload button is enabled
                             if (uploadBtn) {
@@ -791,15 +1087,208 @@
                         reader.readAsDataURL(file);
                     } else {
                         currentPreviewImageUrl = null;
-                        const imagePreview = document.getElementById('imagePreview');
-                        if (imagePreview) {
-                            imagePreview.style.display = 'none';
+                        croppedBlob = null;
+                        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+                        if (imagePreviewContainer) {
+                            imagePreviewContainer.style.display = 'none';
                         }
+                        
+                        // Destroy cropper
+                        if (cropper) {
+                            cropper.destroy();
+                            cropper = null;
+                        }
+                        isCropping = false;
+                        
+                        // Hide crop buttons
+                        const cropBtn = document.getElementById('cropBtn');
+                        const applyCropBtn = document.getElementById('applyCropBtn');
+                        const cancelCropBtn = document.getElementById('cancelCropBtn');
+                        const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+                        const rotateRightBtn = document.getElementById('rotateRightBtn');
+                        if (cropBtn) cropBtn.style.display = 'none';
+                        if (applyCropBtn) applyCropBtn.style.display = 'none';
+                        if (cancelCropBtn) cancelCropBtn.style.display = 'none';
+                        if (rotateLeftBtn) rotateLeftBtn.style.display = 'none';
+                        if (rotateRightBtn) rotateRightBtn.style.display = 'none';
+                        
                         // Disable upload button if no file
                         if (uploadBtn) uploadBtn.disabled = true;
                     }
                 });
             }
+            
+            // Start crop function
+            window.startCrop = function() {
+                const previewImg = document.getElementById('previewImg');
+                if (!previewImg || !previewImg.src) {
+                    showToast('Không có ảnh để cắt', 'error');
+                    return;
+                }
+                
+                // Destroy existing cropper if any
+                if (cropper) {
+                    cropper.destroy();
+                    cropper = null;
+                }
+                
+                // Wait a bit to ensure image is loaded
+                setTimeout(() => {
+                    // Initialize cropper
+                    cropper = new Cropper(previewImg, {
+                        aspectRatio: 1, // 1:1 ratio for profile image
+                        viewMode: 1, // Restrict crop box within canvas
+                        dragMode: 'move', // Default: move image
+                        autoCropArea: 0.8,
+                        restore: false,
+                        guides: true, // Show grid lines
+                        center: true,
+                        highlight: true, // Highlight crop area
+                        cropBoxMovable: true, // Allow moving crop box
+                        cropBoxResizable: true, // Allow resizing crop box
+                        toggleable: false,
+                        minCropBoxWidth: 100,
+                        minCropBoxHeight: 100,
+                        movable: true, // Allow moving image
+                        rotatable: true, // Allow rotating image
+                        scalable: true, // Allow scaling
+                        zoomable: true, // Allow zooming
+                        zoomOnTouch: true,
+                        zoomOnWheel: true,
+                        background: true, // Show background (grid will be more visible)
+                        ready: function() {
+                            console.log('Cropper ready');
+                        }
+                    });
+                    
+                    isCropping = true;
+                    
+                    // Show/hide buttons
+                    const cropBtn = document.getElementById('cropBtn');
+                    const applyCropBtn = document.getElementById('applyCropBtn');
+                    const cancelCropBtn = document.getElementById('cancelCropBtn');
+                    const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+                    const rotateRightBtn = document.getElementById('rotateRightBtn');
+                    if (cropBtn) cropBtn.style.display = 'none';
+                    if (applyCropBtn) applyCropBtn.style.display = 'inline-block';
+                    if (cancelCropBtn) cancelCropBtn.style.display = 'inline-block';
+                    if (rotateLeftBtn) rotateLeftBtn.style.display = 'inline-block';
+                    if (rotateRightBtn) rotateRightBtn.style.display = 'inline-block';
+                }, 100);
+            };
+            
+            // Rotate image function
+            window.rotateImage = function(degrees) {
+                if (!cropper || !isCropping) {
+                    showToast('Vui lòng bắt đầu cắt ảnh trước', 'error');
+                    return;
+                }
+                
+                // Rotate the image
+                cropper.rotate(degrees);
+            };
+            
+            // Apply crop function
+            window.applyCrop = function() {
+                if (!cropper || !isCropping) {
+                    showToast('Không có ảnh đang được cắt', 'error');
+                    return;
+                }
+                
+                // Get cropped canvas
+                const canvas = cropper.getCroppedCanvas({
+                    width: 400,
+                    height: 400,
+                    imageSmoothingEnabled: true,
+                    imageSmoothingQuality: 'high',
+                });
+                
+                if (!canvas) {
+                    showToast('Không thể cắt ảnh', 'error');
+                    return;
+                }
+                
+                // Convert canvas to blob
+                canvas.toBlob(function(blob) {
+                    if (!blob) {
+                        showToast('Không thể tạo ảnh đã cắt', 'error');
+                        return;
+                    }
+                    
+                    croppedBlob = blob;
+                    
+                    // Update preview with cropped image
+                    const previewImg = document.getElementById('previewImg');
+                    if (previewImg) {
+                        canvas.toBlob(function(blob) {
+                            const url = URL.createObjectURL(blob);
+                            // Reset image src to force reload
+                            previewImg.src = '';
+                            setTimeout(() => {
+                                previewImg.src = url;
+                                currentPreviewImageUrl = url;
+                                // Update originalImageUrl so we can crop again
+                                originalImageUrl = url;
+                            }, 10);
+                        }, 'image/jpeg', 0.9);
+                    }
+                    
+                    // Destroy cropper
+                    cropper.destroy();
+                    cropper = null;
+                    isCropping = false;
+                    
+                    // Show/hide buttons
+                    const cropBtn = document.getElementById('cropBtn');
+                    const applyCropBtn = document.getElementById('applyCropBtn');
+                    const cancelCropBtn = document.getElementById('cancelCropBtn');
+                    const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+                    const rotateRightBtn = document.getElementById('rotateRightBtn');
+                    if (cropBtn) cropBtn.style.display = 'inline-block';
+                    if (applyCropBtn) applyCropBtn.style.display = 'none';
+                    if (cancelCropBtn) cancelCropBtn.style.display = 'none';
+                    if (rotateLeftBtn) rotateLeftBtn.style.display = 'none';
+                    if (rotateRightBtn) rotateRightBtn.style.display = 'none';
+                    
+                    showToast('Đã cắt ảnh thành công!', 'success');
+                }, 'image/jpeg', 0.9);
+            };
+            
+            // Cancel crop function
+            window.cancelCrop = function() {
+                if (!cropper || !isCropping) {
+                    return;
+                }
+                
+                // Destroy cropper
+                cropper.destroy();
+                cropper = null;
+                isCropping = false;
+                
+                // Reset preview to original or last cropped version
+                const previewImg = document.getElementById('previewImg');
+                if (previewImg && originalImageUrl) {
+                    previewImg.src = '';
+                    setTimeout(() => {
+                        previewImg.src = originalImageUrl;
+                        currentPreviewImageUrl = originalImageUrl;
+                    }, 10);
+                }
+                
+                croppedBlob = null;
+                
+                // Show/hide buttons
+                const cropBtn = document.getElementById('cropBtn');
+                const applyCropBtn = document.getElementById('applyCropBtn');
+                const cancelCropBtn = document.getElementById('cancelCropBtn');
+                const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+                const rotateRightBtn = document.getElementById('rotateRightBtn');
+                if (cropBtn) cropBtn.style.display = 'inline-block';
+                if (applyCropBtn) applyCropBtn.style.display = 'none';
+                if (cancelCropBtn) cancelCropBtn.style.display = 'none';
+                if (rotateLeftBtn) rotateLeftBtn.style.display = 'none';
+                if (rotateRightBtn) rotateRightBtn.style.display = 'none';
+            };
             
             // Ensure upload button is initially disabled until file is selected
             const modalElement = document.getElementById('imageUploadModal');

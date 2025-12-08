@@ -232,32 +232,8 @@
                     <label class="form-label">
                         <i class="bi bi-card-heading me-1"></i>Tên tùy chọn <span class="text-danger">*</span>
                     </label>
-                    <input type="text" id="optionName" class="form-control" maxlength="255" required placeholder="Nhập tên tùy chọn..." />
+                    <input type="text" id="optionName" class="form-control" required placeholder="Nhập tên tùy chọn..." />
                     <div class="invalid-feedback">Vui lòng nhập tên tùy chọn.</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">
-                        <i class="bi bi-tags me-1"></i>Loại <span class="text-danger">*</span>
-                    </label>
-                    <select id="optionType" class="form-select" required>
-                        <option value="">-- Chọn loại tùy chọn --</option>
-                        <option value="checkbox">☑ Chọn nhiều</option>
-                        <option value="radio">🔘 Chọn một</option>
-                        <option value="textarea">📝 Nhập văn bản</option>
-                    </select>
-                    <div class="invalid-feedback">Vui lòng chọn loại tùy chọn.</div>
-                </div>
-                <div class="mb-3" id="optionFamilyGroup" style="display: none;">
-                    <label class="form-label">
-                        <i class="bi bi-diagram-3 me-1"></i>Nhóm <span class="text-muted small">(Cho radio buttons - chọn 1 trong nhiều)</span>
-                    </label>
-                    <select id="optionFamily" class="form-select">
-                        <option value="">-- Tạo nhóm mới --</option>
-                    </select>
-                    <input type="hidden" id="optionFamilyUUID" />
-                    <small class="text-muted d-block mt-1">
-                        <i class="bi bi-info-circle me-1"></i>Radio buttons cần nhóm để chọn 1 trong nhiều. Checkbox không cần nhóm hoặc có thể chọn nhóm tùy ý.
-                    </small>
                 </div>
                 <div id="optionError" class="text-danger small"></div>
             </div>
@@ -424,18 +400,29 @@
           }
           
           // Option errors
-          if (lowerText.includes('cannot delete option') || lowerText.includes('cannot delete') && lowerText.includes('option')) {
-            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng')) {
+          if (lowerText.includes('cannot delete option') || (lowerText.includes('cannot delete') && lowerText.includes('option'))) {
+            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng') || lowerText.includes('đang được sử dụng')) {
               return 'Không thể xóa tùy chọn này vì đang có dịch vụ đang sử dụng.';
             }
             return 'Không thể xóa tùy chọn. Vui lòng thử lại.';
           }
           
-          if (lowerText.includes('cannot update option') || lowerText.includes('cannot update') && lowerText.includes('option')) {
-            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng')) {
+          if (lowerText.includes('cannot update option') || (lowerText.includes('cannot update') && lowerText.includes('option'))) {
+            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng') || lowerText.includes('đang được sử dụng')) {
               return 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.';
             }
             return 'Không thể cập nhật tùy chọn. Vui lòng thử lại.';
+          }
+          
+          // Kiểm tra lỗi option đang được sử dụng (không cần có "cannot update/delete")
+          if (lowerText.includes('option') && (lowerText.includes('service') || lowerText.includes('dịch vụ')) && (lowerText.includes('đang sử dụng') || lowerText.includes('đang được sử dụng') || lowerText.includes('in use'))) {
+            if (lowerText.includes('update') || lowerText.includes('cập nhật') || lowerText.includes('sửa')) {
+              return 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.';
+            }
+            if (lowerText.includes('delete') || lowerText.includes('xóa') || lowerText.includes('xoá')) {
+              return 'Không thể xóa tùy chọn này vì đang có dịch vụ đang sử dụng.';
+            }
+            return 'Tùy chọn này đang được dịch vụ sử dụng. Không thể thực hiện thao tác.';
           }
           
           // Duplicate name errors
@@ -934,150 +921,28 @@
             return;
           }
 
-          // Nhóm options theo Family
-          const groupedOptions = {};
-          const ungroupedOptions = [];
-
+          // Render danh sách options đơn giản
           list.forEach(o => {
-            if (o.family) {
-              if (!groupedOptions[o.family]) {
-                groupedOptions[o.family] = [];
-              }
-              groupedOptions[o.family].push(o);
-            } else {
-              ungroupedOptions.push(o);
-            }
-          });
+            const li = document.createElement('li');
+            li.className = 'list-group-item option-item';
+            li.dataset.optionId = o.optionId;
 
-          const typeLabels = {
-            'checkbox': 'Chọn nhiều',
-            'radio': 'Chọn một',
-            'textarea': 'Nhập văn bản'
-          };
-
-          // Sắp xếp các nhóm theo type (radio trước, checkbox sau)
-          const groupOrder = ['radio', 'checkbox'];
-          const sortedGroups = Object.keys(groupedOptions).sort((a, b) => {
-            const typeA = groupedOptions[a][0]?.type?.toLowerCase() || '';
-            const typeB = groupedOptions[b][0]?.type?.toLowerCase() || '';
-            const indexA = groupOrder.indexOf(typeA);
-            const indexB = groupOrder.indexOf(typeB);
-            if (indexA === -1 && indexB === -1) return 0;
-            if (indexA === -1) return 1;
-            if (indexB === -1) return -1;
-            return indexA - indexB;
-          });
-
-          // Render các nhóm (Family) - hiển thị trước
-          sortedGroups.forEach(familyId => {
-            const groupOptions = groupedOptions[familyId];
-            const groupType = groupOptions[0]?.type?.toLowerCase() || '';
-            const typeLabel = typeLabels[groupType] || groupType || 'Chưa xác định';
-            
-            // Màu sắc theo loại nhóm
-            let borderColor = '#ffc107'; // default (yellow)
-            let bgColor = '#fffbf0'; // default
-            if (groupType === 'radio') {
-              borderColor = '#0d6efd'; // blue
-              bgColor = '#e7f3ff';
-            } else if (groupType === 'checkbox') {
-              borderColor = '#6f42c1'; // purple
-              bgColor = '#f3e8ff';
-            }
-            
-            // Header cho nhóm
-            const groupHeader = document.createElement('li');
-            groupHeader.className = 'list-group-item';
-            groupHeader.style.borderLeft = `4px solid ${borderColor}`;
-            groupHeader.style.fontWeight = '600';
-            groupHeader.style.backgroundColor = bgColor;
-            groupHeader.style.padding = '0.75rem 1rem';
-            groupHeader.style.marginBottom = '0.25rem';
-            groupHeader.innerHTML = `
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                  <i class="bi bi-diagram-3" style="color: ${borderColor};"></i>
-                  <span>Nhóm: ${typeLabel} (${groupOptions.length} tùy chọn)</span>
-                </div>
+            li.innerHTML = `
+              <div class="l" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="dot ok"></span>
+                <i class="bi bi-list-check pri-i text-primary"></i>
+                <span class="option-name fw-semibold">${o.optionName}</span>
               </div>
-            `;
-            ul.appendChild(groupHeader);
-
-            // Render các options trong nhóm
-            groupOptions.forEach(o => {
-              const optionTypeLabel = typeLabels[o.type?.toLowerCase()] || o.type || 'Chưa xác định';
-              const li = document.createElement('li');
-              li.className = 'list-group-item option-item';
-              li.dataset.optionId = o.optionId;
-              li.style.paddingLeft = '2.5rem';
-              li.style.borderLeft = `3px solid ${borderColor}`;
-              li.style.backgroundColor = bgColor;
-              li.style.marginBottom = '0.15rem';
-              li.style.borderRadius = '0.25rem';
-
-              li.innerHTML = `
-                <div class="l" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                  <span class="dot ok"></span>
-                  <i class="bi bi-list-check pri-i text-primary"></i>
-                  <span class="option-name fw-semibold">${o.optionName}</span>
-                </div>
-                <div class="r btn-group">
-                  <button class="btn btn-sm btn-outline-primary soft btn-edit-option" title="Sửa tùy chọn">
-                    <i class="bi bi-pencil-square"></i> Sửa
-                  </button>
-                  <button class="btn btn-sm btn-outline-danger soft btn-delete-option" title="Xóa tùy chọn">
-                    <i class="bi bi-trash"></i> Xóa
-                  </button>
-                </div>`;
-              ul.appendChild(li);
-            });
-            
-            // Thêm khoảng cách sau mỗi nhóm
-            const spacer = document.createElement('li');
-            spacer.className = 'list-group-item';
-            spacer.style.height = '0.5rem';
-            spacer.style.padding = '0';
-            spacer.style.border = 'none';
-            spacer.style.backgroundColor = 'transparent';
-            ul.appendChild(spacer);
+              <div class="r btn-group">
+                <button class="btn btn-sm btn-outline-primary soft btn-edit-option" title="Sửa tùy chọn">
+                  <i class="bi bi-pencil-square"></i> Sửa
+                </button>
+                <button class="btn btn-sm btn-outline-danger soft btn-delete-option" title="Xóa tùy chọn">
+                  <i class="bi bi-trash"></i> Xóa
+                </button>
+              </div>`;
+            ul.appendChild(li);
           });
-
-          // Render các options không có nhóm - hiển thị sau các nhóm
-          if (ungroupedOptions.length > 0) {
-            // Header cho options không nhóm
-            if (sortedGroups.length > 0) {
-              const separator = document.createElement('li');
-              separator.className = 'list-group-item';
-              separator.style.borderTop = '2px solid #dee2e6';
-              separator.style.marginTop = '0.5rem';
-              separator.style.padding = '0.5rem 0';
-              separator.innerHTML = '<small class="text-muted"><i class="bi bi-three-dots me-1"></i>Options độc lập</small>';
-              ul.appendChild(separator);
-            }
-            
-            ungroupedOptions.forEach(o => {
-              const typeLabel = typeLabels[o.type?.toLowerCase()] || o.type || 'Chưa xác định';
-              const li = document.createElement('li');
-              li.className = 'list-group-item option-item';
-              li.dataset.optionId = o.optionId;
-
-              li.innerHTML = `
-                <div class="l" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                  <span class="dot ok"></span>
-                  <i class="bi bi-list-check pri-i text-primary"></i>
-                  <span class="option-name fw-semibold">${o.optionName}</span>
-                </div>
-                <div class="r btn-group">
-                  <button class="btn btn-sm btn-outline-primary soft btn-edit-option" title="Sửa tùy chọn">
-                    <i class="bi bi-pencil-square"></i> Sửa
-                  </button>
-                  <button class="btn btn-sm btn-outline-danger soft btn-delete-option" title="Xóa tùy chọn">
-                    <i class="bi bi-trash"></i> Xóa
-                  </button>
-                </div>`;
-              ul.appendChild(li);
-            });
-          }
         }
 
         // Toggle options - handle click on toggle-options button
@@ -1108,103 +973,11 @@
         const optionIdEl = document.getElementById('optionId');
         const optionTagIdEl = document.getElementById('optionTagId');
         const optionNameEl = document.getElementById('optionName');
-        const optionTypeEl = document.getElementById('optionType');
-        const optionFamilyEl = document.getElementById('optionFamily');
-        const optionFamilyUUIDEl = document.getElementById('optionFamilyUUID');
-        const optionFamilyGroupEl = document.getElementById('optionFamilyGroup');
         const optionErr = document.getElementById('optionError');
 
         optionNameEl.addEventListener('input', ()=> { 
           if (optionNameEl.value.trim()) optionNameEl.classList.remove('is-invalid'); 
         });
-        
-        // Khi chọn loại option → hiển thị/ẩn nhóm và load nhóm hiện có
-        optionTypeEl.addEventListener('change', async ()=> { 
-          if (optionTypeEl.value) optionTypeEl.classList.remove('is-invalid');
-          
-          const optionType = optionTypeEl.value.toLowerCase();
-          const tagId = optionTagIdEl.value;
-          
-          // Chỉ hiển thị nhóm cho radio và checkbox (có thể có nhóm)
-          if (optionType === 'radio' || optionType === 'checkbox') {
-            optionFamilyGroupEl.style.display = 'block';
-            
-            // Load các nhóm hiện có cùng loại (cho radio và checkbox)
-            await loadExistingGroups(tagId, optionType);
-          } else {
-            // Textarea không cần nhóm
-            optionFamilyGroupEl.style.display = 'none';
-            optionFamilyEl.value = '';
-            optionFamilyUUIDEl.value = '';
-          }
-        });
-        
-        // Khi chọn nhóm → lưu UUID của nhóm
-        optionFamilyEl.addEventListener('change', ()=>{
-          const selectedValue = optionFamilyEl.value;
-          if (selectedValue && selectedValue !== 'NEW_GROUP') {
-            optionFamilyUUIDEl.value = selectedValue;
-          } else {
-            // "Không nhóm" hoặc "Tạo nhóm mới" → để trống, sẽ tự động tạo UUID khi save (nếu cần)
-            optionFamilyUUIDEl.value = '';
-          }
-        });
-        
-        // Hàm load các nhóm hiện có cùng loại
-        async function loadExistingGroups(tagId, optionType) {
-          if (!tagId) return;
-          
-          try {
-            const res = await fetch(routes.optionsByTag + `?tagId=${tagId}`);
-            if (!res.ok) return;
-            const options = await res.json();
-            
-            // Lọc các nhóm có cùng type và có Family
-            const groups = {};
-            options.forEach(opt => {
-              if (opt.type?.toLowerCase() === optionType && opt.family) {
-                if (!groups[opt.family]) {
-                  // Lấy tên các options trong nhóm để hiển thị
-                  const groupOptions = options.filter(o => o.family === opt.family);
-                  const groupNames = groupOptions.map(o => o.optionName).join(', ');
-                  groups[opt.family] = {
-                    uuid: opt.family,
-                    names: groupNames,
-                    count: groupOptions.length
-                  };
-                }
-              }
-            });
-            
-            // Cập nhật dropdown
-            // Với checkbox → có thêm option "Không nhóm" ở đầu
-            let html = '';
-            if (optionType === 'checkbox') {
-              html = '<option value="">-- Không nhóm (checkbox độc lập) --</option>';
-            } else {
-              html = '<option value="">-- Tạo nhóm mới --</option>';
-            }
-            
-            // Thêm các nhóm hiện có
-            Object.values(groups).forEach(group => {
-              html += `<option value="${group.uuid}">Nhóm hiện có (${group.count} tùy chọn): ${group.names.substring(0, 50)}${group.names.length > 50 ? '...' : ''}</option>`;
-            });
-            
-            // Với checkbox → luôn thêm option "Tạo nhóm mới" ở cuối (sau các nhóm hiện có)
-            if (optionType === 'checkbox') {
-              html += '<option value="NEW_GROUP">-- Tạo nhóm mới --</option>';
-            }
-            
-            optionFamilyEl.innerHTML = html;
-            
-            // Nếu đang edit và option có family → chọn nhóm đó
-            if (optionIdEl.value && optionFamilyUUIDEl.value) {
-              optionFamilyEl.value = optionFamilyUUIDEl.value;
-            }
-          } catch (error) {
-            console.error('Lỗi khi tải danh sách nhóm:', error);
-          }
-        }
 
         // Add option - Using event delegation
         document.addEventListener('click', (e)=>{
@@ -1217,13 +990,8 @@
           optionIdEl.value = ''; 
           optionTagIdEl.value = tagId; 
           optionNameEl.value = '';
-          optionTypeEl.value = '';
-          optionFamilyEl.value = '';
-          optionFamilyUUIDEl.value = '';
-          optionFamilyGroupEl.style.display = 'none';
           optionErr.textContent = ''; 
           optionNameEl.classList.remove('is-invalid');
-          optionTypeEl.classList.remove('is-invalid');
           optionModal.show();
         });
 
@@ -1255,28 +1023,9 @@
             optionIdEl.value = optionId; 
             optionTagIdEl.value = tagId;
             optionNameEl.value = opt.optionName || '';
-            optionTypeEl.value = opt.type || '';
-            
-            // Nếu option có family → load nhóm và chọn
-            if (opt.family) {
-              optionFamilyUUIDEl.value = opt.family;
-              // Trigger change event để load groups và chọn nhóm
-              optionTypeEl.dispatchEvent(new Event('change'));
-            } else {
-              optionFamilyEl.value = '';
-              optionFamilyUUIDEl.value = '';
-              const optionType = opt.type?.toLowerCase() || '';
-              if (optionType === 'radio' || optionType === 'checkbox') {
-                optionFamilyGroupEl.style.display = 'block';
-                await loadExistingGroups(tagId, optionType);
-              } else {
-                optionFamilyGroupEl.style.display = 'none';
-              }
-            }
             
             optionErr.textContent = ''; 
             optionNameEl.classList.remove('is-invalid');
-            optionTypeEl.classList.remove('is-invalid');
             optionModal.show(); 
             return;
           }
@@ -1302,38 +1051,10 @@
           const id = optionIdEl.value.trim();
           const tagId = optionTagIdEl.value.trim();
           const name = optionNameEl.value.trim();
-          const type = optionTypeEl.value.trim();
-          
-          // Lấy family từ UUID field (đã được set khi chọn nhóm) hoặc tạo mới
-          let family = optionFamilyUUIDEl.value.trim() || null;
-          
-          // Kiểm tra nếu chọn "Tạo nhóm mới" (value = "NEW_GROUP") hoặc không có family nhưng cần nhóm
-          const selectedFamilyOption = optionFamilyEl.value;
-          const needsGroup = type === 'radio' || (type === 'checkbox' && selectedFamilyOption === 'NEW_GROUP');
-          
-          // Nếu không có family được chọn nhưng option type cần nhóm → tạo UUID mới
-          if (!family && needsGroup) {
-            // Tạo UUID mới cho nhóm mới
-            family = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-              const r = Math.random() * 16 | 0;
-              const v = c === 'x' ? r : (r & 0x3 | 0x8);
-              return v.toString(16);
-            });
-          }
-          
-          // Nếu là checkbox và chọn "Không nhóm" hoặc không chọn gì → family = null
-          if (type === 'checkbox' && (!selectedFamilyOption || selectedFamilyOption === '')) {
-            family = null;
-          }
           
           if (!name){ 
             optionNameEl.classList.add('is-invalid'); 
             optionErr.textContent = 'Vui lòng nhập tên tùy chọn.';
-            return; 
-          }
-          if (!type){ 
-            optionTypeEl.classList.add('is-invalid'); 
-            optionErr.textContent = 'Vui lòng chọn loại tùy chọn.';
             return; 
           }
           if (!tagId){ 
@@ -1343,9 +1064,7 @@
 
           const body = JSON.stringify({ 
             optionName: name, 
-            tagId: tagId, 
-            type: type, 
-            family: family 
+            tagId: tagId
           });
 
           let res;
@@ -1376,22 +1095,48 @@
           } else {
             const errorText = await res.text();
             const translatedError = translateError(errorText);
+            const lowerText = (errorText || '').toLowerCase();
+            
+            // Kiểm tra xem có phải lỗi do option đang được dịch vụ sử dụng không
+            const isInUseError = lowerText.includes('service') || 
+                                 lowerText.includes('dịch vụ') || 
+                                 lowerText.includes('đang sử dụng') || 
+                                 lowerText.includes('cannot update option') ||
+                                 lowerText.includes('cannot update') && lowerText.includes('option') ||
+                                 lowerText.includes('đang được sử dụng');
             
             if (res.status === 409) {
-              // Kiểm tra xem có phải lỗi do option đang được sử dụng không
-              const lowerText = (errorText || '').toLowerCase();
-              if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng') || lowerText.includes('cannot update')) {
+              // Conflict - có thể là duplicate name hoặc đang được sử dụng
+              if (isInUseError) {
+                // Option đang được dịch vụ sử dụng - đóng modal và hiển thị toast
                 optionModal.hide();
-                showNotice(translatedError || 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 4000);
+                showNotice(translatedError || 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
               } else {
+                // Duplicate name
                 optionErr.textContent = translatedError || 'Tên tùy chọn đã tồn tại. Vui lòng chọn tên khác.';
               }
             } else if (res.status === 400) {
-              optionErr.textContent = translatedError || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+              // Bad Request - có thể là validation error hoặc đang được sử dụng
+              if (isInUseError) {
+                optionModal.hide();
+                showNotice(translatedError || 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
+              } else {
+                optionErr.textContent = translatedError || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+              }
+            } else if (res.status === 403) {
+              // Forbidden - thường là do đang được sử dụng
+              optionModal.hide();
+              showNotice(translatedError || 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
             } else if (res.status === 404) {
               optionErr.textContent = 'Không tìm thấy tùy chọn hoặc tag. Vui lòng thử lại.';
             } else {
-              optionErr.textContent = translatedError || 'Có lỗi xảy ra. Vui lòng thử lại sau.';
+              // Các lỗi khác - kiểm tra xem có phải lỗi đang được sử dụng không
+              if (isInUseError) {
+                optionModal.hide();
+                showNotice(translatedError || 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
+              } else {
+                optionErr.textContent = translatedError || 'Có lỗi xảy ra. Vui lòng thử lại sau.';
+              }
             }
           }
         });

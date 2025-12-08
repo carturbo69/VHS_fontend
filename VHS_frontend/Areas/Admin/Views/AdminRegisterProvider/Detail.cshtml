@@ -64,6 +64,48 @@
         // Database đã lưu giờ Việt Nam rồi, chỉ cần format
         return dateTime.Value.ToString("dd/MM/yyyy HH:mm");
     }
+    
+    // ===== Helper: Check if URL is PDF
+    bool IsPDFFile(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        
+        var lowerUrl = url.ToLower();
+        
+        // Check various PDF indicators
+        // 1. Ends with .pdf
+        if (lowerUrl.EndsWith(".pdf")) return true;
+        
+        // 2. Contains .pdf? (with query params)
+        if (lowerUrl.Contains(".pdf?")) return true;
+        
+        // 3. Contains /pdf/ in path
+        if (lowerUrl.Contains("/pdf/")) return true;
+        
+        // 4. Query parameter indicates PDF
+        if (lowerUrl.Contains("type=pdf") || lowerUrl.Contains("format=pdf") || lowerUrl.Contains("filetype=pdf")) return true;
+        
+        // 5. Check filename in path (extract filename and check extension)
+        try
+        {
+            var uri = new Uri(url, UriKind.RelativeOrAbsolute);
+            var segments = uri.Segments;
+            if (segments.Length > 0)
+            {
+                var lastSegment = segments[segments.Length - 1].ToLower();
+                if (lastSegment.EndsWith(".pdf") || lastSegment.Contains(".pdf?"))
+                    return true;
+            }
+        }
+        catch { }
+        
+        // 6. Check if URL contains "pdf" as a distinct word (not part of another word)
+        var urlWithoutQuery = lowerUrl.Split('?')[0];
+        if (urlWithoutQuery.Contains("/pdf") || urlWithoutQuery.Contains("pdf/"))
+            return true;
+        
+        return false;
+    }
 }
 
 @section Styles {
@@ -251,27 +293,60 @@
                         </table>
                     </div>
 
-                    @* Hiển thị TẤT CẢ ảnh GPKD chung ở đây (đã loại bỏ trùng lặp) *@
+                    @* Hiển thị TẤT CẢ ảnh/file GPKD chung ở đây (đã loại bỏ trùng lặp) *@
                     @if (uniqueImages.Any())
                     {
+                        var imageCount = uniqueImages.Count(url => !IsPDFFile(url));
+                        var pdfCount = uniqueImages.Count(url => IsPDFFile(url));
+                        var totalCount = uniqueImages.Count;
+                        
                         <div style="margin-top: 32px; padding-top: 24px; border-top: 2px solid #e2e8f0;">
                             <h6 style="color: #64748b; font-size: 14px; font-weight: 600; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
                                 <i class="bi bi-images" style="margin-right: 8px;"></i>
-                                Giấy phép kinh doanh (@uniqueImages.Count ảnh)
+                                Giấy phép kinh doanh (@totalCount file@(totalCount > 1 ? "s" : "")@(imageCount > 0 && pdfCount > 0 ? $" - {imageCount} ảnh, {pdfCount} PDF" : ""))
                             </h6>
                             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px;">
                                 @foreach (var url in uniqueImages)
                                 {
-                                    <figure style="margin: 0; cursor: pointer; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; transition: all 0.2s;" 
-                                            onclick="enlargeCategoryImage(this)"
-                                            onmouseover="this.style.borderColor='#0ea5e9'; this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.1)'"
-                                            onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                                        <img src="@url" 
-                                             alt="GPKD" 
-                                             loading="lazy" 
-                                             data-src="@url"
-                                             style="width: 100%; height: 150px; object-fit: cover; display: block;" />
-                                    </figure>
+                                    var isPDF = IsPDFFile(url);
+                                    var fileName = url.Split('/').LastOrDefault() ?? "file";
+                                    // Remove query parameters from filename for display
+                                    if (fileName.Contains('?'))
+                                    {
+                                        fileName = fileName.Split('?')[0];
+                                    }
+                                    
+                                    if (isPDF)
+                                    {
+                                        <figure class="file-preview pdf-preview" 
+                                                style="margin: 0; cursor: pointer; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; transition: all 0.2s; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 8px;" 
+                                                onclick="openPDF('@url')"
+                                                onmouseover="this.style.borderColor='#dc2626'; this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(220,38,38,0.2)'"
+                                                onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'; this.style.boxShadow='none'"
+                                                data-url="@url"
+                                                title="Click để mở PDF: @fileName">
+                                            <i class="bi bi-file-earmark-pdf" style="font-size: 48px; color: #dc2626;"></i>
+                                            <div style="text-align: center; width: 100%;">
+                                                <div style="font-size: 12px; font-weight: 600; color: #1e293b; word-break: break-word; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4;">
+                                                    @(fileName.Length > 20 ? fileName.Substring(0, 20) + "..." : fileName)
+                                                </div>
+                                                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">PDF</div>
+                                            </div>
+                                        </figure>
+                                    }
+                                    else
+                                    {
+                                        <figure style="margin: 0; cursor: pointer; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; transition: all 0.2s;" 
+                                                onclick="enlargeCategoryImage(this)"
+                                                onmouseover="this.style.borderColor='#0ea5e9'; this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.1)'"
+                                                onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                                            <img src="@url" 
+                                                 alt="GPKD" 
+                                                 loading="lazy" 
+                                                 data-src="@url"
+                                                 style="width: 100%; height: 150px; object-fit: cover; display: block;" />
+                                        </figure>
+                                    }
                                 }
                             </div>
                         </div>
@@ -281,7 +356,7 @@
                         <div style="margin-top: 24px; padding: 16px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
                             <p style="margin: 0; color: #92400e;">
                                 <i class="bi bi-exclamation-triangle" style="margin-right: 8px;"></i>
-                                <strong>Chưa có ảnh giấy phép kinh doanh</strong>
+                                <strong>Chưa có ảnh/file giấy phép kinh doanh</strong>
                             </p>
                         </div>
                     }
@@ -671,6 +746,93 @@
                 setTimeout(() => notification.remove(), 300);
             }, 2000);
         }
+
+        // Function to detect PDF by trying to load as image
+        async function detectPDFType(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(false); // It's an image
+                img.onerror = () => {
+                    // If image fails to load, might be PDF
+                    // Check URL pattern as fallback
+                    const lowerUrl = url.toLowerCase();
+                    if (lowerUrl.includes('.pdf') || lowerUrl.includes('/pdf/') || 
+                        lowerUrl.includes('type=pdf') || lowerUrl.includes('format=pdf')) {
+                        resolve(true);
+                    } else {
+                        // Try to fetch with HEAD request to check content-type
+                        fetch(url, { method: 'HEAD' })
+                            .then(response => {
+                                const contentType = response.headers.get('content-type') || '';
+                                resolve(contentType.includes('application/pdf') || contentType.includes('pdf'));
+                            })
+                            .catch(() => resolve(false)); // Default to image on error
+                    }
+                };
+                img.src = url;
+            });
+        }
+
+        // Function to open PDF in new tab
+        function openPDF(url) {
+            window.open(url, '_blank');
+        }
+        
+        // Check and update PDF previews on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            const pdfPreviews = document.querySelectorAll('.file-preview.pdf-preview');
+            const imagePreviews = document.querySelectorAll('figure:not(.pdf-preview)');
+            
+            // Check all previews that might be PDFs
+            for (const preview of pdfPreviews) {
+                const url = preview.dataset.url || preview.getAttribute('data-url');
+                if (url) {
+                    const isPDF = await detectPDFType(url);
+                    if (!isPDF) {
+                        // It's actually an image, convert to image preview
+                        const figure = document.createElement('figure');
+                        figure.style.cssText = 'margin: 0; cursor: pointer; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; transition: all 0.2s;';
+                        figure.setAttribute('onclick', 'enlargeCategoryImage(this)');
+                        figure.setAttribute('onmouseover', "this.style.borderColor='#0ea5e9'; this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.1)'");
+                        figure.setAttribute('onmouseout', "this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'; this.style.boxShadow='none'");
+                        figure.innerHTML = `<img src="${url}" alt="GPKD" loading="lazy" data-src="${url}" style="width: 100%; height: 150px; object-fit: cover; display: block;" />`;
+                        preview.parentNode.replaceChild(figure, preview);
+                    }
+                }
+            }
+            
+            // Also check image previews that might be PDFs
+            for (const preview of imagePreviews) {
+                const img = preview.querySelector('img');
+                if (!img) continue;
+                const url = img.src || img.dataset.src;
+                if (!url) continue;
+                
+                const isPDF = await detectPDFType(url);
+                if (isPDF) {
+                    // It's actually a PDF, convert to PDF preview
+                    const fileName = url.split('/').pop() || 'file.pdf';
+                    const pdfPreview = document.createElement('figure');
+                    pdfPreview.className = 'file-preview pdf-preview';
+                    pdfPreview.style.cssText = 'margin: 0; cursor: pointer; border-radius: 8px; overflow: hidden; border: 2px solid #e2e8f0; transition: all 0.2s; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 8px;';
+                    pdfPreview.setAttribute('onclick', `openPDF('${url}')`);
+                    pdfPreview.setAttribute('onmouseover', "this.style.borderColor='#dc2626'; this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 16px rgba(220,38,38,0.2)'");
+                    pdfPreview.setAttribute('onmouseout', "this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'; this.style.boxShadow='none'");
+                    pdfPreview.setAttribute('data-url', url);
+                    pdfPreview.setAttribute('title', `Click để mở PDF: ${fileName}`);
+                    pdfPreview.innerHTML = `
+                        <i class="bi bi-file-earmark-pdf" style="font-size: 48px; color: #dc2626;"></i>
+                        <div style="text-align: center; width: 100%;">
+                            <div style="font-size: 12px; font-weight: 600; color: #1e293b; word-break: break-word; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4;">
+                                ${fileName.length > 20 ? fileName.substring(0, 20) + '...' : fileName}
+                            </div>
+                            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">PDF</div>
+                        </div>
+                    `;
+                    preview.parentNode.replaceChild(pdfPreview, preview);
+                }
+            }
+        });
 
         // Function to delete entire certificate
         async function deleteCertificate(certId, categoryName) {

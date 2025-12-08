@@ -184,20 +184,23 @@
 
                     <!-- Giấy phép kinh doanh -->
                     <div class="field">
-                        <label for="BusinessLicenses">Hình ảnh giấy phép kinh doanh <span class="req">*</span> (có thể chọn nhiều)</label>
+                        <label for="BusinessLicenses">Hình ảnh/File giấy phép kinh doanh <span class="req">*</span> (có thể chọn nhiều)</label>
                         <input id="BusinessLicenses"
                                type="file"
                                name="BusinessLicenses"
                                class="file-input"
-                               accept=".jpg,.jpeg,.png,.gif,.bmp,.webp"
+                               accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.pdf"
                                multiple
                                required />
                         <div class="file-actions">
                             <span class="file-name" id="licenseFileName">Chưa chọn tệp</span>
-                            <label for="BusinessLicenses" class="btn ghost">Chọn ảnh</label>
+                            <label for="BusinessLicenses" class="btn ghost">Chọn file</label>
+                        </div>
+                        <div class="form-text" style="margin-top: 8px; color: #64748b; font-size: 14px;">
+                            Chấp nhận: JPG, PNG, GIF, BMP, WEBP (tối đa 10MB/file) hoặc PDF (tối đa 20MB/file)
                         </div>
                         <div class="img-grid" id="licensePreviews" aria-live="polite"></div>
-                        <div class="field-error text-danger small d-none" id="licenseError">Vui lòng tải lên ít nhất 1 hình giấy phép kinh doanh.</div>
+                        <div class="field-error text-danger small d-none" id="licenseError">Vui lòng tải lên ít nhất 1 hình/file giấy phép kinh doanh.</div>
                     </div>
                 </div>
             </section>
@@ -476,6 +479,31 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             const fileName = file.name.toLowerCase();
             return allowedExtensions.some(ext => fileName.endsWith(ext));
           }
+          
+          // Helper function to validate file (image or PDF)
+          function isValidFile(file) {
+            const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.pdf'];
+            const fileName = file.name.toLowerCase();
+            return allowedExtensions.some(ext => fileName.endsWith(ext));
+          }
+          
+          // Helper function to check if file is PDF
+          function isPDFFile(file) {
+            const fileName = file.name.toLowerCase();
+            return fileName.endsWith('.pdf');
+          }
+          
+          // Helper function to validate file size
+          function validateFileSize(file, maxSizeMB) {
+            const maxSizeBytes = maxSizeMB * 1024 * 1024;
+            if (file.size > maxSizeBytes) {
+              return {
+                valid: false,
+                message: `File "${file.name}" vượt quá giới hạn ${maxSizeMB}MB. Kích thước hiện tại: ${(file.size / 1024 / 1024).toFixed(2)}MB`
+              };
+            }
+            return { valid: true };
+          }
 
           placeholder?.addEventListener("click", () => fileInput?.click());
           fileInput?.addEventListener("change", e => {
@@ -483,6 +511,13 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             // validate avatar client-side - check extension
             if (!isValidImageFile(f)) {
               alert("Ảnh đại diện không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp");
+              fileInput.value = "";
+              return;
+            }
+            // Validate file size (max 10MB for avatar)
+            const sizeCheck = validateFileSize(f, 10);
+            if (!sizeCheck.valid) {
+              alert(sizeCheck.message);
               fileInput.value = "";
               return;
             }
@@ -751,9 +786,17 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             const newFiles = Array.from(e.target.files || []);
 
             newFiles.forEach(f => {
-              // Validate file extension
-              if (!isValidImageFile(f)) {
-                alert(`Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp`);
+              // Validate file extension (image or PDF)
+              if (!isValidFile(f)) {
+                alert(`Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp, .pdf`);
+                return;
+              }
+              
+              // Validate file size
+              const maxSizeMB = isPDFFile(f) ? 20 : 10; // PDF: 20MB, Image: 10MB
+              const sizeCheck = validateFileSize(f, maxSizeMB);
+              if (!sizeCheck.valid) {
+                alert(sizeCheck.message);
                 return;
               }
 
@@ -792,19 +835,43 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               fig.className = 'thumb';
               fig.dataset.imageUrl = url;
               fig.dataset.imageName = f.name;
-              fig.innerHTML = `
-                <img src="${url}" alt="${f.name}">
-                <button type="button" class="thumb-del" data-index="${idx}" aria-label="Xóa">×</button>
-              `;
+              
+              if (isPDFFile(f)) {
+                // PDF file - show PDF icon
+                const fileSizeMB = (f.size / 1024 / 1024).toFixed(2);
+                fig.innerHTML = `
+                  <div class="pdf-preview">
+                    <i class="bi bi-file-earmark-pdf" style="font-size: 48px; color: #dc2626;"></i>
+                    <div class="pdf-info">
+                      <div class="pdf-name" title="${f.name}">${f.name.length > 20 ? f.name.substring(0, 20) + '...' : f.name}</div>
+                      <div class="pdf-size">${fileSizeMB} MB</div>
+                    </div>
+                  </div>
+                  <button type="button" class="thumb-del" data-index="${idx}" aria-label="Xóa">×</button>
+                `;
+              } else {
+                // Image file - show image preview
+                fig.innerHTML = `
+                  <img src="${url}" alt="${f.name}">
+                  <button type="button" class="thumb-del" data-index="${idx}" aria-label="Xóa">×</button>
+                `;
+              }
+              
               licensePreviews.appendChild(fig);
             });
 
-            // Add click event for image zoom
+            // Add click event for image zoom (only for images, not PDFs)
             document.querySelectorAll('#licensePreviews .thumb').forEach(thumb => {
               thumb.addEventListener('click', (e) => {
                 // Don't zoom if clicking delete button
                 if (e.target.closest('.thumb-del')) return;
-                openImageModal(thumb.dataset.imageUrl, thumb.dataset.imageName);
+                // Only zoom if it's an image, not PDF
+                if (thumb.querySelector('img')) {
+                  openImageModal(thumb.dataset.imageUrl, thumb.dataset.imageName);
+                } else {
+                  // For PDF, open in new tab
+                  window.open(thumb.dataset.imageUrl, '_blank');
+                }
               });
             });
           }
@@ -1144,8 +1211,16 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
             console.log('Total files to submit:', allFiles.length);
 
             allFiles.forEach((f, idx) => {
-              if (!isValidImageFile(f)) {
-                errors.push({ msg: `Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp`, el: null });
+              // Validate file extension (image or PDF)
+              if (!isValidFile(f)) {
+                errors.push({ msg: `Tệp "${f.name}" không hợp lệ. Chỉ chấp nhận các định dạng: .jpg, .jpeg, .png, .gif, .bmp, .webp, .pdf`, el: null });
+              } else {
+                // Validate file size
+                const maxSizeMB = isPDFFile(f) ? 20 : 10; // PDF: 20MB, Image: 10MB
+                const sizeCheck = validateFileSize(f, maxSizeMB);
+                if (!sizeCheck.valid) {
+                  errors.push({ msg: sizeCheck.message, el: null });
+                }
               }
               totalBytes += f.size;
               console.log(`  File[${idx}]: ${f.name} - ${(f.size / 1024 / 1024).toFixed(2)} MB - ${f.type}`);

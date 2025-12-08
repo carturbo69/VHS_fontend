@@ -18,6 +18,24 @@
         else
             return dateTime.ToString("dd/MM/yyyy");
     }
+    
+    public string FormatLargeCurrency(decimal value)
+    {
+        if (value >= 1000000000) // >= 1 tỷ
+        {
+            var ty = value / 1000000000;
+            return ty >= 10 ? $"{ty:F0} tỷ" : $"{ty:F1} tỷ";
+        }
+        else if (value >= 1000000) // >= 1 triệu
+        {
+            var trieu = value / 1000000;
+            return trieu >= 10 ? $"{trieu:F0} triệu" : $"{trieu:F1} triệu";
+        }
+        else
+        {
+            return value.ToString("N0");
+        }
+    }
 }
 
 @section Styles {
@@ -85,7 +103,7 @@
                 </div>
             </div>
             <div class="stat-content">
-                <div class="stat-value">@Model.TodayRevenue.ToString("N0")đ</div>
+                <div class="stat-value">@FormatLargeCurrency(Model.TodayRevenue) đ</div>
                 <div class="stat-label">Doanh thu hôm nay</div>
                 <div class="stat-change @(Model.RevenueChange >= 0 ? "positive" : "negative")">
                     <i class="bi bi-arrow-@(Model.RevenueChange >= 0 ? "up" : "down")"></i>
@@ -253,7 +271,7 @@
                 </div>
             </div>
             <div class="stat-content">
-                <div class="stat-value">@Model.TotalSystemRevenue.ToString("N0")đ</div>
+                <div class="stat-value">@FormatLargeCurrency(Model.TotalSystemRevenue) đ</div>
                 <div class="stat-label">Tổng doanh thu hệ thống</div>
                 <div class="stat-change neutral">
                     <i class="bi bi-check-circle"></i>
@@ -717,7 +735,17 @@
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
-                                return '₫' + (value / 1000000) + 'M';
+                                if (value === 0 || value < 0.01) {
+                                    return '₫0';
+                                }
+                                const millions = value / 1000000;
+                                if (millions >= 1) {
+                                    return '₫' + millions.toFixed(1) + 'M';
+                                } else if (millions >= 0.001) {
+                                    return '₫' + (millions * 1000).toFixed(0) + 'K';
+                                } else {
+                                    return '₫' + value.toLocaleString('vi-VN');
+                                }
                             }
                         }
                     }
@@ -751,7 +779,14 @@
                 },
                 scales: {
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            precision: 0,
+                            callback: function(value) {
+                                return Math.round(value);
+                            }
+                        }
                     }
                 }
             }
@@ -782,12 +817,16 @@
         // Sắp xếp theo số sao từ 1 đến 5 và gán màu tương ứng
         const sortedRatings = ratingDistributions
             .slice()
-            .sort((a, b) => a.stars - b.stars)
-            .map(r => ({
-                label: r.stars + " sao",
-                data: r.percentage,
-                color: getRatingColor(r.stars)
-            }));
+            .sort((a, b) => (a.Stars || a.stars) - (b.Stars || b.stars))
+            .map(r => {
+                const stars = r.Stars || r.stars;
+                const percentage = r.Percentage || r.percentage;
+                return {
+                    label: stars + " sao",
+                    data: percentage,
+                    color: getRatingColor(stars)
+                };
+            });
         
         const ratingChart = new Chart(ratingCtx, {
             type: 'doughnut',
