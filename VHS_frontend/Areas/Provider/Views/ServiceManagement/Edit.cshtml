@@ -124,9 +124,9 @@
                             field.classList.add('is-invalid');
                             if (baseUnitError) baseUnitError.textContent = 'Vui lòng nhập số hợp lệ.';
                         } else if (value < limits.min) {
-                            field.setCustomValidity(`Số lượng tối thiểu phải từ ${limits.min} trở lên.`);
+                            field.setCustomValidity(`Số lượng phải từ ${limits.min} trở lên.`);
                             field.classList.add('is-invalid');
-                            if (baseUnitError) baseUnitError.textContent = `Số lượng tối thiểu phải từ ${limits.min} trở lên.`;
+                            if (baseUnitError) baseUnitError.textContent = `Số lượng phải từ ${limits.min} trở lên.`;
                         } else if (value > limits.max) {
                             field.setCustomValidity(limits.message);
                             field.classList.add('is-invalid');
@@ -191,22 +191,27 @@
                 <div class="mt-3">
                     <label asp-for="Description" class="form-label">Mô tả <span class="text-danger">*</span></label>
                     <div class="form-input-wrapper">
-                        <textarea asp-for="Description" name="Description" id="Description" class="form-control" rows="5" placeholder="Ví dụ: Dịch vụ dọn dẹp nhà cửa chuyên nghiệp bao gồm:
+                        <textarea asp-for="Description" name="Description" id="Description" class="form-control" rows="5" maxlength="3000" placeholder="Ví dụ: Dịch vụ dọn dẹp nhà cửa chuyên nghiệp bao gồm:
 - Quét dọn, lau chùi toàn bộ phòng khách, phòng ngủ, nhà bếp, nhà vệ sinh
 - Thời gian: 2-3 giờ/ lần, có thể đặt lịch linh hoạt theo yêu cầu
 - Địa điểm: Tại nhà khách hàng
 - Cam kết: Đảm bảo sạch sẽ, gọn gàng, an toàn cho sức khỏe,..." 
                               data-val="true" 
                               data-val-required="Vui lòng nhập mô tả dịch vụ."
+                              data-val-maxlength="Mô tả không được vượt quá 3000 ký tự."
+                              data-val-maxlength-max="3000"
                               required
                               oninvalid="this.setCustomValidity('Vui lòng nhập mô tả dịch vụ.')"
-                              oninput="this.setCustomValidity(''); this.classList.remove('is-invalid');"></textarea>
+                              oninput="this.setCustomValidity(''); this.classList.remove('is-invalid'); updateDescriptionCharCount(this);"></textarea>
                         <div class="invalid-feedback">Vui lòng nhập mô tả dịch vụ.</div>
                     </div>
-                    <small class="form-text text-muted small">
-                        <i class="bi bi-info-circle me-1"></i>
-                        <strong>Gợi ý:</strong> Mô tả chi tiết về quy trình, thời gian, địa điểm, yêu cầu đặc biệt. Mô tả càng rõ ràng sẽ giúp khách hàng hiểu và tin tưởng dịch vụ của bạn hơn.
-                    </small>
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <small class="form-text text-muted small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Gợi ý:</strong> Mô tả chi tiết về quy trình, thời gian, địa điểm, yêu cầu đặc biệt. Mô tả càng rõ ràng sẽ giúp khách hàng hiểu và tin tưởng dịch vụ của bạn hơn.
+                        </small>
+                        <small class="form-text text-muted text-end" id="descriptionCharCount" style="font-size: 0.75rem;">0/3000 ký tự</small>
+                    </div>
                 </div>
 
                 <div class="row g-3 mt-0">
@@ -215,8 +220,12 @@
                         <label asp-for="Price" class="form-label">Giá (VNĐ) <span class="text-danger">*</span></label>
                         <div class="form-input-wrapper">
                             <input asp-for="Price" asp-format="{0:0}" type="number" class="form-control" id="Price" min="20000" max="100000000" step="1000" placeholder="20000" required />
-                            <div class="invalid-feedback">Giá phải từ 20.000 đến 100.000.000 VNĐ.</div>
+                            <div class="invalid-feedback">Giá phải từ 20.000 đến 100.000.000 VNĐ và là bội số của 1.000.</div>
                         </div>
+                        <small class="form-text text-muted small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Giá tối thiểu: 20.000 VNĐ, tối đa: 100.000.000 VNĐ. Phải là bội số của 1.000.
+                        </small>
                     </div>
 
                     <!-- Unit Type -->
@@ -244,13 +253,13 @@
                     <!-- Base Unit -->
                     <div class="col-md-4">
                         <label asp-for="BaseUnit" class="form-label">
-                            <i class="bi bi-123 me-1"></i>Số lượng tối thiểu <span class="text-danger">*</span>
+                            <i class="bi bi-123 me-1"></i>Số lượng <span class="text-danger">*</span>
                         </label>
                         <div class="form-input-wrapper">
                             <input asp-for="BaseUnit" name="BaseUnit" id="BaseUnit" type="number" class="form-control" min="1" max="100" step="1" placeholder="1" 
                                    data-val="true" 
                                    data-val-required="Vui lòng nhập số lượng tối thiểu."
-                                   data-val-min="Số lượng tối thiểu phải từ 1 trở lên."
+                                   data-val-min="Số lượng phải từ 1 trở lên."
                                    data-val-min-min="1"
                                    required
                                    oninvalid="validateBaseUnit(this)"
@@ -322,7 +331,8 @@
                         var imgs = imagesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
                         var avatar = imgs.FirstOrDefault();
                         var descImgs = imgs.Skip(1).ToList();
-                        string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"http://localhost:5154{p}");
+                        var backendBase = ViewBag.BackendBase as string ?? "http://localhost:5154";
+                        string ToUrl(string? p) => string.IsNullOrEmpty(p) ? string.Empty : (p.StartsWith("http") ? p : $"{backendBase.TrimEnd('/')}/{p.TrimStart('/')}");
                     }
 
                     <!-- Hình ảnh hiện tại (gộp avatar + mô tả) -->
@@ -441,11 +451,20 @@
             if (!path) return; // Skip if this is a preview image
             
             const container = document.getElementById('removedImagesContainer');
+            if (!container) {
+                console.error('❌ removedImagesContainer not found!');
+                return;
+            }
+            
             const hidden = document.createElement('input');
             hidden.type = 'hidden';
             hidden.name = 'RemoveImages';
             hidden.value = path;
             container.appendChild(hidden);
+            
+            console.log('🗑️ Image removed:', path);
+            console.log('📋 RemoveImages inputs count:', container.querySelectorAll('input[name="RemoveImages"]').length);
+            
             wrap.remove();
         });
 
@@ -552,6 +571,9 @@
         const selectedOptionIds = @Html.Raw(Json.Serialize(Model.OptionIds ?? new List<Guid>()));
         const initialTagIds = @Html.Raw(Json.Serialize(Model.TagIds ?? new List<Guid>()));
         const categoryId = '@(ViewBag.CategoryId ?? "")';
+        
+        // Lấy OptionValues từ ViewBag (nếu có)
+        const optionValues = @Html.Raw(Json.Serialize(ViewBag.OptionValues ?? new Dictionary<string, string>()));
         
         // Đảm bảo selectedOptionIds luôn là array
         if (!Array.isArray(selectedOptionIds)) {
@@ -754,8 +776,9 @@
                 
                 options.forEach(o => {
                     const optionDiv = document.createElement('div');
-                    optionDiv.className = 'mb-2';
+                    optionDiv.className = 'mb-3';
                     optionDiv.dataset.tagId = tagId;
+                    optionDiv.dataset.optionId = o.optionId || o.OptionId || '';
                     
                     // Xử lý cả camelCase và PascalCase từ API response
                     const optionIdValue = o.optionId || o.OptionId || '';
@@ -765,20 +788,86 @@
                     const optionIdStr = String(optionIdValue).toLowerCase().trim();
                     const isChecked = selectedOptionIdsStr.includes(optionIdStr);
                     
+                    // Lấy giá trị mô tả cũ từ optionValues (nếu có)
+                    const existingValue = optionValues && optionValues[optionIdValue] ? optionValues[optionIdValue] : '';
+                    const shouldShowDescription = isChecked && existingValue;
+                    
                     // Debug log cho từng option
                     if (isChecked) {
                         console.log('[Edit] Option matched:', optionNameValue, 'ID:', optionIdValue, 'Normalized:', optionIdStr);
                     }
                     
                     const uniqueId = `option_${tagId}_${optionIdValue}`;
+                    const descriptionId = `option_desc_${tagId}_${optionIdValue}`;
                     
                     optionDiv.innerHTML = `
-                        <input class="form-check-input form-check-input-sm" type="checkbox" name="OptionIds" value="${optionIdValue}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
-                        <label class="form-check-label small" for="${uniqueId}">
-                            <span class="fw-semibold">${optionNameValue}</span>
-                        </label>`;
+                        <div class="d-flex align-items-start gap-2">
+                            <input class="form-check-input form-check-input-sm mt-1" type="checkbox" name="OptionIds" value="${optionIdValue}" id="${uniqueId}" ${isChecked ? 'checked' : ''} />
+                            <div class="flex-grow-1">
+                                <label class="form-check-label small" for="${uniqueId}">
+                                    <span class="fw-semibold">${optionNameValue}</span>
+                                </label>
+                                <div id="${descriptionId}" class="mt-2" style="display: ${shouldShowDescription ? 'block' : 'none'};">
+                                    <label class="form-label small text-muted">
+                                        <i class="bi bi-pencil me-1"></i>Mô tả thêm (tùy chọn)
+                                    </label>
+                                    <textarea class="form-control form-control-sm" 
+                                              name="OptionValues[${optionIdValue}]" 
+                                              id="textarea_${optionIdValue}"
+                                              rows="2" 
+                                              maxlength="200"
+                                              placeholder="Nhập mô tả thêm cho tùy chọn này (không bắt buộc)..."
+                                              style="resize: vertical; min-height: 60px;">${existingValue || ''}</textarea>
+                                    <div class="d-flex justify-content-between align-items-center mt-1">
+                                        <small class="form-text text-muted" style="font-size: 0.75rem;">Bạn có thể mô tả thêm chi tiết về tùy chọn này.</small>
+                                        <small class="form-text text-muted text-end" id="charCount_${optionIdValue}" style="font-size: 0.75rem;">${(existingValue || '').length}/200 ký tự</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
                     
                     optionsContainer.appendChild(optionDiv);
+                    
+                    // Thêm event listener để hiển thị/ẩn textarea khi checkbox được chọn/bỏ chọn
+                    const checkbox = optionDiv.querySelector(`#${uniqueId}`);
+                    const descriptionDiv = optionDiv.querySelector(`#${descriptionId}`);
+                    const textarea = descriptionDiv.querySelector(`#textarea_${optionIdValue}`);
+                    const charCount = descriptionDiv.querySelector(`#charCount_${optionIdValue}`);
+                    
+                    // Cập nhật số ký tự khi người dùng nhập
+                    if (textarea && charCount) {
+                        // Khởi tạo counter với giá trị hiện tại
+                        const currentLength = (existingValue || '').length;
+                        if (currentLength >= 200) {
+                            charCount.classList.add('text-danger');
+                        }
+                        
+                        textarea.addEventListener('input', function() {
+                            const length = this.value.length;
+                            charCount.textContent = `${length}/200 ký tự`;
+                            if (length >= 200) {
+                                charCount.classList.add('text-danger');
+                            } else {
+                                charCount.classList.remove('text-danger');
+                            }
+                        });
+                    }
+                    
+                    checkbox.addEventListener('change', function() {
+                        if (this.checked) {
+                            descriptionDiv.style.display = 'block';
+                        } else {
+                            descriptionDiv.style.display = 'none';
+                            // Xóa nội dung textarea khi bỏ chọn
+                            if (textarea) {
+                                textarea.value = '';
+                                if (charCount) {
+                                    charCount.textContent = '0/200 ký tự';
+                                    charCount.classList.remove('text-danger');
+                                }
+                            }
+                        }
+                    });
                 });
             } catch (error) {
                 console.error('Error loading options:', error);
@@ -836,25 +925,69 @@
                 });
             }
             
+            // Function to update description character count
+            function updateDescriptionCharCount(textarea) {
+                const charCount = document.getElementById('descriptionCharCount');
+                if (charCount) {
+                    const length = textarea.value.length;
+                    charCount.textContent = `${length}/3000 ký tự`;
+                    if (length >= 3000) {
+                        charCount.classList.add('text-danger');
+                    } else {
+                        charCount.classList.remove('text-danger');
+                    }
+                }
+            }
+            
             // Description validation
             const descriptionField = document.getElementById('Description');
             if (descriptionField) {
+                // Initialize character count
+                updateDescriptionCharCount(descriptionField);
+                
                 descriptionField.addEventListener('input', function() {
                     if (this.value && this.value.trim()) {
                         this.classList.remove('is-invalid');
                     }
+                    updateDescriptionCharCount(this);
                 });
             }
             
-            // Price validation
+            // Enhanced validation for Price - từ 20,000 đến 100 triệu
             const priceField = document.getElementById('Price');
             if (priceField) {
-                priceField.addEventListener('input', function() {
-                    const price = parseFloat(this.value);
-                    if (this.value && !isNaN(price) && price >= 20000 && price <= 100000000) {
-                        this.classList.remove('is-invalid');
+                function validatePrice() {
+                    const value = parseFloat(priceField.value);
+                    const minPrice = 20000;
+                    const maxPrice = 100000000;
+                    
+                    if (!priceField.value || priceField.value.trim() === '') {
+                        priceField.setCustomValidity('Vui lòng nhập giá dịch vụ.');
+                        priceField.classList.add('is-invalid');
+                    } else if (isNaN(value)) {
+                        priceField.setCustomValidity('Giá phải là số hợp lệ.');
+                        priceField.classList.add('is-invalid');
+                    } else if (value < 0) {
+                        priceField.setCustomValidity('Giá không được là số âm.');
+                        priceField.classList.add('is-invalid');
+                    } else if (value < minPrice) {
+                        priceField.setCustomValidity(`Giá tối thiểu là ${minPrice.toLocaleString('vi-VN')} VNĐ.`);
+                        priceField.classList.add('is-invalid');
+                    } else if (value > maxPrice) {
+                        priceField.setCustomValidity(`Giá tối đa là ${maxPrice.toLocaleString('vi-VN')} VNĐ.`);
+                        priceField.classList.add('is-invalid');
+                    } else if (value % 1000 !== 0) {
+                        priceField.setCustomValidity('Giá phải là bội số của 1.000 VNĐ (ví dụ: 20.000, 50.000, 100.000).');
+                        priceField.classList.add('is-invalid');
+                    } else {
+                        priceField.setCustomValidity('');
+                        priceField.classList.remove('is-invalid');
                     }
-                });
+                }
+
+                priceField.addEventListener('input', validatePrice);
+                priceField.addEventListener('blur', validatePrice);
+                priceField.addEventListener('change', validatePrice);
             }
             
             // UnitType validation - cập nhật giới hạn BaseUnit khi đơn vị thay đổi
@@ -913,14 +1046,40 @@
                     
                     // Validate Price
                     const priceField = document.getElementById('Price');
-                    if (!priceField || !priceField.value) {
-                        if (priceField) priceField.classList.add('is-invalid');
+                    if (!priceField || !priceField.value || priceField.value.trim() === '') {
+                        if (priceField) {
+                            priceField.setCustomValidity('Vui lòng nhập giá dịch vụ.');
+                            priceField.classList.add('is-invalid');
+                        }
                         isValid = false;
                     } else {
                         const price = parseFloat(priceField.value);
-                        if (isNaN(price) || price < 20000 || price > 100000000) {
+                        const minPrice = 20000;
+                        const maxPrice = 100000000;
+                        
+                        if (isNaN(price)) {
+                            priceField.setCustomValidity('Giá phải là số hợp lệ.');
                             priceField.classList.add('is-invalid');
                             isValid = false;
+                        } else if (price < 0) {
+                            priceField.setCustomValidity('Giá không được là số âm.');
+                            priceField.classList.add('is-invalid');
+                            isValid = false;
+                        } else if (price < minPrice) {
+                            priceField.setCustomValidity(`Giá tối thiểu là ${minPrice.toLocaleString('vi-VN')} VNĐ.`);
+                            priceField.classList.add('is-invalid');
+                            isValid = false;
+                        } else if (price > maxPrice) {
+                            priceField.setCustomValidity(`Giá tối đa là ${maxPrice.toLocaleString('vi-VN')} VNĐ.`);
+                            priceField.classList.add('is-invalid');
+                            isValid = false;
+                        } else if (price % 1000 !== 0) {
+                            priceField.setCustomValidity('Giá phải là bội số của 1.000 VNĐ (ví dụ: 20.000, 50.000, 100.000).');
+                            priceField.classList.add('is-invalid');
+                            isValid = false;
+                        } else {
+                            priceField.setCustomValidity('');
+                            priceField.classList.remove('is-invalid');
                         }
                     }
                     
@@ -1010,8 +1169,19 @@
                     const removedInputs = removedImagesContainer ? removedImagesContainer.querySelectorAll('input[name="RemoveImages"]') : [];
                     const removedImages = Array.from(removedInputs).map(input => input.value.trim()).filter(img => img.length > 0);
                     
+                    // Debug log
+                    console.log('📤 Form submit - RemoveImages:', removedImages);
+                    console.log('📤 Form submit - RemoveImages count:', removedImages.length);
+                    console.log('📤 Form submit - Current images:', currentImages);
+                    
                     // Calculate remaining images (current - removed)
-                    const remainingImages = currentImages.filter(img => !removedImages.includes(img));
+                    // Normalize paths for comparison (remove leading/trailing slashes)
+                    const normalizePath = (path) => path.trim().replace(/^\/+|\/+$/g, '');
+                    const normalizedRemoved = removedImages.map(normalizePath);
+                    const remainingImages = currentImages.filter(img => {
+                        const normalizedImg = normalizePath(img);
+                        return !normalizedRemoved.includes(normalizedImg);
+                    });
                     
                     // Check if there are new images being uploaded
                     const hasNewImages = imageInput && imageInput.files && imageInput.files.length > 0;

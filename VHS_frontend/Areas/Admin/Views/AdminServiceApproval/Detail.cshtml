@@ -553,13 +553,13 @@
                                                 @foreach (var o in groupNonTextarea)
                                                 {
                                                     <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
-                                                        <div class="fw-semibold mb-1">@o.OptionName</div>
-                                                        @{
-                                                            var optionValue = o.Value;
-                                                            if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
-                                                            {
-                                                                <div class="text-muted small text-start">@optionValue</div>
-                                                            }
+                                                        @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                        {
+                                                            <div class="fw-semibold mb-1">@o.OptionName<span class="text-muted"> (@o.Value)</span></div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="fw-semibold mb-1">@o.OptionName</div>
                                                         }
                                                     </div>
                                                 }
@@ -568,19 +568,57 @@
                                                 @foreach (var o in groupTextarea)
                                                 {
                                                     <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
-                                                        <div class="fw-semibold mb-1">@o.OptionName</div>
                                                         @{
                                                             var optionValue = o.Value;
                                                             var optionType = o.Type?.ToLower() ?? "";
                                                             if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
                                                             {
-                                                                <div class="mt-1 text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">@optionValue</div>
+                                                                @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                                var valueLines = new List<string>();
+                                                                
+                                                                @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                                if (optionValue.Contains('\n') || optionValue.Contains('\r'))
+                                                                {
+                                                                    @* Nếu có xuống dòng, split theo \n và \r *@
+                                                                    valueLines = optionValue
+                                                                        .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                        .Select(v => v.Trim())
+                                                                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                        .ToList();
+                                                                }
+                                                                else
+                                                                {
+                                                                    @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                                    valueLines = optionValue
+                                                                        .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                        .Select(v => v.Trim())
+                                                                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                        .ToList();
+                                                                }
+                                                                
+                                                                @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                                                if (valueLines.Count > 1)
+                                                                {
+                                                                    <div class="fw-semibold mb-1">@o.OptionName</div>
+                                                                    <div class="mt-1 text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">
+                                                                        @foreach (var line in valueLines)
+                                                                        {
+                                                                            <div>@line</div>
+                                                                        }
+                                                                    </div>
+                                                                }
+                                                                else
+                                                                {
+                                                                    @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                                    <div class="fw-semibold mb-1">@o.OptionName<span class="text-muted"> (@optionValue)</span></div>
+                                                                }
                                                             }
                                                             else
                                                             {
+                                                                <div class="fw-semibold mb-1">@o.OptionName</div>
                                                                 <div class="text-muted small mt-1 text-start">
                                                                     <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
-                                                        </div>
+                                                                </div>
                                                             }
                                                         }
                                                     </div>
@@ -602,13 +640,13 @@
                                                 @foreach (var o in ungroupedNonTextarea)
                                                 {
                                                     <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start">
-                                                        <div class="fw-semibold mb-1">@o.OptionName</div>
-                                                        @{
-                                                            var optionValue = o.Value;
-                                                            if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
-                                                            {
-                                                                <div class="text-muted small text-start">@optionValue</div>
-                                                            }
+                                                        @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                        {
+                                                            <div class="fw-semibold mb-1">@o.OptionName<span class="text-muted"> (@o.Value)</span></div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="fw-semibold mb-1">@o.OptionName</div>
                                                         }
                                                     </div>
                                                 }
@@ -617,16 +655,54 @@
                                                 @foreach (var o in ungroupedTextarea)
                                                 {
                                                     <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start">
-                                                        <div class="fw-semibold mb-1">@o.OptionName</div>
                                                         @{
                                                             var optionValue = o.Value;
                                                             var optionType = o.Type?.ToLower() ?? "";
                                                             if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
                                                             {
-                                                                <div class="mt-1 text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">@optionValue</div>
+                                                                @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                                var valueLines = new List<string>();
+                                                                
+                                                                @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                                if (optionValue.Contains('\n') || optionValue.Contains('\r'))
+                                                                {
+                                                                    @* Nếu có xuống dòng, split theo \n và \r *@
+                                                                    valueLines = optionValue
+                                                                        .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                        .Select(v => v.Trim())
+                                                                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                        .ToList();
+                                                                }
+                                                                else
+                                                                {
+                                                                    @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                                    valueLines = optionValue
+                                                                        .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                        .Select(v => v.Trim())
+                                                                        .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                        .ToList();
+                                                                }
+                                                                
+                                                                @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                                                if (valueLines.Count > 1)
+                                                                {
+                                                                    <div class="fw-semibold mb-1">@o.OptionName</div>
+                                                                    <div class="mt-1 text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">
+                                                                        @foreach (var line in valueLines)
+                                                                        {
+                                                                            <div>@line</div>
+                                                                        }
+                                                                    </div>
+                                                                }
+                                                                else
+                                                                {
+                                                                    @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                                    <div class="fw-semibold mb-1">@o.OptionName<span class="text-muted"> (@optionValue)</span></div>
+                                                                }
                                                             }
                                                             else
                                                             {
+                                                                <div class="fw-semibold mb-1">@o.OptionName</div>
                                                                 <div class="text-muted small mt-1 text-start">
                                                                     <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
                                                                 </div>
@@ -756,13 +832,13 @@
                                                     @foreach (var o in currentGroupNonTextarea)
                                                     {
                                                         <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
-                                                            <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
-                                                            @{
-                                                                var optionValue = o.Value;
-                                                                if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
-                                                                {
-                                                                    <div class="text-muted small text-start"><del>@optionValue</del></div>
-                                                                }
+                                                            @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                            {
+                                                                <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName<span class="text-muted"> (@o.Value)</span></del></div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
                                                             }
                                                         </div>
                                                     }
@@ -771,16 +847,54 @@
                                                     @foreach (var o in currentGroupTextarea)
                                                     {
                                                         <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
-                                                            <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
                                                             @{
                                                                 var optionValue = o.Value;
                                                                 var optionType = o.Type?.ToLower() ?? "";
                                                                 if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
                                                                 {
-                                                                    <div class="mt-1 text-muted text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5; opacity: 0.7;"><del>@optionValue</del></div>
+                                                                    @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                                    var valueLines = new List<string>();
+                                                                    
+                                                                    @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                                    if (optionValue.Contains('\n') || optionValue.Contains('\r'))
+                                                                    {
+                                                                        @* Nếu có xuống dòng, split theo \n và \r *@
+                                                                        valueLines = optionValue
+                                                                            .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                            .Select(v => v.Trim())
+                                                                            .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                            .ToList();
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                                        valueLines = optionValue
+                                                                            .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                            .Select(v => v.Trim())
+                                                                            .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                            .ToList();
+                                                                    }
+                                                                    
+                                                                    @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                                                    if (valueLines.Count > 1)
+                                                                    {
+                                                                        <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
+                                                                        <div class="mt-1 text-muted text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5; opacity: 0.7;">
+                                                                            @foreach (var line in valueLines)
+                                                                            {
+                                                                                <div><del>@line</del></div>
+                                                                            }
+                                                                        </div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                                        <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName<span class="text-muted"> (@optionValue)</span></del></div>
+                                                                    }
                                                                 }
                                                                 else
                                                                 {
+                                                                    <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
                                                                     <div class="text-muted small mt-1 text-start">
                                                                         <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
                                                                     </div>
@@ -805,13 +919,13 @@
                                                     @foreach (var o in currentUngroupedNonTextarea)
                                                     {
                                                         <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start" style="opacity: 0.7;">
-                                                            <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
-                                                            @{
-                                                                var optionValue = o.Value;
-                                                                if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
-                                                                {
-                                                                    <div class="text-muted small text-start"><del>@optionValue</del></div>
-                                                                }
+                                                            @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                            {
+                                                                <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName<span class="text-muted"> (@o.Value)</span></del></div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
                                                             }
                                                         </div>
                                                     }
@@ -820,16 +934,54 @@
                                                     @foreach (var o in currentUngroupedTextarea)
                                                     {
                                                         <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start" style="opacity: 0.7;">
-                                                            <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
                                                             @{
                                                                 var optionValue = o.Value;
                                                                 var optionType = o.Type?.ToLower() ?? "";
                                                                 if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
                                                                 {
-                                                                    <div class="mt-1 text-muted text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5; opacity: 0.7;"><del>@optionValue</del></div>
+                                                                    @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                                    var valueLines = new List<string>();
+                                                                    
+                                                                    @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                                    if (optionValue.Contains('\n') || optionValue.Contains('\r'))
+                                                                    {
+                                                                        @* Nếu có xuống dòng, split theo \n và \r *@
+                                                                        valueLines = optionValue
+                                                                            .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                            .Select(v => v.Trim())
+                                                                            .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                            .ToList();
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                                        valueLines = optionValue
+                                                                            .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                            .Select(v => v.Trim())
+                                                                            .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                            .ToList();
+                                                                    }
+                                                                    
+                                                                    @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                                                    if (valueLines.Count > 1)
+                                                                    {
+                                                                        <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
+                                                                        <div class="mt-1 text-muted text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5; opacity: 0.7;">
+                                                                            @foreach (var line in valueLines)
+                                                                            {
+                                                                                <div><del>@line</del></div>
+                                                                            }
+                                                                        </div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                                        <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName<span class="text-muted"> (@optionValue)</span></del></div>
+                                                                    }
                                                                 }
                                                                 else
                                                                 {
+                                                                    <div class="fw-semibold mb-1 text-muted"><del>@o.OptionName</del></div>
                                                                     <div class="text-muted small mt-1 text-start">
                                                                         <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
                                                                     </div>
@@ -957,13 +1109,13 @@
                                         @foreach (var o in normalGroupNonTextarea)
                                         {
                                             <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
-                                                <div class="fw-semibold mb-1">@o.OptionName</div>
-                                                @{
-                                                    var optionValue = o.Value;
-                                                    if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
-                                                    {
-                                                        <div class="text-muted small text-start">@optionValue</div>
-                                                    }
+                                                @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                {
+                                                    <div class="fw-semibold mb-1">@o.OptionName<span class="text-muted"> (@o.Value)</span></div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="fw-semibold mb-1">@o.OptionName</div>
                                                 }
                                             </div>
                                         }
@@ -972,16 +1124,54 @@
                                         @foreach (var o in normalGroupTextarea)
                                         {
                                             <div class="mb-2 ps-3 text-start" style="border-left: 2px solid @borderColor;">
-                                                <div class="fw-semibold mb-1">@o.OptionName</div>
                                                 @{
                                                     var optionValue = o.Value;
                                                     var optionType = o.Type?.ToLower() ?? "";
                                                     if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
                                                     {
-                                                        <div class="mt-1 text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">@optionValue</div>
+                                                        @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                        var valueLines = new List<string>();
+                                                        
+                                                        @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                        if (optionValue.Contains('\n') || optionValue.Contains('\r'))
+                                                        {
+                                                            @* Nếu có xuống dòng, split theo \n và \r *@
+                                                            valueLines = optionValue
+                                                                .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                .Select(v => v.Trim())
+                                                                .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                .ToList();
+                                                        }
+                                                        else
+                                                        {
+                                                            @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                            valueLines = optionValue
+                                                                .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                .Select(v => v.Trim())
+                                                                .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                .ToList();
+                                                        }
+                                                        
+                                                        @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                                        if (valueLines.Count > 1)
+                                                        {
+                                                            <div class="fw-semibold mb-1">@o.OptionName</div>
+                                                            <div class="mt-1 text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">
+                                                                @foreach (var line in valueLines)
+                                                                {
+                                                                    <div>@line</div>
+                                                                }
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                            <div class="fw-semibold mb-1">@o.OptionName<span class="text-muted"> (@optionValue)</span></div>
+                                                        }
                                                     }
                                                     else
                                                     {
+                                                        <div class="fw-semibold mb-1">@o.OptionName</div>
                                                         <div class="text-muted small mt-1 text-start">
                                                             <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
                                                         </div>
@@ -1006,13 +1196,13 @@
                                         @foreach (var o in normalUngroupedNonTextarea)
                                         {
                                             <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start">
-                                                <div class="fw-semibold mb-1">@o.OptionName</div>
-                                                @{
-                                                    var optionValue = o.Value;
-                                                    if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
-                                                    {
-                                                        <div class="text-muted small text-start">@optionValue</div>
-                                                    }
+                                                @if (!string.IsNullOrWhiteSpace(o.Value))
+                                                {
+                                                    <div class="fw-semibold mb-1">@o.OptionName<span class="text-muted"> (@o.Value)</span></div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="fw-semibold mb-1">@o.OptionName</div>
                                                 }
                                             </div>
                                         }
@@ -1021,16 +1211,54 @@
                                         @foreach (var o in normalUngroupedTextarea)
                                         {
                                             <div class="mb-2 p-2 bg-light rounded border-start border-3 border-secondary text-start">
-                                                <div class="fw-semibold mb-1">@o.OptionName</div>
                                                 @{
                                                     var optionValue = o.Value;
                                                     var optionType = o.Type?.ToLower() ?? "";
                                                     if (optionValue != null && !string.IsNullOrWhiteSpace(optionValue))
                                                     {
-                                                        <div class="mt-1 text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">@optionValue</div>
+                                                        @* Xử lý giá trị: split theo xuống dòng hoặc dấu gạch ngang *@
+                                                        var valueLines = new List<string>();
+                                                        
+                                                        @* Kiểm tra xem có ký tự xuống dòng không *@
+                                                        if (optionValue.Contains('\n') || optionValue.Contains('\r'))
+                                                        {
+                                                            @* Nếu có xuống dòng, split theo \n và \r *@
+                                                            valueLines = optionValue
+                                                                .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                .Select(v => v.Trim())
+                                                                .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                .ToList();
+                                                        }
+                                                        else
+                                                        {
+                                                            @* Nếu không có xuống dòng nhưng có dấu gạch ngang, split theo dấu gạch ngang *@
+                                                            valueLines = optionValue
+                                                                .Split(new[] { " - ", " – ", "-", "–" }, StringSplitOptions.RemoveEmptyEntries)
+                                                                .Select(v => v.Trim())
+                                                                .Where(v => !string.IsNullOrWhiteSpace(v))
+                                                                .ToList();
+                                                        }
+                                                        
+                                                        @* Nếu có nhiều dòng, hiển thị OptionName trước, sau đó hiển thị các dòng Value *@
+                                                        if (valueLines.Count > 1)
+                                                        {
+                                                            <div class="fw-semibold mb-1">@o.OptionName</div>
+                                                            <div class="mt-1 text-start" style="white-space: pre-wrap; word-wrap: break-word; font-size: 0.875rem; line-height: 1.5;">
+                                                                @foreach (var line in valueLines)
+                                                                {
+                                                                    <div>@line</div>
+                                                                }
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
+                                                            <div class="fw-semibold mb-1">@o.OptionName<span class="text-muted"> (@optionValue)</span></div>
+                                                        }
                                                     }
                                                     else
                                                     {
+                                                        <div class="fw-semibold mb-1">@o.OptionName</div>
                                                         <div class="text-muted small mt-1 text-start">
                                                             <i class="bi bi-info-circle me-1"></i>Chưa có giá trị
                                                         </div>

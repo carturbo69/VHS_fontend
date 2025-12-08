@@ -508,6 +508,12 @@ $(document).ready(function() {
     let schedules = window.schedulesData || [];
     let timeOffs = window.timeOffsData || [];
     
+    // Debug: Log timeOffs data
+    console.log('TimeOffs data:', timeOffs);
+    if (timeOffs && timeOffs.length > 0) {
+        console.log('First timeOff sample:', timeOffs[0]);
+    }
+    
     // Handle confirm button click
     const confirmButton = document.getElementById('confirmModalButton');
     if (confirmButton) {
@@ -556,14 +562,50 @@ $(document).ready(function() {
             html += '<div class="calendar-day empty"></div>';
         }
         
+        // Tạo map các ngày trong tuần có schedule
+        const scheduleDays = new Set();
+        if (schedules && Array.isArray(schedules) && schedules.length > 0) {
+            schedules.forEach(s => {
+                // Kiểm tra DayOfWeek (PascalCase từ C# model) trước, sau đó mới kiểm tra dayOfWeek (camelCase)
+                const dayOfWeek = s.DayOfWeek !== undefined ? s.DayOfWeek : 
+                                 (s.dayOfWeek !== undefined ? s.dayOfWeek : null);
+                if (dayOfWeek !== null && dayOfWeek !== undefined) {
+                    scheduleDays.add(parseInt(dayOfWeek));
+                }
+            });
+        }
+        
         for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(year, month, day);
             const dayOfWeek = date.getDay();
             
-            const hasSchedule = schedules && schedules.length > 0 && schedules.some(s => s.dayOfWeek === dayOfWeek);
+            const hasSchedule = scheduleDays.has(dayOfWeek);
             
             const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const hasTimeOff = timeOffs && timeOffs.length > 0 && timeOffs.some(t => t.date && t.date.startsWith(dateString));
+            // Sử dụng window.timeOffsData thay vì biến local timeOffs
+            const currentTimeOffs = window.timeOffsData || [];
+            // Check both Date (PascalCase) and date (camelCase) properties
+            // Also handle different date formats (with or without time)
+            const hasTimeOff = currentTimeOffs && currentTimeOffs.length > 0 && currentTimeOffs.some(t => {
+                const timeOffDate = t.Date || t.date; // Check both PascalCase and camelCase
+                if (!timeOffDate) return false;
+                // Convert to string and check if it matches the date string
+                let dateStr = '';
+                if (typeof timeOffDate === 'string') {
+                    dateStr = timeOffDate.split('T')[0]; // Remove time part if exists
+                    dateStr = dateStr.split(' ')[0]; // Remove time part if exists (space separator)
+                } else if (timeOffDate instanceof Date) {
+                    dateStr = timeOffDate.toISOString().split('T')[0];
+                } else {
+                    dateStr = String(timeOffDate).split('T')[0].split(' ')[0];
+                }
+                // So sánh chính xác với dateString (YYYY-MM-DD)
+                const matches = dateStr === dateString;
+                if (matches) {
+                    console.log(`Time-off found for ${dateString}:`, t);
+                }
+                return matches;
+            });
             
             let className = 'calendar-day';
             if (hasTimeOff) {
@@ -572,12 +614,131 @@ $(document).ready(function() {
                 className += ' has-schedule';
             }
             
-            html += `<div class="${className}" data-day="${day}">
+            html += `<div class="${className}" data-day="${day}" data-day-of-week="${dayOfWeek}">
                 <div class="day-number">${day}</div>
             </div>`;
         }
         
         calendar.innerHTML = html;
+        
+        // Load time-offs từ API cho tháng hiện tại và cập nhật màu
+        loadTimeOffsForMonth(firstDay.toISOString().split('T')[0], lastDay.toISOString().split('T')[0]);
+    }
+    
+    // Function to load time-offs from API
+    function loadTimeOffsForMonth(startDate, endDate) {
+        fetch(`/Provider/ProviderSchedule/GetTimeOffs?startDate=${startDate}&endDate=${endDate}`)
+            .then(async res => {
+                const text = await res.text();
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    return { success: false, data: [] };
+                }
+            })
+            .then(result => {
+                const loadedTimeOffs = result.success ? result.data : (result.data || []);
+                console.log('Loaded time-offs from API:', loadedTimeOffs);
+                
+                // Cập nhật window.timeOffsData với dữ liệu mới
+                if (Array.isArray(loadedTimeOffs)) {
+                    // Merge với dữ liệu hiện có, tránh trùng lặp
+                    const existingTimeOffs = window.timeOffsData || [];
+                    const mergedTimeOffs = [...existingTimeOffs];
+                    
+                    loadedTimeOffs.forEach(newTo => {
+                        const timeOffDate = newTo.Date || newTo.date;
+                        if (!timeOffDate) return;
+                        
+                        let dateStr = '';
+                        if (typeof timeOffDate === 'string') {
+                            dateStr = timeOffDate.split('T')[0];
+                        } else if (timeOffDate instanceof Date) {
+                            dateStr = timeOffDate.toISOString().split('T')[0];
+                        } else {
+                            dateStr = String(timeOffDate).split('T')[0];
+                        }
+                        
+                        // Kiểm tra xem đã có chưa
+                        const exists = mergedTimeOffs.some(existing => {
+                            const existingDate = existing.Date || existing.date;
+                            if (!existingDate) return false;
+                            let existingDateStr = '';
+                            if (typeof existingDate === 'string') {
+                                existingDateStr = existingDate.split('T')[0];
+                            } else if (existingDate instanceof Date) {
+                                existingDateStr = existingDate.toISOString().split('T')[0];
+                            } else {
+                                existingDateStr = String(existingDate).split('T')[0];
+                            }
+                            return existingDateStr === dateStr;
+                        });
+                        
+                        if (!exists) {
+                            mergedTimeOffs.push(newTo);
+                        }
+                    });
+                    
+                    window.timeOffsData = mergedTimeOffs;
+                }
+                
+                // Apply time-off colors to calendar days
+                if (Array.isArray(loadedTimeOffs) && loadedTimeOffs.length > 0) {
+                    console.log(`Applying time-off colors for ${loadedTimeOffs.length} time-offs`);
+                    loadedTimeOffs.forEach(to => {
+                        const timeOffDate = to.Date || to.date;
+                        if (!timeOffDate) {
+                            console.warn('Time-off missing date:', to);
+                            return;
+                        }
+                        
+                        // Convert to date string format YYYY-MM-DD
+                        let dateStr = '';
+                        if (typeof timeOffDate === 'string') {
+                            dateStr = timeOffDate.split('T')[0].split(' ')[0]; // Remove time part if exists
+                        } else if (timeOffDate instanceof Date) {
+                            dateStr = timeOffDate.toISOString().split('T')[0];
+                        } else {
+                            dateStr = String(timeOffDate).split('T')[0].split(' ')[0];
+                        }
+                        
+                        console.log(`Processing time-off date: ${dateStr} (original: ${timeOffDate})`);
+                        
+                        // Extract day number from date string (YYYY-MM-DD)
+                        const dayMatch = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+                        if (dayMatch) {
+                            const day = parseInt(dayMatch[3]);
+                            const month = parseInt(dayMatch[2]);
+                            const year = parseInt(dayMatch[1]);
+                            
+                            // Verify this date is in the current calendar month
+                            const currentYear = window.calendarCurrentMonth.getFullYear();
+                            const currentMonth = window.calendarCurrentMonth.getMonth() + 1; // getMonth() returns 0-11
+                            
+                            if (year === currentYear && month === currentMonth) {
+                                const dayElements = document.querySelectorAll(`[data-day="${day}"]`);
+                                console.log(`Found ${dayElements.length} calendar day elements for day ${day}`);
+                                
+                                dayElements.forEach(el => {
+                                    // Remove has-schedule class and add has-timeoff
+                                    el.classList.remove('has-schedule');
+                                    el.classList.add('has-timeoff');
+                                    console.log(`Applied has-timeoff class to day ${day}`);
+                                });
+                            } else {
+                                console.log(`Time-off date ${dateStr} is not in current month (${currentYear}-${currentMonth})`);
+                            }
+                        } else {
+                            console.warn(`Could not parse date string: ${dateStr}`);
+                        }
+                    });
+                } else {
+                    console.log('No time-offs to apply');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading time-offs:', error);
+            });
     }
     
     // Make updateCalendarDisplay global for navigation buttons

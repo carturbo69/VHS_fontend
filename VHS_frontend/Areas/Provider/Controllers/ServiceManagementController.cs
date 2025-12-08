@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using VHS_frontend.Services.Provider;
 using VHS_frontend.Areas.Provider.Models.Service;
 using VHS_frontend.Areas.Provider.Models.Tag;
@@ -13,13 +14,16 @@ namespace VHS_frontend.Areas.Provider.Controllers
     {
         private readonly ServiceManagementService _serviceManagementService;
         private readonly ProviderProfileService _providerProfileService;
+        private readonly IConfiguration _configuration;
 
         public ServiceManagementController(
             ServiceManagementService serviceManagementService,
-            ProviderProfileService providerProfileService)
+            ProviderProfileService providerProfileService,
+            IConfiguration configuration)
         {
             _serviceManagementService = serviceManagementService;
             _providerProfileService = providerProfileService;
+            _configuration = configuration;
         }
 
         private async Task<string?> GetProviderIdFromSession(string? token)
@@ -81,6 +85,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             var services = await _serviceManagementService.GetServicesByProviderAsync(providerId, token);
 
             ViewData["Title"] = "Quản lý Dịch vụ";
+            ViewBag.BackendBase = _configuration["Apis:Backend"] ?? "http://localhost:5154";
             return View(services ?? new List<ServiceProviderReadDTO>());
         }
 
@@ -106,6 +111,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
             ViewData["Title"] = "Tạo Dịch vụ mới";
             ViewBag.ProviderId = providerId;
+            ViewBag.BackendBase = _configuration["Apis:Backend"] ?? "http://localhost:5154";
 
             return View(new ServiceProviderCreateDTO { ProviderId = Guid.Parse(providerId) });
         }
@@ -155,6 +161,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 ViewBag.Categories = categories ?? new List<CategoryDTO>();
                 // Không nạp Options ở trang tạo mới
                 ViewBag.ProviderId = providerId;
+                ViewBag.BackendBase = _configuration["Apis:Backend"] ?? "http://localhost:5154";
 
                 TempData["Error"] = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.";
                 return View(model);
@@ -181,6 +188,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                 ViewBag.Categories = categories ?? new List<CategoryDTO>();
                 // Không nạp Options ở trang tạo mới
                 ViewBag.ProviderId = providerId;
+                ViewBag.BackendBase = _configuration["Apis:Backend"] ?? "http://localhost:5154";
 
                 TempData["Error"] = response?.Message ?? "Tạo dịch vụ thất bại.";
                 return View(model);
@@ -246,6 +254,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
             ViewBag.CurrentImageUrl = service.Images;
             ViewBag.CategoryName = service.CategoryName;
             ViewBag.CategoryId = service.CategoryId.ToString();
+            ViewBag.BackendBase = _configuration["Apis:Backend"] ?? "http://localhost:5154";
 
             return View(updateModel);
         }
@@ -283,6 +292,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     ViewBag.OptionValues = optionValues;
                 }
                 ViewBag.ServiceId = id;
+                ViewBag.BackendBase = _configuration["Apis:Backend"] ?? "http://localhost:5154";
 
                 TempData["Error"] = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.";
                 return View(model);
@@ -334,6 +344,55 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     }
                 }
             }
+            
+            // Thu thập RemoveImages từ form data (nhiều input hidden với name="RemoveImages")
+            if (model.RemoveImages == null)
+            {
+                model.RemoveImages = new List<string>();
+            }
+            // Lấy tất cả giá trị RemoveImages từ form (có thể có nhiều input với cùng name)
+            if (form.ContainsKey("RemoveImages"))
+            {
+                var removeImages = form["RemoveImages"];
+                foreach (var removePath in removeImages)
+                {
+                    if (!string.IsNullOrWhiteSpace(removePath))
+                    {
+                        // Normalize path: remove leading/trailing whitespace và đảm bảo format đúng
+                        var normalizedPath = removePath.Trim();
+                        // Nếu path bắt đầu bằng http, cần extract relative path
+                        if (normalizedPath.StartsWith("http://") || normalizedPath.StartsWith("https://"))
+                        {
+                            try
+                            {
+                                // Extract path sau domain (ví dụ: http://localhost:5154/uploads/... -> /uploads/...)
+                                var uri = new Uri(normalizedPath);
+                                normalizedPath = uri.AbsolutePath;
+                            }
+                            catch
+                            {
+                                // Nếu không parse được URI, giữ nguyên path
+                            }
+                        }
+                        // Đảm bảo path bắt đầu bằng /
+                        if (!normalizedPath.StartsWith("/"))
+                        {
+                            normalizedPath = "/" + normalizedPath;
+                        }
+                        model.RemoveImages.Add(normalizedPath);
+                    }
+                }
+            }
+            
+            // Debug log
+            if (model.RemoveImages != null && model.RemoveImages.Count > 0)
+            {
+                System.Diagnostics.Debug.WriteLine($"RemoveImages count: {model.RemoveImages.Count}");
+                foreach (var path in model.RemoveImages)
+                {
+                    System.Diagnostics.Debug.WriteLine($"  - {path}");
+                }
+            }
 
             var response = await _serviceManagementService.UpdateServiceAsync(id, model, token);
 
@@ -368,6 +427,7 @@ namespace VHS_frontend.Areas.Provider.Controllers
                     ViewBag.OptionValues = optionValues;
                 }
                 ViewBag.ServiceId = id;
+                ViewBag.BackendBase = _configuration["Apis:Backend"] ?? "http://localhost:5154";
 
                 TempData["Error"] = response?.Message ?? "Cập nhật dịch vụ thất bại.";
                 return View(model);

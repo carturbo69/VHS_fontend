@@ -232,8 +232,9 @@
                     <label class="form-label">
                         <i class="bi bi-card-heading me-1"></i>Tên tùy chọn <span class="text-danger">*</span>
                     </label>
-                    <input type="text" id="optionName" class="form-control" required placeholder="Nhập tên tùy chọn..." />
+                    <textarea id="optionName" class="form-control" maxlength="200" required placeholder="Nhập tên tùy chọn..." rows="3" style="resize: vertical; min-height: 60px;"></textarea>
                     <div class="invalid-feedback">Vui lòng nhập tên tùy chọn.</div>
+                    <small class="form-text text-muted">Tối đa 200 ký tự. Text sẽ tự động xuống dòng khi quá dài.</small>
                 </div>
                 <div id="optionError" class="text-danger small"></div>
             </div>
@@ -384,6 +385,24 @@
             return 'Không thể xóa danh mục. Vui lòng kiểm tra lại.';
           }
           
+          if (lowerText.includes('cannot update category') || (lowerText.includes('cannot update') && lowerText.includes('category'))) {
+            if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng') || lowerText.includes('being used')) {
+              return 'Không thể cập nhật danh mục này vì đang có dịch vụ đang sử dụng.';
+            }
+            return 'Không thể cập nhật danh mục. Vui lòng thử lại.';
+          }
+          
+          // Kiểm tra lỗi category đang được sử dụng (không cần có "cannot update")
+          if (lowerText.includes('category') && (lowerText.includes('service') || lowerText.includes('dịch vụ')) && (lowerText.includes('đang sử dụng') || lowerText.includes('đang được sử dụng') || lowerText.includes('being used'))) {
+            if (lowerText.includes('update') || lowerText.includes('cập nhật') || lowerText.includes('sửa')) {
+              return 'Không thể cập nhật danh mục này vì đang có dịch vụ đang sử dụng.';
+            }
+            if (lowerText.includes('delete') || lowerText.includes('xóa') || lowerText.includes('xoá')) {
+              return 'Không thể xóa danh mục này vì đang có dịch vụ đang sử dụng.';
+            }
+            return 'Danh mục này đang được dịch vụ sử dụng. Không thể thực hiện thao tác.';
+          }
+          
           // Tag errors
           if (lowerText.includes('cannot delete tag') || lowerText.includes('cannot delete') && lowerText.includes('tag')) {
             if (lowerText.includes('service') || lowerText.includes('dịch vụ') || lowerText.includes('đang sử dụng')) {
@@ -492,14 +511,22 @@
 
           // edit
           if (btn.classList.contains('btn-edit')) {
-            const res = await fetch(routes.catGet + `?id=${id}`);
-            if (!res.ok) { showNotice('Không thể đọc dữ liệu. Vui lòng thử lại.', 'error', 3000); return; }
-            const dto = await res.json();
-            document.getElementById('catModalTitle').textContent = 'Sửa danh mục';
-            catIdEl.value = dto.categoryId;
-            catNameEl.value = dto.name;
-            catErr.textContent = '';
-            catModal.show(); return;
+            // Check if category is being used by services before allowing edit
+            try {
+              // Try to update with same name to check if it's in use (this will fail if in use)
+              // Or we can check directly via a separate endpoint, but for now we'll let backend handle it
+              const res = await fetch(routes.catGet + `?id=${id}`);
+              if (!res.ok) { showNotice('Không thể đọc dữ liệu. Vui lòng thử lại.', 'error', 3000); return; }
+              const dto = await res.json();
+              document.getElementById('catModalTitle').textContent = 'Sửa danh mục';
+              catIdEl.value = dto.categoryId;
+              catNameEl.value = dto.name;
+              catErr.textContent = '';
+              catModal.show(); return;
+            } catch (error) {
+              showNotice('Không thể mở form sửa. Vui lòng thử lại.', 'error', 3000);
+              return;
+            }
           }
 
            // delete
@@ -647,15 +674,44 @@
            } else {
             const errorText = await res.text();
             const translatedError = translateError(errorText);
+            const lowerText = (errorText || '').toLowerCase();
+            
+            // Kiểm tra xem có phải lỗi do category đang được dịch vụ sử dụng không
+            const isInUseError = lowerText.includes('service') || 
+                                 lowerText.includes('dịch vụ') || 
+                                 lowerText.includes('đang sử dụng') || 
+                                 lowerText.includes('cannot update category') ||
+                                 lowerText.includes('cannot update') && lowerText.includes('category') ||
+                                 lowerText.includes('being used');
             
             if (res.status === 409) {
-              catErr.textContent = translatedError || 'Tên danh mục đã tồn tại. Vui lòng chọn tên khác.';
+              // Conflict - có thể là duplicate name hoặc đang được sử dụng
+              if (isInUseError) {
+                // Category đang được dịch vụ sử dụng - đóng modal và hiển thị toast
+                catModal.hide();
+                showNotice(translatedError || 'Không thể cập nhật danh mục này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
+              } else {
+                // Duplicate name
+                catErr.textContent = translatedError || 'Tên danh mục đã tồn tại. Vui lòng chọn tên khác.';
+              }
             } else if (res.status === 400) {
-              catErr.textContent = translatedError || 'Dữ liệu không hợp lệ.';
+              // Bad Request - có thể là validation error hoặc đang được sử dụng
+              if (isInUseError) {
+                catModal.hide();
+                showNotice(translatedError || 'Không thể cập nhật danh mục này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
+              } else {
+                catErr.textContent = translatedError || 'Dữ liệu không hợp lệ.';
+              }
             } else if (res.status === 404) {
               catErr.textContent = 'Không tìm thấy danh mục.';
             } else {
-              catErr.textContent = translatedError || 'Có lỗi xảy ra.';
+              // Các lỗi khác - kiểm tra xem có phải lỗi đang được sử dụng không
+              if (isInUseError) {
+                catModal.hide();
+                showNotice(translatedError || 'Không thể cập nhật danh mục này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
+              } else {
+                catErr.textContent = translatedError || 'Có lỗi xảy ra.';
+              }
             }
           }
         });
@@ -923,26 +979,26 @@
 
           // Render danh sách options đơn giản
           list.forEach(o => {
-            const li = document.createElement('li');
-            li.className = 'list-group-item option-item';
-            li.dataset.optionId = o.optionId;
+              const li = document.createElement('li');
+              li.className = 'list-group-item option-item';
+              li.dataset.optionId = o.optionId;
 
-            li.innerHTML = `
-              <div class="l" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                <span class="dot ok"></span>
-                <i class="bi bi-list-check pri-i text-primary"></i>
-                <span class="option-name fw-semibold">${o.optionName}</span>
-              </div>
-              <div class="r btn-group">
-                <button class="btn btn-sm btn-outline-primary soft btn-edit-option" title="Sửa tùy chọn">
-                  <i class="bi bi-pencil-square"></i> Sửa
-                </button>
-                <button class="btn btn-sm btn-outline-danger soft btn-delete-option" title="Xóa tùy chọn">
-                  <i class="bi bi-trash"></i> Xóa
-                </button>
-              </div>`;
-            ul.appendChild(li);
-          });
+              li.innerHTML = `
+                <div class="l" style="display: flex; align-items: flex-start; gap: 0.5rem; flex-wrap: wrap; flex: 1; min-width: 0;">
+                  <span class="dot ok" style="flex-shrink: 0; margin-top: 0.25rem;"></span>
+                  <i class="bi bi-list-check pri-i text-primary" style="flex-shrink: 0; margin-top: 0.25rem;"></i>
+                  <span class="option-name fw-semibold" style="flex: 1; min-width: 0;">${o.optionName}</span>
+                </div>
+                <div class="r btn-group" style="flex-shrink: 0;">
+                  <button class="btn btn-sm btn-outline-primary soft btn-edit-option" title="Sửa tùy chọn">
+                    <i class="bi bi-pencil-square"></i> Sửa
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger soft btn-delete-option" title="Xóa tùy chọn">
+                    <i class="bi bi-trash"></i> Xóa
+                  </button>
+                </div>`;
+              ul.appendChild(li);
+            });
         }
 
         // Toggle options - handle click on toggle-options button
@@ -1121,7 +1177,7 @@
                 optionModal.hide();
                 showNotice(translatedError || 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
               } else {
-                optionErr.textContent = translatedError || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+              optionErr.textContent = translatedError || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
               }
             } else if (res.status === 403) {
               // Forbidden - thường là do đang được sử dụng
@@ -1134,8 +1190,8 @@
               if (isInUseError) {
                 optionModal.hide();
                 showNotice(translatedError || 'Không thể cập nhật tùy chọn này vì đang có dịch vụ đang sử dụng.', 'error', 5000);
-              } else {
-                optionErr.textContent = translatedError || 'Có lỗi xảy ra. Vui lòng thử lại sau.';
+            } else {
+              optionErr.textContent = translatedError || 'Có lỗi xảy ra. Vui lòng thử lại sau.';
               }
             }
           }

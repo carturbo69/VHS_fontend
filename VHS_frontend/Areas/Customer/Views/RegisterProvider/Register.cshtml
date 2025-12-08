@@ -148,6 +148,7 @@
                                            class="category-checkbox"
                                            data-category-name="@c.Name" />
                                     <label for="cat_@c.Id" class="category-label">
+                                        <i class="bi bi-check-circle category-check-icon"></i>
                                         <div class="category-icon">
                                             @{
                                                 var iconClass = "bi-tools"; // default
@@ -164,7 +165,6 @@
                                             <i class="bi @iconClass"></i>
                                         </div>
                                         <span class="category-name">@c.Name</span>
-                                        <i class="bi bi-check-circle category-check-icon"></i>
                                     </label>
 
                                     <!-- Tags cho category này (sẽ load từ API) -->
@@ -563,6 +563,12 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
 
           // Cache tags data
           const tagsCache = new Map();
+          
+          // Store auto-close timers for each category
+          const categoryAutoCloseTimers = new Map();
+          
+          // Track categories that are open but have no tags selected
+          const openCategoriesWithoutTags = new Set();
 
           // Check phone number duplicate
           let phoneCheckTimeout = null;
@@ -703,7 +709,7 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               `;
               container.appendChild(label);
 
-              // Add event listener để xóa lỗi khi chọn tag
+              // Add event listener để xóa lỗi khi chọn tag và hủy auto-close
               const tagCheckbox = label.querySelector('input[type="checkbox"]');
               tagCheckbox.addEventListener('change', function() {
                 const catId = this.dataset.categoryId;
@@ -714,6 +720,20 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 // Ẩn lỗi nếu đã chọn ít nhất 1 tag
                 if (tagsChecked.length > 0 && tagError) {
                   tagError.style.display = 'none';
+                }
+                
+                // Cập nhật set khi tag được chọn/bỏ chọn
+                if (tagsChecked.length === 0) {
+                  // Thêm vào set nếu category đang mở
+                  const categoryCheckbox = document.querySelector(`.category-checkbox[value="${catId}"]`);
+                  if (categoryCheckbox && categoryCheckbox.checked) {
+                    openCategoriesWithoutTags.add(catId);
+                    console.log('📝 Category added to openCategoriesWithoutTags (all tags unselected):', catId);
+                  }
+                } else {
+                  // Xóa khỏi set khi có tag được chọn
+                  openCategoriesWithoutTags.delete(catId);
+                  console.log('✅ Category removed from openCategoriesWithoutTags (tag selected):', catId);
                 }
               });
             });
@@ -734,6 +754,13 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               console.log('📍 Tags section:', tagsSection);
 
               if (this.checked) {
+                // Hủy auto-close timer cũ nếu có
+                const existingTimer = categoryAutoCloseTimers.get(categoryId);
+                if (existingTimer) {
+                  clearTimeout(existingTimer);
+                  categoryAutoCloseTimers.delete(categoryId);
+                }
+                
                 // Show tags for selected category
                 if (tagsSection) {
                   console.log('👁️ Showing tags section');
@@ -751,9 +778,27 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                     console.log('🚀 Loading tags...');
                     const tags = await loadTagsForCategory(categoryId);
                     renderTags(categoryId, tags);
+                    
+                    // Kiểm tra xem có tag nào được chọn không
+                    const tagsChecked = document.querySelectorAll(`[data-category="${categoryId}"] input[name="SelectedTags"]:checked`);
+                    if (tagsChecked.length === 0) {
+                      // Thêm vào set để track category mở nhưng chưa có tag
+                      openCategoriesWithoutTags.add(categoryId);
+                      console.log('📝 Category added to openCategoriesWithoutTags:', categoryId);
+                    }
                   }
                 }
               } else {
+                // Hủy auto-close timer nếu có
+                const existingTimer = categoryAutoCloseTimers.get(categoryId);
+                if (existingTimer) {
+                  clearTimeout(existingTimer);
+                  categoryAutoCloseTimers.delete(categoryId);
+                }
+                
+                // Xóa khỏi set khi category được đóng
+                openCategoriesWithoutTags.delete(categoryId);
+                
                 // Hide tags và uncheck tất cả tags của category này
                 if (tagsSection) {
                   console.log('🙈 Hiding tags section');
@@ -764,6 +809,36 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 }
               }
             });
+          });
+
+          // Handle click outside category to auto-close if no tags selected
+          document.addEventListener('click', function(e) {
+            // Kiểm tra xem click có nằm trong category card không
+            const clickedCategoryCard = e.target.closest('.category-card');
+            
+            // Nếu click ra ngoài tất cả category cards
+            if (!clickedCategoryCard) {
+              // Đóng tất cả categories không có tag được chọn
+              openCategoriesWithoutTags.forEach(categoryId => {
+                const categoryCheckbox = document.querySelector(`.category-checkbox[value="${categoryId}"]`);
+                if (categoryCheckbox && categoryCheckbox.checked) {
+                  const tagsChecked = document.querySelectorAll(`[data-category="${categoryId}"] input[name="SelectedTags"]:checked`);
+                  if (tagsChecked.length === 0) {
+                    console.log('🖱️ Click outside - closing category:', categoryId);
+                    categoryCheckbox.checked = false;
+                    categoryCheckbox.dispatchEvent(new Event('change'));
+                  }
+                }
+              });
+            } else {
+              // Nếu click trong category card, kiểm tra xem có click vào category label không
+              const clickedCategoryLabel = e.target.closest('.category-label');
+              const clickedTag = e.target.closest('.tag-checkbox');
+              
+              // Nếu click vào category label (để check/uncheck) hoặc tag, không làm gì
+              // Nếu click vào phần khác của category card (như tags section), cũng không làm gì
+              // Chỉ đóng khi click hoàn toàn ra ngoài category card
+            }
           });
 
           // Business License file upload
@@ -1057,8 +1132,10 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
 
             // BẮT BUỘC ảnh đại diện (cho cả lần đầu và resubmit)
             const avatarError = document.getElementById('avatarError');
+            const avatarField = placeholder?.closest('.field') || fileInput?.closest('.field');
             if (!fileInput?.files || fileInput.files.length === 0) {
-              errors.push({ msg: "Vui lòng chọn ảnh đại diện.", el: fileInput });
+              // Sử dụng placeholder hoặc field chứa avatar để scroll
+              errors.push({ msg: "Vui lòng chọn ảnh đại diện.", el: placeholder || avatarField || fileInput });
               placeholder?.classList.add('is-invalid');
               avatarError?.classList.remove('d-none');
             } else {
@@ -1240,22 +1317,72 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
               // Hiển thị lỗi đầu tiên bằng toast
               if (firstError.msg) {
                 showToast(firstError.msg, 'error');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
               }
               
-              if (firstError.el) {
-                // Special handling for terms checkbox
-                if (firstError.el === agreeTermsEl) {
-                  scrollToTermsError();
-                } else {
-                  setTimeout(() => {
-                    firstError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    if (typeof firstError.el.focus === 'function') {
-                      firstError.el.focus();
+              // Scroll đến trường lỗi đầu tiên
+              setTimeout(() => {
+                if (firstError.el) {
+                  // Special handling for terms checkbox
+                  if (firstError.el === agreeTermsEl) {
+                    scrollToTermsError();
+                  } else if (firstError.el === placeholder || firstError.el.classList?.contains('avatar-tile')) {
+                    // Avatar placeholder - scroll đến field chứa avatar
+                    const avatarField = firstError.el.closest('.field');
+                    if (avatarField) {
+                      avatarField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                      firstError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
-                  }, 500);
+                  } else {
+                    // Scroll đến element và focus
+                    firstError.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Focus sau khi scroll xong (chỉ với input, textarea, select)
+                    setTimeout(() => {
+                      if (firstError.el && 
+                          (firstError.el.tagName === 'INPUT' || 
+                           firstError.el.tagName === 'TEXTAREA' || 
+                           firstError.el.tagName === 'SELECT')) {
+                        if (typeof firstError.el.focus === 'function') {
+                          firstError.el.focus();
+                        }
+                      }
+                    }, 300);
+                  }
+                } else {
+                  // Nếu không có element cụ thể, scroll đến phần liên quan dựa trên message
+                  if (firstError.msg.includes('danh mục')) {
+                    const categoryGrid = document.querySelector('.category-grid');
+                    if (categoryGrid) {
+                      categoryGrid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  } else if (firstError.msg.includes('dịch vụ cụ thể') || firstError.msg.includes('tag')) {
+                    // Tag error - scroll đến category card đầu tiên có lỗi
+                    const firstCategoryCard = document.querySelector('.category-card .tag-error');
+                    if (firstCategoryCard) {
+                      firstCategoryCard.closest('.category-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                      const categoryGrid = document.querySelector('.category-grid');
+                      if (categoryGrid) {
+                        categoryGrid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }
+                  } else if (firstError.msg.includes('giấy phép')) {
+                    // License error - scroll đến license input field
+                    const licenseField = document.querySelector('#BusinessLicenses')?.closest('.field');
+                    if (licenseField) {
+                      licenseField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                      const licenseInput = document.querySelector('#BusinessLicenses');
+                      if (licenseInput) {
+                        licenseInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }
+                  } else {
+                    // Default: scroll to top để người dùng thấy toast
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
                 }
-              }
+              }, 100);
 
               return;
             }

@@ -14,7 +14,7 @@ namespace VHS_frontend.Areas.Provider.Models.Service
         public string Title { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Vui lòng nhập mô tả dịch vụ.")]
-        [StringLength(2000, ErrorMessage = "Mô tả không được vượt quá 2000 ký tự.")]
+        [StringLength(3000, ErrorMessage = "Mô tả không được vượt quá 3000 ký tự.")]
         public string Description { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Giá không được để trống.")]
