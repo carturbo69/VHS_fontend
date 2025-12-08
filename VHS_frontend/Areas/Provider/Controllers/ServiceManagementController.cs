@@ -398,6 +398,62 @@ namespace VHS_frontend.Areas.Provider.Controllers
 
             if (response?.Success == true)
             {
+                // Lấy service sau khi update để kiểm tra status thực tế
+                var updatedService = await _serviceManagementService.GetServiceByIdAsync(id, token);
+                var actualStatus = updatedService?.Status ?? model.Status;
+                
+                // Xóa tất cả cart items có ServiceId này khi provider sửa dịch vụ
+                // Lý do: Khi dịch vụ được sửa, thông tin có thể thay đổi (giá, mô tả, options, tags...)
+                // và không còn phù hợp với cart items cũ. Đặc biệt khi service chuyển sang Pending/PendingUpdate
+                // thì cần xóa để tránh khách hàng đặt hàng với thông tin dịch vụ cũ.
+                if (Guid.TryParse(id, out var serviceIdGuid))
+                {
+                    try
+                    {
+                        var backendBase = _configuration["Apis:Backend"] ?? "http://localhost:5154";
+                        var apiUrl = $"{backendBase.TrimEnd('/')}/api/carts/service/{serviceIdGuid}/items";
+                        
+                        System.Diagnostics.Debug.WriteLine($"🔄 Đang xóa cart items cho service {serviceIdGuid}...");
+                        System.Diagnostics.Debug.WriteLine($"   API URL: {apiUrl}");
+                        
+                        using var httpClient = new HttpClient();
+                        if (!string.IsNullOrEmpty(token))
+                        {
+                            httpClient.DefaultRequestHeaders.Authorization = 
+                                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                        }
+                        
+                        var deleteResponse = await httpClient.DeleteAsync(apiUrl);
+                        
+                        if (deleteResponse.IsSuccessStatusCode)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"✅ Đã xóa cart items cho service {serviceIdGuid} (Status trước: {currentService.Status}, Status sau: {actualStatus})");
+                        }
+                        else
+                        {
+                            var errorContent = await deleteResponse.Content.ReadAsStringAsync();
+                            System.Diagnostics.Debug.WriteLine($"⚠️ Không thể xóa cart items cho service {serviceIdGuid}:");
+                            System.Diagnostics.Debug.WriteLine($"   Status Code: {deleteResponse.StatusCode}");
+                            System.Diagnostics.Debug.WriteLine($"   Response: {errorContent}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log lỗi nhưng không chặn flow chính
+                        System.Diagnostics.Debug.WriteLine($"❌ Lỗi khi xóa cart items cho service {serviceIdGuid}:");
+                        System.Diagnostics.Debug.WriteLine($"   Message: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"   Stack trace: {ex.StackTrace}");
+                        if (ex.InnerException != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"   Inner exception: {ex.InnerException.Message}");
+                        }
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"⚠️ Không thể parse serviceId: {id}");
+                }
+                
                 TempData["Success"] = "Cập nhật dịch vụ thành công!";
                 return RedirectToAction("Index");
             }

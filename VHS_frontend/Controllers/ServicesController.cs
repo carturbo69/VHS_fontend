@@ -9,6 +9,7 @@ using VHS_frontend.Models.ServiceShop;
 using VHS_frontend.Services.Customer.Implementations;
 using VHS_frontend.Services.Customer.Interfaces;
 using Microsoft.Extensions.Configuration;
+using System.Security.Cryptography;
 
 namespace VHS_frontend.Controllers
 {
@@ -47,7 +48,8 @@ namespace VHS_frontend.Controllers
          string? search = null,
          string? category = null,
          string? tag = null,
-         string? sort = null)
+         string? sort = null,
+         string? filter = null)
         {
             const int pageSize = 20;
 
@@ -101,8 +103,9 @@ namespace VHS_frontend.Controllers
             // Filter theo tag (nếu có)
             if (!string.IsNullOrWhiteSpace(tag) && Guid.TryParse(tag, out var tagId))
             {
-                // Lấy tagName từ tags list đã load
                 string? tagName = null;
+                
+                // Ưu tiên: Lấy tagName từ tags list đã load (từ category đã chọn)
                 if (tags != null)
                 {
                     var selectedTag = tags.FirstOrDefault(t => t.TagId == tagId);
@@ -126,9 +129,23 @@ namespace VHS_frontend.Controllers
                             {
                                 var allTags = await tagsResponse.Content.ReadFromJsonAsync<List<TagDTO>>(_jsonOptions);
                                 var foundTag = allTags?.FirstOrDefault(t => t.TagId == tagId);
-                                if (foundTag != null)
+                                if (foundTag != null && !string.IsNullOrWhiteSpace(foundTag.Name))
                                 {
                                     tagName = foundTag.Name;
+                                }
+                            }
+                        }
+                        
+                        // Nếu vẫn không tìm thấy, thử lấy tag trực tiếp từ tagId
+                        if (string.IsNullOrWhiteSpace(tagName))
+                        {
+                            var tagResponse = await httpClient.GetAsync($"api/tag/{tagId}");
+                            if (tagResponse.IsSuccessStatusCode)
+                            {
+                                var tagInfo = await tagResponse.Content.ReadFromJsonAsync<TagDTO>(_jsonOptions);
+                                if (tagInfo != null && !string.IsNullOrWhiteSpace(tagInfo.Name))
+                                {
+                                    tagName = tagInfo.Name;
                                 }
                             }
                         }
@@ -137,6 +154,8 @@ namespace VHS_frontend.Controllers
                 }
 
                 // Filter services theo tagName (kiểm tra trong title hoặc description)
+                // Lưu ý: Đây là cách filter tạm thời vì DTO không có thông tin Tags
+                // Để filter chính xác, cần có API backend filter services theo tagId
                 if (!string.IsNullOrWhiteSpace(tagName))
                 {
                     all = all.Where(s =>
@@ -144,18 +163,49 @@ namespace VHS_frontend.Controllers
                         (!string.IsNullOrEmpty(s.Description) && s.Description.Contains(tagName, StringComparison.OrdinalIgnoreCase))
                     );
                 }
+                else
+                {
+                    // Nếu không tìm thấy tagName, không filter (hiển thị tất cả services của category)
+                    // Hoặc có thể return empty nếu muốn strict filter
+                }
             }
 
+            // Filter theo khoảng giá (sort parameter)
             all = sort switch
             {
                 "price-500" => all.Where(s => s.Price < 500_000),
                 "price-500-1000" => all.Where(s => s.Price >= 500_000 && s.Price < 1_000_000),
                 "price-1000-5000" => all.Where(s => s.Price >= 1_000_000 && s.Price <= 5_000_000),
                 "price-5000" => all.Where(s => s.Price > 5_000_000),
-                "stars" => all.OrderByDescending(s => s.AverageRating).ThenByDescending(s => s.TotalReviews),
-                "newest" => all.OrderByDescending(s => s.CreatedAt ?? DateTime.MinValue),
-                _ => all.OrderBy(s => s.Title) 
+                _ => all
             };
+
+            // Sắp xếp kết quả (filter parameter)
+            all = filter switch
+            {
+                "price-asc" => all.OrderBy(s => s.Price),
+                "price-desc" => all.OrderByDescending(s => s.Price),
+                "stars" => all.Where(s => s.AverageRating >= 4.0)
+                              .OrderByDescending(s => s.AverageRating)
+                              .ThenByDescending(s => s.TotalReviews),
+                _ => all.OrderBy(s => s.Title)
+            };
+
+            // Xáo trộn ngẫu nhiên danh sách dịch vụ (chỉ khi không có filter sắp xếp cụ thể)
+            if (string.IsNullOrWhiteSpace(filter))
+            {
+                var allList = all.ToList();
+                // Sử dụng Random với seed dựa trên thời gian để mỗi lần reload có thứ tự khác nhau
+                var random = new Random((int)DateTime.Now.Ticks);
+                for (int i = allList.Count - 1; i > 0; i--)
+                {
+                    int j = random.Next(i + 1);
+                    var temp = allList[i];
+                    allList[i] = allList[j];
+                    allList[j] = temp;
+                }
+                all = allList.AsQueryable();
+            }
 
             page = Math.Max(1, page);
             var totalFiltered = all.Count();
@@ -172,6 +222,7 @@ namespace VHS_frontend.Controllers
             ViewBag.Category = category;
             ViewBag.Tag = tag;
             ViewBag.Sort = sort;
+            ViewBag.Filter = filter;
 
             return View(models);
         }

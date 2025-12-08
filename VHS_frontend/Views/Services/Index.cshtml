@@ -6,6 +6,7 @@
     string category = ViewBag.Category as string ?? "";
     string tag = ViewBag.Tag as string ?? "";
     string sort = ViewBag.Sort as string ?? "";
+    string filter = ViewBag.Filter as string ?? "";
     int currentPage = ViewBag.CurrentPage ?? 1;
     int totalPages = ViewBag.TotalPages ?? 1;
     int startPage = Math.Max(1, currentPage - 2);
@@ -126,6 +127,7 @@
 
         <!-- Advanced Filter -->
         <form method="get" asp-action="Index" class="services-filter-card" id="filterForm">
+            <input type="hidden" name="tag" id="tagHiddenInput" value="@tag" />
             <div class="filter-header">
                 <svg class="filter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M22 3H2L10 12.46V19L14 21V12.46L22 3Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -152,56 +154,6 @@
                 <div class="filter-input-group">
                     <label class="filter-label">
                         <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M4 4H20V6H4V4ZM7 9H17V11H7V9ZM10 14H14V16H10V14Z" fill="currentColor"/>
-                        </svg>
-                        Danh mục
-                    </label>
-                    <div class="select-wrapper">
-                        <select name="category" id="categorySelect" class="filter-select">
-                            <option value="">Tất cả danh mục</option>
-                            @if (ViewBag.Categories is IEnumerable<VHS_frontend.Areas.Admin.Models.Category.CategoryDTO> categories)
-                            {
-                                foreach (var cat in categories)
-                                {
-                                    <option value="@cat.CategoryId" selected="@(category == cat.CategoryId.ToString())">
-                                        @cat.Name
-                                    </option>
-                                }
-                            }
-                        </select>
-                        <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M6 9L12 15L18 9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="filter-input-group" id="tagFilterGroup" style="@(tags.Any() ? "" : "display: none;")">
-                    <label class="filter-label">
-                        <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M20.59 13.41L13.42 20.58C13.2343 20.766 13.0137 20.9135 12.7709 21.0141C12.5281 21.1148 12.2678 21.1666 12.005 21.1666C11.7422 21.1666 11.4819 21.1148 11.2391 21.0141C10.9963 20.9135 10.7757 20.766 10.59 20.58L2 12V2H12L20.59 10.59C20.9625 10.9647 21.1716 11.4716 21.1716 12C21.1716 12.5284 20.9625 13.0353 20.59 13.41Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <circle cx="7" cy="7" r="1.5" fill="currentColor"/>
-                        </svg>
-                        Tag
-                    </label>
-                    <div class="select-wrapper">
-                        <select name="tag" id="tagSelect" class="filter-select">
-                            <option value="">Tất cả tags</option>
-                            @foreach (var tagItem in tags)
-                            {
-                                <option value="@tagItem.TagId" selected="@(tag == tagItem.TagId.ToString())">
-                                    @tagItem.Name
-                                </option>
-                            }
-                        </select>
-                        <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M6 9L12 15L18 9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="filter-input-group">
-                    <label class="filter-label">
-                        <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M12 2V6M12 18V22M4.93 4.93L7.76 7.76M16.24 16.24L19.07 19.07M2 12H6M18 12H22M4.93 19.07L7.76 16.24M16.24 7.76L19.07 4.93" stroke-width="2" stroke-linecap="round"/>
                         </svg>
                         Sắp xếp
@@ -213,7 +165,26 @@
                             <option value="price-500-1000" selected="@(sort == "price-500-1000")">500K - 1M</option>
                             <option value="price-1000-5000" selected="@(sort == "price-1000-5000")">1M - 5M</option>
                             <option value="price-5000" selected="@(sort == "price-5000")">Trên 5M</option>
-                            <option value="stars" selected="@(sort == "stars")">⭐ Đánh giá cao nhất</option>
+                        </select>
+                        <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M6 9L12 15L18 9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="filter-input-group">
+                    <label class="filter-label">
+                        <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M3 4H21V6H3V4ZM3 10H21V12H3V10ZM3 16H21V18H3V16Z" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        Bộ lọc
+                    </label>
+                    <div class="select-wrapper">
+                        <select name="filter" class="filter-select">
+                            <option value="">Mặc định</option>
+                            <option value="price-asc" selected="@(filter == "price-asc")">Giá từ thấp đến cao</option>
+                            <option value="price-desc" selected="@(filter == "price-desc")">Giá từ cao đến thấp</option>
+                            <option value="stars" selected="@(filter == "stars")">⭐ Đánh giá cao nhất</option>
                         </select>
                         <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M6 9L12 15L18 9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -229,6 +200,47 @@
                     <span>Tìm kiếm</span>
                     <div class="btn-shine"></div>
                 </button>
+
+                <div class="filter-input-group category-chips-group" style="grid-column: 1 / -1;">
+                    <label class="filter-label">
+                        <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M4 4H20V6H4V4ZM7 9H17V11H7V9ZM10 14H14V16H10V14Z" fill="currentColor"/>
+                        </svg>
+                        Danh mục
+                    </label>
+                    <div class="category-chips-container">
+                        <input type="hidden" name="category" id="categorySelect" value="@category" />
+                        <div class="category-chip-wrapper">
+                            <button type="button" class="category-chip @(string.IsNullOrEmpty(category) ? "active" : "")" data-category-id="">
+                                <span>Tất cả</span>
+                </button>
+                        </div>
+                        @if (ViewBag.Categories is IEnumerable<VHS_frontend.Areas.Admin.Models.Category.CategoryDTO> categories)
+                        {
+                            foreach (var cat in categories)
+                            {
+                                var isSelected = category == cat.CategoryId.ToString();
+                                var categoryTags = tags.Where(t => t.CategoryId == cat.CategoryId).ToList();
+                                <div class="category-chip-wrapper">
+                                    <button type="button" class="category-chip @(isSelected ? "active" : "")" data-category-id="@cat.CategoryId">
+                                        <span>@cat.Name</span>
+                                    </button>
+                                    <div class="category-tag-dropdown @(isSelected && categoryTags.Any() ? "show" : "")" data-category-id="@cat.CategoryId" style="display: @(isSelected && categoryTags.Any() ? "block" : "none");">
+                                        <div class="category-tags-list">
+                                            @foreach (var tagItem in categoryTags)
+                                            {
+                                                var isTagSelected = tag == tagItem.TagId.ToString();
+                                                <button type="button" class="category-tag-item @(isTagSelected ? "active" : "")" data-tag-id="@tagItem.TagId">
+                                                    @tagItem.Name
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
             </div>
         </form>
 
@@ -536,6 +548,115 @@ document.addEventListener('DOMContentLoaded', function() {
     const categorySelect = document.getElementById('categorySelect');
     const tagSelect = document.getElementById('tagSelect');
     const tagFilterGroup = document.getElementById('tagFilterGroup');
+    const tagHiddenInput = document.getElementById('tagHiddenInput');
+    
+    // Handle tag button clicks
+    document.addEventListener('click', function(e) {
+        const tagButton = e.target.closest('.category-tag-item');
+        if (!tagButton) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const tagId = tagButton.getAttribute('data-tag-id') || '';
+        
+        // Lấy categoryId từ dropdown chứa tag này
+        const dropdown = tagButton.closest('.category-tag-dropdown');
+        const categoryId = dropdown ? dropdown.getAttribute('data-category-id') : '';
+        
+        // Remove active class from all tag buttons trong tất cả dropdowns
+        document.querySelectorAll('.category-tag-item').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Add active class to clicked tag button
+        tagButton.classList.add('active');
+        
+        // Update hidden input cho tag
+        if (tagHiddenInput) {
+            tagHiddenInput.value = tagId;
+        }
+        
+        // Set category tương ứng nếu có
+        if (categoryId && categorySelect) {
+            categorySelect.value = categoryId;
+            
+            // Update active state của category chip
+            document.querySelectorAll('.category-chip').forEach(chip => {
+                chip.classList.remove('active');
+            });
+            const categoryChip = document.querySelector(`.category-chip[data-category-id="${categoryId}"]`);
+            if (categoryChip) {
+                categoryChip.classList.add('active');
+            }
+        }
+        
+        // Auto-load services when tag is selected
+        loadServices(1);
+    });
+    
+    // Initialize tag dropdown for selected category on page load
+    const currentTag = '@tag';
+    if (categorySelect && categorySelect.value) {
+        const selectedCategoryId = categorySelect.value;
+        const selectedChip = document.querySelector(`.category-chip[data-category-id="${selectedCategoryId}"]`);
+        if (selectedChip) {
+            const categoryWrapper = selectedChip.closest('.category-chip-wrapper');
+            const tagDropdown = categoryWrapper ? categoryWrapper.querySelector('.category-tag-dropdown') : null;
+            const tagsList = tagDropdown ? tagDropdown.querySelector('.category-tags-list') : null;
+            
+            if (tagDropdown && tagsList && tagsList.children.length > 0) {
+                // If tags are already loaded, just show the dropdown and set selected tag
+                if (currentTag && currentTag !== '') {
+                    tagsList.querySelectorAll('.category-tag-item').forEach(btn => {
+                        if (btn.getAttribute('data-tag-id') === currentTag) {
+                            btn.classList.add('active');
+                        } else {
+                            btn.classList.remove('active');
+                        }
+                    });
+                }
+                tagDropdown.style.display = 'block';
+                void tagDropdown.offsetHeight;
+                tagDropdown.classList.add('show');
+            } else if (selectedCategoryId) {
+                // Load tags from API
+                fetch(`/Services/GetTagsByCategory?categoryId=${selectedCategoryId}`)
+                    .then(response => response.json())
+                    .then(tags => {
+                        if (tags && tags.length > 0 && tagsList) {
+                            // Clear existing tags
+                            tagsList.innerHTML = '';
+                            
+                            tags.forEach(tag => {
+                                const tagButton = document.createElement('button');
+                                tagButton.type = 'button';
+                                tagButton.className = 'category-tag-item';
+                                const tagId = (tag.tagId || tag.TagId).toString();
+                                tagButton.setAttribute('data-tag-id', tagId);
+                                tagButton.textContent = tag.name || tag.Name;
+                                
+                                // Check if this tag is selected
+                                if (currentTag && currentTag === tagId) {
+                                    tagButton.classList.add('active');
+                                }
+                                
+                                tagsList.appendChild(tagButton);
+                            });
+                            
+                            if (tagDropdown) {
+                                tagDropdown.style.display = 'block';
+                                void tagDropdown.offsetHeight;
+                                tagDropdown.classList.add('show');
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading tags on page load:', error);
+                    });
+            }
+        }
+    }
     
     // Hàm để đảm bảo tất cả provider section trong cùng hàng có cùng chiều cao
     function equalizeProviderHeights() {
@@ -616,44 +737,122 @@ document.addEventListener('DOMContentLoaded', function() {
         resizeTimeout = setTimeout(equalizeProviderHeights, 100);
     });
     
-    // Load tags khi category thay đổi
-    if (categorySelect) {
-        categorySelect.addEventListener('change', function() {
-            const categoryId = this.value;
+    // Handle category chip hover to show dropdown - mượt mà hơn
+    let hoverTimeouts = new Map();
+    
+    document.querySelectorAll('.category-chip-wrapper').forEach(wrapper => {
+        const categoryChip = wrapper.querySelector('.category-chip');
+        const tagDropdown = wrapper.querySelector('.category-tag-dropdown');
+        const tagsList = tagDropdown ? tagDropdown.querySelector('.category-tags-list') : null;
+        const categoryId = categoryChip ? categoryChip.getAttribute('data-category-id') : '';
             
-            // Reset tag selection
-            if (tagSelect) {
-                tagSelect.innerHTML = '<option value="">Tất cả tags</option>';
+        // Hover vào category chip hoặc dropdown - hiển thị ngay lập tức
+        wrapper.addEventListener('mouseenter', function() {
+            // Clear timeout đóng nếu có
+            if (hoverTimeouts.has(wrapper)) {
+                clearTimeout(hoverTimeouts.get(wrapper));
+                hoverTimeouts.delete(wrapper);
             }
             
-            // Ẩn tag filter nếu không có category
-            if (!categoryId) {
-                if (tagFilterGroup) tagFilterGroup.style.display = 'none';
+            // Nếu là "Tất cả", không hiển thị dropdown
+            if (!categoryId || !tagDropdown) {
                 return;
             }
             
-            // Load tags từ API
+            // Nếu dropdown đã có tags, hiển thị ngay
+            if (tagsList && tagsList.children.length > 0) {
+                tagDropdown.style.display = 'block';
+                // Force reflow để animation hoạt động
+                requestAnimationFrame(() => {
+                    tagDropdown.classList.add('show');
+                });
+                return;
+            }
+            
+            // Load tags từ API nếu chưa có
             fetch(`/Services/GetTagsByCategory?categoryId=${categoryId}`)
                 .then(response => response.json())
                 .then(tags => {
-                    if (tags && tags.length > 0 && tagSelect) {
+                    if (tags && tags.length > 0 && tagsList) {
+                        // Clear existing tags
+                        tagsList.innerHTML = '';
+                        
+                        // Add tags as buttons
                         tags.forEach(tag => {
-                            const option = document.createElement('option');
-                            option.value = tag.tagId;
-                            option.textContent = tag.name;
-                            tagSelect.appendChild(option);
+                            const tagButton = document.createElement('button');
+                            tagButton.type = 'button';
+                            tagButton.className = 'category-tag-item';
+                            tagButton.setAttribute('data-tag-id', tag.tagId || tag.TagId);
+                            tagButton.textContent = tag.name || tag.Name;
+                            
+                            // Check if this tag is selected
+                            const currentTag = '@tag';
+                            if (currentTag && currentTag === (tag.tagId || tag.TagId).toString()) {
+                                tagButton.classList.add('active');
+                            }
+                            
+                            tagsList.appendChild(tagButton);
                         });
-                        if (tagFilterGroup) tagFilterGroup.style.display = '';
-                    } else {
-                        if (tagFilterGroup) tagFilterGroup.style.display = 'none';
+                        
+                        // Show dropdown với animation mượt
+                        tagDropdown.style.display = 'block';
+                        requestAnimationFrame(() => {
+                            tagDropdown.classList.add('show');
+                        });
                     }
                 })
                 .catch(error => {
                     console.error('Error loading tags:', error);
-                    if (tagFilterGroup) tagFilterGroup.style.display = 'none';
                 });
         });
-    }
+        
+        // Hover ra ngoài category wrapper - đóng mượt mà
+        wrapper.addEventListener('mouseleave', function() {
+            if (!tagDropdown) return;
+            
+            // Đóng với animation mượt
+            tagDropdown.classList.remove('show');
+            
+            // Đợi animation xong rồi mới ẩn hoàn toàn
+            const timeout = setTimeout(() => {
+                tagDropdown.style.display = 'none';
+                hoverTimeouts.delete(wrapper);
+            }, 200); // Đợi 200ms cho animation fade-out hoàn thành
+            
+            hoverTimeouts.set(wrapper, timeout);
+        });
+    });
+    
+    // Handle category chip clicks để chọn category và load services
+    document.addEventListener('click', function(e) {
+        const categoryChip = e.target.closest('.category-chip');
+        if (!categoryChip) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Remove active class from all chips
+        document.querySelectorAll('.category-chip').forEach(chip => {
+            chip.classList.remove('active');
+        });
+        
+        // Add active class to clicked chip
+        categoryChip.classList.add('active');
+        
+        // Update hidden input
+        const categoryId = categoryChip.getAttribute('data-category-id') || '';
+        if (categorySelect) {
+            categorySelect.value = categoryId;
+        }
+        
+        // Reset tag khi chọn category mới
+        if (tagHiddenInput) {
+            tagHiddenInput.value = '';
+        }
+        
+        // Load services với category đã chọn
+        loadServices(1);
+    });
     
     // Handle form submission
     if (filterForm) {
@@ -687,12 +886,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const params = new URLSearchParams(formData);
         params.set('page', page);
         
+        // Lấy tag value từ hidden input (đã được set khi click tag button)
+        const tagValue = tagHiddenInput ? tagHiddenInput.value.trim() : '';
+        
         // Đảm bảo tag được thêm vào params
-        const tagValue = tagSelect ? tagSelect.value : '';
         if (tagValue) {
             params.set('tag', tagValue);
         } else {
             params.delete('tag');
+        }
+        
+        // Đảm bảo category được thêm vào params
+        const categoryValue = categorySelect ? categorySelect.value.trim() : '';
+        if (categoryValue) {
+            params.set('category', categoryValue);
+        } else {
+            params.delete('category');
         }
         
         // Show loading state
