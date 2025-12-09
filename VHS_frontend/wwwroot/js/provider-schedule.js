@@ -327,7 +327,31 @@ function validateTimeOffForm() {
 function validateEditScheduleForm() {
     let isValid = true;
     
-    // Chỉ validate booking limit (không validate giờ làm việc vì chỉ chỉnh sửa giới hạn đơn)
+    // Validate start time
+    const startTime = document.getElementById('editStartTime').value;
+    if (!startTime) {
+        showError('editStartTime', 'Vui lòng chọn giờ bắt đầu');
+        isValid = false;
+    } else {
+        clearError('editStartTime');
+    }
+    
+    // Validate end time
+    const endTime = document.getElementById('editEndTime').value;
+    if (!endTime) {
+        showError('editEndTime', 'Vui lòng chọn giờ kết thúc');
+        isValid = false;
+    } else {
+        clearError('editEndTime');
+    }
+    
+    // Validate time range
+    if (startTime && endTime && startTime >= endTime) {
+        showError('editEndTime', 'Giờ kết thúc phải lớn hơn giờ bắt đầu');
+        isValid = false;
+    }
+    
+    // Validate booking limit if provided
     const bookingLimitInput = document.getElementById('editBookingLimit').value;
     // Chỉ validate nếu có giá trị và không phải rỗng/null
     if (bookingLimitInput && bookingLimitInput.trim() !== '' && bookingLimitInput !== 'null') {
@@ -452,9 +476,8 @@ window.openEditScheduleModal = function(scheduleId, dayName, startTime, endTime,
     document.getElementById('editScheduleId').value = scheduleId;
     document.getElementById('editScheduleDayName').textContent = dayName;
     
-    // Hiển thị giờ làm việc (read-only)
-    document.getElementById('editStartTimeDisplay').value = startTime || '';
-    document.getElementById('editEndTimeDisplay').value = endTime || '';
+    // Set giờ làm việc (có thể chỉnh sửa)
+    // Chuyển đổi từ format HH:mm sang format time input (HH:mm)
     document.getElementById('editStartTime').value = startTime || '';
     document.getElementById('editEndTime').value = endTime || '';
     
@@ -754,8 +777,32 @@ $(document).ready(function() {
         ['editStartTime', 'editEndTime', 'editBookingLimit'].forEach(id => {
             const input = document.getElementById(id);
             if (input) {
-                input.addEventListener('input', () => clearError(id));
-                input.addEventListener('change', () => clearError(id));
+                input.addEventListener('input', () => {
+                    clearError(id);
+                    // Nếu là giờ, validate lại time range
+                    if (id === 'editStartTime' || id === 'editEndTime') {
+                        const startTime = document.getElementById('editStartTime').value;
+                        const endTime = document.getElementById('editEndTime').value;
+                        if (startTime && endTime && startTime >= endTime) {
+                            showError('editEndTime', 'Giờ kết thúc phải lớn hơn giờ bắt đầu');
+                        } else {
+                            clearError('editEndTime');
+                        }
+                    }
+                });
+                input.addEventListener('change', () => {
+                    clearError(id);
+                    // Nếu là giờ, validate lại time range
+                    if (id === 'editStartTime' || id === 'editEndTime') {
+                        const startTime = document.getElementById('editStartTime').value;
+                        const endTime = document.getElementById('editEndTime').value;
+                        if (startTime && endTime && startTime >= endTime) {
+                            showError('editEndTime', 'Giờ kết thúc phải lớn hơn giờ bắt đầu');
+                        } else {
+                            clearError('editEndTime');
+                        }
+                    }
+                });
             }
         });
         
@@ -776,6 +823,10 @@ $(document).ready(function() {
                 return;
             }
             
+            // Lấy giờ làm việc
+            const startTime = document.getElementById('editStartTime').value;
+            const endTime = document.getElementById('editEndTime').value;
+            
             // Xử lý bookingLimit: nếu rỗng, null, hoặc "null" thì gửi null, ngược lại parse thành số
             let bookingLimit = null;
             if (bookingLimitInput && bookingLimitInput.trim() !== '' && bookingLimitInput !== 'null') {
@@ -785,8 +836,10 @@ $(document).ready(function() {
                 }
             }
             
-            // Chỉ gửi BookingLimit, không gửi StartTime và EndTime (chỉ chỉnh sửa giới hạn đơn)
+            // Gửi StartTime, EndTime và BookingLimit
             const data = {
+                StartTime: startTime,
+                EndTime: endTime,
                 BookingLimit: bookingLimit
             };
             
@@ -827,13 +880,13 @@ $(document).ready(function() {
                 setLoading(false);
                 
                 if (result.success) {
-                    showToast('success', 'Thành công', 'Đã cập nhật giới hạn đơn thành công!');
+                    showToast('success', 'Thành công', 'Đã cập nhật lịch làm việc thành công!');
                     bootstrap.Modal.getInstance(document.getElementById('editScheduleModal')).hide();
                     setTimeout(() => location.reload(), 1000);
                 } else {
                     setLoading(false);
                     // Parse error message (có thể là JSON string)
-                    let errorMsg = result.message || 'Đã xảy ra lỗi khi cập nhật giới hạn đơn';
+                    let errorMsg = result.message || 'Đã xảy ra lỗi khi cập nhật lịch làm việc';
                     try {
                         // Thử parse JSON nếu message là JSON string
                         const parsed = JSON.parse(errorMsg);

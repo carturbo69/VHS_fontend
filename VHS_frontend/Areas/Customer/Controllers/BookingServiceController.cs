@@ -9,6 +9,7 @@ using VHS_frontend.Areas.Customer.Models.VoucherDTOs;
 using VHS_frontend.Areas.Customer.Models.ReportDTOs;
 using VHS_frontend.Services.Customer;
 using VHS_frontend.Services.Provider;
+using VHS_frontend.Services.Admin;
 using VHS_frontend.Areas.Provider.Models.Staff;
 using Microsoft.Extensions.Configuration;
 
@@ -23,6 +24,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
         private readonly UserAddressService _userAddressService;
         private readonly ReportService _reportService;
         private readonly StaffManagementService _staffService;
+        private readonly AdminSettingsService _adminSettingsService;
         private readonly IConfiguration _configuration;
 
         // Session keys để giữ lựa chọn trong flow checkout
@@ -41,6 +43,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             UserAddressService userAddressService,
             ReportService reportService,
             StaffManagementService staffService,
+            AdminSettingsService adminSettingsService,
             IConfiguration configuration)
         {
             _cartService = cartService;
@@ -48,6 +51,7 @@ namespace VHS_frontend.Areas.Customer.Controllers
             _userAddressService = userAddressService;
             _reportService = reportService;
             _staffService = staffService;
+            _adminSettingsService = adminSettingsService;
             _configuration = configuration;
         }
 
@@ -181,6 +185,21 @@ namespace VHS_frontend.Areas.Customer.Controllers
             // Pass VietMap tilemap key to view
             var vietMapTilemapKey = _configuration["VietMap:TilemapKey"] ?? "";
             ViewBag.VietMapTilemapKey = vietMapTilemapKey;
+            
+            // Lấy cài đặt giờ và ngày giới hạn đặt trước
+            try
+            {
+                var minHoursAhead = await _adminSettingsService.GetMinHoursAheadAsync();
+                var maxDaysAhead = await _adminSettingsService.GetMaxDaysAheadAsync();
+                ViewBag.MinHoursAhead = minHoursAhead;
+                ViewBag.MaxDaysAhead = maxDaysAhead;
+            }
+            catch
+            {
+                // Nếu không lấy được, dùng giá trị mặc định
+                ViewBag.MinHoursAhead = 3;
+                ViewBag.MaxDaysAhead = 15;
+            }
             
             var jwt = HttpContext.Session.GetString("JWToken");
 

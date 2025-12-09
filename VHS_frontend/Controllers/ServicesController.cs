@@ -49,7 +49,8 @@ namespace VHS_frontend.Controllers
          string? category = null,
          string? tag = null,
          string? sort = null,
-         string? filter = null)
+         string? filter = null,
+         string? provider = null)
         {
             const int pageSize = 20;
 
@@ -57,6 +58,15 @@ namespace VHS_frontend.Controllers
 
             var categories = await _serviceCustomerService.GetAllAsync();
             ViewBag.Categories = categories;
+            
+            // Lấy danh sách providers từ tất cả services (trước khi filter)
+            var allProviders = dtos
+                .Where(s => s.ProviderId != Guid.Empty && !string.IsNullOrWhiteSpace(s.ProviderName))
+                .Select(s => new { s.ProviderId, s.ProviderName })
+                .Distinct()
+                .OrderBy(p => p.ProviderName)
+                .ToList();
+            ViewBag.Providers = allProviders;
 
             // Lấy tags theo category đã chọn (nếu có)
             List<TagDTO>? tags = null;
@@ -170,6 +180,12 @@ namespace VHS_frontend.Controllers
                 }
             }
 
+            // Filter theo provider (nếu có)
+            if (!string.IsNullOrWhiteSpace(provider) && Guid.TryParse(provider, out var providerId))
+            {
+                all = all.Where(s => s.ProviderId == providerId);
+            }
+
             // Filter theo khoảng giá (sort parameter)
             all = sort switch
             {
@@ -223,6 +239,7 @@ namespace VHS_frontend.Controllers
             ViewBag.Tag = tag;
             ViewBag.Sort = sort;
             ViewBag.Filter = filter;
+            ViewBag.Provider = provider;
 
             return View(models);
         }

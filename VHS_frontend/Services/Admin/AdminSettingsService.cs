@@ -122,6 +122,114 @@ namespace VHS_frontend.Services.Admin
                 return new List<SystemSettingResponse>();
             }
         }
+
+        /// <summary>
+        /// Lấy giờ giới hạn đặt trước (MinHoursAhead)
+        /// </summary>
+        public async Task<int> GetMinHoursAheadAsync(CancellationToken ct = default)
+        {
+            AttachAuth();
+            
+            try
+            {
+                var res = await _http.GetAsync("/api/AdminSettings/BookingMinHoursAhead", ct);
+                if (!res.IsSuccessStatusCode) 
+                {
+                    return 3; // Mặc định 3 giờ
+                }
+                
+                var setting = await res.Content.ReadFromJsonAsync<SystemSettingResponse>(_json, ct);
+                if (setting != null && !string.IsNullOrWhiteSpace(setting.Value))
+                {
+                    if (int.TryParse(setting.Value, out var hours) && hours > 0)
+                    {
+                        return hours;
+                    }
+                }
+                
+                return 3; // Mặc định 3 giờ
+            }
+            catch
+            {
+                return 3; // Mặc định 3 giờ
+            }
+        }
+
+        /// <summary>
+        /// Cập nhật giờ giới hạn đặt trước (MinHoursAhead)
+        /// </summary>
+        public async Task<bool> UpdateMinHoursAheadAsync(int hours, CancellationToken ct = default)
+        {
+            AttachAuth();
+            
+            try
+            {
+                var requestBody = new { Hours = hours };
+                var json = JsonSerializer.Serialize(requestBody, _json);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                
+                var res = await _http.PostAsync("/api/AdminSettings/booking-min-hours-ahead", content, ct);
+                return res.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Lấy ngày giới hạn đặt trước (MaxDaysAhead)
+        /// </summary>
+        public async Task<int> GetMaxDaysAheadAsync(CancellationToken ct = default)
+        {
+            AttachAuth();
+            
+            try
+            {
+                var res = await _http.GetAsync("/api/AdminSettings/BookingMaxDaysAhead", ct);
+                if (!res.IsSuccessStatusCode) 
+                {
+                    return 15; // Mặc định 15 ngày
+                }
+                
+                var setting = await res.Content.ReadFromJsonAsync<SystemSettingResponse>(_json, ct);
+                if (setting != null && !string.IsNullOrWhiteSpace(setting.Value))
+                {
+                    if (int.TryParse(setting.Value, out var days) && days > 0)
+                    {
+                        return days;
+                    }
+                }
+                
+                return 15; // Mặc định 15 ngày
+            }
+            catch
+            {
+                return 15; // Mặc định 15 ngày
+            }
+        }
+
+        /// <summary>
+        /// Cập nhật ngày giới hạn đặt trước (MaxDaysAhead)
+        /// </summary>
+        public async Task<bool> UpdateMaxDaysAheadAsync(int days, CancellationToken ct = default)
+        {
+            AttachAuth();
+            
+            try
+            {
+                var requestBody = new { Days = days };
+                var json = JsonSerializer.Serialize(requestBody, _json);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                
+                var res = await _http.PostAsync("/api/AdminSettings/booking-max-days-ahead", content, ct);
+                return res.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 
     public class SystemSettingResponse
