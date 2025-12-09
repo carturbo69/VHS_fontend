@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using VHS_frontend.Areas.Admin.Models.Complaint;
 using VHS_frontend.Services.Admin;
+using System.Linq;
 
 namespace VHS_frontend.Areas.Admin.Controllers
 {
@@ -40,6 +41,9 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 if (filter.Page <= 0) filter.Page = 1;
                 if (filter.PageSize <= 0) filter.PageSize = 10;
                 
+                // Debug logging
+                Console.WriteLine($"[AdminComplaintController] Filter received - Status: '{filter.Status}', Type: '{filter.Type}', Search: '{filter.Search}', Page: {filter.Page}, PageSize: {filter.PageSize}");
+                
                 var result = await _complaintService.GetAllAsync(filter);
                 
                 if (result == null)
@@ -56,6 +60,18 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 else
                 {
                     Console.WriteLine($"[AdminComplaintController] Service returned {result.Complaints.Count} complaints, TotalCount: {result.TotalCount}");
+                    
+                    // Loại bỏ các khiếu nại liên quan đến đơn tự động hủy
+                    var originalCount = result.Complaints.Count;
+                    result.Complaints = result.Complaints.Where(c => !IsAutoCancelComplaint(c)).ToList();
+                    
+                    // Cập nhật TotalCount sau khi filter
+                    result.TotalCount = result.Complaints.Count;
+                    
+                    if (originalCount != result.Complaints.Count)
+                    {
+                        Console.WriteLine($"[AdminComplaintController] Filtered out {originalCount - result.Complaints.Count} auto-cancel complaints");
+                    }
                 }
 
                 ViewBag.Filter = filter;
@@ -170,6 +186,68 @@ namespace VHS_frontend.Areas.Admin.Controllers
             {
                 return Json(new { error = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// Kiểm tra xem khiếu nại có liên quan đến đơn tự động hủy không
+        /// </summary>
+        private bool IsAutoCancelComplaint(AdminComplaintDTO complaint)
+        {
+            if (complaint == null) return false;
+            
+            // Kiểm tra description có chứa từ khóa về auto cancel
+            if (!string.IsNullOrWhiteSpace(complaint.Description))
+            {
+                var descLower = complaint.Description.ToLower();
+                var autoCancelKeywords = new[]
+                {
+                    "tự động hủy",
+                    "auto cancel",
+                    "auto-cancel",
+                    "automatic cancel",
+                    "automatic cancellation",
+                    "hệ thống tự động hủy",
+                    "đơn tự động hủy",
+                    "booking tự động hủy",
+                    "hết thời gian chờ xác nhận",
+                    "đã hết thời gian chờ xác nhận",
+                    "không kịp xác nhận",
+                    "nhà cung cấp không kịp xác nhận",
+                    "bạn không kịp xác nhận",
+                    "trong thời gian quy định",
+                    "hết thời gian",
+                    "đã hết thời gian",
+                    "nhà cung cấp không kịp",
+                    "được hủy tự động"
+                };
+                
+                if (autoCancelKeywords.Any(keyword => descLower.Contains(keyword)))
+                {
+                    return true;
+                }
+            }
+            
+            // Kiểm tra title có chứa từ khóa về auto cancel
+            if (!string.IsNullOrWhiteSpace(complaint.Title))
+            {
+                var titleLower = complaint.Title.ToLower();
+                var autoCancelKeywords = new[]
+                {
+                    "tự động hủy",
+                    "auto cancel",
+                    "auto-cancel",
+                    "đơn hàng bị từ chối",
+                    "bị từ chối",
+                    "hết thời gian"
+                };
+                
+                if (autoCancelKeywords.Any(keyword => titleLower.Contains(keyword)))
+                {
+                    return true;
+                }
+            }
+            
+            return false;
         }
     }
 }

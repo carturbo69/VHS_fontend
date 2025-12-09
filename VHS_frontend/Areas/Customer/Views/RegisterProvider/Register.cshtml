@@ -1697,6 +1697,27 @@ Ngày đồng ý: {{AGREEMENT_DATE}}
                 displayMessage = `${msg}\n\nChi tiết: ${detail}`;
               }
               
+              // Xử lý đặc biệt cho lỗi avatar image
+              const isAvatarError = msg.includes('ảnh đại diện') || msg.includes('avatar') || 
+                                   msg.includes('Invalid avatar') || msg.includes('định dạng file') || 
+                                   msg.includes('Kích thước file') || msg.includes('không được để trống');
+              if (isAvatarError) {
+                // Highlight avatar field
+                const avatarField = placeholder?.closest('.field') || fileInput?.closest('.field');
+                if (avatarField) {
+                  placeholder?.classList.add('is-invalid');
+                  const avatarErrorEl = document.getElementById('avatarError');
+                  if (avatarErrorEl) {
+                    avatarErrorEl.textContent = msg || 'Ảnh đại diện không hợp lệ. Vui lòng kiểm tra lại.';
+                    avatarErrorEl.classList.remove('d-none');
+                  }
+                  // Scroll đến avatar field
+                  setTimeout(() => {
+                    avatarField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                }
+              }
+              
               // Xử lý đặc biệt cho TaskCanceledException (database timeout)
               if (msg.includes('TaskCanceledException') || msg.includes('task was canceled') || 
                   msg.includes('canceled') || detail.includes('TaskCanceledException')) {

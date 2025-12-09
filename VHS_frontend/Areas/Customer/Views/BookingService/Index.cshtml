@@ -1726,6 +1726,10 @@
 
 @section Scripts {
     <script>
+        // ========= Cấu hình booking settings từ server (admin có thể chỉnh trong AdminSettings) =========
+        const BOOKING_MIN_HOURS_AHEAD = @(ViewBag.MinHoursAhead ?? 3);
+        const BOOKING_MAX_DAYS_AHEAD = @(ViewBag.MaxDaysAhead ?? 15);
+        
         // ========= Định nghĩa các hàm global TRƯỚC TIÊN để đảm bảo có sẵn khi button được click =========
         // Modal chọn địa chỉ - PHẢI định nghĩa trong global scope
         window.openAddressModal = function() {
@@ -3734,6 +3738,69 @@
                 return false;
             }
             
+            // Parse datetime để kiểm tra khoảng cách thời gian
+            const [datePart, timePart] = dateTimeValue.split('T');
+            if (!datePart || !timePart) {
+                return true; // Nếu không parse được, để validateBookingTime xử lý
+            }
+            
+            const [selectedYear, selectedMonth, selectedDay] = datePart.split('-').map(Number);
+            const [selectedHours, selectedMinutes] = timePart.split(':').map(Number);
+            
+            // Tạo Date object từ thời gian đã chọn (local time)
+            const selectedDateTime = new Date(selectedYear, selectedMonth - 1, selectedDay, selectedHours, selectedMinutes);
+            const currentDateTime = new Date();
+            
+            // Kiểm tra ngày đặt không được quá MaxDaysAhead ngày so với ngày hiện tại
+            const daysDiff = Math.floor((selectedDateTime - currentDateTime) / (1000 * 60 * 60 * 24));
+            if (daysDiff > BOOKING_MAX_DAYS_AHEAD) {
+                if (errorDiv) {
+                    errorDiv.textContent = `⚠️ Ngày đặt không được quá ${BOOKING_MAX_DAYS_AHEAD} ngày so với ngày hiện tại. Vui lòng chọn lại.`;
+                    errorDiv.style.borderLeftColor = '';
+                    errorDiv.style.background = '';
+                    errorDiv.style.color = '';
+                    errorDiv.style.transition = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.style.visibility = 'visible';
+                    errorDiv.style.opacity = '1';
+                    errorDiv.style.maxHeight = 'none';
+                    errorDiv.style.marginTop = '8px';
+                    errorDiv.style.paddingTop = '8px';
+                    errorDiv.style.paddingBottom = '8px';
+                    errorDiv.style.overflow = 'visible';
+                    void errorDiv.offsetHeight; // Force reflow
+                }
+                input.classList.add('booking-input-error');
+                bookingTimeValidations.set(index, false);
+                return false;
+            }
+            
+            // Kiểm tra thời gian đặt phải cách thời gian hiện tại ít nhất MinHoursAhead giờ
+            const timeDiffMs = selectedDateTime - currentDateTime;
+            const timeDiffHours = timeDiffMs / (1000 * 60 * 60);
+            
+            if (timeDiffHours < BOOKING_MIN_HOURS_AHEAD) {
+                if (errorDiv) {
+                    errorDiv.textContent = `⚠️ Thời gian đặt phải cách thời gian hiện tại ít nhất ${BOOKING_MIN_HOURS_AHEAD} giờ. Vui lòng chọn lại.`;
+                    errorDiv.style.borderLeftColor = '';
+                    errorDiv.style.background = '';
+                    errorDiv.style.color = '';
+                    errorDiv.style.transition = 'none';
+                    errorDiv.style.display = 'block';
+                    errorDiv.style.visibility = 'visible';
+                    errorDiv.style.opacity = '1';
+                    errorDiv.style.maxHeight = 'none';
+                    errorDiv.style.marginTop = '8px';
+                    errorDiv.style.paddingTop = '8px';
+                    errorDiv.style.paddingBottom = '8px';
+                    errorDiv.style.overflow = 'visible';
+                    void errorDiv.offsetHeight; // Force reflow
+                }
+                input.classList.add('booking-input-error');
+                bookingTimeValidations.set(index, false);
+                return false;
+            }
+            
             // Thời gian hợp lệ, ẩn lỗi và gọi validateBookingTime để kiểm tra với API
             if (errorDiv) {
                 // Ẩn error ngay lập tức - không dùng transition
@@ -4236,6 +4303,45 @@
                                 });
                                 if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
                             } else {
+                                // Parse datetime để kiểm tra khoảng cách thời gian
+                                const [datePart, timePart] = dateTimeValue.split('T');
+                                if (datePart && timePart) {
+                                    const [selectedYear, selectedMonth, selectedDay] = datePart.split('-').map(Number);
+                                    const [selectedHours, selectedMinutes] = timePart.split(':').map(Number);
+                                    
+                                    // Tạo Date object từ thời gian đã chọn (local time)
+                                    const selectedDateTime = new Date(selectedYear, selectedMonth - 1, selectedDay, selectedHours, selectedMinutes);
+                                    const currentDateTime = new Date();
+                                    
+                                    // Kiểm tra ngày đặt không được quá MaxDaysAhead ngày so với ngày hiện tại
+                                    const daysDiff = Math.floor((selectedDateTime - currentDateTime) / (1000 * 60 * 60 * 24));
+                                    if (daysDiff > BOOKING_MAX_DAYS_AHEAD) {
+                                        errors.push({
+                                            type: 'bookingTime',
+                                            element: input.closest('.booking-time') || input,
+                                            errorId: `booking-time-error-${index}`,
+                                            message: `⚠️ Ngày đặt không được quá ${BOOKING_MAX_DAYS_AHEAD} ngày so với ngày hiện tại. Vui lòng chọn lại.`
+                                        });
+                                        if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
+                                        continue; // Skip các validation khác
+                                    }
+                                    
+                                    // Kiểm tra thời gian đặt phải cách thời gian hiện tại ít nhất MinHoursAhead giờ
+                                    const timeDiffMs = selectedDateTime - currentDateTime;
+                                    const timeDiffHours = timeDiffMs / (1000 * 60 * 60);
+                                    
+                                    if (timeDiffHours < BOOKING_MIN_HOURS_AHEAD) {
+                                        errors.push({
+                                            type: 'bookingTime',
+                                            element: input.closest('.booking-time') || input,
+                                            errorId: `booking-time-error-${index}`,
+                                            message: `⚠️ Thời gian đặt phải cách thời gian hiện tại ít nhất ${BOOKING_MIN_HOURS_AHEAD} giờ. Vui lòng chọn lại.`
+                                        });
+                                        if (!firstErrorElement) firstErrorElement = input.closest('.booking-time') || input;
+                                        continue; // Skip các validation khác
+                                    }
+                                }
+                                
                                 // Kiểm tra duplicate TRƯỚC khi validate với API
                                 const serviceId = input.dataset.serviceId || 
                                                  (document.querySelector(`input[form="@placeOrderFormId"][name="Items[${index}].ServiceId"]`)?.value);

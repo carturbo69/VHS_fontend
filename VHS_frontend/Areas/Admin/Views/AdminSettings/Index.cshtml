@@ -3,6 +3,8 @@
     Layout = "~/Areas/Admin/Views/_AdminLayout.cshtml";
     
     var autoCancelMinutes = (int)(ViewBag.AutoCancelMinutes ?? 30);
+    var minHoursAhead = (int)(ViewBag.MinHoursAhead ?? 3);
+    var maxDaysAhead = (int)(ViewBag.MaxDaysAhead ?? 15);
 }
 
 @section Styles {
@@ -73,6 +75,110 @@
         </div>
     </div>
     
+    <!-- Cài đặt giờ giới hạn đặt trước -->
+    <div class="settings-card">
+        <div class="settings-section-title">
+            <i class="bi bi-clock"></i>
+            <span>Giờ giới hạn đặt trước</span>
+        </div>
+        
+        <p class="settings-description">
+            Thời gian tối thiểu mà khách hàng phải đặt trước khi thực hiện dịch vụ. 
+            Ví dụ: nếu đặt là 3 giờ, khách hàng phải đặt dịch vụ ít nhất 3 giờ trước thời điểm muốn thực hiện.
+        </p>
+        
+        <div class="settings-input-group">
+            <label for="minHoursAhead" class="settings-label">
+                Số giờ tối thiểu đặt trước
+            </label>
+            
+            <div class="settings-input-wrapper">
+                <input type="number" 
+                       id="minHoursAhead" 
+                       class="settings-input" 
+                       value="@minHoursAhead" 
+                       min="1" 
+                       max="168"
+                       placeholder="Nhập số giờ (1-168)"
+                       inputmode="numeric" />
+                <span class="settings-input-unit">giờ</span>
+            </div>
+            
+            <div class="settings-current-value">
+                Giá trị hiện tại: <strong id="currentMinHours">@minHoursAhead</strong> giờ
+            </div>
+        </div>
+        
+        <div id="saveMessageMinHours" class="settings-message"></div>
+        
+        <div class="settings-actions">
+            <button type="button" 
+                    class="settings-btn settings-btn-primary" 
+                    id="btnSaveMinHours">
+                <i class="bi bi-save"></i>
+                <span>Lưu thay đổi</span>
+            </button>
+            <button type="button" 
+                    class="settings-btn settings-btn-secondary" 
+                    id="btnResetMinHours">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                <span>Đặt lại mặc định (3 giờ)</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Cài đặt ngày giới hạn đặt trước -->
+    <div class="settings-card">
+        <div class="settings-section-title">
+            <i class="bi bi-calendar-range"></i>
+            <span>Ngày giới hạn đặt trước</span>
+        </div>
+        
+        <p class="settings-description">
+            Số ngày tối đa mà khách hàng có thể đặt trước dịch vụ. 
+            Ví dụ: nếu đặt là 15 ngày, khách hàng không thể đặt dịch vụ quá 15 ngày kể từ ngày hiện tại.
+        </p>
+        
+        <div class="settings-input-group">
+            <label for="maxDaysAhead" class="settings-label">
+                Số ngày tối đa đặt trước
+            </label>
+            
+            <div class="settings-input-wrapper">
+                <input type="number" 
+                       id="maxDaysAhead" 
+                       class="settings-input" 
+                       value="@maxDaysAhead" 
+                       min="1" 
+                       max="365"
+                       placeholder="Nhập số ngày (1-365)"
+                       inputmode="numeric" />
+                <span class="settings-input-unit">ngày</span>
+            </div>
+            
+            <div class="settings-current-value">
+                Giá trị hiện tại: <strong id="currentMaxDays">@maxDaysAhead</strong> ngày
+            </div>
+        </div>
+        
+        <div id="saveMessageMaxDays" class="settings-message"></div>
+        
+        <div class="settings-actions">
+            <button type="button" 
+                    class="settings-btn settings-btn-primary" 
+                    id="btnSaveMaxDays">
+                <i class="bi bi-save"></i>
+                <span>Lưu thay đổi</span>
+            </button>
+            <button type="button" 
+                    class="settings-btn settings-btn-secondary" 
+                    id="btnResetMaxDays">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                <span>Đặt lại mặc định (15 ngày)</span>
+            </button>
+        </div>
+    </div>
+    
     <!-- Thông tin bổ sung -->
     <div class="settings-info-card">
         <div class="settings-info-title">
@@ -80,10 +186,10 @@
             <span>Lưu ý quan trọng</span>
         </div>
         <ul class="settings-info-list">
-            <li>Thời gian hủy mặc định sẽ được áp dụng cho tất cả các đơn đặt dịch vụ mới nếu không có cài đặt riêng.</li>
-            <li>Quản trị viên có thể chỉnh sửa thời gian hủy cho từng đơn đặt dịch vụ cụ thể trong trang chi tiết đơn hàng.</li>
-            <li>Thời gian hủy được tính từ thời điểm đơn đặt dịch vụ được tạo (Chờ xử lý) hoặc được xác nhận (Đã xác nhận nhưng chưa thanh toán).</li>
-            <li>Giá trị hợp lệ: từ 1 đến 1440 phút (tối đa 24 giờ).</li>
+            <li><strong>Thời gian hủy:</strong> Thời gian hủy mặc định sẽ được áp dụng cho tất cả các đơn đặt dịch vụ mới nếu không có cài đặt riêng. Quản trị viên có thể chỉnh sửa thời gian hủy cho từng đơn đặt dịch vụ cụ thể trong trang chi tiết đơn hàng. Giá trị hợp lệ: từ 1 đến 1440 phút (tối đa 24 giờ).</li>
+            <li><strong>Giờ giới hạn đặt trước:</strong> Thời gian tối thiểu mà khách hàng phải đặt trước khi thực hiện dịch vụ. Giá trị này sẽ được áp dụng cho tất cả các đơn đặt dịch vụ mới. Giá trị hợp lệ: từ 1 đến 168 giờ (tối đa 7 ngày).</li>
+            <li><strong>Ngày giới hạn đặt trước:</strong> Số ngày tối đa mà khách hàng có thể đặt trước dịch vụ. Giá trị này sẽ được áp dụng cho tất cả các đơn đặt dịch vụ mới. Giá trị hợp lệ: từ 1 đến 365 ngày (tối đa 1 năm).</li>
+            <li>Tất cả các cài đặt sẽ có hiệu lực ngay sau khi được lưu và sẽ áp dụng cho các đơn đặt dịch vụ mới.</li>
         </ul>
     </div>
 </div>
@@ -167,6 +273,164 @@
                 // Tự động ẩn sau 5 giây
                 setTimeout(() => {
                     saveMessage.style.display = 'none';
+                }, 5000);
+            }
+        });
+
+        // Xử lý cài đặt giờ giới hạn đặt trước
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputMinHours = document.getElementById('minHoursAhead');
+            const btnSaveMinHours = document.getElementById('btnSaveMinHours');
+            const btnResetMinHours = document.getElementById('btnResetMinHours');
+            const saveMessageMinHours = document.getElementById('saveMessageMinHours');
+            const currentMinHours = document.getElementById('currentMinHours');
+            
+            const originalSaveMinHoursContent = btnSaveMinHours.innerHTML;
+            
+            // Lưu thay đổi
+            btnSaveMinHours.addEventListener('click', async function() {
+                const hours = parseInt(inputMinHours.value);
+                
+                if (isNaN(hours) || hours < 1 || hours > 168) {
+                    showMessageMinHours('Vui lòng nhập số giờ hợp lệ (1-168)', 'danger');
+                    inputMinHours.focus();
+                    return;
+                }
+                
+                btnSaveMinHours.disabled = true;
+                btnSaveMinHours.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span><span>Đang lưu...</span>';
+                
+                try {
+                    const response = await fetch('@Url.Action("UpdateMinHoursAhead", "AdminSettings", new { area = "Admin" })', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ hours: hours })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showMessageMinHours(result.message || 'Đã cập nhật thành công!', 'success');
+                        currentMinHours.textContent = hours;
+                        inputMinHours.value = hours;
+                        
+                        inputMinHours.style.borderColor = 'var(--success)';
+                        setTimeout(() => {
+                            inputMinHours.style.borderColor = '';
+                        }, 2000);
+                    } else {
+                        showMessageMinHours(result.message || 'Lỗi khi cập nhật', 'danger');
+                    }
+                } catch (error) {
+                    showMessageMinHours('Lỗi: ' + error.message, 'danger');
+                } finally {
+                    btnSaveMinHours.disabled = false;
+                    btnSaveMinHours.innerHTML = originalSaveMinHoursContent;
+                }
+            });
+            
+            // Đặt lại mặc định
+            btnResetMinHours.addEventListener('click', function() {
+                inputMinHours.value = 3;
+                btnSaveMinHours.click();
+            });
+            
+            // Enter key để lưu
+            inputMinHours.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    btnSaveMinHours.click();
+                }
+            });
+            
+            // Hiển thị thông báo
+            function showMessageMinHours(message, type) {
+                saveMessageMinHours.className = `settings-message settings-message-${type}`;
+                saveMessageMinHours.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>${message}`;
+                saveMessageMinHours.style.display = 'block';
+                
+                setTimeout(() => {
+                    saveMessageMinHours.style.display = 'none';
+                }, 5000);
+            }
+        });
+
+        // Xử lý cài đặt ngày giới hạn đặt trước
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputMaxDays = document.getElementById('maxDaysAhead');
+            const btnSaveMaxDays = document.getElementById('btnSaveMaxDays');
+            const btnResetMaxDays = document.getElementById('btnResetMaxDays');
+            const saveMessageMaxDays = document.getElementById('saveMessageMaxDays');
+            const currentMaxDays = document.getElementById('currentMaxDays');
+            
+            const originalSaveMaxDaysContent = btnSaveMaxDays.innerHTML;
+            
+            // Lưu thay đổi
+            btnSaveMaxDays.addEventListener('click', async function() {
+                const days = parseInt(inputMaxDays.value);
+                
+                if (isNaN(days) || days < 1 || days > 365) {
+                    showMessageMaxDays('Vui lòng nhập số ngày hợp lệ (1-365)', 'danger');
+                    inputMaxDays.focus();
+                    return;
+                }
+                
+                btnSaveMaxDays.disabled = true;
+                btnSaveMaxDays.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span><span>Đang lưu...</span>';
+                
+                try {
+                    const response = await fetch('@Url.Action("UpdateMaxDaysAhead", "AdminSettings", new { area = "Admin" })', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ days: days })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showMessageMaxDays(result.message || 'Đã cập nhật thành công!', 'success');
+                        currentMaxDays.textContent = days;
+                        inputMaxDays.value = days;
+                        
+                        inputMaxDays.style.borderColor = 'var(--success)';
+                        setTimeout(() => {
+                            inputMaxDays.style.borderColor = '';
+                        }, 2000);
+                    } else {
+                        showMessageMaxDays(result.message || 'Lỗi khi cập nhật', 'danger');
+                    }
+                } catch (error) {
+                    showMessageMaxDays('Lỗi: ' + error.message, 'danger');
+                } finally {
+                    btnSaveMaxDays.disabled = false;
+                    btnSaveMaxDays.innerHTML = originalSaveMaxDaysContent;
+                }
+            });
+            
+            // Đặt lại mặc định
+            btnResetMaxDays.addEventListener('click', function() {
+                inputMaxDays.value = 15;
+                btnSaveMaxDays.click();
+            });
+            
+            // Enter key để lưu
+            inputMaxDays.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    btnSaveMaxDays.click();
+                }
+            });
+            
+            // Hiển thị thông báo
+            function showMessageMaxDays(message, type) {
+                saveMessageMaxDays.className = `settings-message settings-message-${type}`;
+                saveMessageMaxDays.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>${message}`;
+                saveMessageMaxDays.style.display = 'block';
+                
+                setTimeout(() => {
+                    saveMessageMaxDays.style.display = 'none';
                 }, 5000);
             }
         });

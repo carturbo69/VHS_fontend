@@ -31,12 +31,22 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 var cancelMinutes = await _settingsService.GetAutoCancelMinutesAsync();
                 ViewBag.AutoCancelMinutes = cancelMinutes;
                 
+                // Lấy giờ giới hạn đặt trước (MinHoursAhead)
+                var minHoursAhead = await _settingsService.GetMinHoursAheadAsync();
+                ViewBag.MinHoursAhead = minHoursAhead;
+                
+                // Lấy ngày giới hạn đặt trước (MaxDaysAhead)
+                var maxDaysAhead = await _settingsService.GetMaxDaysAheadAsync();
+                ViewBag.MaxDaysAhead = maxDaysAhead;
+                
                 return View();
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = $"Lỗi khi tải cài đặt: {ex.Message}";
                 ViewBag.AutoCancelMinutes = 30; // Mặc định
+                ViewBag.MinHoursAhead = 3; // Mặc định 3 giờ
+                ViewBag.MaxDaysAhead = 15; // Mặc định 15 ngày
                 return View();
             }
         }
@@ -80,11 +90,101 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 return Json(new { success = false, message = $"Lỗi: {ex.Message}" });
             }
         }
+
+        // POST: Admin/AdminSettings/UpdateMinHoursAhead
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> UpdateMinHoursAhead([FromBody] UpdateMinHoursAheadRequest request)
+        {
+            var token = HttpContext.Session.GetString("JWTToken");
+            if (string.IsNullOrEmpty(token))
+            {
+                return Json(new { success = false, message = "Vui lòng đăng nhập lại." });
+            }
+
+            if (request.Hours < 1)
+            {
+                return Json(new { success = false, message = "Số giờ phải lớn hơn hoặc bằng 1." });
+            }
+
+            try
+            {
+                _settingsService.SetBearerToken(token);
+                var success = await _settingsService.UpdateMinHoursAheadAsync(request.Hours);
+                
+                if (success)
+                {
+                    return Json(new { 
+                        success = true, 
+                        message = $"Đã cập nhật giờ giới hạn đặt trước thành {request.Hours} giờ.",
+                        hours = request.Hours
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = "Lỗi khi cập nhật giờ giới hạn." });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Lỗi: {ex.Message}" });
+            }
+        }
+
+        // POST: Admin/AdminSettings/UpdateMaxDaysAhead
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> UpdateMaxDaysAhead([FromBody] UpdateMaxDaysAheadRequest request)
+        {
+            var token = HttpContext.Session.GetString("JWTToken");
+            if (string.IsNullOrEmpty(token))
+            {
+                return Json(new { success = false, message = "Vui lòng đăng nhập lại." });
+            }
+
+            if (request.Days < 1)
+            {
+                return Json(new { success = false, message = "Số ngày phải lớn hơn hoặc bằng 1." });
+            }
+
+            try
+            {
+                _settingsService.SetBearerToken(token);
+                var success = await _settingsService.UpdateMaxDaysAheadAsync(request.Days);
+                
+                if (success)
+                {
+                    return Json(new { 
+                        success = true, 
+                        message = $"Đã cập nhật ngày giới hạn đặt trước thành {request.Days} ngày.",
+                        days = request.Days
+                    });
+                }
+                else
+                {
+                    return Json(new { success = false, message = "Lỗi khi cập nhật ngày giới hạn." });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"Lỗi: {ex.Message}" });
+            }
+        }
     }
 
     public class UpdateAutoCancelMinutesRequest
     {
         public int Minutes { get; set; }
+    }
+
+    public class UpdateMinHoursAheadRequest
+    {
+        public int Hours { get; set; }
+    }
+
+    public class UpdateMaxDaysAheadRequest
+    {
+        public int Days { get; set; }
     }
 }
 
