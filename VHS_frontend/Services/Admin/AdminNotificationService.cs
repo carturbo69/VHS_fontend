@@ -163,10 +163,22 @@ namespace VHS_frontend.Services.Admin
                 Console.WriteLine($"Response content: {json}");
                 
                 using var doc = JsonDocument.Parse(json);
-                
-                return JsonSerializer.Deserialize<List<AccountItemDTO>>(
-                    doc.RootElement.GetRawText(),
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+                // API có thể trả dạng mảng hoặc { data: [...] }
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    return JsonSerializer.Deserialize<List<AccountItemDTO>>(doc.RootElement.GetRawText(), options) ?? new();
+                }
+
+                if (doc.RootElement.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Array)
+                {
+                    return JsonSerializer.Deserialize<List<AccountItemDTO>>(dataElement.GetRawText(), options) ?? new();
+                }
+
+                // Fallback: thử deserialise toàn bộ
+                var fallback = JsonSerializer.Deserialize<List<AccountItemDTO>>(json, options);
+                return fallback ?? new();
             }
             catch (Exception ex)
             {

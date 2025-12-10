@@ -1515,9 +1515,16 @@
         });
 
         document.getElementById('receiverRole')?.addEventListener('change', function() {
+            // Reset người nhận mỗi khi đổi vai trò
+            const select = document.getElementById('accountReceivedId');
+            if (select) {
+                select.value = '';
+                clearAccountSelectError();
+            }
+            
             if (formSubmitted) {
                 validateField('receiverRole', 'receiverRole-error', 'Vui lòng chọn vai trò');
-                    } else {
+            } else {
                 const field = document.getElementById('receiverRole');
                 const errorEl = document.getElementById('receiverRole-error');
                 if (field && errorEl && field.value && field.value !== '') {
@@ -1525,7 +1532,31 @@
                     errorEl.style.display = 'none';
                 }
             }
+            
+            // Chỉ load danh sách người nhận khi đã có vai trò
+            loadAccounts();
         });
+
+        // Ngăn chọn người nhận nếu chưa chọn vai trò (click/focus)
+        const accountSelect = document.getElementById('accountReceivedId');
+        if (accountSelect) {
+            // Ngăn mở dropdown và hiển thị lỗi khi chưa chọn vai trò
+            ['mousedown', 'click', 'focus'].forEach(ev => {
+                accountSelect.addEventListener(ev, (e) => {
+                    const role = (document.getElementById('receiverRole')?.value || '').trim();
+                    if (!role) {
+                        showRoleRequiredMessage();
+                        setAccountSelectState(false);
+                        // Chặn mở dropdown
+                        e.preventDefault();
+                        e.stopPropagation();
+                        accountSelect.blur();
+                    } else {
+                        clearAccountSelectError();
+                    }
+                });
+            });
+        }
 
         document.getElementById('notificationType')?.addEventListener('change', function() {
             if (formSubmitted) {
@@ -1781,6 +1812,50 @@
         });
 
         // ===== Load Accounts =====
+        // Chuẩn hoá dữ liệu account từ API (camelCase hoặc PascalCase) và so sánh vai trò không phân biệt hoa/thường
+        function normalizeAccount(raw) {
+            return {
+                accountId: raw.accountId || raw.AccountId || '',
+                accountName: raw.accountName || raw.AccountName || '',
+                role: (raw.role || raw.Role || '').trim()
+            };
+        }
+
+        function setAccountSelectState(enabled) {
+            const select = document.getElementById('accountReceivedId');
+            if (!select) return;
+            // Không disable để còn bắt được click, chỉ reset nội dung
+            if (!enabled) {
+                select.innerHTML = '<option value="">-- Chọn vai trò trước --</option>';
+            }
+        }
+
+        function showRoleRequiredMessage() {
+            const select = document.getElementById('accountReceivedId');
+            const errorEl = document.getElementById('accountReceivedId-error');
+            if (select && errorEl) {
+                select.classList.add('is-invalid');
+                select.setAttribute('aria-invalid', 'true');
+                errorEl.textContent = 'Vui lòng chọn vai trò trước';
+                errorEl.style.display = 'flex';
+                errorEl.style.visibility = 'visible';
+                errorEl.style.opacity = '1';
+            }
+        }
+
+        function clearAccountSelectError() {
+            const select = document.getElementById('accountReceivedId');
+            const errorEl = document.getElementById('accountReceivedId-error');
+            if (select && errorEl) {
+                select.classList.remove('is-invalid');
+                select.setAttribute('aria-invalid', 'false');
+                errorEl.textContent = errorEl.getAttribute('data-message') || 'Vui lòng chọn người nhận.';
+                errorEl.style.display = 'none';
+                errorEl.style.visibility = 'hidden';
+                errorEl.style.opacity = '0';
+            }
+        }
+
         async function loadAccounts() {
             try {
                 console.log('Loading accounts...');
@@ -1788,22 +1863,32 @@
                 console.log('Response status:', res.status);
                 
                 if (res.ok) {
-                    const accounts = await res.json();
+                    const raw = await res.json();
+                    const rawAccounts = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.data) ? raw.data : []);
+                    const accounts = rawAccounts.map(normalizeAccount);
                     console.log('Loaded accounts:', accounts);
                     
                     const select = document.getElementById('accountReceivedId');
                     const roleSelect = document.getElementById('receiverRole');
-                    const selectedRole = roleSelect.value;
+                    const selectedRole = (roleSelect.value || '').trim().toLowerCase();
+                    
+                    // Không có vai trò -> yêu cầu chọn trước, không nạp danh sách
+                    if (!selectedRole) {
+                        setAccountSelectState(false);
+                        return;
+                    }
                     
                     select.innerHTML = '<option value="">-- Chọn người nhận --</option>';
                     
                     // Filter accounts by selected role and exclude Admin accounts
                     const filteredAccounts = selectedRole ? 
-                        accounts.filter(account => account.role === selectedRole && account.role !== 'Admin') : 
-                        accounts.filter(account => account.role !== 'Admin');
+                        accounts.filter(account => account.role.toLowerCase() === selectedRole && account.role.toLowerCase() !== 'admin') : 
+                        accounts.filter(account => account.role.toLowerCase() !== 'admin');
                     
                     console.log('Filtered accounts:', filteredAccounts);
                     
+                    setAccountSelectState(true);
+
                     if (filteredAccounts.length === 0) {
                         const option = document.createElement('option');
                         option.value = '';
@@ -1830,6 +1915,9 @@
             }
         }
 
+        // Khởi tạo: khoá dropdown người nhận cho tới khi chọn vai trò
+        setAccountSelectState(false);
+
         // ===== Helper Functions =====
         function clearNotificationForm() {
             document.getElementById('accountReceivedId').value = '';
@@ -1845,6 +1933,7 @@
             document.getElementById('notificationType').value = '';
             const contentField = document.getElementById('content');
             contentField.value = '';
+            setAccountSelectState(false);
             
             // Reset character count
             if (charCountElement) {
