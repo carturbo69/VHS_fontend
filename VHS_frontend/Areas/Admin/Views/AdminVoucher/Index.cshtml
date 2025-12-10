@@ -28,10 +28,10 @@
             </div>
         </div>
         <div class="right">
-            <div class="pill"><span class="lbl">Tổng</span><span class="val">@total</span></div>
-            <div class="pill good"><span class="lbl">Hoạt động</span><span class="val">@active</span></div>
-            <div class="pill mute"><span class="lbl">Ngưng</span><span class="val">@inactive</span></div>
-            <div class="pill warn"><span class="lbl">Hết hạn</span><span class="val">@expired</span></div>
+            <div class="pill"><span class="lbl">Tổng</span><span class="val" id="pillTotal">@total</span></div>
+            <div class="pill good"><span class="lbl">Hoạt động</span><span class="val" id="pillActive">@active</span></div>
+            <div class="pill mute"><span class="lbl">Ngưng</span><span class="val" id="pillInactive">@inactive</span></div>
+            <div class="pill warn"><span class="lbl">Hết hạn</span><span class="val" id="pillExpired">@expired</span></div>
         </div>
     </div>
 
@@ -523,6 +523,36 @@
           }
         }
 
+        // Cập nhật số liệu tổng/hoạt động/ngưng/hết hạn trên header
+        function updateSummaryCounts() {
+          const rows = document.querySelectorAll('#tblVouchers tbody tr');
+          const spanTotal = document.getElementById('pillTotal');
+          const spanActive = document.getElementById('pillActive');
+          const spanInactive = document.getElementById('pillInactive');
+          const spanExpired = document.getElementById('pillExpired');
+
+          const total = rows.length;
+          let active = 0;
+          let expired = 0;
+
+          rows.forEach(tr => {
+            const tState = tr.dataset.tstate || tr.getAttribute('data-tstate') || '';
+            const isActive = (tr.dataset.isactive || tr.getAttribute('data-isactive')) === 'true';
+            if (tState === 'expired') {
+              expired++;
+            } else if (isActive) {
+              active++;
+            }
+          });
+
+          const inactive = total - active - expired;
+
+          if (spanTotal) spanTotal.textContent = total;
+          if (spanActive) spanActive.textContent = active;
+          if (spanInactive) spanInactive.textContent = inactive < 0 ? 0 : inactive;
+          if (spanExpired) spanExpired.textContent = expired;
+        }
+
         // Hàm refresh lại trạng thái thời gian của tất cả voucher trong bảng
         function refreshAllTimeStates() {
           try {
@@ -608,6 +638,9 @@
                 applyAllFilters();
               }, 100);
             }
+
+            // Cập nhật số liệu trên header sau khi tính lại trạng thái
+            updateSummaryCounts();
           } catch (error) {
             console.error('Lỗi khi refresh trạng thái voucher:', error);
           }
@@ -618,7 +651,25 @@
           return num.toLocaleString('vi-VN');
         }
 
+        // Chuẩn hoá dto từ API (camelCase hoặc PascalCase)
+        function normalizeVoucherDto(v) {
+          if (!v) return {};
+          return {
+            voucherId: v.voucherId ?? v.VoucherId ?? v.id ?? v.Id,
+            code: v.code ?? v.Code ?? '',
+            description: v.description ?? v.Description ?? '',
+            discountPercent: v.discountPercent ?? v.DiscountPercent ?? null,
+            discountMaxAmount: v.discountMaxAmount ?? v.DiscountMaxAmount ?? null,
+            startDate: v.startDate ?? v.StartDate ?? null,
+            endDate: v.endDate ?? v.EndDate ?? null,
+            usageLimit: v.usageLimit ?? v.UsageLimit ?? null,
+            usedCount: v.usedCount ?? v.UsedCount ?? 0,
+            isActive: (v.isActive ?? v.IsActive) === true
+          };
+        }
+
         function addNewVoucherRow(v) {
+          v = normalizeVoucherDto(v);
           const tbody = document.querySelector('#tblVouchers tbody');
           if (!tbody) return;
 
@@ -702,10 +753,25 @@
               '</div>' +
             '</td>';
 
+          // Đưa voucher mới lên đầu bảng để dễ thấy ngay
           tbody.insertBefore(tr, tbody.firstChild);
+          // Làm mới trạng thái thời gian và bộ lọc để hàng mới không bị ẩn
+          refreshAllTimeStates();
+          if (typeof applyAllFilters === 'function') {
+            applyAllFilters();
+          }
+          // Cập nhật số liệu header ngay sau khi thêm
+          updateSummaryCounts();
+          // Cuộn tới hàng mới để người dùng nhìn thấy
+          try {
+            tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } catch (e) {
+            // ignore scroll errors
+          }
         }
 
         function updateVoucherRow(v) {
+          v = normalizeVoucherDto(v);
           const tr = document.querySelector('tr[data-id="' + v.voucherId + '"]');
           if (!tr) return;
 
@@ -995,7 +1061,7 @@
                 showNotice('Không đọc được voucher.', 'error', 3000);
                 return; 
               }
-              const v = await res.json();
+              const v = normalizeVoucherDto(await res.json());
 
               document.getElementById('vModalTitle').textContent = 'Sửa voucher';
               vId.value = v.voucherId;
@@ -1022,9 +1088,14 @@
             try{
               const res = await fetch(routes.vDelete + `?id=${encodeURIComponent(id)}`, { method:'DELETE' });
               if (res.status === 204) {
-                // Ẩn row ngay lập tức
-                tr.style.display = 'none';
+                // Loại bỏ row ngay lập tức
+                tr.remove();
                 showNotice('Xóa voucher thành công!', 'success', 2800);
+                updateSummaryCounts();
+                // Áp lại filter để ẩn/hiện đúng nếu đang có lọc
+                if (typeof applyAllFilters === 'function') {
+                  applyAllFilters();
+                }
                 return;
               }
               const msg = await readJsonMessage(res);
@@ -1250,7 +1321,7 @@
                 body: JSON.stringify(payload)
               });
               if (res.status === 201 || res.status === 200) {
-                const dto = await res.json();
+                const dto = normalizeVoucherDto(await res.json());
                 vModal.hide();
                 addNewVoucherRow(dto);
                 showNotice('Thêm voucher thành công!', 'success', 2800);
@@ -1275,12 +1346,16 @@
                 body: JSON.stringify(payload)
               });
               if (res.status === 200) {
-                const dto = await res.json();
+                const dto = normalizeVoucherDto(await res.json());
                 vModal.hide();
                 updateVoucherRow(dto);
                 // Refresh lại trạng thái thời gian sau khi cập nhật để đảm bảo đúng
                 setTimeout(() => {
                   refreshAllTimeStates();
+                  if (typeof applyAllFilters === 'function') {
+                    applyAllFilters();
+                  }
+                  updateSummaryCounts();
                 }, 100);
                 showNotice('Cập nhật voucher thành công!', 'success', 2800);
                 // Reset form
