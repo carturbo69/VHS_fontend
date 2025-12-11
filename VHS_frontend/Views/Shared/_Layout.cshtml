@@ -198,27 +198,19 @@
         let menu = null;
         let hoverTimeout;
 
-        // Tải HTML dropdown trực tiếp từ server (partial view) để đảm bảo đúng dữ liệu/ UI
-        async function loadNotificationDropdownFromServer() {
-            if (!menu) return;
-            try {
-                const resp = await fetch('/Customer/Notification/GetNotificationsPartial', { cache: 'no-store' });
-                if (!resp.ok) {
-                    console.warn('⚠️ Không tải được dropdown notification, status:', resp.status);
-                    return;
-                }
-                const html = await resp.text();
-                menu.innerHTML = html;
-                menuRendered = true;
-                menu.setAttribute('data-latest-html', html);
-
-                // Sau khi inject partial, cố gắng apply style thời gian nếu có hàm
-                if (typeof applyTimeStyle === 'function') {
-                    setTimeout(applyTimeStyle, 0);
-                }
-            } catch (err) {
-                console.error('❌ Lỗi tải dropdown notification:', err);
+        // Đảm bảo đã có dữ liệu notifications trước khi render
+        async function ensureNotificationsLoaded() {
+            if (!notifications || notifications.length === 0) {
+                console.debug('[Notification] notifications array empty, loading...');
+                await loadNotifications(true);
+            } else {
+                console.debug('[Notification] notifications array already loaded', { length: notifications.length });
             }
+            
+            console.debug('[Notification] ensureNotificationsLoaded after load', {
+                length: Array.isArray(notifications) ? notifications.length : 'n/a',
+                sample: Array.isArray(notifications) && notifications.length ? notifications[0] : null
+            });
         }
 
         // Khởi tạo sau khi DOM ready
@@ -231,64 +223,112 @@
                 return;
             }
 
+            // Di chuyển menu ra khỏi thẻ <a> để không bị clip bởi container/overflow
+            // (tương tự provider/admin đang làm). Giữ nguyên ID để các selector hoạt động.
+            if (menu.parentElement !== document.body) {
+                document.body.appendChild(menu);
+            }
+
+            // Ngăn click vào chuông chuyển trang (chỉ dùng hover)
+            btn.addEventListener('click', (e) => e.preventDefault());
+
             const showMenu = async () => {
-                await loadNotificationDropdownFromServer();
+                console.debug('[Notification] showMenu start');
+                await ensureNotificationsLoaded();
+                renderNotificationMenu();
+
+                // Đặt menu ra ngoài flow để tránh bị che (overflow hidden)
+                const rect = btn.getBoundingClientRect();
+                const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+                const menuWidth = Math.min(380, viewportWidth - 16);
+
+                // Tính vị trí dựa trên tọa độ tuyệt đối của nút chuông (viewport)
+                const top = rect.bottom + 8;
+                const left = Math.min(
+                    Math.max(rect.right - menuWidth, 8),
+                    viewportWidth - menuWidth - 8
+                );
+
+                console.debug('[Notification] showMenu position', {
+                    rect,
+                    menuWidth,
+                    top,
+                    left
+                });
+
+                menu.classList.add('show');
+                menu.style.position = 'fixed';
+                menu.style.top = `${top}px`;
+                menu.style.left = `${left}px`;
+                menu.style.width = `${menuWidth}px`;
+                menu.style.minWidth = `${menuWidth}px`;
+                menu.style.maxHeight = '70vh';
                 menu.style.display = 'block';
                 menu.style.visibility = 'visible';
                 menu.style.opacity = '1';
-                menu.style.position = 'absolute';
-                menu.style.right = '0';
-                menu.style.top = '100%';
                 menu.style.zIndex = '2000';
-                menu.style.minWidth = '320px';
+                menu.style.pointerEvents = 'auto';
             };
 
             const hideMenu = () => {
+                menu.classList.remove('show');
                 menu.style.display = 'none';
                 menu.style.visibility = 'hidden';
                 menu.style.opacity = '0';
             };
 
-            // Hover để hiển thị dropdown
+            // Hover để hiển thị (mở khi rê, không cần click)
             btn.addEventListener('mouseenter', async () => {
                 clearTimeout(hoverTimeout);
                 await showMenu();
             });
 
-            // Click để toggle (đỡ phụ thuộc hover)
-            btn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const isOpen = menu.style.display === 'block';
-                if (isOpen) {
+            // Giữ mở khi hover vào menu
+            menu.addEventListener('mouseenter', () => {
+                clearTimeout(hoverTimeout);
+            });
+
+            // Ẩn khi rời chuột khỏi btn và menu (delay nhỏ)
+            const scheduleHide = () => {
+                clearTimeout(hoverTimeout);
+                hoverTimeout = setTimeout(() => hideMenu(), 120);
+            };
+            btn.addEventListener('mouseleave', scheduleHide);
+            menu.addEventListener('mouseleave', scheduleHide);
+
+            // Đóng khi click ra ngoài
+            document.addEventListener('click', (e) => {
+                if (!btn.contains(e.target) && !menu.contains(e.target)) {
                     hideMenu();
-                } else {
-                    await showMenu();
                 }
             });
 
-            // Mouse leave button - delay ẩn dropdown
-            btn.addEventListener('mouseleave', () => {
-                hoverTimeout = setTimeout(() => {
-                    menu.style.display = 'none';
-                }, 100);
-            });
-
-            // Hover vào dropdown để giữ mở
-            menu.addEventListener('mouseenter', () => {
-                clearTimeout(hoverTimeout);
-                menu.style.display = 'block';
-            });
-
-            // Mouse leave khỏi dropdown để ẩn
-            menu.addEventListener('mouseleave', () => {
-                hoverTimeout = setTimeout(() => {
-                    menu.style.display = 'none';
-                }, 100);
+            // Đóng khi nhấn ESC
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') hideMenu();
             });
         }
         
-        // Render notification menu từ array notifications
+        function normalizeNotification(n) {
+            if (!n) return null;
+            
+            // Chuyển đổi IsRead về boolean (tránh trường hợp trả về "false"/"true" dạng string)
+            const isReadRaw = n.isRead ?? n.IsRead ?? false;
+            const isRead =
+                typeof isReadRaw === 'string'
+                    ? isReadRaw.toLowerCase() === 'true'
+                    : !!isReadRaw;
+
+            return {
+                notificationId: n.notificationId || n.NotificationId || n.id || n.Id,
+                content: n.content || n.Content || '',
+                notificationType: (n.notificationType || n.NotificationType || '').toString(),
+                createdAt: n.createdAt || n.CreatedAt || n.created_at || n.createdAtUtc || '',
+                isRead
+            };
+        }
+
+        // Render notification menu từ array notifications (hiển thị toàn bộ chưa đọc)
         function renderNotificationMenu() {
             if (!menu) return;
             
@@ -300,9 +340,21 @@
             header.innerHTML = '<h3>Thông báo</h3>';
             menu.appendChild(header);
             
-            const unreadNotifications = notifications.filter(n => !n.isRead);
+            const unreadNotifications = (notifications || [])
+                .map(normalizeNotification)
+                .filter(n => n && !n.isRead);
+
+            console.debug('[Notification] renderNotificationMenu', {
+                total: notifications ? notifications.length : 0,
+                unread: unreadNotifications.length,
+                sample: unreadNotifications.length ? unreadNotifications[0] : null
+            });
             
             if (unreadNotifications.length === 0) {
+                console.warn('[Notification] No unread notifications but menu opened', {
+                    total: notifications ? notifications.length : 0,
+                    notifications
+                });
                 const empty = document.createElement('li');
                 empty.className = 'text-center text-muted py-2';
                 empty.innerHTML = '<i class="bi bi-bell-slash me-2"></i>Không có thông báo nào';
@@ -359,7 +411,10 @@
         // Đếm và hiển thị badge (gọi API để tránh lệ thuộc biến notifications)
         async function loadUnreadCount() {
             const badge = document.getElementById('notificationBadge');
-            if (!badge) return;
+            if (!badge) {
+                console.warn('⚠️ loadUnreadCount: #notificationBadge not found');
+                return;
+            }
             try {
                 const resp = await fetch('/Customer/Notification/GetUnreadCount', { cache: 'no-store' });
                 if (!resp.ok) {
@@ -369,6 +424,7 @@
                 }
                 const data = await resp.json();
                 const unreadCount = data?.count ?? 0;
+                console.debug('[Notification] loadUnreadCount', { unreadCount, raw: data });
                 if (unreadCount > 0) {
                     badge.textContent = unreadCount;
                     badge.style.display = 'inline-block';
@@ -421,20 +477,88 @@
             }
         }
 
-        // Load danh sách thông báo từ API
-        async function loadNotifications() {
+        // Debounce và throttle để tránh gọi API quá nhiều lần
+        let loadNotificationsTimeout = null;
+        let isLoadingNotifications = false;
+        let lastLoadTime = 0;
+        const MIN_LOAD_INTERVAL = 2000; // Tối thiểu 2 giây giữa các lần gọi
+        
+        // Load danh sách thông báo từ API với debounce và throttle
+        async function loadNotifications(force = false) {
+            console.debug('[Notification] loadNotifications start', { force });
+            
+            // Nếu đang load thì bỏ qua
+            if (isLoadingNotifications && !force) {
+                console.debug('[Notification] loadNotifications skipped (isLoadingNotifications=true)');
+                return;
+            }
+            
+            // Throttle: Kiểm tra thời gian từ lần gọi cuối
+            const now = Date.now();
+            if (!force && (now - lastLoadTime) < MIN_LOAD_INTERVAL) {
+                console.debug('[Notification] loadNotifications throttled', { delta: now - lastLoadTime });
+                // Nếu chưa đủ thời gian, debounce lại
+                if (loadNotificationsTimeout) {
+                    clearTimeout(loadNotificationsTimeout);
+                }
+                loadNotificationsTimeout = setTimeout(() => {
+                    loadNotifications(false);
+                }, MIN_LOAD_INTERVAL - (now - lastLoadTime));
+                return;
+            }
+            
+            isLoadingNotifications = true;
+            lastLoadTime = now;
+            
             try {
-                const response = await fetch('/Customer/Notification/Unread');
-                const data = await response.json();
+                console.debug('[Notification] fetching /Customer/Notification/Unread ...');
+                const response = await fetch('/Customer/Notification/Unread', { cache: 'no-store' });
                 
-                if (data.success && data.data) {
+                if (!response.ok) {
+                    console.warn('[Notification] /Unread not OK', response.status);
+                }
+                
+                const data = await response.json();
+
+                // Chấp nhận nhiều format trả về: mảng thuần, {data|Data: [...]}, {data|Data:{items|Items:[...]}}, {notifications|Notifications:[...]}
+                if (Array.isArray(data)) {
+                    notifications = data;
+                } else if (Array.isArray(data?.data)) {
                     notifications = data.data;
+                } else if (Array.isArray(data?.Data)) {
+                    notifications = data.Data;
+                } else if (Array.isArray(data?.data?.items)) {
+                    notifications = data.data.items;
+                } else if (Array.isArray(data?.Data?.items)) {
+                    notifications = data.Data.items;
+                } else if (Array.isArray(data?.Data?.Items)) {
+                    notifications = data.Data.Items;
+                } else if (Array.isArray(data?.items)) {
+                    notifications = data.items;
+                } else if (Array.isArray(data?.Items)) {
+                    notifications = data.Items;
+                } else if (Array.isArray(data?.notifications)) {
+                    notifications = data.notifications;
+                } else if (Array.isArray(data?.Notifications)) {
+                    notifications = data.Notifications;
                 } else {
+                    console.warn('[Notification] Unexpected response shape from /Unread', data);
                     notifications = [];
                 }
+
+                console.debug('[Notification] parsed notifications', {
+                    rawType: typeof data,
+                    isArray: Array.isArray(data),
+                    fromDataArray: Array.isArray(data?.data),
+                    fromNotificationsArray: Array.isArray(data?.notifications),
+                    length: Array.isArray(notifications) ? notifications.length : 'n/a',
+                    sample: Array.isArray(notifications) && notifications.length ? notifications[0] : null
+                });
             } catch (error) {
                 console.error('Error loading notifications:', error);
                 notifications = [];
+            } finally {
+                isLoadingNotifications = false;
             }
             
             // Reset flag để render lại menu lần sau
@@ -558,6 +682,71 @@
                 }
             } catch (error) {
                 console.error('Error in markAsReadFromDropdown:', error);
+            }
+        }
+
+        // Mark tất cả đã đọc từ dropdown (Customer)
+        async function markAllReadFromDropdown(event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            // Tránh double-click
+            if (window.__markingAllRead) return;
+            window.__markingAllRead = true;
+            
+            try {
+                const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                const formData = new FormData();
+                if (tokenInput) {
+                    formData.append('__RequestVerificationToken', tokenInput.value);
+                }
+
+                const resp = await fetch('/Customer/Notification/MarkAllRead', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+
+                // Cập nhật local state
+                if (Array.isArray(notifications)) {
+                    notifications = notifications.map(n => ({ ...n, isRead: true }));
+                }
+
+                // Cập nhật UI dropdown
+                if (menu) {
+                    menu.querySelectorAll('.notification-item.unread').forEach((item, idx) => {
+                        setTimeout(() => {
+                            item.classList.remove('unread');
+                            const dot = item.querySelector('.notification-dot, .unread-dot');
+                            if (dot) {
+                                dot.style.opacity = '0';
+                                setTimeout(() => dot.remove(), 200);
+                            }
+                        }, idx * 30);
+                    });
+                }
+
+                // Ẩn badge
+                const badge = document.getElementById('notificationBadge');
+                if (badge) {
+                    badge.textContent = '0';
+                    badge.style.display = 'none';
+                }
+
+                // Reset flag để lần mở tiếp theo load lại server
+                menuRendered = false;
+
+                // Thông báo cho trang notification nếu đang mở
+                notifyCustomerNotificationPage('markAllRead', {});
+            } catch (err) {
+                console.error('Error markAllReadFromDropdown:', err);
+            } finally {
+                window.__markingAllRead = false;
             }
         }
         
@@ -710,8 +899,17 @@
     <script>
         (function() {
           let notificationConnection = null;
+          let isInitializing = false; // Flag để tránh khởi tạo nhiều lần
 
           async function initNotificationSignalR() {
+            // Tránh khởi tạo nhiều lần
+            if (isInitializing || notificationConnection) {
+              console.log('[NotificationHub] Already initialized or initializing, skipping...');
+              return;
+            }
+            
+            isInitializing = true;
+            
             try {
               // Load SignalR if not already loaded (may be loaded by chatbox)
               if (typeof signalR === 'undefined') {
@@ -769,9 +967,13 @@
               // Start connection
               await notificationConnection.start();
               console.log('[NotificationHub] Connected successfully for Customer');
+              isInitializing = false;
 
             } catch (error) {
               console.error('[NotificationHub] Error initializing SignalR for Customer:', error);
+              isInitializing = false;
+              // Reset connection để có thể thử lại sau
+              notificationConnection = null;
             }
           }
 
@@ -808,13 +1010,20 @@
 
             // Always reload from server to sync and update dropdown
             // Method 1: Use loadNotifications if available (updates array and re-renders)
+            // Debounce để tránh gọi quá nhiều lần khi có nhiều notification cùng lúc
             if (typeof loadNotifications === 'function') {
-              loadNotifications().then(() => {
-                // Re-render menu after loading if it's open
-                if (typeof menuRendered !== 'undefined' && menuRendered && typeof renderNotificationMenu === 'function') {
-                  renderNotificationMenu();
-                }
-              });
+              // Sử dụng debounce với delay 500ms
+              if (loadNotificationsTimeout) {
+                clearTimeout(loadNotificationsTimeout);
+              }
+              loadNotificationsTimeout = setTimeout(() => {
+                loadNotifications(true).then(() => {
+                  // Re-render menu after loading if it's open
+                  if (typeof menuRendered !== 'undefined' && menuRendered && typeof renderNotificationMenu === 'function') {
+                    renderNotificationMenu();
+                  }
+                });
+              }, 500);
             }
             
             // Method 2: Also reload partial view HTML directly for immediate update
@@ -880,12 +1089,27 @@
             return div.innerHTML;
           }
 
-          // Initialize SignalR when page loads
-          document.addEventListener('DOMContentLoaded', () => {
-            // Wait a bit for notification system to initialize
+          // Initialize SignalR when page loads (chỉ một lần)
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+              // Wait a bit for notification system to initialize
+              setTimeout(() => {
+                initNotificationSignalR();
+              }, 1000);
+            });
+          } else {
+            // DOM đã sẵn sàng
             setTimeout(() => {
               initNotificationSignalR();
             }, 1000);
+          }
+          
+          // Cleanup khi page unload
+          window.addEventListener('beforeunload', () => {
+            if (notificationConnection) {
+              notificationConnection.stop();
+              notificationConnection = null;
+            }
           });
 
           // Cleanup on page unload

@@ -21,11 +21,18 @@
             _ => type
         };
     }
-    
+
     // Database đã lưu theo giờ Việt Nam, không cần convert nữa
-    DateTime ToVietnamTime(DateTime vietnamTime)
+    DateTime ToVietnamTime(DateTime vietnamTime) => vietnamTime;
+
+    string GetTimeAgo(DateTime createdAt)
     {
-        return vietnamTime;
+        var diff = DateTime.Now - createdAt;
+        if (diff.TotalMinutes < 1) return "Vừa xong";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} phút trước";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} giờ trước";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays} ngày trước";
+        return createdAt.ToString("dd/MM/yyyy HH:mm");
     }
 }
 
@@ -101,85 +108,60 @@
     </div>
 
     <div class="dropdown-content">
-        @if (Model.Data.Any())
-        {
-            <div class="notification-items">
-                @foreach (var notification in Model.Data.Take(5))
-                {
-                    <div class="notification-item @(notification.IsRead ? "read" : "unread")" 
-                         data-notification-id="@notification.NotificationId"
-                         style="cursor: pointer;"
-                         @if (!notification.IsRead) { <text>onclick="markAsReadFromDropdown('@notification.NotificationId')"</text> }
-                         @if (notification.IsRead) { <text>onclick="window.location.href='/Customer/Notification/Index'"</text> }>
-                        
-                        <div class="item-icon">
-                            @switch (notification.NotificationType.ToLower())
-                            {
-                                case "booking":
-                                case "new_booking":
-                                case "booking_confirmed":
-                                case "booking_cancelled":
-                                case "booking_completed":
-                                    <i class="icon-calendar"></i>
-                                    break;
-                                case "payment":
-                                case "payment_success":
-                                    <i class="icon-credit-card"></i>
-                                    break;
-                                case "system":
-                                    <i class="icon-settings"></i>
-                                    break;
-                                default:
-                                    <i class="icon-bell"></i>
-                                    break;
-                            }
-                        </div>
-                        
-                        <div class="item-content">
-                            <div class="content-text">@notification.Content</div>
-                            @{
-                                var timeText = ToVietnamTime(notification.CreatedAt).ToString("dd/MM/yyyy HH:mm");
-                            }
-                            <span class="item-time notification-time-white vhs-time-display" 
-                                  data-time-color="auto"
-                                  data-time-text="@timeText"
-                                  style="display: block !important; font-size: 12px !important; font-weight: 700 !important; opacity: 1 !important; letter-spacing: 0.1px !important; color: #ffffff !important;">@timeText</span>
-                        </div>
-                        
-                        @if (!notification.IsRead)
-                        {
-                            <div class="unread-dot"></div>
-                        }
+        <ul class="notification-list">
+            @if (!Model.Data.Any())
+            {
+                <li class="notification-empty">
+                    <div class="empty-dropdown">
+                        <i class="icon-bell-off"></i>
+                        <p>Không có thông báo nào</p>
+                        <small>Bạn đã đọc tất cả thông báo</small>
                     </div>
+                </li>
+            }
+            else
+            {
+                @foreach (var notification in Model.Data.Take(10))
+                {
+                    var notifType = notification.NotificationType?.ToLower() ?? string.Empty;
+                    var timeAgo = GetTimeAgo(ToVietnamTime(notification.CreatedAt));
+                    <li class="notification-item @(notification.IsRead ? "read" : "unread")" data-notification-id="@notification.NotificationId">
+                        <a href="#" class="notification-link" onclick="markAsReadFromDropdown('@notification.NotificationId', event); return false;">
+                            @if (!notification.IsRead)
+                            {
+                                <span class="notification-dot"></span>
+                            }
+                            <div class="notification-content-wrapper">
+                                <div class="notification-header">
+                                    @if (!string.IsNullOrEmpty(notification.NotificationType))
+                                    {
+                                        <span class="notification-badge badge-@notifType">@GetNotificationTypeVN(notification.NotificationType)</span>
+                                    }
+                                    <span class="notification-time">
+                                        <i class="bi bi-clock"></i>
+                                        @timeAgo
+                                    </span>
+                                </div>
+                                <div class="notification-text">@notification.Content</div>
+                            </div>
+                        </a>
+                    </li>
                 }
-            </div>
 
-            @if (Model.Data.Count > 5)
-            {
-                <div class="dropdown-footer">
-                    <a asp-area="Customer" asp-controller="Notification" asp-action="Index" class="view-all-link">
-                        Xem tất cả (@Model.Data.Count)
-                    </a>
-                </div>
+                <li class="notification-footer">
+                    <div class="footer-actions">
+                        <a href="#" class="footer-btn mark-all-read" onclick="markAllReadFromDropdown(event); return false;">
+                            <i class="bi bi-check-all"></i>
+                            <span>Đánh dấu tất cả đã đọc</span>
+                        </a>
+                        <a asp-area="Customer" asp-controller="Notification" asp-action="Index" class="footer-btn view-all">
+                            <i class="bi bi-inbox-fill"></i>
+                            <span>Xem tất cả</span>
+                        </a>
+                    </div>
+                </li>
             }
-            else if (Model.Data.Count > 0)
-            {
-                <div class="dropdown-footer">
-                    <a asp-area="Customer" asp-controller="Notification" asp-action="Index" class="view-all-link">
-                        Xem tất cả
-                    </a>
-                </div>
-            }
-        }
-        else
-        {
-            <div class="empty-dropdown">
-                <div class="empty-icon">
-                    <i class="icon-bell-off"></i>
-                </div>
-                <p>Không có thông báo mới</p>
-            </div>
-        }
+        </ul>
     </div>
 </div>
 
