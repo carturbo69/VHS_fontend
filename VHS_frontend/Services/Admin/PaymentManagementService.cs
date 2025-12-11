@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using VHS_frontend.Areas.Admin.Models.Payment;
 
 namespace VHS_frontend.Services.Admin
@@ -477,6 +478,73 @@ namespace VHS_frontend.Services.Admin
                 System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] ❌ Exception: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"[GetTodayVNPAYRevenue] ❌ Stack trace: {ex.StackTrace}");
                 return 0;
+            }
+        }
+        
+        /// <summary>
+        /// Get recent payments (paid/completed) within a date range
+        /// </summary>
+        public async Task<List<RecentPaymentDTO>?> GetRecentPaymentsAsync(
+            DateTime? fromDate = null,
+            DateTime? toDate = null,
+            int? top = null,
+            CancellationToken ct = default)
+        {
+            AttachAuth();
+            
+            var queryParams = new List<string>();
+            if (fromDate.HasValue)
+            {
+                queryParams.Add($"fromDate={Uri.EscapeDataString(fromDate.Value.ToString("o"))}");
+            }
+            if (toDate.HasValue)
+            {
+                queryParams.Add($"toDate={Uri.EscapeDataString(toDate.Value.ToString("o"))}");
+            }
+            if (top.HasValue)
+            {
+                queryParams.Add($"$top={top.Value}");
+            }
+            
+            var url = "/api/PaymentManagement/recent-payments";
+            if (queryParams.Any())
+            {
+                url += "?" + string.Join("&", queryParams);
+            }
+            
+            try
+            {
+                var res = await _http.GetAsync(url, ct);
+                
+                if (!res.IsSuccessStatusCode)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[GetRecentPayments] API call failed: {res.StatusCode}");
+                    return new List<RecentPaymentDTO>();
+                }
+                
+                var json = await res.Content.ReadAsStringAsync(ct);
+                
+                // Try to parse as OData response first
+                try
+                {
+                    var jsonDoc = JsonDocument.Parse(json);
+                    if (jsonDoc.RootElement.TryGetProperty("value", out var valueArray))
+                    {
+                        return JsonSerializer.Deserialize<List<RecentPaymentDTO>>(valueArray.GetRawText(),
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    }
+                }
+                catch { }
+                
+                // Fallback to ApiResponse format
+                var response = JsonSerializer.Deserialize<ApiResponse<List<RecentPaymentDTO>>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                return response?.Data ?? new List<RecentPaymentDTO>();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GetRecentPayments] Exception: {ex.Message}");
+                return new List<RecentPaymentDTO>();
             }
         }
         

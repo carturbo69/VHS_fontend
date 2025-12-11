@@ -39,6 +39,7 @@ namespace VHS_frontend.Areas.Admin.Models.Dashboard
         // Charts Data
         public List<decimal> RevenueChartData { get; set; } = new List<decimal>();
         public List<string> RevenueChartLabels { get; set; } = new List<string>();
+        public double RevenueWeekChange { get; set; } // % tăng trưởng doanh thu so với tuần trước
         
         public List<int> OrdersChartData { get; set; } = new List<int>();
         public List<string> OrdersChartLabels { get; set; } = new List<string>();

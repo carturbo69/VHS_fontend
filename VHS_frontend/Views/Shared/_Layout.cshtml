@@ -191,12 +191,35 @@
 
     <!-- Notification System -->
     <script>
-        // Biến lưu trữ thông báo từ API
+        // Biến lưu trữ thông báo từ API (giữ lại để các chỗ khác dùng)
         let notifications = [];
         let menuRendered = false; // Flag để biết menu đã được render chưa
         let btn = null;
         let menu = null;
         let hoverTimeout;
+
+        // Tải HTML dropdown trực tiếp từ server (partial view) để đảm bảo đúng dữ liệu/ UI
+        async function loadNotificationDropdownFromServer() {
+            if (!menu) return;
+            try {
+                const resp = await fetch('/Customer/Notification/GetNotificationsPartial', { cache: 'no-store' });
+                if (!resp.ok) {
+                    console.warn('⚠️ Không tải được dropdown notification, status:', resp.status);
+                    return;
+                }
+                const html = await resp.text();
+                menu.innerHTML = html;
+                menuRendered = true;
+                menu.setAttribute('data-latest-html', html);
+
+                // Sau khi inject partial, cố gắng apply style thời gian nếu có hàm
+                if (typeof applyTimeStyle === 'function') {
+                    setTimeout(applyTimeStyle, 0);
+                }
+            } catch (err) {
+                console.error('❌ Lỗi tải dropdown notification:', err);
+            }
+        }
 
         // Khởi tạo sau khi DOM ready
         function initNotificationMenu() {
@@ -208,21 +231,40 @@
                 return;
             }
 
-            // Hover để hiển thị dropdown
-            btn.addEventListener('mouseenter', () => {
-                clearTimeout(hoverTimeout);
-                // Check if we have latest HTML from real-time update
-                const latestHtml = menu.getAttribute('data-latest-html');
-                if (latestHtml) {
-                    // Use cached HTML from real-time update
-                    menu.innerHTML = latestHtml;
-                    menu.removeAttribute('data-latest-html');
-                    menuRendered = true;
-                } else if (!menuRendered) {
-                    renderNotificationMenu();
-                    menuRendered = true;
-                }
+            const showMenu = async () => {
+                await loadNotificationDropdownFromServer();
                 menu.style.display = 'block';
+                menu.style.visibility = 'visible';
+                menu.style.opacity = '1';
+                menu.style.position = 'absolute';
+                menu.style.right = '0';
+                menu.style.top = '100%';
+                menu.style.zIndex = '2000';
+                menu.style.minWidth = '320px';
+            };
+
+            const hideMenu = () => {
+                menu.style.display = 'none';
+                menu.style.visibility = 'hidden';
+                menu.style.opacity = '0';
+            };
+
+            // Hover để hiển thị dropdown
+            btn.addEventListener('mouseenter', async () => {
+                clearTimeout(hoverTimeout);
+                await showMenu();
+            });
+
+            // Click để toggle (đỡ phụ thuộc hover)
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const isOpen = menu.style.display === 'block';
+                if (isOpen) {
+                    hideMenu();
+                } else {
+                    await showMenu();
+                }
             });
 
             // Mouse leave button - delay ẩn dropdown
@@ -314,17 +356,31 @@
             menu.appendChild(all);
         }
 
-        // Đếm và hiển thị badge
-        function loadUnreadCount() {
-            const unreadCount = notifications.filter(n => !n.isRead).length;
+        // Đếm và hiển thị badge (gọi API để tránh lệ thuộc biến notifications)
+        async function loadUnreadCount() {
             const badge = document.getElementById('notificationBadge');
-            if (badge) {
+            if (!badge) return;
+            try {
+                const resp = await fetch('/Customer/Notification/GetUnreadCount', { cache: 'no-store' });
+                if (!resp.ok) {
+                    console.warn('⚠️ loadUnreadCount response not OK:', resp.status);
+                    badge.style.display = 'none';
+                    return;
+                }
+                const data = await resp.json();
+                const unreadCount = data?.count ?? 0;
                 if (unreadCount > 0) {
                     badge.textContent = unreadCount;
                     badge.style.display = 'inline-block';
+                    badge.style.visibility = 'visible';
+                    badge.style.opacity = '1';
                 } else {
                     badge.style.display = 'none';
+                    badge.textContent = '0';
                 }
+            } catch (error) {
+                console.error('Error loadUnreadCount:', error);
+                badge.style.display = 'none';
             }
         }
 

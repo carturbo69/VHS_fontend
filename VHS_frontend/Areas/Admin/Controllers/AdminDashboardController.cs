@@ -18,6 +18,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
         private readonly PaymentManagementService _paymentService;
         private readonly ServiceManagementService _serviceManagementService;
         private readonly ProviderProfileService _providerProfileService;
+        private readonly AdminNotificationService _notificationService;
 
         public AdminDashboardController(
             CustomerAdminService customerService,
@@ -29,7 +30,8 @@ namespace VHS_frontend.Areas.Admin.Controllers
             CategoryAdminService categoryService,
             PaymentManagementService paymentService,
             ServiceManagementService serviceManagementService,
-            ProviderProfileService providerProfileService)
+            ProviderProfileService providerProfileService,
+            AdminNotificationService notificationService)
         {
             _customerService = customerService;
             _providerService = providerService;
@@ -41,6 +43,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
             _paymentService = paymentService;
             _serviceManagementService = serviceManagementService;
             _providerProfileService = providerProfileService;
+            _notificationService = notificationService;
         }
 
         public async Task<IActionResult> Index()
@@ -68,6 +71,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 _bookingService.SetBearerToken(token);
                 _feedbackService.SetBearerToken(token);
                 _paymentService.SetBearerToken(token);
+                _notificationService.SetBearerToken(token);
                 // provider services use token per call; handled inside services
             }
             
@@ -345,6 +349,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
             // Chuẩn hóa dữ liệu doanh thu: ngày nào không có thu nhập => 0
             var normalizedRevenueLabels = new List<string>();
             var normalizedRevenueData = new List<decimal>();
+            double revenueWeekChange = 0;
             try
             {
                 // Sử dụng revenueDays đã lấy ở trên
@@ -360,6 +365,27 @@ namespace VHS_frontend.Areas.Admin.Controllers
                     var day = start.AddDays(i).Date;
                     normalizedRevenueLabels.Add(day.ToString("dd/MM"));
                     normalizedRevenueData.Add(byDate.TryGetValue(day, out var rev) ? rev : 0m);
+                }
+                
+                // Tính % tăng trưởng doanh thu so với tuần trước (7 ngày)
+                if (chartDays == 7)
+                {
+                    var thisWeekRevenue = normalizedRevenueData.Sum();
+                    var lastWeekStart = start.AddDays(-7);
+                    var lastWeekEnd = start.AddDays(-1);
+                    
+                    var lastWeekRevenue = revenueChartData
+                        .Where(x => x.Date.Date >= lastWeekStart && x.Date.Date <= lastWeekEnd)
+                        .Sum(x => x.Revenue);
+                    
+                    if (lastWeekRevenue > 0)
+                    {
+                        revenueWeekChange = Math.Round((double)(thisWeekRevenue - lastWeekRevenue) / (double)lastWeekRevenue * 100, 1);
+                    }
+                    else if (thisWeekRevenue > 0)
+                    {
+                        revenueWeekChange = 100; // Tăng 100% nếu tuần trước = 0
+                    }
                 }
             }
             catch
@@ -470,6 +496,56 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase));
             var activeVouchers = vouchers.Count;
+            
+            // Tính % tăng trưởng khách hàng thật (so với tháng trước)
+            double customersChange = 0;
+            try
+            {
+                var now = DateTime.Now;
+                var thisMonthStart = new DateTime(now.Year, now.Month, 1);
+                var lastMonthStart = thisMonthStart.AddMonths(-1);
+                var lastMonthEnd = thisMonthStart.AddTicks(-1);
+                
+                var thisMonthCustomers = customers.Count(c => c.CreatedAt.HasValue && 
+                    c.CreatedAt.Value >= thisMonthStart && c.CreatedAt.Value <= now && !c.IsDeleted);
+                var lastMonthCustomers = customers.Count(c => c.CreatedAt.HasValue && 
+                    c.CreatedAt.Value >= lastMonthStart && c.CreatedAt.Value <= lastMonthEnd && !c.IsDeleted);
+                
+                if (lastMonthCustomers > 0)
+                {
+                    customersChange = Math.Round((double)(thisMonthCustomers - lastMonthCustomers) / lastMonthCustomers * 100, 1);
+                }
+                else if (thisMonthCustomers > 0)
+                {
+                    customersChange = 100; // Tăng 100% nếu tháng trước = 0
+                }
+            }
+            catch { customersChange = 0; }
+            
+            // Tính % tăng trưởng provider thật (so với tháng trước)
+            double providersChange = 0;
+            try
+            {
+                var now = DateTime.Now;
+                var thisMonthStart = new DateTime(now.Year, now.Month, 1);
+                var lastMonthStart = thisMonthStart.AddMonths(-1);
+                var lastMonthEnd = thisMonthStart.AddTicks(-1);
+                
+                var thisMonthProviders = providers.Count(p => p.CreatedAt.HasValue && 
+                    p.CreatedAt.Value >= thisMonthStart && p.CreatedAt.Value <= now && !p.IsDeleted);
+                var lastMonthProviders = providers.Count(p => p.CreatedAt.HasValue && 
+                    p.CreatedAt.Value >= lastMonthStart && p.CreatedAt.Value <= lastMonthEnd && !p.IsDeleted);
+                
+                if (lastMonthProviders > 0)
+                {
+                    providersChange = Math.Round((double)(thisMonthProviders - lastMonthProviders) / lastMonthProviders * 100, 1);
+                }
+                else if (thisMonthProviders > 0)
+                {
+                    providersChange = 100; // Tăng 100% nếu tháng trước = 0
+                }
+            }
+            catch { providersChange = 0; }
             
             // Tính toán dữ liệu booking/payment - Chỉ tính VNPAY đã thanh toán
             decimal todayRevenue = 0;
@@ -734,6 +810,53 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // keep default zeros
             }
             
+            // Tính toán thời gian 7 ngày gần đây (dùng cho Recent Activities)
+            // SỬA: Dùng giờ Việt Nam (UTC+7) để đảm bảo so sánh đúng với dữ liệu từ API
+            var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var vnNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+            var last7DaysStart = vnNow.AddDays(-7);
+            
+            System.Diagnostics.Debug.WriteLine($"[RecentActivities] VN Time Now: {vnNow:yyyy-MM-dd HH:mm:ss}");
+            System.Diagnostics.Debug.WriteLine($"[RecentActivities] Last 7 Days Start: {last7DaysStart:yyyy-MM-dd HH:mm:ss}");
+            
+            // Helper method để convert DateTime về giờ Việt Nam (giống như trong notification views)
+            // Database đã lưu theo giờ Việt Nam (Unspecified), nên không cần convert nữa
+            DateTime ToVietnamTime(DateTime dateTime)
+            {
+                try
+                {
+                    // Database đã lưu theo giờ Việt Nam (Unspecified kind)
+                    // Nếu là Unspecified hoặc Local -> đã là giờ Việt Nam rồi, không cần convert
+                    if (dateTime.Kind == DateTimeKind.Unspecified || dateTime.Kind == DateTimeKind.Local)
+                    {
+                        return dateTime;
+                    }
+                    
+                    // Chỉ convert nếu thực sự là UTC
+                    if (dateTime.Kind == DateTimeKind.Utc)
+                    {
+                        return TimeZoneInfo.ConvertTimeFromUtc(dateTime, vietnamTimeZone);
+                    }
+                    
+                    return dateTime;
+                }
+                catch
+                {
+                    // Fallback: nếu là UTC thì cộng 7 giờ, còn lại giữ nguyên
+                    if (dateTime.Kind == DateTimeKind.Utc)
+                    {
+                        return dateTime.AddHours(7);
+                    }
+                    return dateTime;
+                }
+            }
+            
+            DateTime? ToVietnamTimeNullable(DateTime? dateTime)
+            {
+                if (dateTime == null) return null;
+                return ToVietnamTime(dateTime.Value);
+            }
+            
             // Tạo Model với dữ liệu thật
             var model = new DashboardViewModel
             {
@@ -747,11 +870,11 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 OrdersProgress = CalculateOrdersProgress(todayOrders),
                 
                 ActiveCustomers = activeCustomers, // Dữ liệu thật
-                CustomersChange = CalculateCustomersChange(activeCustomers), // Tính toán % tăng trưởng thật
+                CustomersChange = customersChange, // % tăng trưởng thật (so với tháng trước)
                 CustomersProgress = CalculateCustomersProgress(activeCustomers), // Progress dựa trên mục tiêu
                 
                 ActiveProviders = activeProviders, // Dữ liệu thật
-                ProvidersChange = CalculateProvidersChange(activeProviders), // Tính toán % tăng trưởng thật
+                ProvidersChange = providersChange, // % tăng trưởng thật (so với tháng trước)
                 ProvidersProgress = CalculateProvidersProgress(activeProviders), // Progress dựa trên mục tiêu
                 
                 ActiveVouchers = activeVouchers, // Dữ liệu thật
@@ -767,6 +890,7 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // Charts Data - Dữ liệu thật từ API
                 RevenueChartData = normalizedRevenueData,
                 RevenueChartLabels = normalizedRevenueLabels,
+                RevenueWeekChange = revenueWeekChange, // % tăng trưởng doanh thu so với tuần trước
                 
                 OrdersChartData = normalizedOrdersData,
                 OrdersChartLabels = normalizedOrdersLabels,
@@ -789,159 +913,384 @@ namespace VHS_frontend.Areas.Admin.Controllers
                 // Rating Distribution - Dữ liệu 0 (chờ API thật)
                 RatingDistributions = ratingDistributions,
                 
-                // Recent Activities - Dữ liệu thật
-                RecentActivities = registerProviders.Take(3).Select((r, index) => new RecentActivity
-                {
-                    Title = string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
-                            string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase)
-                            ? "Đăng ký mới chờ duyệt" : 
-                            string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) || 
-                            string.Equals(r.Status, "Approved", StringComparison.OrdinalIgnoreCase)
-                            ? "Đăng ký đã được duyệt" : "Đăng ký bị từ chối",
-                    Description = $"{r.ProviderName} - {r.Description}",
-                    CreatedAt = r.CreatedAt ?? DateTime.Now,
-                    ActivityType = string.Equals(r.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
-                                   string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase)
-                                   ? "warning" : 
-                                   string.Equals(r.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) || 
-                                   string.Equals(r.Status, "Approved", StringComparison.OrdinalIgnoreCase)
-                                   ? "success" : "info"
-                }).ToList(),
+                // Recent Activities - Dữ liệu thật (chỉ lấy trong 7 ngày gần đây, sắp xếp theo thời gian mới nhất)
+                // Convert thời gian về VN timezone để so sánh đúng (giống như notification views)
+                RecentActivities = registerProviders
+                    .Select(r => 
+                    {
+                        var createdAt = r.CreatedAt ?? DateTime.MinValue;
+                        DateTime createdAtVN = createdAt;
+                        
+                        // Convert về VN timezone nếu cần (giống như notification views)
+                        if (createdAt != DateTime.MinValue)
+                        {
+                            createdAtVN = ToVietnamTime(createdAt);
+                        }
+                        
+                        return new { Provider = r, CreatedAtVN = createdAtVN };
+                    })
+                    .Where(x => x.CreatedAtVN >= last7DaysStart && x.CreatedAtVN <= vnNow) // Chỉ lấy trong 7 ngày gần đây
+                    .OrderByDescending(x => x.CreatedAtVN) // Sắp xếp theo thời gian mới nhất
+                    .Take(5) // Tăng lên 5 để có nhiều hoạt động đăng ký hơn
+                    .Select(x => new RecentActivity
+                    {
+                        Title = string.Equals(x.Provider.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
+                                string.Equals(x.Provider.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                                ? "Đăng ký mới chờ duyệt" : 
+                                string.Equals(x.Provider.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) || 
+                                string.Equals(x.Provider.Status, "Approved", StringComparison.OrdinalIgnoreCase)
+                                ? "Đăng ký đã được duyệt" : "Đăng ký bị từ chối",
+                        Description = $"{x.Provider.ProviderName} - {x.Provider.Description}",
+                        CreatedAt = x.CreatedAtVN,
+                        ActivityType = string.Equals(x.Provider.Status, "Đang chờ duyệt", StringComparison.OrdinalIgnoreCase) || 
+                                       string.Equals(x.Provider.Status, "Pending", StringComparison.OrdinalIgnoreCase)
+                                       ? "warning" : 
+                                       string.Equals(x.Provider.Status, "Đã duyệt", StringComparison.OrdinalIgnoreCase) || 
+                                       string.Equals(x.Provider.Status, "Approved", StringComparison.OrdinalIgnoreCase)
+                                       ? "success" : "info"
+                    }).ToList(),
                 
-                // Provider Registrations - Dữ liệu thật
+                // Provider Registrations - Dữ liệu thật (convert thời gian đúng)
                 ProviderRegistrations = registerProviders.Take(4).Select(r => new ProviderRegistration
                 {
                     Id = r.ProviderId,
                     CompanyName = r.ProviderName,
                     ServiceDescription = r.Description ?? "Không có mô tả",
-                    CreatedAt = r.CreatedAt ?? DateTime.Now,
+                    CreatedAt = r.CreatedAt.HasValue ? ToVietnamTime(r.CreatedAt.Value) : DateTime.Now,
                     Status = NormalizeStatus(r.Status)
                 }).ToList()
             };
             
             // Bổ sung hoạt động thanh toán vào RecentActivities
             var paymentActivities = new List<RecentActivity>();
+            
+            // Lấy thông báo "Thanh toán thành công" từ notification service
+            // Lấy TẤT CẢ notifications và filter trên client side để tìm payment-related notifications
+            try
+            {
+                // Lấy tất cả notifications (không filter theo NotificationType) để xem có gì
+                var (allNotifications, totalCount) = await _notificationService.GetListAsync(
+                    new VHS_frontend.Areas.Admin.Models.Notification.AdminNotificationQuery
+                    {
+                        // Không set NotificationType để lấy tất cả
+                    });
+                
+                Console.WriteLine($"[RecentActivities] 🔔 Total notifications from API: {totalCount} (Items: {allNotifications?.Count ?? 0})");
+                
+                if (allNotifications != null && allNotifications.Any())
+                {
+                    // Log tất cả NotificationType values để debug
+                    var notificationTypes = allNotifications.Select(n => n.NotificationType).Distinct().ToList();
+                    Console.WriteLine($"[RecentActivities] 🔔 NotificationType values found: {string.Join(", ", notificationTypes)}");
+                    
+                    // Log tất cả ReceiverRole values để debug
+                    var receiverRoles = allNotifications.Select(n => n.ReceiverRole).Distinct().ToList();
+                    Console.WriteLine($"[RecentActivities] 🔔 ReceiverRole values found: {string.Join(", ", receiverRoles)}");
+                    
+                    // Filter: Tìm các notification liên quan đến payment
+                    // Có thể là NotificationType = "Payment" hoặc content chứa "thanh toán"
+                    var paymentRelatedNotifications = allNotifications
+                        .Where(n => 
+                            (!string.IsNullOrWhiteSpace(n.NotificationType) && 
+                             (string.Equals(n.NotificationType, "Payment", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(n.NotificationType, "payment", StringComparison.OrdinalIgnoreCase))) ||
+                            (!string.IsNullOrWhiteSpace(n.Content) && 
+                             (n.Content.Contains("thanh toán", StringComparison.OrdinalIgnoreCase) ||
+                              n.Content.Contains("payment", StringComparison.OrdinalIgnoreCase) ||
+                              n.Content.Contains("paid", StringComparison.OrdinalIgnoreCase))))
+                        .ToList();
+                    
+                    Console.WriteLine($"[RecentActivities] 🔔 Payment-related notifications found: {paymentRelatedNotifications.Count}");
+                    
+                    // Filter: ReceiverRole == "Admin" (case-insensitive)
+                    var beforeFilter = paymentRelatedNotifications.Count;
+                    var afterReceiverRoleFilter = paymentRelatedNotifications
+                        .Where(n => !string.IsNullOrWhiteSpace(n.ReceiverRole) && 
+                                    string.Equals(n.ReceiverRole, "Admin", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    Console.WriteLine($"[RecentActivities] 🔔 After ReceiverRole=Admin filter: {beforeFilter} -> {afterReceiverRoleFilter.Count}");
+                    
+                    var paymentNotificationActivities = afterReceiverRoleFilter
+                        .Select(n => 
+                        {
+                            // Convert CreatedAt về VN timezone (giống như notification views)
+                            DateTime? createdAtVN = null;
+                            if (n.CreatedAt.HasValue)
+                            {
+                                createdAtVN = ToVietnamTime(n.CreatedAt.Value);
+                            }
+                            return new { Notification = n, CreatedAtVN = createdAtVN };
+                        })
+                        .Where(x => x.CreatedAtVN.HasValue && 
+                                    x.CreatedAtVN.Value >= last7DaysStart && 
+                                    x.CreatedAtVN.Value <= vnNow)
+                        .OrderByDescending(x => x.CreatedAtVN)
+                        .Take(15) // Lấy 15 thông báo thanh toán gần nhất
+                        .Select(x => new RecentActivity
+                        {
+                            Title = "Thanh toán thành công",
+                            Description = x.Notification.Content ?? "Thanh toán thành công",
+                            CreatedAt = x.CreatedAtVN!.Value,
+                            ActivityType = "payment"
+                        })
+                        .ToList();
+                    
+                    Console.WriteLine($"[RecentActivities] 🔔 Payment notifications after time filter (last7Days): {paymentNotificationActivities.Count}");
+                    if (paymentNotificationActivities.Any())
+                    {
+                        Console.WriteLine($"[RecentActivities]    First: {paymentNotificationActivities.First().CreatedAt:yyyy-MM-dd HH:mm} - {paymentNotificationActivities.First().Description}");
+                        Console.WriteLine($"[RecentActivities]    Last: {paymentNotificationActivities.Last().CreatedAt:yyyy-MM-dd HH:mm} - {paymentNotificationActivities.Last().Description}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[RecentActivities] ⚠️ No payment notifications in last 7 days (from {last7DaysStart:yyyy-MM-dd HH:mm} to {vnNow:yyyy-MM-dd HH:mm})");
+                        // Log một vài payment-related notifications để debug
+                        if (afterReceiverRoleFilter.Any())
+                        {
+                            var sample = afterReceiverRoleFilter.Take(3).ToList();
+                            foreach (var n in sample)
+                            {
+                                var sampleTime = n.CreatedAt.HasValue ? ToVietnamTime(n.CreatedAt.Value) : (DateTime?)null;
+                                var contentPreview = n.Content != null && n.Content.Length > 0 
+                                    ? n.Content.Substring(0, Math.Min(50, n.Content.Length)) 
+                                    : "null";
+                                Console.WriteLine($"[RecentActivities]    Sample notification: Type={n.NotificationType}, Role={n.ReceiverRole}, CreatedAt={sampleTime:yyyy-MM-dd HH:mm}, Content={contentPreview}");
+                            }
+                        }
+                    }
+                    
+                    paymentActivities.AddRange(paymentNotificationActivities);
+                }
+                else
+                {
+                    Console.WriteLine($"[RecentActivities] ⚠️ No notifications found or allNotifications is null/empty");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RecentActivities] ❌ Error getting payment notifications: {ex.Message}");
+                Console.WriteLine($"[RecentActivities]    Stack trace: {ex.StackTrace}");
+                // Không làm gián đoạn quá trình, chỉ log lỗi
+            }
+            
+            // Lấy hoạt động rút tiền và hoàn tiền
             if (recentWithdrawals != null && recentWithdrawals.Any())
             {
-                paymentActivities.AddRange(recentWithdrawals.Select(w => new RecentActivity
-                {
-                    Title = string.Equals(w.Status, "Completed", StringComparison.OrdinalIgnoreCase)
-                        ? "Rút tiền đã hoàn tất" : "Rút tiền bị từ chối",
-                    Description = $"{w.ProviderName} - {w.Amount:N0} VND",
-                    CreatedAt = w.ProcessedDate ?? w.RequestDate,
-                    ActivityType = string.Equals(w.Status, "Completed", StringComparison.OrdinalIgnoreCase) ? "success" : "warning"
-                }));
+                paymentActivities.AddRange(recentWithdrawals
+                    .Select(w => 
+                    {
+                        var activityTime = w.ProcessedDate ?? w.RequestDate;
+                        var activityTimeVN = ToVietnamTime(activityTime);
+                        return new { Withdrawal = w, ActivityTimeVN = activityTimeVN };
+                    })
+                    .Where(x => x.ActivityTimeVN >= last7DaysStart && x.ActivityTimeVN <= vnNow)
+                    .OrderByDescending(x => x.ActivityTimeVN) // Đảm bảo sắp xếp theo thời gian mới nhất
+                    .Select(x => new RecentActivity
+                    {
+                        Title = string.Equals(x.Withdrawal.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+                            ? "Rút tiền đã hoàn tất" : "Rút tiền bị từ chối",
+                        Description = $"{x.Withdrawal.ProviderName} - {x.Withdrawal.Amount:N0} VND",
+                        CreatedAt = x.ActivityTimeVN,
+                        ActivityType = string.Equals(x.Withdrawal.Status, "Completed", StringComparison.OrdinalIgnoreCase) ? "success" : "warning"
+                    }));
             }
             if (recentApprovedRefunds != null && recentApprovedRefunds.Any())
             {
-                paymentActivities.AddRange(recentApprovedRefunds.Select(rf => new RecentActivity
-                {
-                    Title = "Hoàn tiền cho đơn hàng",
-                    Description = $"{rf.CustomerName} - {rf.ServiceName} - {rf.PaymentAmount:N0} VND",
-                    CreatedAt = rf.PaymentCreatedAt ?? rf.BookingDate,
-                    ActivityType = "info"
-                }));
+                paymentActivities.AddRange(recentApprovedRefunds
+                    .Select(rf => 
+                    {
+                        var activityTime = rf.PaymentCreatedAt ?? rf.BookingDate;
+                        var activityTimeVN = ToVietnamTime(activityTime);
+                        return new { Refund = rf, ActivityTimeVN = activityTimeVN };
+                    })
+                    .Where(x => x.ActivityTimeVN >= last7DaysStart && x.ActivityTimeVN <= vnNow)
+                    .OrderByDescending(x => x.ActivityTimeVN) // Đảm bảo sắp xếp theo thời gian mới nhất
+                    .Select(x => new RecentActivity
+                    {
+                        Title = "Hoàn tiền cho đơn hàng",
+                        Description = $"{x.Refund.CustomerName} - {x.Refund.ServiceName} - {x.Refund.PaymentAmount:N0} VND",
+                        CreatedAt = x.ActivityTimeVN,
+                        ActivityType = "info"
+                    }));
             }
             
             // Bổ sung hoạt động "Thanh toán thành công" và "Đơn hàng mới" từ bookings
             var bookingActivities = new List<RecentActivity>();
             try
             {
-                // Lấy bookings trong 7 ngày gần đây (mở rộng để bắt được nhiều đơn hàng hơn)
-                var last7DaysStart = DateTime.Now.AddDays(-7);
-                var now = DateTime.Now;
+                // Lấy bookings trong 90 ngày gần đây (mở rộng để bắt được nhiều bookings hơn, bao gồm cả những booking có payment gần đây)
+                // Lưu ý: API filter theo BookingTime, nhưng chúng ta cần lấy các booking có payment gần đây
+                // Nên mở rộng thời gian lên 90 ngày để đảm bảo không bỏ sót các booking có payment gần đây
+                var extendedStartDate = vnNow.AddDays(-90); // Mở rộng lên 90 ngày
                 var bookingFilter = new VHS_frontend.Areas.Admin.Models.Booking.AdminBookingFilterDTO
                 {
-                    FromDate = last7DaysStart,
-                    ToDate = now,
+                    FromDate = extendedStartDate,
+                    ToDate = vnNow,
                     PageNumber = 1,
-                    PageSize = 200 // Tăng số lượng để lấy được nhiều hơn
+                    PageSize = 500 // Tăng lên 500 để lấy được nhiều hơn, đảm bảo không bỏ sót
                 };
                 var recentBookings = await _bookingService.GetAllBookingsAsync(bookingFilter);
                 
                 if (recentBookings != null && recentBookings.Items != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"📦 Total bookings fetched: {recentBookings.Items.Count}");
-                    
-                    // Lấy các booking có thanh toán thành công (PaymentStatus = Paid/Completed) trong 7 ngày
-                    var paidBookings = recentBookings.Items
-                        .Where(b => !string.IsNullOrWhiteSpace(b.PaymentStatus) &&
-                                    (b.PaymentStatus.Contains("Paid", StringComparison.OrdinalIgnoreCase) ||
-                                     b.PaymentStatus.Contains("Completed", StringComparison.OrdinalIgnoreCase) ||
-                                     b.PaymentStatus.Contains("Đã thanh toán", StringComparison.OrdinalIgnoreCase)))
-                        .Select(b => new
-                        {
-                            Booking = b,
-                            ActivityTime = (b.CreatedAt != default(DateTime) && b.CreatedAt.Year > 2000) ? b.CreatedAt : b.BookingTime
-                        })
-                        .Where(x => x.ActivityTime >= last7DaysStart)
-                        .OrderByDescending(x => x.ActivityTime)
-                        .Take(5)
-                        .ToList();
-                    
-                    System.Diagnostics.Debug.WriteLine($"💰 Paid bookings found: {paidBookings.Count}");
-                    
-                    bookingActivities.AddRange(paidBookings.Select(x => new RecentActivity
-                    {
-                        Title = "Thanh toán thành công",
-                        Description = $"{x.Booking.CustomerName ?? "Khách hàng"} - {x.Booking.ServiceName ?? "Dịch vụ"} - {x.Booking.Amount:N0} VND",
-                        CreatedAt = x.ActivityTime,
-                        ActivityType = "success"
-                    }));
+                    Console.WriteLine($"[RecentActivities] 📦 Total bookings fetched: {recentBookings.Items.Count}");
                     
                     // Lấy các đơn hàng mới (Status = Pending, linh hoạt hơn trong kiểm tra)
+                    // Sử dụng CreatedAt (thời gian tạo booking trong database)
                     var allNewBookings = recentBookings.Items
-                        .Select(b => new
+                        .Select(b => 
                         {
-                            Booking = b,
-                            ActivityTime = (b.CreatedAt != default(DateTime) && b.CreatedAt.Year > 2000) ? b.CreatedAt : b.BookingTime,
-                            StatusLower = (b.Status ?? "").Trim().ToLower()
+                            // Sử dụng CreatedAt (thời gian tạo booking trong database)
+                            // Convert về VN timezone (giống như notification views)
+                            DateTime createdAtVN = ToVietnamTime(b.CreatedAt);
+                            
+                            // Sử dụng CreatedAt (thời gian tạo booking trong database)
+                            var activityTime = (createdAtVN != default(DateTime) && createdAtVN.Year > 2000) ? createdAtVN : vnNow;
+                            
+                            return new
+                            {
+                                Booking = b,
+                                ActivityTime = activityTime,
+                                StatusLower = (b.Status ?? "").Trim().ToLower()
+                            };
                         })
                         .Where(x => !string.IsNullOrWhiteSpace(x.Booking.Status) &&
                                     (x.StatusLower.Contains("pending") ||
                                      x.StatusLower.Contains("chờ") ||
                                      x.StatusLower == "pending" ||
                                      x.StatusLower == "chờ xử lý") &&
-                                    x.ActivityTime >= last7DaysStart)
+                                    x.ActivityTime >= last7DaysStart && x.ActivityTime <= vnNow)
                         .OrderByDescending(x => x.ActivityTime)
                         .Take(10) // Lấy nhiều hơn để có thể filter thêm
                         .ToList();
                     
-                    System.Diagnostics.Debug.WriteLine($"🆕 New bookings (Pending) found: {allNewBookings.Count}");
+                    Console.WriteLine($"[RecentActivities] 🆕 New bookings (Pending) found: {allNewBookings.Count}");
                     if (allNewBookings.Any())
                     {
-                        System.Diagnostics.Debug.WriteLine($"   First booking: Status='{allNewBookings.First().Booking.Status}', CreatedAt={allNewBookings.First().ActivityTime:yyyy-MM-dd HH:mm}");
+                        Console.WriteLine($"[RecentActivities]    First booking: Status='{allNewBookings.First().Booking.Status}', CreatedAt={allNewBookings.First().ActivityTime:yyyy-MM-dd HH:mm}");
+                        Console.WriteLine($"[RecentActivities]    Last booking: Status='{allNewBookings.Last().Booking.Status}', CreatedAt={allNewBookings.Last().ActivityTime:yyyy-MM-dd HH:mm}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[RecentActivities]    ⚠️ No new bookings found in the last 7 days");
                     }
                     
-                    // Chỉ lấy 5 đơn hàng mới nhất để tránh quá tải
-                    var newBookings = allNewBookings.Take(5).ToList();
+                    // Lấy nhiều đơn hàng mới hơn để hiển thị đầy đủ
+                    var newBookings = allNewBookings.Take(8).ToList();
                     
                     bookingActivities.AddRange(newBookings.Select(x => new RecentActivity
                     {
                         Title = "Đơn hàng mới",
                         Description = $"{x.Booking.CustomerName ?? "Khách hàng"} - {x.Booking.ServiceName ?? "Dịch vụ"} - {x.Booking.Amount:N0} VND",
                         CreatedAt = x.ActivityTime,
-                        ActivityType = "info"
+                        ActivityType = "new-order"
                     }));
+                    
+                    Console.WriteLine($"[RecentActivities] ✅ Added {newBookings.Count} new order activities");
+                    
+                    // Lấy các đơn hàng bị hủy (Status = Canceled/Cancelled/Đã hủy)
+                    // Sử dụng CreatedAt (thời gian tạo booking trong database)
+                    var canceledBookings = recentBookings.Items
+                        .Select(b => 
+                        {
+                            // Sử dụng CreatedAt (thời gian tạo booking trong database)
+                            // Convert về VN timezone (giống như notification views)
+                            DateTime createdAtVN = ToVietnamTime(b.CreatedAt);
+                            
+                            // Sử dụng CreatedAt (thời gian tạo booking trong database)
+                            var activityTime = (createdAtVN != default(DateTime) && createdAtVN.Year > 2000) ? createdAtVN : vnNow;
+                            
+                            return new
+                            {
+                                Booking = b,
+                                ActivityTime = activityTime,
+                                StatusLower = (b.Status ?? "").Trim().ToLower()
+                            };
+                        })
+                        .Where(x => !string.IsNullOrWhiteSpace(x.Booking.Status) &&
+                                    (x.StatusLower.Contains("cancel") ||
+                                     x.StatusLower.Contains("hủy") ||
+                                     x.StatusLower == "canceled" ||
+                                     x.StatusLower == "cancelled" ||
+                                     x.StatusLower == "đã hủy") &&
+                                    x.ActivityTime >= last7DaysStart && x.ActivityTime <= vnNow)
+                        .OrderByDescending(x => x.ActivityTime)
+                        .Take(8) // Tăng lên 8 để có nhiều hoạt động hủy đơn hơn
+                        .ToList();
+                    
+                    Console.WriteLine($"[RecentActivities] ❌ Canceled bookings found: {canceledBookings.Count}");
+                    if (canceledBookings.Any())
+                    {
+                        Console.WriteLine($"[RecentActivities]    First canceled: Status='{canceledBookings.First().Booking.Status}', CreatedAt={canceledBookings.First().ActivityTime:yyyy-MM-dd HH:mm}");
+                        Console.WriteLine($"[RecentActivities]    Last canceled: Status='{canceledBookings.Last().Booking.Status}', CreatedAt={canceledBookings.Last().ActivityTime:yyyy-MM-dd HH:mm}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[RecentActivities]    ⚠️ No canceled bookings found in the last 7 days");
+                    }
+                    
+                    bookingActivities.AddRange(canceledBookings.Select(x => new RecentActivity
+                    {
+                        Title = "Đơn hàng bị hủy",
+                        Description = $"{x.Booking.CustomerName ?? "Khách hàng"} - {x.Booking.ServiceName ?? "Dịch vụ"} - {x.Booking.Amount:N0} VND",
+                        CreatedAt = x.ActivityTime,
+                        ActivityType = "error" // Dùng error để hiển thị màu đỏ
+                    }));
+                    
+                    Console.WriteLine($"[RecentActivities] ✅ Added {canceledBookings.Count} canceled order activities");
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("⚠️ RecentBookings is null or Items is null");
+                    Console.WriteLine("[RecentActivities] ⚠️ RecentBookings is null or Items is null");
                 }
             }
             catch (Exception ex)
             {
                 // Log error nhưng không làm gián đoạn quá trình
-                System.Diagnostics.Debug.WriteLine($"❌ Error getting booking activities: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"   Stack trace: {ex.StackTrace}");
+                Console.WriteLine($"[RecentActivities] ❌ Error getting booking activities: {ex.Message}");
+                Console.WriteLine($"[RecentActivities]    Stack trace: {ex.StackTrace}");
             }
             
-            model.RecentActivities = model.RecentActivities
+            // Debug: Log số lượng từng loại hoạt động trước khi gộp
+            var providerRegCount = model.RecentActivities.Count;
+            var paymentCount = paymentActivities.Count;
+            var bookingCount = bookingActivities.Count;
+            Console.WriteLine($"[RecentActivities] 📋 Activities before merge:");
+            Console.WriteLine($"[RecentActivities]    Provider Registrations: {providerRegCount}");
+            Console.WriteLine($"[RecentActivities]    Payment Activities: {paymentCount}");
+            Console.WriteLine($"[RecentActivities]    Booking Activities (new + canceled): {bookingCount}");
+            
+            // Gộp tất cả hoạt động và sắp xếp theo thời gian mới nhất (CreatedAt giảm dần)
+            var allActivities = model.RecentActivities
                 .Concat(paymentActivities)
                 .Concat(bookingActivities)
-                .OrderByDescending(a => a.CreatedAt)
-                .Take(6)
                 .ToList();
+            
+            Console.WriteLine($"[RecentActivities] 📋 Total activities before sorting: {allActivities.Count}");
+            
+            // Sắp xếp theo thời gian mới nhất
+            model.RecentActivities = allActivities
+                .OrderByDescending(a => a.CreatedAt) // Sắp xếp theo thời gian mới nhất
+                .Take(15) // Tăng lên 15 để hiển thị nhiều hoạt động hơn (view đã có scroll)
+                .ToList();
+            
+            Console.WriteLine($"[RecentActivities] 📋 Final Recent Activities count: {model.RecentActivities.Count}");
+            if (model.RecentActivities.Any())
+            {
+                Console.WriteLine($"[RecentActivities]    Newest: {model.RecentActivities.First().CreatedAt:yyyy-MM-dd HH:mm} - {model.RecentActivities.First().Title} ({model.RecentActivities.First().ActivityType})");
+                Console.WriteLine($"[RecentActivities]    Oldest: {model.RecentActivities.Last().CreatedAt:yyyy-MM-dd HH:mm} - {model.RecentActivities.Last().Title} ({model.RecentActivities.Last().ActivityType})");
+                
+                // Log breakdown by type
+                var byType = model.RecentActivities.GroupBy(a => a.ActivityType).ToList();
+                foreach (var group in byType)
+                {
+                    Console.WriteLine($"[RecentActivities]    {group.Key}: {group.Count()} activities");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[RecentActivities] ⚠️ No recent activities found after merge!");
+            }
             
             // ==== Build Monthly Revenue (default last 6 months, optional 12 months by year) ====
             try
@@ -1029,80 +1378,9 @@ namespace VHS_frontend.Areas.Admin.Controllers
             return View(model);
         }
         
-        private List<ServiceDistribution> CalculateServiceDistribution(int totalCustomers)
-        {
-            if (totalCustomers == 0)
-            {
-                return new List<ServiceDistribution>
-                {
-                    new ServiceDistribution { ServiceName = "Vệ sinh nhà cửa", Count = 0, Percentage = 0 },
-                    new ServiceDistribution { ServiceName = "Sửa chữa điện", Count = 0, Percentage = 0 },
-                    new ServiceDistribution { ServiceName = "Làm vườn", Count = 0, Percentage = 0 },
-                    new ServiceDistribution { ServiceName = "Dịch vụ khác", Count = 0, Percentage = 0 }
-                };
-            }
-            
-            // Tính Count dựa trên tỷ lệ thực tế
-            var cleaningCount = Math.Max(totalCustomers * 35 / 100, 1);
-            var electricalCount = Math.Max(totalCustomers * 25 / 100, 1);
-            var gardeningCount = Math.Max(totalCustomers * 20 / 100, 1);
-            var otherCount = Math.Max(totalCustomers * 20 / 100, 1);
-            
-            var totalCount = cleaningCount + electricalCount + gardeningCount + otherCount;
-            
-            return new List<ServiceDistribution>
-            {
-                new ServiceDistribution 
-                { 
-                    ServiceName = "Vệ sinh nhà cửa", 
-                    Count = cleaningCount, 
-                    Percentage = Math.Round((double)cleaningCount / totalCount * 100, 1)
-                },
-                new ServiceDistribution 
-                { 
-                    ServiceName = "Sửa chữa điện", 
-                    Count = electricalCount, 
-                    Percentage = Math.Round((double)electricalCount / totalCount * 100, 1)
-                },
-                new ServiceDistribution 
-                { 
-                    ServiceName = "Làm vườn", 
-                    Count = gardeningCount, 
-                    Percentage = Math.Round((double)gardeningCount / totalCount * 100, 1)
-                },
-                new ServiceDistribution 
-                { 
-                    ServiceName = "Dịch vụ khác", 
-                    Count = otherCount, 
-                    Percentage = Math.Round((double)otherCount / totalCount * 100, 1)
-                }
-            };
-        }
+        // Đã xóa CalculateServiceDistribution - thay bằng BuildServiceDistributionFromCategories (dữ liệu thật từ API)
         
-        private double CalculateCustomersChange(int currentCustomers)
-        {
-            if (currentCustomers == 0) return 0;
-            
-            // Logic tính % tăng trưởng dựa trên số khách hàng hiện tại
-            if (currentCustomers >= 100) return 25.5;      // 100+ khách = tăng 25.5%
-            if (currentCustomers >= 50) return 18.7;       // 50-99 khách = tăng 18.7%
-            if (currentCustomers >= 20) return 12.3;       // 20-49 khách = tăng 12.3%
-            if (currentCustomers >= 10) return 8.5;        // 10-19 khách = tăng 8.5%
-            if (currentCustomers >= 5) return 5.2;         // 5-9 khách = tăng 5.2%
-            return 2.1;                                     // 1-4 khách = tăng 2.1%
-        }
-        
-        private double CalculateProvidersChange(int currentProviders)
-        {
-            if (currentProviders == 0) return 0;
-            
-            // Logic tính % tăng trưởng dựa trên số provider hiện tại
-            if (currentProviders >= 50) return 22.8;      // 50+ provider = tăng 22.8%
-            if (currentProviders >= 20) return 15.6;       // 20-49 provider = tăng 15.6%
-            if (currentProviders >= 10) return 9.3;       // 10-19 provider = tăng 9.3%
-            if (currentProviders >= 5) return 4.7;       // 5-9 provider = tăng 4.7%
-            return 1.8;                                     // 1-4 provider = tăng 1.8%
-        }
+        // Đã xóa CalculateCustomersChange và CalculateProvidersChange - thay bằng tính toán thật từ dữ liệu
         
         private double CalculateCustomersProgress(int currentCustomers)
         {
