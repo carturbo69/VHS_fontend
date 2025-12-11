@@ -295,10 +295,27 @@
                         @($"{days} ngày qua");
                     }</h3>
                     <div class="chart-summary">
-                        <span class="summary-item">
-                            <i class="bi bi-arrow-up text-success"></i>
-                            <span>Tăng 12.5%</span>
-                        </span>
+                        @if (Model.RevenueWeekChange > 0)
+                        {
+                            <span class="summary-item">
+                                <i class="bi bi-arrow-up text-success"></i>
+                                <span>Tăng @Model.RevenueWeekChange.ToString("F1")%</span>
+                            </span>
+                        }
+                        else if (Model.RevenueWeekChange < 0)
+                        {
+                            <span class="summary-item">
+                                <i class="bi bi-arrow-down text-danger"></i>
+                                <span>Giảm @Math.Abs(Model.RevenueWeekChange).ToString("F1")%</span>
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="summary-item">
+                                <i class="bi bi-dash text-muted"></i>
+                                <span>Không đổi</span>
+                            </span>
+                        }
                         <span class="summary-item">
                             <i class="bi bi-calendar"></i>
                             <span>So với tuần trước</span>
@@ -373,11 +390,38 @@
             <div class="activity-list">
                 @if (Model.RecentActivities != null && Model.RecentActivities.Any())
                 {
-                    @foreach (var activity in Model.RecentActivities.Take(3))
+                    @foreach (var activity in Model.RecentActivities)
                     {
+                        string iconClass = "info-circle";
+                        // Xử lý rõ ràng từng loại ActivityType
+                        if (activity.ActivityType == "payment")
+                        {
+                            iconClass = "credit-card"; // Icon cho thanh toán thành công
+                        }
+                        else if (activity.ActivityType == "new-order")
+                        {
+                            iconClass = "cart-plus"; // Icon cho đơn hàng mới
+                        }
+                        else if (activity.ActivityType == "error" || activity.ActivityType == "danger")
+                        {
+                            iconClass = "x-circle"; // Icon màu đỏ cho hủy đơn
+                        }
+                        else if (activity.ActivityType == "warning")
+                        {
+                            iconClass = "exclamation-triangle";
+                        }
+                        else if (activity.ActivityType == "success")
+                        {
+                            iconClass = activity.Title.Contains("Thanh toán") ? "credit-card" : "check-circle";
+                        }
+                        else if (activity.Title.Contains("Đơn hàng mới") || activity.Title.Contains("Đặt đơn"))
+                        {
+                            iconClass = "cart-plus";
+                        }
+                        
                         <div class="activity-item">
                             <div class="activity-icon @activity.ActivityType">
-                                <i class="bi bi-@(activity.ActivityType == "success" ? "check-circle" : activity.ActivityType == "warning" ? "exclamation-triangle" : "info-circle")"></i>
+                                <i class="bi bi-@iconClass"></i>
                             </div>
                             <div class="activity-content">
                                 <div class="activity-title">@activity.Title</div>
@@ -400,7 +444,7 @@
 
         <div class="provider-registrations-container">
             <div class="provider-registrations-header">
-                <h3><i class="bi bi-clipboard-check"></i> Đăng ký Provider</h3>
+                <h3><i class="bi bi-clipboard-check"></i> Đăng ký nhà cung cấp</h3>
                 <a asp-area="Admin" asp-controller="AdminRegisterProvider" asp-action="Index" class="btn btn-sm btn-outline-primary">Xem tất cả</a>
             </div>
             <div class="provider-registrations-list">

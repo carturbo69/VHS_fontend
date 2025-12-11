@@ -107,13 +107,14 @@
                                         @* Hiển thị non-textarea options trước *@
                                         @foreach (var option in nonTextareaOptions)
                                         {
+                                            var displayValue = FormatOptionValue(option.Value);
                                             <div style="font-size: 0.9375rem; color: #6c757d; margin-bottom: 0.25rem;">
                                                 <div style="display: flex; align-items: flex-start;">
                                                     <i class="bi bi-check-circle-fill me-1" style="color: #198754; font-size: 0.75rem; margin-top: 0.125rem; flex-shrink: 0;"></i>
                                                     <div style="flex: 1; min-width: 0;">
                                                         @if (!string.IsNullOrWhiteSpace(option.Value))
                                                         {
-                                                            <span>@option.OptionName<span class="text-muted"> (@option.Value)</span></span>
+                                                            <span>@option.OptionName<span class="text-muted"> (@displayValue)</span></span>
                                                         }
                                                         else
                                                         {
@@ -127,6 +128,7 @@
                                         @* Hiển thị textarea options sau cùng *@
                                         @foreach (var option in textareaOptions)
                                         {
+                                            var displayValue = FormatOptionValue(option.Value);
                                             var isTextarea = option.Type?.ToLower() == "textarea" || option.Type?.ToLower() == "text";
                                             <div style="font-size: 0.9375rem; color: #6c757d; margin-bottom: 0.25rem;">
                                                 <div style="display: flex; align-items: flex-start;">
@@ -173,12 +175,12 @@
                                                                 else
                                                                 {
                                                                     @* Nếu chỉ có một dòng, hiển thị OptionName (Value) *@
-                                                                    <span>@option.OptionName<span class="text-muted"> (@option.Value)</span></span>
+                                                                    <span>@option.OptionName<span class="text-muted"> (@displayValue)</span></span>
                                                                 }
                                                             }
                                                             else
                                                             {
-                                                                <span>@option.OptionName<span class="text-muted"> (@option.Value)</span></span>
+                                                                <span>@option.OptionName<span class="text-muted"> (@displayValue)</span></span>
                                                             }
                                                         }
                                                         else
@@ -1581,6 +1583,21 @@
             "rejected" => "Đã từ chối",
             _ => paymentStatus
         };
+    }
+
+    // Loại bỏ cặp ngoặc ngoài cùng nếu Value đã có sẵn để tránh hiển thị ((...))
+    string FormatOptionValue(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return string.Empty;
+
+        var trimmed = raw.Trim();
+        if (trimmed.Length >= 2 && trimmed.StartsWith("(") && trimmed.EndsWith(")"))
+        {
+            trimmed = trimmed.Substring(1, trimmed.Length - 2).Trim();
+        }
+
+        return trimmed;
     }
 }
 
